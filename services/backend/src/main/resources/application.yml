@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: fitness-coaching-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fitness_coaching}
+    username: ${DATABASE_USERNAME:fitness_app}
+    password: ${DATABASE_PASSWORD:change-me}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  port: ${BACKEND_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

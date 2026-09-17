@@ -1,0 +1,20 @@
+{
+  "name": "ai-integrated-personalized-online-fitness-coaching-system",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/admin-web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "npm --prefix apps/mobile run start",
+    "dev:admin": "npm run dev --workspace=@fitness-coaching/admin-web",
+    "lint:mobile": "npm --prefix apps/mobile run lint",
+    "typecheck:mobile": "npm --prefix apps/mobile run typecheck",
+    "lint:admin": "npm run lint --workspace=@fitness-coaching/admin-web",
+    "build:admin": "npm run build --workspace=@fitness-coaching/admin-web"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

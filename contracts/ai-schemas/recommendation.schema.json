@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/recommendation.schema.json",
+  "title": "AI Recommendation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recommendationType",
+    "summary",
+    "reasoning",
+    "usedData",
+    "missingData",
+    "confidence",
+    "suggestedActions"
+  ],
+  "properties": {
+    "recommendationType": { "type": "string" },
+    "summary": { "type": "string", "minLength": 1 },
+    "reasoning": { "type": "array", "items": { "type": "string" } },
+    "usedData": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "missingData": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "suggestedActions": { "type": "array", "items": { "type": "object" } }
+  }
+}
