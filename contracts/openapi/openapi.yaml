@@ -1,0 +1,708 @@
+openapi: 3.1.0
+info:
+  title: AI Integrated Personalized Online Fitness Coaching System API
+  version: 0.1.0
+  description: >-
+    Executable REST contract for Phase 1 Milestone 1 Identity and Common
+    Account. Spring Boot is the business authority. Creating a Trainer Profile
+    or submitting a Trainer Application does not grant coaching authority.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+tags:
+  - name: Authentication
+  - name: Current User
+  - name: Student Profile
+  - name: Trainer Profile
+  - name: Trainer Application
+
+paths:
+  /auth/registrations:
+    post:
+      tags: [Authentication]
+      operationId: registerUser
+      summary: Register one common User Account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created and email verification required
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          $ref: '#/components/responses/EmailAlreadyRegistered'
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/email-verifications/confirmations:
+    post:
+      tags: [Authentication]
+      operationId: confirmEmail
+      summary: Confirm a registered email using a one-time token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmEmailRequest'
+      responses:
+        '204': { description: Email confirmed }
+        '400':
+          $ref: '#/components/responses/InvalidOrExpiredOneTimeToken'
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/sessions:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Create an authenticated session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '403':
+          $ref: '#/components/responses/AccountUnavailable'
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      tags: [Authentication]
+      operationId: logoutCurrentSession
+      summary: Revoke the current refresh-token session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204': { description: Session revoked or already inactive }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /auth/token-refreshes:
+    post:
+      tags: [Authentication]
+      operationId: refreshSession
+      summary: Rotate a refresh token and issue a new token pair
+      description: >-
+        The presented refresh token is invalidated when rotation succeeds.
+        Reuse of a revoked/replaced token is rejected and audited.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token rotated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          $ref: '#/components/responses/InvalidRefreshToken'
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /users/me:
+    get:
+      tags: [Current User]
+      operationId: getCurrentUser
+      summary: Get the authenticated User and activated capabilities
+      responses:
+        '200':
+          description: Current User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    patch:
+      tags: [Current User]
+      operationId: updateCurrentUser
+      summary: Update mutable account preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCurrentUserRequest'
+      responses:
+        '200':
+          description: Updated User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /student-profiles:
+    post:
+      tags: [Student Profile]
+      operationId: createStudentProfile
+      summary: Activate the Student capability on the current account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertStudentProfileRequest'
+      responses:
+        '201':
+          description: Student Profile created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentProfileResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: The current User already has a Student Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /student-profiles/me:
+    get:
+      tags: [Student Profile]
+      operationId: getMyStudentProfile
+      summary: Get the current User's Student Profile
+      responses:
+        '200':
+          description: Student Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentProfileResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ProfileNotFound' }
+    patch:
+      tags: [Student Profile]
+      operationId: updateMyStudentProfile
+      summary: Update the current User's Student Profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertStudentProfileRequest'
+      responses:
+        '200':
+          description: Updated Student Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentProfileResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ProfileNotFound' }
+
+  /trainer-profiles:
+    post:
+      tags: [Trainer Profile]
+      operationId: createTrainerProfile
+      summary: Create a Trainer Profile without granting coaching authority
+      description: >-
+        Coaching authority remains unavailable until verification, activity,
+        and applicable policy conditions are all satisfied.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertTrainerProfileRequest'
+      responses:
+        '201':
+          description: Trainer Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfileResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: The current User already has a Trainer Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /trainer-profiles/me:
+    get:
+      tags: [Trainer Profile]
+      operationId: getMyTrainerProfile
+      summary: Get the current User's Trainer Profile and eligibility state
+      responses:
+        '200':
+          description: Trainer Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfileResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ProfileNotFound' }
+    patch:
+      tags: [Trainer Profile]
+      operationId: updateMyTrainerProfile
+      summary: Update mutable Trainer Profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertTrainerProfileRequest'
+      responses:
+        '200':
+          description: Updated Trainer Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfileResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ProfileNotFound' }
+
+  /trainer-applications:
+    post:
+      tags: [Trainer Application]
+      operationId: submitTrainerApplication
+      summary: Submit the current Trainer Profile for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTrainerApplicationRequest'
+      responses:
+        '201':
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerApplicationResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: A Trainer Profile must exist first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: An active application already exists or the transition is invalid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /trainer-applications/me/current:
+    get:
+      tags: [Trainer Application]
+      operationId: getMyCurrentTrainerApplication
+      summary: Get the current Trainer Application
+      responses:
+        '200':
+          description: Current application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerApplicationResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: No Trainer Application exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthenticated:
+      description: Authentication is missing or invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCredentials:
+      description: Email or password is invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AccountUnavailable:
+      description: Account state does not permit login
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidRefreshToken:
+      description: Refresh token is invalid, expired, revoked, or reused
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidOrExpiredOneTimeToken:
+      description: One-time token is invalid, expired, or already consumed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    EmailAlreadyRegistered:
+      description: Email already belongs to an account
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ProfileNotFound:
+      description: Requested capability profile does not exist for this User
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        preferredLocale:
+          type: string
+          default: vi-VN
+          maxLength: 16
+        timezone:
+          type: string
+          default: Asia/Ho_Chi_Minh
+          maxLength: 64
+
+    RegistrationResponse:
+      type: object
+      required: [user, verificationRequired]
+      properties:
+        user: { $ref: '#/components/schemas/UserSummary' }
+        verificationRequired: { type: boolean, const: true }
+
+    ConfirmEmailRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 20
+          maxLength: 512
+          writeOnly: true
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+        deviceName: { type: string, maxLength: 200 }
+
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20, maxLength: 2048, writeOnly: true }
+        deviceName: { type: string, maxLength: 200 }
+
+    LogoutRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20, maxLength: 2048, writeOnly: true }
+
+    TokenPairResponse:
+      type: object
+      required: [tokenType, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, user]
+      properties:
+        tokenType: { type: string, const: Bearer }
+        accessToken: { type: string }
+        accessTokenExpiresAt: { type: string, format: date-time }
+        refreshToken: { type: string }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/CurrentUserResponse' }
+
+    UserSummary:
+      type: object
+      required: [id, email, displayName, status, preferredLocale, timezone, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        status: { $ref: '#/components/schemas/AccountStatus' }
+        preferredLocale: { type: string }
+        timezone: { type: string }
+        emailVerifiedAt:
+          type: [string, 'null']
+          format: date-time
+        createdAt: { type: string, format: date-time }
+
+    CurrentUserResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          required: [roles, capabilities, settings]
+          properties:
+            phoneNumber: { type: [string, 'null'], maxLength: 32 }
+            roles:
+              type: array
+              uniqueItems: true
+              items: { $ref: '#/components/schemas/RoleCode' }
+            capabilities:
+              type: object
+              required: [hasStudentProfile, hasTrainerProfile, canCoach]
+              properties:
+                hasStudentProfile: { type: boolean }
+                hasTrainerProfile: { type: boolean }
+                canCoach:
+                  type: boolean
+                  description: Derived result; not a stored role or permanent profile property.
+            settings: { $ref: '#/components/schemas/UserSettings' }
+
+    UpdateCurrentUserRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 160 }
+        phoneNumber: { type: [string, 'null'], maxLength: 32 }
+        preferredLocale: { type: string, maxLength: 16 }
+        timezone: { type: string, maxLength: 64 }
+        settings: { $ref: '#/components/schemas/UpdateUserSettings' }
+
+    UserSettings:
+      type: object
+      required: [weekStartsOn, measurementSystem, accessibilityPreferences, privacyPreferences]
+      properties:
+        weekStartsOn: { type: integer, minimum: 0, maximum: 6 }
+        measurementSystem: { $ref: '#/components/schemas/MeasurementSystem' }
+        accessibilityPreferences: { type: object, additionalProperties: true }
+        privacyPreferences: { type: object, additionalProperties: true }
+
+    UpdateUserSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        weekStartsOn: { type: integer, minimum: 0, maximum: 6 }
+        measurementSystem: { $ref: '#/components/schemas/MeasurementSystem' }
+        accessibilityPreferences: { type: object, additionalProperties: true }
+        privacyPreferences: { type: object, additionalProperties: true }
+
+    UpsertStudentProfileRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        dateOfBirth: { type: [string, 'null'], format: date }
+        gender: { oneOf: [{ $ref: '#/components/schemas/Gender' }, { type: 'null' }] }
+        trainingExperienceLevel:
+          oneOf: [{ $ref: '#/components/schemas/TrainingExperienceLevel' }, { type: 'null' }]
+        trainingExperienceMonths: { type: [number, 'null'], minimum: 0 }
+        availableDaysPerWeek: { type: [integer, 'null'], minimum: 1, maximum: 7 }
+        preferredSessionMinutes: { type: [integer, 'null'], minimum: 5, maximum: 480 }
+        onboardingCompleted: { type: boolean, default: false }
+
+    StudentProfileResponse:
+      type: object
+      additionalProperties: false
+      required: [userId, createdAt, updatedAt]
+      properties:
+        userId: { type: string, format: uuid }
+        dateOfBirth: { type: [string, 'null'], format: date }
+        gender: { oneOf: [{ $ref: '#/components/schemas/Gender' }, { type: 'null' }] }
+        trainingExperienceLevel:
+          oneOf: [{ $ref: '#/components/schemas/TrainingExperienceLevel' }, { type: 'null' }]
+        trainingExperienceMonths: { type: [number, 'null'], minimum: 0 }
+        availableDaysPerWeek: { type: [integer, 'null'], minimum: 1, maximum: 7 }
+        preferredSessionMinutes: { type: [integer, 'null'], minimum: 5, maximum: 480 }
+        onboardingCompleted: { type: boolean }
+        onboardingCompletedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    UpsertTrainerProfileRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        publicSlug:
+          type: [string, 'null']
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          maxLength: 100
+        bio: { type: [string, 'null'], maxLength: 4000 }
+        yearsExperience: { type: [number, 'null'], minimum: 0, maximum: 99.99 }
+        acceptingStudents: { type: boolean, default: false }
+
+    TrainerProfileResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - verificationStatus
+        - activityStatus
+        - coachingEligibility
+        - createdAt
+        - updatedAt
+      properties:
+        userId: { type: string, format: uuid }
+        publicSlug: { type: [string, 'null'] }
+        bio: { type: [string, 'null'] }
+        yearsExperience: { type: [number, 'null'] }
+        acceptingStudents: { type: boolean }
+        verificationStatus: { $ref: '#/components/schemas/TrainerVerificationStatus' }
+        activityStatus: { $ref: '#/components/schemas/TrainerActivityStatus' }
+        coachingEligibility: { $ref: '#/components/schemas/CoachingEligibility' }
+        verifiedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CoachingEligibility:
+      type: object
+      required: [eligible, blockingReasons]
+      properties:
+        eligible:
+          type: boolean
+          description: Derived from verification, activity, policy, and later relationship scope.
+        blockingReasons:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - PROFILE_NOT_FOUND
+              - APPLICATION_NOT_SUBMITTED
+              - VERIFICATION_PENDING
+              - VERIFICATION_REJECTED
+              - VERIFICATION_EXPIRED
+              - VERIFICATION_REVOKED
+              - ACTIVITY_SUSPENDED
+              - ACTIVITY_INACTIVE
+              - POLICY_RESTRICTION
+
+    SubmitTrainerApplicationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        certificateIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        documentMediaIds:
+          type: array
+          uniqueItems: true
+          description: Optional identifiers of media uploaded through an authorized media workflow.
+          items: { type: string, format: uuid }
+        applicantNote: { type: [string, 'null'], maxLength: 2000 }
+
+    TrainerApplicationResponse:
+      type: object
+      required: [id, trainerId, status, submittedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/TrainerVerificationStatus' }
+        submittedAt: { type: string, format: date-time }
+        reviewedAt: { type: [string, 'null'], format: date-time }
+        rejectionReason: { type: [string, 'null'] }
+        updatedAt: { type: string, format: date-time }
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message, timestamp, requestId, fieldErrors]
+      properties:
+        errorCode:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          examples: [VALIDATION_FAILED]
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+        requestId: { type: string }
+        fieldErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code: { type: string }
+        message: { type: string }
+
+    AccountStatus:
+      type: string
+      enum: [PENDING_VERIFICATION, ACTIVE, SUSPENDED, DISABLED, DELETION_PENDING, DELETED]
+    RoleCode:
+      type: string
+      enum: [STUDENT, TRAINER, ADMIN]
+    MeasurementSystem:
+      type: string
+      enum: [METRIC, IMPERIAL]
+    Gender:
+      type: string
+      enum: [MALE, FEMALE, NON_BINARY, OTHER, PREFER_NOT_TO_SAY]
+    TrainingExperienceLevel:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+    TrainerVerificationStatus:
+      type: string
+      enum: [NOT_SUBMITTED, PENDING, APPROVED, REJECTED, EXPIRED, REVOKED]
+    TrainerActivityStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, SUSPENDED]
+
+security:
+  - bearerAuth: []

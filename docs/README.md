@@ -16,14 +16,15 @@ The documentation describes the target product. The roadmap controls delivery or
 8. [API conventions](05-api/README.md)
 9. [UI and UX documentation](06-ui-ux/README.md)
 10. [Development guide](07-development/setup.md)
-11. [AI subsystem](08-ai/README.md)
-12. [Security and operations](09-security-operations/README.md)
-13. [Source traceability](source-traceability.md)
+11. [Phase 1 implementation plan](07-development/phase-1-implementation-plan.md)
+12. [AI subsystem](08-ai/README.md)
+13. [Security and operations](09-security-operations/README.md)
+14. [Source traceability](source-traceability.md)
 
 ## Sources of truth
 
 - PostgreSQL is the source of truth for normalized business data.
-- Flyway migrations in `database/migrations` are the executable schema history.
+- Flyway migrations in `services/backend/src/main/resources/db/migration` are the executable schema history.
 - OpenAPI and event schemas in `contracts` are executable interface contracts.
 - These documents define product intent, invariants, ownership, and implementation constraints.
 - `AGENTS.md` defines repository-wide instructions for coding agents.
@@ -42,4 +43,3 @@ If implementation and documentation disagree, do not silently choose one. Verify
 - Missing data is unknown, never zero.
 - Progress Engine produces validated signals before AI context is built.
 - Appointment, Planned Workout, and Actual Workout have independent lifecycles.
-

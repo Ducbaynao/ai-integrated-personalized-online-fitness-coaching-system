@@ -8,10 +8,12 @@ apps/
   admin-web/          React/Vite application for Administrator
 services/
   backend/            Spring Boot modular monolith and business authority
+    src/main/resources/db/migration/
+                      Executable Flyway schema history
   ai-service/         FastAPI AI, RAG, rule, and vision workloads
 packages/             Shared TypeScript packages for client applications
 contracts/            OpenAPI, WebSocket, and AI structured-output contracts
-database/             Flyway migrations, seed data, and executable DB assets
+database/             Database design, seed data, backup, and recovery guidance
 infrastructure/       Local/deployment infrastructure configuration
 docs/                 Product and engineering documentation
 tools/                Repository tooling and scripts
@@ -19,8 +21,9 @@ tools/                Repository tooling and scripts
 
 ## Where changes belong
 
-- Product intent, domain rules, lifecycles, and architecture: `docs`.
-- Executable database changes: `database/migrations`.
+- Product intent, domain rules, lifecycles, architecture, and delivery plan: `docs`.
+- Executable database changes: `services/backend/src/main/resources/db/migration`.
+- Database domain map, seed data, and recovery guidance: `database`.
 - API/event/model contracts: `contracts`.
 - Business logic, authorization, transactions, and orchestration: `services/backend`.
 - Model prompts, retrieval, structured-output adapters, evaluation, and Python AI integrations: `services/ai-service`.
@@ -37,13 +40,13 @@ Cross-module behavior uses published interfaces, application services, or events
 
 Before implementing a feature:
 
-1. Identify the owning domain and decision authority.
-2. Read the corresponding docs and repository/component `AGENTS.md`.
-3. Check whether the change introduces a lifecycle transition, version, effective date, permission, audit event, or contract change.
-4. Update Flyway migration instead of relying on schema auto-generation.
-5. Update OpenAPI/event/structured-output contracts when interfaces change.
-6. Add unit, integration, authorization, and lifecycle tests for changed rules.
-7. Update documentation when product behavior changes.
+1. Locate the feature milestone in `phase-1-implementation-plan.md`.
+2. Identify the owning domain and decision authority.
+3. Read the corresponding docs and repository/component `AGENTS.md`.
+4. Check whether the change introduces a lifecycle transition, version, effective date, permission, audit event, or contract change.
+5. Update Flyway migration instead of relying on schema auto-generation.
+6. Update OpenAPI/event/structured-output contracts when interfaces change.
+7. Add unit, integration, authorization, and lifecycle tests for changed rules.
+8. Update documentation and traceability when product behavior changes.
 
 Avoid duplicating the full product description inside source-code comments. Comments should explain local implementation reasoning and link to the relevant domain document when necessary.
-
