@@ -1,20 +1,41 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
+    container_name: digital-fitness-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-fitness_coaching}
+      POSTGRES_DB: ${POSTGRES_DB:-digital_fitness}
       POSTGRES_USER: ${POSTGRES_USER:-fitness_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      TZ: UTC
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitness_app} -d ${POSTGRES_DB:-fitness_coaching}"]
-      interval: 10s
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fitness_app} -d ${POSTGRES_DB:-digital_fitness}"
+        ]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 20
+
+  flyway:
+    image: flyway/flyway:11
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/backend/src/main/resources/db/migration:/flyway/sql:ro
+    command:
+      - "-url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-digital_fitness}"
+      - "-user=${POSTGRES_USER:-fitness_app}"
+      - "-password=${POSTGRES_PASSWORD:-change-me}"
+      - "-schemas=fitness"
+      - "-defaultSchema=fitness"
+      - "-connectRetries=60"
+      - "migrate"
 
   redis:
     image: redis:7-alpine
