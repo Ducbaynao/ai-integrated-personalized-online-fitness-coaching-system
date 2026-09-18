@@ -2,15 +2,22 @@ spring:
   application:
     name: fitness-coaching-backend
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fitness_coaching}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/digital_fitness}
     username: ${DATABASE_USERNAME:fitness_app}
     password: ${DATABASE_PASSWORD:change-me}
+    hikari:
+      schema: fitness
   jpa:
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: fitness
     open-in-view: false
   flyway:
     enabled: true
+    schemas: fitness
+    default-schema: fitness
 
 server:
   port: ${BACKEND_PORT:8080}
