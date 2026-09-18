@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Backend and Data"
+  short_description: "Build Spring modules APIs and persistence"

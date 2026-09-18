@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Measurement and Progress"
+  short_description: "Build measurements progress and attention signals"

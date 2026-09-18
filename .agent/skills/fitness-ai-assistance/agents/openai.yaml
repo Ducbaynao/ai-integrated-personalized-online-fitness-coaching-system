@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness AI Assistance"
+  short_description: "Build governed AI recommendations and RAG"

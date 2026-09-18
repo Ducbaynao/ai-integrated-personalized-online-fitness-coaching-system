@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Scheduling and Collaboration"
+  short_description: "Build appointments chat and notifications"

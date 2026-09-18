@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Admin Web"
+  short_description: "Build the permission-scoped Admin interface"

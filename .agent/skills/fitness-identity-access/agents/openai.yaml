@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Identity and Access"
+  short_description: "Build accounts roles consent and authorization"

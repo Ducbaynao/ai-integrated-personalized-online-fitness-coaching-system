@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fitness Advanced Sensing"
+  short_description: "Build pose and health-device integrations"
