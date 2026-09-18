@@ -1,8 +1,27 @@
 # Database documentation
 
-- PostgreSQL is the system of record.
-- Flyway owns schema evolution.
-- pgvector supports retrieval for versioned knowledge content.
-- Media bytes stay in object storage; PostgreSQL stores metadata and object references.
+PostgreSQL is the system of record for normalized business data. pgvector supports retrieval for versioned Knowledge Chunks. Redis stores cache and temporary state. Object storage holds binary media while PostgreSQL stores ownership, type, size, object key, and lifecycle metadata.
+
+## Documentation and executable schema
+
+- This directory explains the data model and migration rules.
+- `database/migrations` contains executable Flyway migrations.
 - Applied migrations are immutable.
-- Backup procedures must include periodic restore tests.
+- Entity/table names in design documents are conceptual until a migration and code contract establish the physical name.
+
+## Data groups
+
+- identity, roles, permissions, sessions, and account lifecycle;
+- Student and Trainer profiles, applications, verification, certifications, capacity, and availability;
+- Fitness Goals, Targets, Proposals, Versions, and Transitions;
+- Coaching Relationships, Periods, and Data Sharing Permissions;
+- Exercise/content catalog and media references;
+- Workout Plans/Versions, Planned Workouts, Actual Workouts, and set logs;
+- Appointments, recurrence, Change Requests, conflicts, and supervision;
+- Metric Definitions, Measurements, sources, validation, quality, integrations, and continuity;
+- Progress signals, review cycles, and Attention Signals;
+- Nutrition Goals, Proposals, Target Versions, Daily Targets/Overrides, Meals, and Food Logs;
+- chat, notification, AI metadata, Knowledge, moderation, support, audit, jobs, and configuration.
+
+See [data model](data-model.md) and [migration guidelines](migration-guidelines.md).
+
