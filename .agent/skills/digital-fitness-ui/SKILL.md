@@ -9,7 +9,7 @@ Build interfaces that match the product's coaching, fitness, nutrition, AI, and 
 
 ## Required workflow
 
-1. Read `../../../docs/ux-ui/README.md`, `design-principles.md`, `design-tokens.md`, and `component-specifications.md`.
+1. Read `../../../docs/06-ui-ux/README.md`, `design-principles.md`, `design-tokens.md`, and `component-specifications.md`.
 2. Identify the actor and surface: Student Mobile, Trainer Mobile, or Admin Web.
 3. Read the matching actor flow and screen specification.
 4. Locate the screen ID in `screen-inventory.md` and relevant row in `references/traceability-matrix.md`.
@@ -20,9 +20,9 @@ Build interfaces that match the product's coaching, fitness, nutrition, AI, and 
 
 ## Routing
 
-- Student work: read `../../../docs/ux-ui/student/student-flows.md` and `student-screens.md`.
-- Trainer work: read `../../../docs/ux-ui/trainer/trainer-flows.md` and `trainer-screens.md`.
-- Admin work: read `../../../docs/ux-ui/admin/admin-flows.md` and `admin-screens.md`.
+- Student work: read `../../../docs/06-ui-ux/student/student-flows.md` and `student-screens.md`.
+- Trainer work: read `../../../docs/06-ui-ux/trainer/trainer-flows.md` and `trainer-screens.md`.
+- Admin work: read `../../../docs/06-ui-ux/admin/admin-flows.md` and `admin-screens.md`.
 - New navigation or screen: also update `screen-inventory.md` and `references/traceability-matrix.md`.
 - New reusable component or token: update its specification and code token source in the same change.
 - Implementation planning: read [implementation workflow](references/implementation-workflow.md).
@@ -43,4 +43,4 @@ If a request conflicts with these rules, explain the conflict and request a prod
 
 ## Visual direction
 
-Follow `../../../docs/ux-ui/references/superfit-reference.md`: DM Sans, purple brand, light canvas, rounded cards, generous spacing, and clear metric cards. Do not copy template branding, images, wording, navigation, or simplified goal model.
+Follow `../../../docs/06-ui-ux/references/superfit-reference.md`: DM Sans, purple brand, light canvas, rounded cards, generous spacing, and clear metric cards. Do not copy template branding, images, wording, navigation, or simplified goal model.

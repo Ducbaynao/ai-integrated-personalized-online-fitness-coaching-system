@@ -20,5 +20,5 @@ Component được khuyến nghị:
 - TimelineEvent
 - EmptyState
 
-API và trạng thái của component được mô tả tại `docs/ux-ui/component-specifications.md`.
+API và trạng thái của component được mô tả tại `docs/06-ui-ux/component-specifications.md`.
 
