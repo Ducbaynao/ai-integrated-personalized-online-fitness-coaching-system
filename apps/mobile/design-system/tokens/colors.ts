@@ -1,0 +1,45 @@
+export const colors = {
+  brand: {
+    50: '#F4F0FF',
+    100: '#E9E0FF',
+    300: '#B9A1FF',
+    500: '#6D3DF5',
+    600: '#5B2EEA',
+    700: '#4720C7',
+  },
+  neutral: {
+    0: '#FFFFFF',
+    50: '#F8F9FC',
+    100: '#F0F2F7',
+    200: '#E1E5EC',
+    300: '#CBD1DC',
+    500: '#7B8496',
+    700: '#3B4252',
+    900: '#151822',
+  },
+  success: { 100: '#DDF7EA', 600: '#159A61' },
+  warning: { 100: '#FFF3D6', 600: '#D88800' },
+  danger: { 100: '#FFE2E3', 600: '#D9434E' },
+} as const;
+
+export const semanticColors = {
+  canvas: colors.neutral[50],
+  surface: colors.neutral[0],
+  surfaceSubtle: colors.neutral[100],
+  primary: colors.brand[600],
+  primaryPressed: colors.brand[700],
+  brandSoft: colors.brand[50],
+  aiSurface: colors.brand[100],
+  textPrimary: colors.neutral[900],
+  textSecondary: colors.neutral[500],
+  textOnPrimary: colors.neutral[0],
+  border: colors.neutral[200],
+  borderStrong: colors.neutral[300],
+  successSurface: colors.success[100],
+  successText: colors.success[600],
+  warningSurface: colors.warning[100],
+  warningText: colors.warning[600],
+  dangerSurface: colors.danger[100],
+  dangerText: colors.danger[600],
+} as const;
+

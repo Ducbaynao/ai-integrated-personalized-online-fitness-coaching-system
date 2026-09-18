@@ -1,0 +1,5 @@
+interface:
+  display_name: "Digital Fitness UI"
+  short_description: "Build product-accurate fitness coaching UI"
+  brand_color: "#5B2EEA"
+  default_prompt: "Use $digital-fitness-ui to design or implement this screen according to the product rules and shared design system."
