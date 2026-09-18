@@ -4,8 +4,9 @@ PostgreSQL is the system of record for normalized business data. pgvector suppor
 
 ## Documentation and executable schema
 
-- This directory explains the data model and migration rules.
-- `database/migrations` contains executable Flyway migrations.
+- This directory explains the conceptual data model and migration rules.
+- `services/backend/src/main/resources/db/migration` contains executable Flyway migrations.
+- `database/design/domain-map.md` maps physical tables to business boundaries and authority.
 - Applied migrations are immutable.
 - Entity/table names in design documents are conceptual until a migration and code contract establish the physical name.
 
@@ -24,4 +25,3 @@ PostgreSQL is the system of record for normalized business data. pgvector suppor
 - chat, notification, AI metadata, Knowledge, moderation, support, audit, jobs, and configuration.
 
 See [data model](data-model.md) and [migration guidelines](migration-guidelines.md).
-
