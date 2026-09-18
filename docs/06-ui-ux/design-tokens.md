@@ -1,6 +1,6 @@
 # Design Tokens
 
-Token triển khai mẫu nằm tại `mobile/src/design-system/tokens`. Mọi component phải lấy giá trị từ token thay vì hardcode.
+Token triển khai mẫu nằm tại `apps/mobile/src/design-system/tokens`. Mọi component phải lấy giá trị từ token thay vì hardcode.
 
 ## Màu
 

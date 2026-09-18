@@ -21,7 +21,7 @@ const required = [
   'docs/06-ui-ux/admin/admin-screens.md',
   'docs/06-ui-ux/references/traceability-matrix.md',
   'docs/06-ui-ux/references/source-section-map.md',
-  'mobile/src/design-system/tokens/index.ts',
+  'apps/mobile/src/design-system/tokens/index.ts',
 ];
 
 const failures = [];
