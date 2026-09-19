@@ -33,3 +33,25 @@
 
 - Follow `apps/mobile/AGENTS.md` before changing Expo code.
 - Add component-specific `AGENTS.md` files only when the component needs additional rules.
+
+
+## Git safety
+
+- Coding agents may inspect Git using read-only commands such as
+  `git status`, `git diff`, `git log`, and `git show`.
+- Do not run `git add`, `git commit`, `git commit --amend`, `git push`,
+  `git pull`, `git fetch`, `git merge`, `git rebase`, `git cherry-pick`,
+  `git revert`, `git stash`, `git switch`, `git checkout`, `git reset`,
+  `git restore`, `git clean`, or create/delete branches or tags unless the
+  user explicitly requests that exact Git operation.
+- Do not modify `.git`, Git hooks, Git configuration, remotes, credentials,
+  branch tracking, submodules, or worktrees.
+- Never rewrite Git history or force-push.
+- Never discard, overwrite, stage, or commit existing user changes.
+- Implementation requests authorize working-tree file changes only. They do
+  not authorize staging, committing, pushing, pulling, or changing branches.
+- Before making changes, inspect `git status --short`.
+- After making changes, report `git status --short`, changed files, tests run,
+  and any unrelated pre-existing changes.
+- The user remains responsible for reviewing, staging, committing, and
+  pushing changes unless they explicitly delegate one of those operations.
