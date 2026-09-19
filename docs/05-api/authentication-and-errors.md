@@ -49,3 +49,14 @@ Examples include:
 
 Errors should state what the caller can do next without revealing unrelated data. The `requestId` must correlate API, backend, AI-service, and operational logs.
 
+## Rate limiting status
+
+Rate limiting (`429 Too Many Requests`) and its accompanying `Retry-After` response header are fully defined in `contracts/openapi/openapi.yaml`. Active enforcement is assigned to Milestone M8 / infrastructure reverse proxy and Redis token-bucket rate limiter. For the M1A identity and email verification slice, 429 rate limiting remains deferred while the error contract and status mapping remain reserved.
+
+## Email verification delivery status
+
+In Milestone M1A, email verification delivery is implemented as follows:
+- **Local Development**: The simulated email sender bean `DevelopmentVerificationEmailSender` requires explicit activation via the `dev` profile (`spring.profiles.active=dev`). It simulates verification dispatch without logging plaintext tokens.
+- **Testing**: Test suites explicitly activate the `test` profile (`@ActiveProfiles("test")`), which provides a dedicated in-memory capturing adapter (`TestVerificationEmailSender`).
+- **Production & Default Environments**: The default/production configuration does not register a fallback or dummy email sender. If a production-ready mail provider is not configured, Spring Boot will fail fast at startup to prevent silent message loss.
+- **Post-Commit Delivery & Deferrals**: M1A dispatches verification emails post-commit to ensure transaction integrity. If dispatch fails, the system increments the Micrometer metric `auth.email.verification.delivery.failures` and logs a structured warning. External durable outbox delivery, persistent retry queues, and user-initiated resend workflows are deferred to Milestone M1B/M2. M1A is explicitly **not production-email-ready**.

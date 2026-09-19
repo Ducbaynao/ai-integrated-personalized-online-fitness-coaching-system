@@ -41,10 +41,19 @@ npm run dev:admin
 
 ## 6. Start Backend
 
+Windows:
 ```powershell
 cd services\backend
-.\mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
+
+Unix:
+```bash
+cd services/backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+The `dev` profile explicitly activates the simulated verification-email adapter (`DevelopmentVerificationEmailSender`). Default and production profiles intentionally fail fast at startup if no real `VerificationEmailPort` is configured, preventing silent message loss. The simulated adapter masks recipient email addresses and does not expose or log plaintext verification tokens. Milestone M1A is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
 
 ## 7. Start AI Service
 

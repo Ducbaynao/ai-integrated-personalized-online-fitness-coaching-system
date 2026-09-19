@@ -38,18 +38,26 @@ Start local infrastructure:
 docker compose up -d
 ```
 
-Run an application:
-
 ```bash
 npm run dev:mobile
 npm run dev:admin
 ```
 
-```bash
-cd services/backend
-./mvnw spring-boot:run
+Start Backend (Windows):
+```powershell
+cd services\backend
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
+Start Backend (Unix):
+```bash
+cd services/backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+The `dev` profile activates the simulated verification-email adapter. Default and production startup intentionally fail fast when no real `VerificationEmailPort` is configured, preventing silent message loss. The simulated adapter masks recipient addresses and does not expose or log plaintext verification tokens. Note that M1A is not production-email-ready (durable outbox delivery and external provider integration are deferred).
+
+Start AI Service:
 ```bash
 cd services/ai-service
 python -m venv .venv
@@ -57,6 +65,6 @@ python -m pip install -e ".[dev]"
 fastapi dev app/main.py
 ```
 
-On Windows, use `mvnw.cmd` instead of `./mvnw` and `.venv\\Scripts\\python.exe` for the virtual environment interpreter.
+On Windows, use `.venv\Scripts\python.exe` for the virtual environment interpreter.
 
 See `docs/07-development/setup.md` for the complete setup sequence.

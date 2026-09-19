@@ -18,6 +18,9 @@ spring:
     enabled: true
     schemas: fitness
     default-schema: fitness
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
 
 server:
   port: ${BACKEND_PORT:8080}
