@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.common.config.ClockConfig;
 import com.fitnesscoaching.platform.common.config.SecurityConfig;
 import com.fitnesscoaching.platform.common.exception.EmailAlreadyRegisteredException;
 import com.fitnesscoaching.platform.common.exception.GlobalExceptionHandler;
+import com.fitnesscoaching.platform.common.exception.InvalidCredentialsException;
 import com.fitnesscoaching.platform.common.exception.InvalidOrExpiredTokenException;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.ConfirmEmailRequest;
@@ -14,7 +15,16 @@ import com.fitnesscoaching.platform.modules.auth.application.port.in.ConfirmEmai
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUserCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUserResult;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUserUseCase;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LoginUseCase;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.RefreshSessionUseCase;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.TokenPairResult;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.auth.domain.UserAccountRecord;
+import com.fitnesscoaching.platform.modules.user.application.model.CurrentUserView;
+import com.fitnesscoaching.platform.modules.user.application.model.UserCapabilitiesView;
+import com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView;
+
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +33,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -45,7 +56,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AuthController.class)
-@Import({SecurityConfig.class, ClockConfig.class, GlobalExceptionHandler.class, RequestIdFilter.class, com.fitnesscoaching.platform.common.config.JacksonConfig.class})
+@Import({
+        SecurityConfig.class,
+        com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint.class,
+        com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler.class,
+        ClockConfig.class,
+        GlobalExceptionHandler.class,
+        RequestIdFilter.class,
+        com.fitnesscoaching.platform.common.config.JacksonConfig.class
+})
 class AuthControllerUnitTest {
 
     @Autowired
@@ -59,6 +78,15 @@ class AuthControllerUnitTest {
 
     @MockitoBean
     private ConfirmEmailUseCase confirmEmailUseCase;
+
+    @MockitoBean
+    private LoginUseCase loginUseCase;
+
+    @MockitoBean
+    private RefreshSessionUseCase refreshSessionUseCase;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Test
     @DisplayName("POST /api/v1/auth/registrations returns 201 with Location header and user summary")
@@ -260,5 +288,64 @@ class AuthControllerUnitTest {
                 .andExpect(jsonPath("$.timestamp", notNullValue()))
                 .andExpect(jsonPath("$.requestId", notNullValue()))
                 .andExpect(jsonPath("$.fieldErrors", empty()));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/sessions returns the token pair and safe current-user projection")
+    void loginReturnsTokenPair() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-09-19T10:00:00Z");
+        Instant verifiedAt = Instant.parse("2026-09-19T11:00:00Z");
+        CurrentUserView user = new CurrentUserView(
+                userId, "active@example.com", "Active User", AccountStatus.ACTIVE,
+                "vi-VN", "Asia/Ho_Chi_Minh", verifiedAt, createdAt, null, List.of("STUDENT"),
+                new UserCapabilitiesView(true, false, false),
+                UserSettingsView.defaults()
+        );
+        when(loginUseCase.login(any())).thenReturn(new TokenPairResult(
+                "access.jwt.value", Instant.parse("2026-09-19T12:15:00Z"),
+                "raw-refresh-token-with-more-than-20-chars", Instant.parse("2026-10-19T12:00:00Z"), user));
+
+        mockMvc.perform(post("/api/v1/auth/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"active@example.com","password":"StrongPassword123!","deviceName":"Pixel 9"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType", is("Bearer")))
+                .andExpect(jsonPath("$.accessToken", is("access.jwt.value")))
+                .andExpect(jsonPath("$.refreshToken", is("raw-refresh-token-with-more-than-20-chars")))
+                .andExpect(jsonPath("$.user.id", is(userId.toString())))
+                .andExpect(jsonPath("$.user.roles[0]", is("STUDENT")))
+                .andExpect(jsonPath("$.user.capabilities.hasStudentProfile", is(true)))
+                .andExpect(jsonPath("$.user.capabilities.canCoach", is(false)))
+                .andExpect(jsonPath("$.user.settings.measurementSystem", is("METRIC")))
+                .andExpect(jsonPath("$.user.passwordHash").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/sessions returns stable 401 for invalid credentials")
+    void loginInvalidCredentialsReturns401() throws Exception {
+        when(loginUseCase.login(any())).thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(post("/api/v1/auth/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"unknown@example.com","password":"WrongPassword123!"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_CREDENTIALS")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/token-refreshes rejects unknown JSON properties")
+    void refreshRejectsUnknownProperties() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"refresh-token-with-more-than-20-chars","role":"ADMINISTRATOR"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
     }
 }

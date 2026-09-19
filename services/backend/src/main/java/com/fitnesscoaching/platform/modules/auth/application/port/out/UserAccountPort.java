@@ -17,4 +17,6 @@ public interface UserAccountPort {
     Optional<UserAccountRecord> findById(UUID id);
 
     int activatePendingUser(UUID userId, Instant now);
+
+    int updateLastLogin(UUID userId, Instant now);
 }

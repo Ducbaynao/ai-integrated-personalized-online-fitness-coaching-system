@@ -99,6 +99,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ErrorResponse.of(
+                "INVALID_CREDENTIALS", ex.getMessage(), Instant.now(clock), RequestIdHolder.get()));
+    }
+
+    @ExceptionHandler(AccountUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAccountUnavailable(AccountUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "ACCOUNT_UNAVAILABLE", ex.getMessage(), Instant.now(clock), RequestIdHolder.get()));
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ErrorResponse.of(
+                "INVALID_REFRESH_TOKEN", ex.getMessage(), Instant.now(clock), RequestIdHolder.get()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
@@ -122,6 +140,18 @@ public class GlobalExceptionHandler {
                 Collections.emptyList()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "ACCESS_DENIED",
+                "Access is denied.",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(Exception.class)

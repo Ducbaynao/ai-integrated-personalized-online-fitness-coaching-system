@@ -545,9 +545,9 @@ class UserRegistrationAndVerificationIntegrationTest {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk());
 
-        // Other actuator paths require authentication (403 Forbidden for anonymous)
+        // Other actuator paths require Bearer authentication.
         mockMvc.perform(get("/actuator/info"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

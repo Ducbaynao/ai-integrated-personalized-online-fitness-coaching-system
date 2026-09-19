@@ -30,3 +30,10 @@ management:
     web:
       exposure:
         include: health,info
+
+auth:
+  jwt:
+    issuer: ${JWT_ISSUER:fitness-coaching-backend}
+    secret: ${JWT_SECRET:}
+    access-token-ttl: ${ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${REFRESH_TOKEN_TTL:P30D}

@@ -44,6 +44,11 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
         return repository.activatePendingUser(userId, now);
     }
 
+    @Override
+    public int updateLastLogin(UUID userId, Instant now) {
+        return repository.updateLastLogin(userId, now);
+    }
+
     private UserAccountRecord toRecord(UserAccountEntity entity) {
         return new UserAccountRecord(
                 entity.getId(),

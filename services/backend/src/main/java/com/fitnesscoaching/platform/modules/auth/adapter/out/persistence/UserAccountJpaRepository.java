@@ -22,4 +22,8 @@ public interface UserAccountJpaRepository extends JpaRepository<UserAccountEntit
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "UPDATE fitness.users SET status = 'ACTIVE', email_verified_at = :now, updated_at = :now WHERE id = :userId AND status = 'PENDING_VERIFICATION'", nativeQuery = true)
     int activatePendingUser(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE fitness.users SET last_login_at = :now, updated_at = :now WHERE id = :userId", nativeQuery = true)
+    int updateLastLogin(@Param("userId") UUID userId, @Param("now") Instant now);
 }

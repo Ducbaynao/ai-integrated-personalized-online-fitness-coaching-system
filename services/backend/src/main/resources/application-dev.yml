@@ -8,3 +8,7 @@ spring:
 logging:
   level:
     com.fitnesscoaching.platform: DEBUG
+
+auth:
+  jwt:
+    secret: dev-only-jwt-secret-change-before-production-1234567890

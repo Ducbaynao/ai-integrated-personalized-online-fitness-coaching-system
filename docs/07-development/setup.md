@@ -4,6 +4,8 @@
 
 Copy `.env.example` to `.env` and replace development credentials.
 
+For any non-`dev` backend profile, set `JWT_SECRET` to an application secret containing at least 32 UTF-8 bytes. Do not commit a production JWT secret. `ACCESS_TOKEN_TTL` and `REFRESH_TOKEN_TTL` use ISO-8601 duration syntax, for example `PT15M` and `P30D`. The local `dev` profile supplies an explicitly development-only JWT secret so the quick-start command remains reproducible.
+
 ## 2. Install JavaScript dependencies
 
 From the repository root:
@@ -53,7 +55,7 @@ cd services/backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The `dev` profile explicitly activates the simulated verification-email adapter (`DevelopmentVerificationEmailSender`). Default and production profiles intentionally fail fast at startup if no real `VerificationEmailPort` is configured, preventing silent message loss. The simulated adapter masks recipient email addresses and does not expose or log plaintext verification tokens. Milestone M1A is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
+The `dev` profile explicitly activates the simulated verification-email adapter (`DevelopmentVerificationEmailSender`) and a development-only JWT signing secret. Default and production profiles intentionally fail fast if `JWT_SECRET` is missing/short or no real `VerificationEmailPort` is configured. The simulated adapter masks recipient email addresses and does not expose or log plaintext verification tokens. Milestone M1A/M1B is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
 
 ## 7. Start AI Service
 

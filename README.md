@@ -55,7 +55,7 @@ cd services/backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The `dev` profile activates the simulated verification-email adapter. Default and production startup intentionally fail fast when no real `VerificationEmailPort` is configured, preventing silent message loss. The simulated adapter masks recipient addresses and does not expose or log plaintext verification tokens. Note that M1A is not production-email-ready (durable outbox delivery and external provider integration are deferred).
+The `dev` profile activates the simulated verification-email adapter and a development-only JWT signing secret. Default and production startup require a `JWT_SECRET` of at least 32 UTF-8 bytes and intentionally fail fast when no real `VerificationEmailPort` is configured. The simulated adapter masks recipient addresses and does not expose or log plaintext verification tokens. M1A/M1B is not production-email-ready (durable outbox delivery and external provider integration are deferred).
 
 Start AI Service:
 ```bash
