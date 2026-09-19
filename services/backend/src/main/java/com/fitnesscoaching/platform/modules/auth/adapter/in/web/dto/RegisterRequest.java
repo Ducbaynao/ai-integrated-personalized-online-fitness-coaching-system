@@ -37,4 +37,15 @@ public record RegisterRequest(
             email = email.trim();
         }
     }
+
+    @Override
+    public String toString() {
+        return "RegisterRequest[" +
+                "email=" + email +
+                ", password=" + (password == null ? "null" : "[REDACTED]") +
+                ", displayName=" + displayName +
+                ", preferredLocale=" + preferredLocale +
+                ", timezone=" + timezone +
+                ']';
+    }
 }

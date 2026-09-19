@@ -10,6 +10,11 @@ spring:
   flyway:
     enabled: false
 
+logging:
+  level:
+    org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor: INFO
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: WARN
+
 auth:
   jwt:
     issuer: fitness-coaching-backend-test

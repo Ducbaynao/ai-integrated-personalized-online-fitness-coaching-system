@@ -17,4 +17,11 @@ public record ConfirmEmailRequest(
             token = token.trim();
         }
     }
+
+    @Override
+    public String toString() {
+        return "ConfirmEmailRequest[" +
+                "token=" + (token == null ? "null" : "[REDACTED]") +
+                ']';
+    }
 }

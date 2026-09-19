@@ -9,6 +9,9 @@ import com.fitnesscoaching.platform.common.exception.InvalidCredentialsException
 import com.fitnesscoaching.platform.common.exception.InvalidOrExpiredTokenException;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.ConfirmEmailRequest;
+import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.LoginRequest;
+import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.LogoutRequest;
+import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.RefreshTokenRequest;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.RegisterRequest;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.ConfirmEmailCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.ConfirmEmailUseCase;
@@ -16,6 +19,8 @@ import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUse
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUserResult;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RegisterUserUseCase;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.LoginUseCase;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LogoutSessionCommand;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LogoutSessionUseCase;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RefreshSessionUseCase;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.TokenPairResult;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
@@ -25,6 +30,11 @@ import com.fitnesscoaching.platform.modules.user.application.model.UserCapabilit
 import com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView;
 
 import java.util.List;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +48,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
@@ -48,7 +59,10 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -84,6 +98,9 @@ class AuthControllerUnitTest {
 
     @MockitoBean
     private RefreshSessionUseCase refreshSessionUseCase;
+
+    @MockitoBean
+    private LogoutSessionUseCase logoutSessionUseCase;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -347,5 +364,206 @@ class AuthControllerUnitTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/auth/sessions returns 401 when unauthenticated")
+    void logoutUnauthenticatedReturns401() throws Exception {
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"valid-token-with-more-than-20-chars"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/auth/sessions returns 204 when authenticated with valid token")
+    void logoutAuthenticatedReturns204() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String refreshToken = "valid-token-with-more-than-20-chars";
+
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .with(jwt().jwt(jwt -> jwt.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken))))
+                .andExpect(status().isNoContent());
+
+        verify(logoutSessionUseCase).logout(new LogoutSessionCommand(userId, refreshToken));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/auth/sessions returns 400 when refreshToken is blank")
+    void logoutBlankRefreshTokenReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .with(jwt().jwt(jwt -> jwt.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/auth/sessions returns 400 when refreshToken is too short")
+    void logoutTooShortRefreshTokenReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .with(jwt().jwt(jwt -> jwt.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"too-short"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/auth/sessions rejects unknown JSON properties")
+    void logoutUnknownPropertiesReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .with(jwt().jwt(jwt -> jwt.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"valid-token-with-more-than-20-chars","unknown":"property"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("Spring MVC logging does not leak secret sentinels even when DEBUG logging is active")
+    void springMvcLoggingDoesNotLeakSecretsAtDebug() throws Exception {
+        Logger webLogger = (Logger) LoggerFactory.getLogger("org.springframework.web");
+        Level originalLevel = webLogger.getLevel();
+        webLogger.setLevel(Level.DEBUG);
+
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        webLogger.addAppender(listAppender);
+
+        String passwordSentinel = "password-secret-sentinel-xyz";
+        String verificationTokenSentinel = "verification-token-secret-sentinel-xyz";
+        String refreshTokenSentinel = "refresh-token-secret-sentinel-xyz";
+        String accessTokenSentinel = "access-token-secret-sentinel-xyz";
+
+        try {
+            // 1. Register with password sentinel
+            UUID userId = UUID.randomUUID();
+            when(registerUserUseCase.register(any())).thenReturn(new RegisterUserResult(
+                    userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE, "en-US", "UTC", null, Instant.now()));
+
+            mockMvc.perform(post("/api/v1/auth/registrations")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RegisterRequest(
+                                    "athlete@example.com", passwordSentinel, "Alex", "en-US", "UTC"))))
+                    .andExpect(status().isCreated());
+
+            // 2. Confirm email with token sentinel
+            doNothing().when(confirmEmailUseCase).confirmEmail(any());
+            mockMvc.perform(post("/api/v1/auth/email-verifications/confirmations")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ConfirmEmailRequest(verificationTokenSentinel))))
+                    .andExpect(status().isNoContent());
+
+            // 3. Login returning token pair with secret sentinels
+            when(loginUseCase.login(any())).thenReturn(new TokenPairResult(
+                    accessTokenSentinel,
+                    Instant.now().plusSeconds(900),
+                    refreshTokenSentinel,
+                    Instant.now().plusSeconds(86400),
+                    new CurrentUserView(
+                            userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE,
+                            "en-US", "UTC", Instant.now(), Instant.now(), null,
+                            List.of("STUDENT"),
+                            new UserCapabilitiesView(true, false, false),
+                            UserSettingsView.defaults()
+                    )
+            ));
+
+            mockMvc.perform(post("/api/v1/auth/sessions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new LoginRequest(
+                                    "athlete@example.com", passwordSentinel, "Pixel 9"))))
+                    .andExpect(status().isOk());
+
+            // 4. Refresh token
+            when(refreshSessionUseCase.refresh(any())).thenReturn(new TokenPairResult(
+                    accessTokenSentinel,
+                    Instant.now().plusSeconds(900),
+                    refreshTokenSentinel,
+                    Instant.now().plusSeconds(86400),
+                    new CurrentUserView(
+                            userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE,
+                            "en-US", "UTC", Instant.now(), Instant.now(), null,
+                            List.of("STUDENT"),
+                            new UserCapabilitiesView(true, false, false),
+                            UserSettingsView.defaults()
+                    )
+            ));
+
+            mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RefreshTokenRequest(
+                                    refreshTokenSentinel, "Pixel 9"))))
+                    .andExpect(status().isOk());
+
+            // 5. Logout
+            mockMvc.perform(delete("/api/v1/auth/sessions")
+                            .with(jwt().jwt(jwt -> jwt.subject(userId.toString())))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new LogoutRequest(refreshTokenSentinel))))
+                    .andExpect(status().isNoContent());
+
+            // Assert that none of the log messages contain the raw secret sentinels
+            for (ILoggingEvent event : listAppender.list) {
+                String msg = event.getFormattedMessage();
+                assertThat(msg).doesNotContain(passwordSentinel);
+                assertThat(msg).doesNotContain(verificationTokenSentinel);
+                assertThat(msg).doesNotContain(refreshTokenSentinel);
+                assertThat(msg).doesNotContain(accessTokenSentinel);
+            }
+        } finally {
+            webLogger.detachAppender(listAppender);
+            webLogger.setLevel(originalLevel);
+        }
+    }
+
+    @Test
+    @DisplayName("Spring MVC validation failure log does not leak invalid password sentinel")
+    void validationFailureLogDoesNotLeakPassword() throws Exception {
+        Logger webLogger = (Logger) LoggerFactory.getLogger("org.springframework.web");
+        Level originalLevel = webLogger.getLevel();
+        webLogger.setLevel(Level.DEBUG);
+
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        webLogger.addAppender(listAppender);
+
+        String shortPasswordSentinel = "pwd-123";
+
+        try {
+            mockMvc.perform(post("/api/v1/auth/registrations")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RegisterRequest(
+                                    "athlete@example.com", shortPasswordSentinel, "Alex", "en-US", "UTC"))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+            for (ILoggingEvent event : listAppender.list) {
+                String msg = event.getFormattedMessage();
+                assertThat(msg).doesNotContain(shortPasswordSentinel);
+            }
+        } finally {
+            webLogger.detachAppender(listAppender);
+            webLogger.setLevel(originalLevel);
+        }
     }
 }

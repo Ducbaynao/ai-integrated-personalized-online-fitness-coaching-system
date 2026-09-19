@@ -15,6 +15,21 @@ public record UserAccountRecord(
         Instant createdAt,
         Instant updatedAt
 ) {
+    @Override
+    public String toString() {
+        return "UserAccountRecord[" +
+                "id=" + id +
+                ", email=" + email +
+                ", passwordHash=" + (passwordHash == null ? "null" : "[REDACTED]") +
+                ", displayName=" + displayName +
+                ", status=" + status +
+                ", preferredLocale=" + preferredLocale +
+                ", timezone=" + timezone +
+                ", emailVerifiedAt=" + emailVerifiedAt +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                ']';
+    }
     public static UserAccountRecord newPendingUser(
             String email,
             String passwordHash,

@@ -4,9 +4,11 @@ import com.fitnesscoaching.platform.common.config.JwtProperties;
 import com.fitnesscoaching.platform.common.exception.AccountUnavailableException;
 import com.fitnesscoaching.platform.common.exception.InvalidCredentialsException;
 import com.fitnesscoaching.platform.common.exception.InvalidRefreshTokenException;
+import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.audit.SecurityEventRecord;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.LoginCommand;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LogoutSessionCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RefreshSessionCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.TokenPairResult;
 import com.fitnesscoaching.platform.modules.auth.application.port.out.AccessTokenIssuer;
@@ -264,6 +266,107 @@ class AuthSessionServiceTest {
         // 5. Valid config passes
         props.setRefreshTokenTtl(Duration.ofDays(30));
         props.validate();
+    }
+
+    @Test
+    @DisplayName("Logout active token revokes it and records audit log and security event")
+    void logoutActiveTokenRevokesAndRecordsAuditAndSecurityEvent() {
+        UUID userId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+        String rawToken = "my-active-refresh-token-123456";
+        String tokenHash = TokenHasher.sha256Hex(rawToken);
+
+        RefreshTokenRecord record = new RefreshTokenRecord(
+                tokenId, userId, tokenHash, "Test Device",
+                NOW.minusSeconds(100), NOW.plusSeconds(1000), null, null, null
+        );
+
+        when(refreshTokenPort.findByTokenHash(tokenHash)).thenReturn(Optional.of(record));
+        when(refreshTokenPort.revokeForLogout(tokenId, userId, NOW)).thenReturn(1);
+
+        service.logout(new LogoutSessionCommand(userId, rawToken));
+
+        verify(refreshTokenPort).revokeForLogout(tokenId, userId, NOW);
+
+        ArgumentCaptor<SecurityEventRecord> secCaptor = ArgumentCaptor.forClass(SecurityEventRecord.class);
+        verify(auditService).recordSecurityEvent(secCaptor.capture());
+        assertThat(secCaptor.getValue().eventType()).isEqualTo("SESSION_LOGOUT");
+        assertThat(secCaptor.getValue().userId()).isEqualTo(userId);
+        assertThat(secCaptor.getValue().severity()).isEqualTo("INFO");
+
+        ArgumentCaptor<AuditRecord> auditCaptor = ArgumentCaptor.forClass(AuditRecord.class);
+        verify(auditService).recordAudit(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().action()).isEqualTo("SESSION_REVOKED");
+        assertThat(auditCaptor.getValue().actorUserId()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("Logout repeated/idempotent call with updated == 0 does not emit duplicate audit or security events")
+    void logoutRepeatedIdempotentDoesNotEmitAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+        String rawToken = "my-already-revoked-token-123456";
+        String tokenHash = TokenHasher.sha256Hex(rawToken);
+
+        RefreshTokenRecord record = new RefreshTokenRecord(
+                tokenId, userId, tokenHash, "Test Device",
+                NOW.minusSeconds(200), NOW.plusSeconds(1000), null, NOW.minusSeconds(50), "LOGOUT"
+        );
+
+        when(refreshTokenPort.findByTokenHash(tokenHash)).thenReturn(Optional.of(record));
+        when(refreshTokenPort.revokeForLogout(tokenId, userId, NOW)).thenReturn(0);
+
+        service.logout(new LogoutSessionCommand(userId, rawToken));
+
+        verify(refreshTokenPort).revokeForLogout(tokenId, userId, NOW);
+        verify(auditService, never()).recordSecurityEvent(any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Logout with another user's token does not revoke and records owner mismatch security event for caller")
+    void logoutCrossUserMismatchDoesNotRevokeAndRecordsOwnerMismatchEvent() {
+        UUID userAId = UUID.randomUUID();
+        UUID userBId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+        String rawToken = "user-b-refresh-token-12345678";
+        String tokenHash = TokenHasher.sha256Hex(rawToken);
+
+        RefreshTokenRecord recordOfUserB = new RefreshTokenRecord(
+                tokenId, userBId, tokenHash, "User B Device",
+                NOW.minusSeconds(100), NOW.plusSeconds(1000), null, null, null
+        );
+
+        when(refreshTokenPort.findByTokenHash(tokenHash)).thenReturn(Optional.of(recordOfUserB));
+
+        service.logout(new LogoutSessionCommand(userAId, rawToken));
+
+        verify(refreshTokenPort, never()).revokeForLogout(any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+
+        ArgumentCaptor<SecurityEventRecord> secCaptor = ArgumentCaptor.forClass(SecurityEventRecord.class);
+        verify(auditService).recordSecurityEvent(secCaptor.capture());
+        assertThat(secCaptor.getValue().eventType()).isEqualTo("LOGOUT_TOKEN_OWNER_MISMATCH");
+        assertThat(secCaptor.getValue().userId()).isEqualTo(userAId);
+        assertThat(secCaptor.getValue().severity()).isEqualTo("MEDIUM");
+        assertThat(secCaptor.getValue().detailsJson()).doesNotContain(rawToken);
+        assertThat(secCaptor.getValue().detailsJson()).doesNotContain(tokenHash);
+    }
+
+    @Test
+    @DisplayName("Logout with unknown token succeeds cleanly without revoking or emitting audit")
+    void logoutUnknownTokenReturnsCleanlyWithoutAudit() {
+        UUID userId = UUID.randomUUID();
+        String rawToken = "unknown-token-that-does-not-exist";
+        String tokenHash = TokenHasher.sha256Hex(rawToken);
+
+        when(refreshTokenPort.findByTokenHash(tokenHash)).thenReturn(Optional.empty());
+
+        service.logout(new LogoutSessionCommand(userId, rawToken));
+
+        verify(refreshTokenPort, never()).revokeForLogout(any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+        verify(auditService, never()).recordSecurityEvent(any());
     }
 
     private UserAccountRecord activeUser() {

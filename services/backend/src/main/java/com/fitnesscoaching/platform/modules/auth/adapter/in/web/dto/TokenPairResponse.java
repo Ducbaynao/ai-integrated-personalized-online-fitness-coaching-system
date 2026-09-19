@@ -10,4 +10,15 @@ public record TokenPairResponse(
         Instant refreshTokenExpiresAt,
         SessionUserDto user
 ) {
+    @Override
+    public String toString() {
+        return "TokenPairResponse[" +
+                "tokenType=" + tokenType +
+                ", accessToken=" + (accessToken == null ? "null" : "[REDACTED]") +
+                ", accessTokenExpiresAt=" + accessTokenExpiresAt +
+                ", refreshToken=" + (refreshToken == null ? "null" : "[REDACTED]") +
+                ", refreshTokenExpiresAt=" + refreshTokenExpiresAt +
+                ", user=" + user +
+                ']';
+    }
 }

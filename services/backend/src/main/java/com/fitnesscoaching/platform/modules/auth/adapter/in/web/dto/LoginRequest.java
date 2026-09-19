@@ -16,4 +16,13 @@ public record LoginRequest(
         if (email != null) email = email.trim();
         if (deviceName != null) deviceName = deviceName.trim();
     }
+
+    @Override
+    public String toString() {
+        return "LoginRequest[" +
+                "email=" + email +
+                ", password=" + (password == null ? "null" : "[REDACTED]") +
+                ", deviceName=" + deviceName +
+                ']';
+    }
 }

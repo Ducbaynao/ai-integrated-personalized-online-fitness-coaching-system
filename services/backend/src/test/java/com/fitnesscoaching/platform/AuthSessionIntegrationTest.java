@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.ConfirmEmailRequest;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.LoginRequest;
+import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.LogoutRequest;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.RefreshTokenRequest;
 import com.fitnesscoaching.platform.modules.auth.adapter.in.web.dto.RegisterRequest;
 import com.fitnesscoaching.platform.modules.auth.adapter.out.email.TestVerificationEmailSender;
@@ -34,6 +35,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -56,6 +62,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -550,6 +557,452 @@ class AuthSessionIntegrationTest {
                         .content(objectMapper.writeValueAsString(new LoginRequest(email, password, "Test Device"))))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.errorCode", is("INTERNAL_SERVER_ERROR")));
+    }
+
+    @Test
+    @DisplayName("M1C: DELETE /api/v1/auth/sessions returns 401 UNAUTHORIZED when unauthenticated")
+    void testLogoutUnauthenticatedReturns401() throws Exception {
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest("some-valid-length-refresh-token"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
+    }
+
+    @Test
+    @DisplayName("M1C: DELETE /api/v1/auth/sessions returns 401 for invalid or expired Bearer JWT")
+    void testLogoutInvalidOrExpiredJwtReturns401() throws Exception {
+        // 1. Invalid JWT
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer invalid-tampered-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest("some-valid-length-refresh-token"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
+
+        // 2. Expired JWT
+        Instant now = Instant.now();
+        JwtClaimsSet expiredClaims = JwtClaimsSet.builder()
+                .issuer(jwtProperties.getIssuer())
+                .subject(UUID.randomUUID().toString())
+                .issuedAt(now.minusSeconds(3600))
+                .expiresAt(now.minusSeconds(1800))
+                .claim("email", "expired@example.com")
+                .claim("roles", List.of("STUDENT"))
+                .build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        String expiredToken = jwtEncoder.encode(JwtEncoderParameters.from(header, expiredClaims)).getTokenValue();
+
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + expiredToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest("some-valid-length-refresh-token"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("AUTH_TOKEN_EXPIRED")));
+    }
+
+    @Test
+    @DisplayName("M1C: DELETE /api/v1/auth/sessions returns 400 for blank, invalid, or unexpected payload")
+    void testLogoutValidationErrorsReturn400() throws Exception {
+        String email = "logout.validation@example.com";
+        String password = "StrongPassword123!";
+        registerAndConfirm(email, password);
+        Map<String, Object> session = login(email, password, "Validation Device");
+        String accessToken = (String) session.get("accessToken");
+
+        // Blank refreshToken
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // Too short refreshToken
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"too-short"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // Unknown property
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"some-valid-length-refresh-token","unknownField":"test"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("M1C: Active refresh token is revoked with LOGOUT, returns 204, emits audit/security events, while other user sessions remain active")
+    void testLogoutRevokesOnlyTargetSession() throws Exception {
+        String email = "logout.active@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+
+        // Login twice to create 2 distinct sessions/devices
+        Map<String, Object> session1 = login(email, password, "Phone Device");
+        String accessToken1 = (String) session1.get("accessToken");
+        String refreshToken1 = (String) session1.get("refreshToken");
+
+        Map<String, Object> session2 = login(email, password, "Tablet Device");
+        String refreshToken2 = (String) session2.get("refreshToken");
+
+        // Logout session 1 using session 1's access token and refresh token
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken1))))
+                .andExpect(status().isNoContent());
+
+        // Verify session 1 is revoked with reason LOGOUT
+        Map<String, Object> storedToken1 = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshToken1));
+        assertThat(storedToken1.get("revoked_at")).isNotNull();
+        assertThat(storedToken1.get("revoke_reason")).isEqualTo("LOGOUT");
+
+        // Verify session 2 remains ACTIVE
+        Map<String, Object> storedToken2 = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshToken2));
+        assertThat(storedToken2.get("revoked_at")).isNull();
+        assertThat(storedToken2.get("revoke_reason")).isNull();
+
+        // Verify session 2 can still be refreshed successfully
+        mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refreshToken2, "Tablet Device"))))
+                .andExpect(status().isOk());
+
+        // Verify audit log and security event emitted for logout
+        Integer logoutEventCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'SESSION_LOGOUT'",
+                Integer.class, userId);
+        assertThat(logoutEventCount).isEqualTo(1);
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id = ? AND action = 'SESSION_REVOKED'",
+                Integer.class, userId);
+        assertThat(auditCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("M1C: Repeated idempotent logout returns 204, does not change row, and avoids duplicate audit records")
+    void testRepeatedLogoutIsIdempotent() throws Exception {
+        String email = "logout.idempotent@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+
+        Map<String, Object> session = login(email, password, "Phone Device");
+        String accessToken = (String) session.get("accessToken");
+        String refreshToken = (String) session.get("refreshToken");
+
+        // First logout
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken))))
+                .andExpect(status().isNoContent());
+
+        Map<String, Object> firstRow = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshToken));
+        Object firstRevokedAt = firstRow.get("revoked_at");
+        assertThat(firstRevokedAt).isNotNull();
+
+        // Second (idempotent) logout
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken))))
+                .andExpect(status().isNoContent());
+
+        Map<String, Object> secondRow = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshToken));
+        assertThat(secondRow.get("revoked_at")).isEqualTo(firstRevokedAt);
+
+        // Audit logs and security events count must remain 1
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id = ? AND action = 'SESSION_REVOKED'",
+                Integer.class, userId);
+        assertThat(auditCount).isEqualTo(1);
+
+        Integer logoutEventCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'SESSION_LOGOUT'",
+                Integer.class, userId);
+        assertThat(logoutEventCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("M1C: Cross-user logout returns 204, never revokes foreign token, and records owner mismatch event")
+    void testCrossUserLogoutSafeHandling() throws Exception {
+        String emailA = "user.a@example.com";
+        String emailB = "user.b@example.com";
+        String password = "StrongPassword123!";
+        UUID userAId = registerAndConfirm(emailA, password);
+        UUID userBId = registerAndConfirm(emailB, password);
+
+        Map<String, Object> sessionA = login(emailA, password, "Device A");
+        String accessTokenA = (String) sessionA.get("accessToken");
+
+        Map<String, Object> sessionB = login(emailB, password, "Device B");
+        String refreshTokenB = (String) sessionB.get("refreshToken");
+
+        // User A attempts to logout User B's refresh token
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessTokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshTokenB))))
+                .andExpect(status().isNoContent());
+
+        // User B's token remains ACTIVE
+        Map<String, Object> storedB = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshTokenB));
+        assertThat(storedB.get("revoked_at")).isNull();
+        assertThat(storedB.get("revoke_reason")).isNull();
+
+        // User A has a LOGOUT_TOKEN_OWNER_MISMATCH security event
+        Integer mismatchEvent = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'LOGOUT_TOKEN_OWNER_MISMATCH'",
+                Integer.class, userAId);
+        assertThat(mismatchEvent).isEqualTo(1);
+
+        // User B has NO security events recorded
+        Integer userBEventCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'LOGOUT_TOKEN_OWNER_MISMATCH'",
+                Integer.class, userBId);
+        assertThat(userBEventCount).isEqualTo(0);
+
+        // Details JSON must not leak raw tokens or token hashes
+        String detailsJson = jdbcTemplate.queryForObject(
+                "SELECT details::text FROM fitness.security_events WHERE user_id = ? AND event_type = 'LOGOUT_TOKEN_OWNER_MISMATCH'",
+                String.class, userAId);
+        assertThat(detailsJson).doesNotContain(refreshTokenB);
+        assertThat(detailsJson).doesNotContain(TokenHasher.sha256Hex(refreshTokenB));
+    }
+
+    @Test
+    @DisplayName("M1C: Non-existent refresh token returns 204 No Content without mutation or audit")
+    void testNonExistentTokenLogoutReturns204() throws Exception {
+        String email = "nonexistent.token@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+
+        Map<String, Object> session = login(email, password, "Test Device");
+        String accessToken = (String) session.get("accessToken");
+
+        String dummyToken = "completely-unknown-token-that-never-existed-in-system";
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(dummyToken))))
+                .andExpect(status().isNoContent());
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id = ? AND action = 'SESSION_REVOKED'",
+                Integer.class, userId);
+        assertThat(auditCount).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("M1C: Concurrent logouts for the same token all return 204 with exactly one audit record and atomic revocation")
+    void testConcurrentLogoutsAtomicity() throws Exception {
+        String email = "concurrent.logout@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+
+        Map<String, Object> session = login(email, password, "Concurrent Device");
+        String accessToken = (String) session.get("accessToken");
+        String refreshToken = (String) session.get("refreshToken");
+
+        int concurrency = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        List<Callable<Integer>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < concurrency; i++) {
+            tasks.add(() -> {
+                MvcResult res = mockMvc.perform(delete("/api/v1/auth/sessions")
+                                .header("Authorization", "Bearer " + accessToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken))))
+                        .andReturn();
+                return res.getResponse().getStatus();
+            });
+        }
+
+        List<Future<Integer>> results = executor.invokeAll(tasks);
+        executor.shutdown();
+
+        AtomicInteger noContentCount = new AtomicInteger(0);
+        for (Future<Integer> f : results) {
+            if (f.get() == 204) {
+                noContentCount.incrementAndGet();
+            }
+        }
+
+        assertThat(noContentCount.get()).isEqualTo(concurrency);
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id = ? AND action = 'SESSION_REVOKED'",
+                Integer.class, userId);
+        assertThat(auditCount).isEqualTo(1);
+
+        Integer logoutEventCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'SESSION_LOGOUT'",
+                Integer.class, userId);
+        assertThat(logoutEventCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("M1C: Logged-out refresh token cannot be refreshed and triggers replay detection (revoking all user tokens)")
+    void testLoggedOutTokenReplayDetection() throws Exception {
+        String email = "logout.replay@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+
+        // Session 1 (will be logged out)
+        Map<String, Object> session1 = login(email, password, "Device 1");
+        String accessToken1 = (String) session1.get("accessToken");
+        String refreshToken1 = (String) session1.get("refreshToken");
+
+        // Session 2 (should be active until replay attack)
+        Map<String, Object> session2 = login(email, password, "Device 2");
+        String refreshToken2 = (String) session2.get("refreshToken");
+
+        // Logout session 1
+        mockMvc.perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer " + accessToken1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken1))))
+                .andExpect(status().isNoContent());
+
+        // Replay attack: try to refresh using the logged-out refresh token
+        mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refreshToken1, null))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_REFRESH_TOKEN")));
+
+        // Replay detection should have revoked Session 2 with reason REUSE_DETECTED
+        Map<String, Object> storedToken2 = jdbcTemplate.queryForMap(
+                "SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash = ?",
+                TokenHasher.sha256Hex(refreshToken2));
+        assertThat(storedToken2.get("revoked_at")).isNotNull();
+        assertThat(storedToken2.get("revoke_reason")).isEqualTo("REUSE_DETECTED");
+
+        // Critical security event REFRESH_TOKEN_REUSE emitted
+        Integer reuseEventCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.security_events WHERE user_id = ? AND event_type = 'REFRESH_TOKEN_REUSE'",
+                Integer.class, userId);
+        assertThat(reuseEventCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("M1C Security: End-to-end authentication flow and database audit/events never expose raw secrets or token hashes")
+    void testEndToEndFlowLogsAndAuditDoNotExposeSecrets() throws Exception {
+        Logger rootLogger = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        rootLogger.addAppender(listAppender);
+
+        String email = "security.redaction.e2e@example.com";
+        String passwordSentinel = "P@ssword-Secret-Sentinel-999!";
+
+        try {
+            // 1. Registration
+            UUID userId = register(email, passwordSentinel);
+            String verificationToken = emailSender.getLastTokenFor(email);
+            assertThat(verificationToken).isNotNull();
+
+            // 2. Email verification
+            mockMvc.perform(post("/api/v1/auth/email-verifications/confirmations")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new ConfirmEmailRequest(verificationToken))))
+                    .andExpect(status().isNoContent());
+
+            // 3. Login
+            Map<String, Object> session = login(email, passwordSentinel, "Redaction Audit Device");
+            String accessToken = (String) session.get("accessToken");
+            String refreshToken = (String) session.get("refreshToken");
+            String refreshTokenHash = TokenHasher.sha256Hex(refreshToken);
+
+            // 4. Token Refresh
+            MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refreshToken, "Redaction Audit Device"))))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            Map<String, Object> refreshed = objectMapper.readValue(
+                    refreshResult.getResponse().getContentAsString(), Map.class);
+            String newAccessToken = (String) refreshed.get("accessToken");
+            String newRefreshToken = (String) refreshed.get("refreshToken");
+            String newRefreshTokenHash = TokenHasher.sha256Hex(newRefreshToken);
+
+            // 5. Logout
+            mockMvc.perform(delete("/api/v1/auth/sessions")
+                            .header("Authorization", "Bearer " + newAccessToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new LogoutRequest(newRefreshToken))))
+                    .andExpect(status().isNoContent());
+
+            // 6. Verify Application & Spring Logs do not leak secrets
+            for (ILoggingEvent event : listAppender.list) {
+                String logMsg = event.getFormattedMessage();
+                assertThat(logMsg)
+                        .as("Log message should not contain raw password")
+                        .doesNotContain(passwordSentinel);
+                assertThat(logMsg)
+                        .as("Log message should not contain verification token")
+                        .doesNotContain(verificationToken);
+                assertThat(logMsg)
+                        .as("Log message should not contain original refresh token")
+                        .doesNotContain(refreshToken);
+                assertThat(logMsg)
+                        .as("Log message should not contain new refresh token")
+                        .doesNotContain(newRefreshToken);
+            }
+
+            // 7. Verify Database security_events table does not leak raw tokens or hashes
+            List<String> secDetails = jdbcTemplate.queryForList(
+                    "SELECT details::text FROM fitness.security_events WHERE user_id = ?",
+                    String.class, userId);
+            assertThat(secDetails).isNotEmpty();
+            for (String detail : secDetails) {
+                assertThat(detail).doesNotContain(passwordSentinel);
+                assertThat(detail).doesNotContain(verificationToken);
+                assertThat(detail).doesNotContain(refreshToken);
+                assertThat(detail).doesNotContain(newRefreshToken);
+                assertThat(detail).doesNotContain(refreshTokenHash);
+                assertThat(detail).doesNotContain(newRefreshTokenHash);
+            }
+
+            // 8. Verify Database audit_logs table does not leak raw tokens or hashes
+            List<String> auditMetadata = jdbcTemplate.queryForList(
+                    "SELECT metadata::text FROM fitness.audit_logs WHERE actor_user_id = ?",
+                    String.class, userId);
+            assertThat(auditMetadata).isNotEmpty();
+            for (String meta : auditMetadata) {
+                assertThat(meta).doesNotContain(passwordSentinel);
+                assertThat(meta).doesNotContain(verificationToken);
+                assertThat(meta).doesNotContain(refreshToken);
+                assertThat(meta).doesNotContain(newRefreshToken);
+                assertThat(meta).doesNotContain(refreshTokenHash);
+                assertThat(meta).doesNotContain(newRefreshTokenHash);
+            }
+        } finally {
+            rootLogger.detachAppender(listAppender);
+        }
     }
 
     private UUID registerAndConfirm(String email, String password) throws Exception {

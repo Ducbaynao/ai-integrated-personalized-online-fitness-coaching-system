@@ -8,6 +8,8 @@ spring:
 logging:
   level:
     com.fitnesscoaching.platform: DEBUG
+    org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor: INFO
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: WARN
 
 auth:
   jwt:

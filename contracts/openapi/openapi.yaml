@@ -105,6 +105,7 @@ paths:
               $ref: '#/components/schemas/LogoutRequest'
       responses:
         '204': { description: Session revoked or already inactive }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
   /auth/token-refreshes:

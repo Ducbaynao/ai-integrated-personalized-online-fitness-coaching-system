@@ -10,6 +10,8 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.audit.SecurityEventRecord;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.LoginCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.LoginUseCase;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LogoutSessionCommand;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.LogoutSessionUseCase;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RefreshSessionCommand;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.RefreshSessionUseCase;
 import com.fitnesscoaching.platform.modules.auth.application.port.in.TokenPairResult;
@@ -33,9 +35,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
-public class AuthSessionService implements LoginUseCase, RefreshSessionUseCase {
+public class AuthSessionService implements LoginUseCase, RefreshSessionUseCase, LogoutSessionUseCase {
 
     private static final String REUSE_DETECTED = "REUSE_DETECTED";
 
@@ -152,6 +155,29 @@ public class AuthSessionService implements LoginUseCase, RefreshSessionUseCase {
         recordSecurityEvent(user.id(), "REFRESH_TOKEN_ROTATED", "INFO", now);
         recordAudit(user.id(), "SESSION_REFRESHED", "USER", now);
         return result;
+    }
+
+    @Override
+    @Transactional
+    public void logout(LogoutSessionCommand command) {
+        Instant now = clock.instant();
+        String tokenHash = TokenHasher.sha256Hex(command.refreshToken().trim());
+        RefreshTokenRecord existing = refreshTokenPort.findByTokenHash(tokenHash).orElse(null);
+
+        if (existing == null) {
+            return;
+        }
+
+        if (!existing.userId().equals(command.userId())) {
+            recordSecurityEvent(command.userId(), "LOGOUT_TOKEN_OWNER_MISMATCH", "MEDIUM", now);
+            return;
+        }
+
+        int updated = refreshTokenPort.revokeForLogout(existing.id(), command.userId(), now);
+        if (updated > 0) {
+            recordSecurityEvent(command.userId(), "SESSION_LOGOUT", "INFO", now);
+            recordAudit(command.userId(), "SESSION_REVOKED", "USER", now);
+        }
     }
 
     private TokenPairResult issueTokenPair(

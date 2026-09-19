@@ -14,5 +14,7 @@ public interface RefreshTokenPort {
 
     int revokeForRotation(UUID tokenId, Instant revokedAt);
 
+    int revokeForLogout(UUID tokenId, UUID userId, Instant revokedAt);
+
     int revokeActiveForUser(UUID userId, Instant revokedAt, String reason);
 }

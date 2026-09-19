@@ -21,6 +21,15 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEnt
     int revokeForRotation(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RefreshTokenEntity t SET t.revokedAt = :now, t.revokeReason = 'LOGOUT' " +
+            "WHERE t.id = :id AND t.userId = :userId AND t.revokedAt IS NULL AND t.expiresAt > :now")
+    int revokeForLogout(
+            @Param("id") UUID id,
+            @Param("userId") UUID userId,
+            @Param("now") Instant now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE RefreshTokenEntity t SET t.revokedAt = :now, t.revokeReason = :reason " +
             "WHERE t.userId = :userId AND t.revokedAt IS NULL")
     int revokeActiveForUser(

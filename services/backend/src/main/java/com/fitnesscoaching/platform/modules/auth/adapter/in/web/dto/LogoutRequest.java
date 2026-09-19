@@ -6,20 +6,19 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 @JsonIgnoreProperties(ignoreUnknown = false)
-public record RefreshTokenRequest(
-        @NotBlank @Size(min = 20, max = 2048) @JsonProperty("refreshToken") String refreshToken,
-        @Size(max = 200) @JsonProperty("deviceName") String deviceName
+public record LogoutRequest(
+        @NotBlank @Size(min = 20, max = 2048) @JsonProperty("refreshToken") String refreshToken
 ) {
-    public RefreshTokenRequest {
-        if (refreshToken != null) refreshToken = refreshToken.trim();
-        if (deviceName != null) deviceName = deviceName.trim();
+    public LogoutRequest {
+        if (refreshToken != null) {
+            refreshToken = refreshToken.trim();
+        }
     }
 
     @Override
     public String toString() {
-        return "RefreshTokenRequest[" +
+        return "LogoutRequest[" +
                 "refreshToken=" + (refreshToken == null ? "null" : "[REDACTED]") +
-                ", deviceName=" + deviceName +
                 ']';
     }
 }

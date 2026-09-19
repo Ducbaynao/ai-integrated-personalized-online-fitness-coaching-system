@@ -17,7 +17,17 @@ The initial identity flow uses email/password and returns short-lived Access Tok
   - Capabilities are derived from the active roles and profile existence (`hasStudentProfile`, `hasTrainerProfile`); `canCoach` remains `false` at the application layer with full coaching eligibility deferred to future milestones.
   - User settings come from PostgreSQL (`fitness.user_settings`); missing optional settings fall back to defaults according to the API contract (`weekStartsOn = 1`, `measurementSystem = 'METRIC'`, empty preferences).
   - Malformed or non-object persisted settings JSON is treated as a server/data integrity failure, not silently accepted as missing settings.
-- Logout is the next session slice and is not part of M1B.
+- Logout is implemented in Milestone M1C.
+
+### M1C session logout behavior
+
+- `DELETE /auth/sessions` accepts a `LogoutRequest` (`refreshToken`) and requires an authenticated Bearer JWT access token. Unauthenticated or invalid token requests return `401 UNAUTHORIZED` (or `AUTH_TOKEN_EXPIRED`). The User ID is derived exclusively from the verified JWT subject.
+- **Idempotent Revocation**: Atomically revokes the presented active refresh token belonging to the authenticated User by setting `revoked_at` and `revoke_reason = 'LOGOUT'`. Successful revocation returns HTTP `204 No Content`.
+- **Safe Ownership & Non-Enumeration**: If the presented refresh token does not exist, belongs to another user, is already revoked, or is expired, the endpoint returns HTTP `204 No Content`. The server never revokes another user's token and never reveals whether an unknown or cross-user token exists. When a presented token belongs to another user, a security event (`LOGOUT_TOKEN_OWNER_MISMATCH`, severity `MEDIUM`) is recorded for the authenticated caller without exposing cross-user identifiers or token details.
+- **Repeated & Concurrent Idempotency**: Subsequent or concurrent logout requests for the same token return HTTP `204 No Content`. Only the first successful revocation mutates the database row and emits the `SESSION_REVOKED` audit record and `SESSION_LOGOUT` security event; subsequent calls perform 0 row updates and omit duplicate audit entries.
+- **Targeted Scope & Session Isolation**: The logout operation itself revokes strictly the presented session (the single refresh token passed in `LogoutRequest`). Other sessions and devices belonging to the user remain active immediately after logout. Multi-device logout and Admin force-revocation remain deferred.
+- **Replay Protection vs. Immediate Session State**: Refresh tokens revoked via logout cannot be refreshed. If an adversary or faulty client later attempts to use that already-revoked token at `POST /auth/token-refreshes`, that subsequent request triggers the existing M1B token-reuse policy: all remaining active refresh tokens for that user are revoked with reason `REUSE_DETECTED`, and a critical security event `REFRESH_TOKEN_REUSE` is recorded. In normal operation where the revoked token is discarded, other sessions remain active indefinitely until their own expiration or logout.
+- **Stateless Access Token Lifecycle**: Access tokens are stateless HS256 JWTs that remain cryptographically valid until expiration; the platform intentionally does not maintain a server-side token blacklist. Clients are strictly responsible for clearing locally stored access and refresh tokens upon receiving HTTP `204 No Content`.
 
 ## Authorization layers
 

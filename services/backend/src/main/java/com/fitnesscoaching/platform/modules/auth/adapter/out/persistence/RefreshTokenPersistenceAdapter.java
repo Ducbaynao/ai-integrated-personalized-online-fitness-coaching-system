@@ -36,6 +36,11 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     }
 
     @Override
+    public int revokeForLogout(UUID tokenId, UUID userId, Instant revokedAt) {
+        return repository.revokeForLogout(tokenId, userId, revokedAt);
+    }
+
+    @Override
     public int revokeActiveForUser(UUID userId, Instant revokedAt, String reason) {
         return repository.revokeActiveForUser(userId, revokedAt, reason);
     }
