@@ -12,7 +12,16 @@
     "lint:mobile": "npm --prefix apps/mobile run lint",
     "typecheck:mobile": "npm --prefix apps/mobile run typecheck",
     "lint:admin": "npm run lint --workspace=@fitness-coaching/admin-web",
-    "build:admin": "npm run build --workspace=@fitness-coaching/admin-web"
+    "build:admin": "npm run build --workspace=@fitness-coaching/admin-web",
+    "validate:ux-docs": "node tools/validate-ux-docs.mjs",
+    "validate:openapi": "redocly lint contracts/openapi/openapi.yaml",
+    "validate:ai-schemas": "node tools/validate-ai-schemas.mjs",
+    "validate:contracts": "npm run validate:openapi && npm run validate:ai-schemas",
+    "test:migrations": "node tools/test-migrations.mjs"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.53.3",
+    "ajv": "^8.20.0"
   },
   "engines": {
     "node": ">=22.13.0"

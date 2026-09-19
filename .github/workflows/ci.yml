@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  web-and-mobile:
+  client-admin:
+    name: Client Admin Web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +16,25 @@ jobs:
           node-version: 22.13.1
           cache: npm
       - run: npm ci
-      - run: npm ci --prefix apps/mobile
+      - run: npm run lint:admin
       - run: npm run build:admin
+
+  client-mobile:
+    name: Client Mobile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci --prefix apps/mobile
+      - run: npm run lint:mobile
       - run: npm run typecheck:mobile
 
   backend:
+    name: Backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,10 +43,14 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+        working-directory: services/backend
       - run: ./mvnw -B test
         working-directory: services/backend
 
   ai-service:
+    name: AI Service
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +58,36 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: services/ai-service/pyproject.toml
       - run: python -m pip install -e ".[dev]"
         working-directory: services/ai-service
-      - run: pytest
+      - run: python -m ruff check .
         working-directory: services/ai-service
+      - run: python -m pytest
+        working-directory: services/ai-service
+
+  contracts:
+    name: Contracts & Docs Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:contracts
+      - run: npm run validate:ux-docs
+
+  migrations:
+    name: Database Migrations Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci
+      - name: Run Flyway migrations on fresh disposable PostgreSQL 18 + pgvector
+        run: npm run test:migrations

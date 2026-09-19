@@ -46,20 +46,26 @@ Important flows include onboarding, Goal proposal decisions, Workout logging, re
 
 ## Contract and migration tests
 
-- Validate OpenAPI and WebSocket/AI schemas in CI.
-- Run Flyway migrations against a clean database and, for risky changes, a representative previous schema/data set.
+- Validate OpenAPI and WebSocket/AI schemas:
+  ```bash
+  npm run validate:contracts
+  npm run validate:ux-docs
+  ```
+- Run Flyway migrations against an isolated disposable PostgreSQL 18 + pgvector database:
+  ```bash
+  npm run test:migrations
+  ```
 - Test unique/check/reference constraints and expected indexes.
 - Verify backward compatibility for supported app/API versions.
 
 ## CI sequence
 
-A recommended pipeline is:
+The CI pipeline runs independent parallel jobs that report failures clearly:
 
-1. static formatting/lint/type checks;
-2. unit tests;
-3. contract validation;
-4. database migration and integration tests;
-5. application builds;
-6. container-image build and security checks;
-7. deployment to the selected environment with health verification.
+1. **Client Admin Web**: `npm ci`, `npm run lint:admin`, `npm run build:admin`
+2. **Client Mobile**: `npm ci --prefix apps/mobile`, `npm run lint:mobile`, `npm run typecheck:mobile`
+3. **Backend**: `./mvnw -B test` (Java 21)
+4. **AI Service**: `python -m ruff check .`, `python -m pytest` (Python 3.12)
+5. **Contracts & Docs**: `npm run validate:contracts`, `npm run validate:ux-docs`
+6. **Database Migrations Check**: Flyway migration verification against disposable PostgreSQL 18 + pgvector container
 

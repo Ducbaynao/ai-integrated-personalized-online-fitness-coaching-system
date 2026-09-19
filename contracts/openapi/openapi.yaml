@@ -6,15 +6,22 @@ info:
     Executable REST contract for Phase 1 Milestone 1 Identity and Common
     Account. Spring Boot is the business authority. Creating a Trainer Profile
     or submitting a Trainer Application does not grant coaching authority.
+  license:
+    name: License decision pending
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development
 tags:
   - name: Authentication
+    description: Account registration, verification, authentication, session refresh, and logout operations.
   - name: Current User
+    description: Profile query, settings management, and account details for the authenticated user.
   - name: Student Profile
+    description: Student capability activation and profile management on the common account.
   - name: Trainer Profile
+    description: Trainer capability activation and profile management on the common account.
   - name: Trainer Application
+    description: Submission and status tracking for trainer verification applications.
 
 paths:
   /auth/registrations:

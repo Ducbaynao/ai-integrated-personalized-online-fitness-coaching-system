@@ -1,0 +1,4 @@
+# Redocly configuration for contract validation
+# Allows localhost URL for local development server while preserving all standard rules
+rules:
+  no-server-example.com: off
