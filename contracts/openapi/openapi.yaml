@@ -190,8 +190,11 @@ paths:
                 $ref: '#/components/schemas/StudentProfileResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
         '409':
-          description: The current User already has a Student Profile
+          description: >-
+            Conflict — Student profile already exists (STUDENT_PROFILE_ALREADY_EXISTS)
+            or Student capability has been revoked (STUDENT_CAPABILITY_REVOKED).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -209,6 +212,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/StudentProfileResponse'
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Student capability is not active (STUDENT_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404': { $ref: '#/components/responses/ProfileNotFound' }
     patch:
       tags: [Student Profile]
@@ -229,6 +239,13 @@ paths:
                 $ref: '#/components/schemas/StudentProfileResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Student capability is not active (STUDENT_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404': { $ref: '#/components/responses/ProfileNotFound' }
 
   /trainer-profiles:
@@ -369,7 +386,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     AccountUnavailable:
-      description: Account state does not permit login
+      description: Account state does not permit the requested operation
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
