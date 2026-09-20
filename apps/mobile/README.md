@@ -45,7 +45,30 @@ npm run ios
 npm run web
 npm run lint
 npm run typecheck
+npm test
 ```
+
+### Environment configuration
+
+Create `.env` in `apps/mobile/`:
+```env
+# Android emulator (10.0.2.2 connects to host localhost:8080)
+EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8080/api/v1
+
+# iOS simulator or Web
+# EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8080/api/v1
+
+# Physical device on the same LAN
+# EXPO_PUBLIC_API_BASE_URL=http://<LAN_IP>:8080/api/v1
+```
+
+### Deep linking and email verification
+
+The scheme is configured as `ai-fitness-coaching`.
+Verification links sent via Mailpit have the format:
+`ai-fitness-coaching://verify-email?token=<token>`
+
+Opening this link in the emulator/device or manually pasting the token activates the user's account.
 
 The Android/iOS commands require the corresponding local tooling. Expo Go may not support every native dependency added later; use a development build when required.
 
@@ -68,7 +91,10 @@ As features are implemented, prefer feature folders such as `features/auth`, `fe
 
 - The reviewed contract is `../../contracts/openapi/openapi.yaml`.
 - Use `/api/v1` endpoints through the shared API client.
-- Store access/refresh credentials only with platform-appropriate secure storage.
+- Platform token storage security:
+  - On iOS and Android: tokens are persisted using hardware-backed secure storage via `expo-secure-store`.
+  - On Web (`Platform.OS === 'web'`): tokens are stored strictly in-memory. Browsers lack hardware keystore equivalents; storing tokens in `localStorage`, `sessionStorage`, unprotected cookies, or `IndexedDB` is prohibited to prevent XSS credential extraction.
+  - Web preview session limitation: because tokens reside purely in memory on web, authenticated sessions reset upon browser page reload. This is an intentional security boundary for development web preview.
 - Rotate refresh tokens through the Backend and clear local session state on forced logout.
 - Backend authorization remains the security boundary; hiding a button is not authorization.
 - Preserve safe drafts on recoverable network failures and prevent duplicate submissions.

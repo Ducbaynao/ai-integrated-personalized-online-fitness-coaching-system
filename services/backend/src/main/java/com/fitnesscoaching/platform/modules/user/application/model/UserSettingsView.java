@@ -21,4 +21,14 @@ public record UserSettingsView(
     public static UserSettingsView defaults() {
         return new UserSettingsView(1, "METRIC", Collections.emptyMap(), Collections.emptyMap());
     }
+
+    @Override
+    public String toString() {
+        return "UserSettingsView[" +
+                "weekStartsOn=" + weekStartsOn +
+                ", measurementSystem=" + measurementSystem +
+                ", accessibilityPreferences=" + accessibilityPreferences +
+                ", privacyPreferences=[REDACTED]" +
+                "]";
+    }
 }

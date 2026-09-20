@@ -32,30 +32,37 @@ npm install
 npm install --prefix apps/mobile
 ```
 
-Start local infrastructure:
+Start local infrastructure (PostgreSQL, Redis, MinIO, Mailpit):
 
 ```bash
 docker compose up -d
 ```
+
+Mailpit web UI is accessible at `http://localhost:8025` (SMTP port 1025) to review verification emails and tokens.
+
+Start Mobile and Admin Web:
 
 ```bash
 npm run dev:mobile
 npm run dev:admin
 ```
 
+For Mobile, configure `EXPO_PUBLIC_API_BASE_URL` in `apps/mobile/.env` (defaults to `http://10.0.2.2:8080/api/v1` on Android emulator, `http://127.0.0.1:8080/api/v1` on iOS simulator). Email verification deep link is `ai-fitness-coaching://verify-email?token=<token>`.
+
 Start Backend (Windows):
 ```powershell
 cd services\backend
-.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+$env:SPRING_PROFILES_ACTIVE="dev"
+.\mvnw.cmd spring-boot:run
 ```
 
 Start Backend (Unix):
 ```bash
 cd services/backend
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-The `dev` profile activates the simulated verification-email adapter and a development-only JWT signing secret. Default and production startup require a `JWT_SECRET` of at least 32 UTF-8 bytes and intentionally fail fast when no real `VerificationEmailPort` is configured. The simulated adapter masks recipient addresses and does not expose or log plaintext verification tokens. M1A/M1B is not production-email-ready (durable outbox delivery and external provider integration are deferred).
+The `dev` profile activates the development verification-email adapter (`DevelopmentVerificationEmailSender`), which dispatches emails via SMTP to Mailpit, alongside a development-only JWT signing secret. Default and production startup require a `JWT_SECRET` of at least 32 UTF-8 bytes and intentionally fail fast when no real `VerificationEmailPort` is configured. The development adapter masks recipient addresses and does not expose or log plaintext verification tokens. M1A/M1B is not production-email-ready (durable outbox delivery and external provider integration are deferred).
 
 Start AI Service:
 ```bash

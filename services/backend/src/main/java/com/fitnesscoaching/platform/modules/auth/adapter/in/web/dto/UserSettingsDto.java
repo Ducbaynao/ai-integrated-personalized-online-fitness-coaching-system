@@ -11,4 +11,14 @@ public record UserSettingsDto(
     public static UserSettingsDto defaults() {
         return new UserSettingsDto(1, "METRIC", Map.of(), Map.of());
     }
+
+    @Override
+    public String toString() {
+        return "UserSettingsDto[" +
+                "weekStartsOn=" + weekStartsOn +
+                ", measurementSystem=" + measurementSystem +
+                ", accessibilityPreferences=" + accessibilityPreferences +
+                ", privacyPreferences=[REDACTED]" +
+                "]";
+    }
 }

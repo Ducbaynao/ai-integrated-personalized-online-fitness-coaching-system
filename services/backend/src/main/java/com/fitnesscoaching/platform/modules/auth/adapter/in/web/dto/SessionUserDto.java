@@ -20,4 +20,21 @@ public record SessionUserDto(
         UserCapabilitiesDto capabilities,
         UserSettingsDto settings
 ) {
+    @Override
+    public String toString() {
+        return "SessionUserDto[" +
+                "id=" + id +
+                ", email=" + email +
+                ", displayName=" + displayName +
+                ", status=" + status +
+                ", preferredLocale=" + preferredLocale +
+                ", timezone=" + timezone +
+                ", emailVerifiedAt=" + emailVerifiedAt +
+                ", createdAt=" + createdAt +
+                ", phoneNumber=" + (phoneNumber != null ? "[REDACTED]" : "null") +
+                ", roles=" + roles +
+                ", capabilities=" + capabilities +
+                ", settings=" + settings +
+                "]";
+    }
 }

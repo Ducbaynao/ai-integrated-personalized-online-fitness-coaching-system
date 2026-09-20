@@ -29,6 +29,22 @@ The initial identity flow uses email/password and returns short-lived Access Tok
 - **Replay Protection vs. Immediate Session State**: Refresh tokens revoked via logout cannot be refreshed. If an adversary or faulty client later attempts to use that already-revoked token at `POST /auth/token-refreshes`, that subsequent request triggers the existing M1B token-reuse policy: all remaining active refresh tokens for that user are revoked with reason `REUSE_DETECTED`, and a critical security event `REFRESH_TOKEN_REUSE` is recorded. In normal operation where the revoked token is discarded, other sessions remain active indefinitely until their own expiration or logout.
 - **Stateless Access Token Lifecycle**: Access tokens are stateless HS256 JWTs that remain cryptographically valid until expiration; the platform intentionally does not maintain a server-side token blacklist. Clients are strictly responsible for clearing locally stored access and refresh tokens upon receiving HTTP `204 No Content`.
 
+### Current User profile and settings (M1)
+
+- `GET /users/me` requires an authenticated Bearer JWT access token. Unauthenticated requests or invalid tokens return `401 UNAUTHORIZED`. The User ID is derived exclusively from the verified JWT subject.
+- **Contract Projection**: Returns `CurrentUserResponse` combining user account identity (`id`, `email`, `displayName`, `status`, `preferredLocale`, `timezone`, `emailVerifiedAt`, `createdAt`, `phoneNumber`), active roles (`fitness.user_roles` where `revoked_at IS NULL`), capabilities (`hasStudentProfile`, `hasTrainerProfile`, and `canCoach: false`), and user settings.
+- **Default Settings Fallback**: If the user does not yet have a record in `fitness.user_settings`, the query returns default contract settings (`weekStartsOn = 1`, `measurementSystem = 'METRIC'`, empty maps for `accessibilityPreferences` and `privacyPreferences`).
+- `PATCH /users/me` accepts `UpdateCurrentUserRequest` with partial updates to mutable account profile attributes and settings. Requires at least one property (`minProperties: 1`).
+- **Partial Update Semantics**:
+  - Omitted fields in the request payload are preserved without modification.
+  - An explicit `"phoneNumber": null` clears the phone number; omitting `phoneNumber` leaves the existing phone number unchanged.
+  - Partial nested `settings` updates only specified fields while preserving existing persisted settings fields. If no prior settings record exists, missing fields are initialized with contract defaults.
+  - Profile and settings updates are executed in a single atomic database transaction (`@Transactional`); any failure triggers a complete rollback.
+  - Updates `updated_at` timestamps on modified rows.
+  - Read-only fields cannot be altered: `email`, `status`, `roles`, `capabilities`, and coaching authority cannot be modified through this endpoint.
+  - Returns the updated `CurrentUserResponse`.
+- **Sensitive Data Redaction**: `phoneNumber` and `privacyPreferences` are treated as sensitive data and redacted (`[REDACTED]`) in all DTO, model, command, view, and logging string representations (`toString()`).
+
 ## Authorization layers
 
 Endpoints enforce all relevant layers:

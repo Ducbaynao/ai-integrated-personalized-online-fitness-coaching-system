@@ -34,4 +34,22 @@ public record CurrentUserView(
             settings = UserSettingsView.defaults();
         }
     }
+
+    @Override
+    public String toString() {
+        return "CurrentUserView[" +
+                "id=" + id +
+                ", email=" + email +
+                ", displayName=" + displayName +
+                ", status=" + status +
+                ", preferredLocale=" + preferredLocale +
+                ", timezone=" + timezone +
+                ", emailVerifiedAt=" + emailVerifiedAt +
+                ", createdAt=" + createdAt +
+                ", phoneNumber=" + (phoneNumber != null ? "[REDACTED]" : "null") +
+                ", roles=" + roles +
+                ", capabilities=" + capabilities +
+                ", settings=" + settings +
+                "]";
+    }
 }

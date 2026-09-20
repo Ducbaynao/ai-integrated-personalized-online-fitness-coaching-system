@@ -4,6 +4,15 @@ spring:
       on-profile: dev
   jpa:
     show-sql: true
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 logging:
   level:
@@ -14,3 +23,7 @@ logging:
 auth:
   jwt:
     secret: dev-only-jwt-secret-change-before-production-1234567890
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8081,http://127.0.0.1:8081}

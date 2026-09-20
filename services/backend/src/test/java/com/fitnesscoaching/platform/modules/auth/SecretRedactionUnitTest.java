@@ -254,4 +254,91 @@ class SecretRedactionUnitTest {
         assertThat(deserializedTokenPair.accessToken()).isEqualTo(ACCESS_TOKEN_SENTINEL);
         assertThat(deserializedTokenPair.refreshToken()).isEqualTo(REFRESH_TOKEN_SENTINEL);
     }
+
+    @Test
+    @DisplayName("Current User DTOs, domain models, and commands redact phoneNumber and privacyPreferences in toString()")
+    void currentUserToStringRedactsSensitiveData() {
+        String phoneSentinel = "+84999999999-secret-phone";
+        String privacySentinel = "secret-privacy-value";
+        Instant now = Instant.parse("2026-09-20T08:00:00Z");
+        UUID userId = UUID.randomUUID();
+
+        // 1. UpdateCurrentUserRequest
+        var updateReq = com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UpdateCurrentUserRequest.of(
+                "Alex", true, phoneSentinel, "en-US", "UTC",
+                com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UpdateUserSettingsRequest.of(
+                        0, "METRIC", Map.of("theme", "dark"), Map.of("secretKey", privacySentinel)
+                )
+        );
+        assertThat(updateReq.toString())
+                .doesNotContain(phoneSentinel)
+                .contains("phoneNumber=[REDACTED]");
+        assertThat(updateReq.getSettings().toString())
+                .doesNotContain(privacySentinel)
+                .contains("privacyPreferences=[REDACTED]");
+
+        // 2. CurrentUserResponse
+        var userResp = new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.CurrentUserResponse(
+                userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE, "en-US", "UTC", now, now,
+                phoneSentinel, List.of("STUDENT"),
+                new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UserCapabilitiesDto(true, false, false),
+                new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UserSettingsDto(1, "METRIC", Map.of(), Map.of("secretKey", privacySentinel))
+        );
+        assertThat(userResp.toString())
+                .doesNotContain(phoneSentinel)
+                .contains("phoneNumber=[REDACTED]");
+        assertThat(userResp.settings().toString())
+                .doesNotContain(privacySentinel)
+                .contains("privacyPreferences=[REDACTED]");
+
+        // 3. CurrentUserView & UserSettingsView
+        var userView = new com.fitnesscoaching.platform.modules.user.application.model.CurrentUserView(
+                userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE, "en-US", "UTC", now, now,
+                phoneSentinel, List.of("STUDENT"),
+                new com.fitnesscoaching.platform.modules.user.application.model.UserCapabilitiesView(true, false, false),
+                new com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView(1, "METRIC", Map.of(), Map.of("secretKey", privacySentinel))
+        );
+        assertThat(userView.toString())
+                .doesNotContain(phoneSentinel)
+                .contains("phoneNumber=[REDACTED]");
+        assertThat(userView.settings().toString())
+                .doesNotContain(privacySentinel)
+                .contains("privacyPreferences=[REDACTED]");
+
+        // 4. UpdateCurrentUserCommand & UpdateUserSettingsCommand
+        var updateCmd = new com.fitnesscoaching.platform.modules.user.application.port.in.UpdateCurrentUserCommand(
+                userId,
+                com.fitnesscoaching.platform.modules.user.application.model.PatchField.of("Alex"),
+                com.fitnesscoaching.platform.modules.user.application.model.PatchField.of(phoneSentinel),
+                com.fitnesscoaching.platform.modules.user.application.model.PatchField.omitted(),
+                com.fitnesscoaching.platform.modules.user.application.model.PatchField.omitted(),
+                com.fitnesscoaching.platform.modules.user.application.model.PatchField.of(
+                        new com.fitnesscoaching.platform.modules.user.application.port.in.UpdateUserSettingsCommand(
+                                com.fitnesscoaching.platform.modules.user.application.model.PatchField.of(1),
+                                com.fitnesscoaching.platform.modules.user.application.model.PatchField.omitted(),
+                                com.fitnesscoaching.platform.modules.user.application.model.PatchField.omitted(),
+                                com.fitnesscoaching.platform.modules.user.application.model.PatchField.of(Map.of("secretKey", privacySentinel))
+                        )
+                )
+        );
+        assertThat(updateCmd.toString())
+                .doesNotContain(phoneSentinel)
+                .contains("phoneNumber=[REDACTED]");
+        assertThat(updateCmd.settings().value().toString())
+                .doesNotContain(privacySentinel)
+                .contains("privacyPreferences=[REDACTED]");
+
+        // 5. UserProfileUpdateData & UserSettingsData
+        var profileData = new com.fitnesscoaching.platform.modules.user.application.model.UserProfileUpdateData(
+                "Alex", true, phoneSentinel, "en-US", "UTC", now);
+        assertThat(profileData.toString())
+                .doesNotContain(phoneSentinel)
+                .contains("phoneNumber=[REDACTED]");
+
+        var settingsData = new com.fitnesscoaching.platform.modules.user.application.model.UserSettingsData(
+                1, "METRIC", Map.of(), Map.of("secretKey", privacySentinel), now);
+        assertThat(settingsData.toString())
+                .doesNotContain(privacySentinel)
+                .contains("privacyPreferences=[REDACTED]");
+    }
 }

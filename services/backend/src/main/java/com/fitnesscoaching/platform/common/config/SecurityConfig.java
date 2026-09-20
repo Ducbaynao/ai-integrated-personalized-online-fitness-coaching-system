@@ -15,6 +15,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfigurationSource;
+
+import java.util.Optional;
 
 @Configuration
 @EnableWebSecurity
@@ -42,8 +45,15 @@ public class SecurityConfig {
             HttpSecurity http,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            Optional<CorsConfigurationSource> corsConfigurationSource
     ) throws Exception {
+        if (corsConfigurationSource.isPresent()) {
+            http.cors(cors -> cors.configurationSource(corsConfigurationSource.get()));
+        } else {
+            http.cors(AbstractHttpConfigurer::disable);
+        }
+
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
