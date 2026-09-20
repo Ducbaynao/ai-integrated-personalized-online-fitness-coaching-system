@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
-import { colors, semanticColors } from '@/design-system/tokens/colors';
+import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -67,11 +67,12 @@ export function VerifyEmailScreen() {
     }
   };
 
-  const bg = isDark ? '#12141A' : semanticColors.canvas;
-  const cardBg = isDark ? '#1C1F26' : semanticColors.surface;
-  const textColor = isDark ? '#FFFFFF' : semanticColors.textPrimary;
-  const subtextColor = isDark ? '#8E95A5' : semanticColors.textSecondary;
-  const borderColor = isDark ? '#2D323F' : semanticColors.border;
+  const themeColors = getSemanticColors(isDark);
+  const bg = themeColors.canvas;
+  const cardBg = themeColors.surface;
+  const textColor = themeColors.textPrimary;
+  const subtextColor = themeColors.textSecondary;
+  const borderColor = themeColors.border;
 
   return (
     <KeyboardAvoidingView
@@ -87,20 +88,29 @@ export function VerifyEmailScreen() {
           </Text>
 
           {infoMessage && (
-            <View style={styles.infoBanner}>
+            <View
+              style={styles.infoBanner}
+              accessibilityRole="summary"
+              accessibilityLiveRegion="polite">
               <Text style={styles.infoBannerText}>{infoMessage}</Text>
             </View>
           )}
 
           {errorMessage && (
-            <View style={styles.errorBanner}>
+            <View
+              style={styles.errorBanner}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite">
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           )}
 
           {isSuccess ? (
             <View style={styles.successContainer}>
-              <View style={styles.successBanner}>
+              <View
+                style={styles.successBanner}
+                accessibilityRole="summary"
+                accessibilityLiveRegion="polite">
                 <Text style={styles.successBannerText}>
                   Your email address has been successfully verified! You can now sign in to your
                   account.
@@ -109,12 +119,14 @@ export function VerifyEmailScreen() {
 
               <Pressable
                 testID="go-to-sign-in-button"
+                accessibilityRole="button"
+                accessibilityLabel="Proceed to Sign In"
                 style={({ pressed }) => [
                   styles.primaryButton,
                   {
                     backgroundColor: pressed
-                      ? semanticColors.primaryPressed
-                      : semanticColors.primary,
+                      ? themeColors.primaryPressed
+                      : themeColors.primary,
                   },
                 ]}
                 onPress={() => router.replace('/(auth)/sign-in')}>
@@ -127,6 +139,8 @@ export function VerifyEmailScreen() {
                 <Text style={[styles.label, { color: textColor }]}>Verification Token</Text>
                 <TextInput
                   testID="token-input"
+                  accessibilityLabel="Verification Token"
+                  accessibilityHint="Enter or paste the verification token received in your email"
                   style={[styles.input, { color: textColor, borderColor }]}
                   placeholder="Paste or enter verification token"
                   placeholderTextColor={subtextColor}
@@ -144,20 +158,23 @@ export function VerifyEmailScreen() {
 
               <Pressable
                 testID="submit-verify"
+                accessibilityRole="button"
+                accessibilityLabel="Confirm Verification"
+                accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
                 style={({ pressed }) => [
                   styles.primaryButton,
                   {
                     backgroundColor: isSubmitting
                       ? colors.brand[300]
                       : pressed
-                      ? semanticColors.primaryPressed
-                      : semanticColors.primary,
+                      ? themeColors.primaryPressed
+                      : themeColors.primary,
                   },
                 ]}
                 onPress={handleVerify}
                 disabled={isSubmitting}>
                 {isSubmitting ? (
-                  <ActivityIndicator color={semanticColors.textOnPrimary} />
+                  <ActivityIndicator color={themeColors.textOnPrimary} />
                 ) : (
                   <Text style={styles.buttonText}>Confirm Verification</Text>
                 )}
@@ -166,6 +183,8 @@ export function VerifyEmailScreen() {
               <View style={styles.footerLinks}>
                 <Pressable
                   testID="back-to-sign-in"
+                  accessibilityRole="link"
+                  accessibilityLabel="Back to Sign In"
                   onPress={() => router.push('/(auth)/sign-in')}
                   style={styles.linkButton}
                   disabled={isSubmitting}>

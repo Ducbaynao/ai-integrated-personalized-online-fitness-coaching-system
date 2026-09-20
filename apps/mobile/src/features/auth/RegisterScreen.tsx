@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
-import { colors, semanticColors } from '@/design-system/tokens/colors';
+import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -34,14 +34,13 @@ export function RegisterScreen() {
   const handleRegister = async () => {
     if (isSubmitting) return;
 
+    // Client validation
     const errors: Record<string, string> = {};
     if (!displayName.trim()) {
-      errors.displayName = 'Name is required';
+      errors.displayName = 'Full name is required';
     }
     if (!email.trim()) {
       errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = 'Please enter a valid email address';
     }
     if (!password) {
       errors.password = 'Password is required';
@@ -60,8 +59,8 @@ export function RegisterScreen() {
 
     try {
       await register({
-        displayName: displayName.trim(),
         email: email.trim(),
+        displayName: displayName.trim(),
         password,
       });
 
@@ -91,11 +90,12 @@ export function RegisterScreen() {
     }
   };
 
-  const bg = isDark ? '#12141A' : semanticColors.canvas;
-  const cardBg = isDark ? '#1C1F26' : semanticColors.surface;
-  const textColor = isDark ? '#FFFFFF' : semanticColors.textPrimary;
-  const subtextColor = isDark ? '#8E95A5' : semanticColors.textSecondary;
-  const borderColor = isDark ? '#2D323F' : semanticColors.border;
+  const themeColors = getSemanticColors(isDark);
+  const bg = themeColors.canvas;
+  const cardBg = themeColors.surface;
+  const textColor = themeColors.textPrimary;
+  const subtextColor = themeColors.textSecondary;
+  const borderColor = themeColors.border;
 
   return (
     <KeyboardAvoidingView
@@ -111,7 +111,10 @@ export function RegisterScreen() {
           </Text>
 
           {errorMessage && (
-            <View style={styles.errorBanner}>
+            <View
+              style={styles.errorBanner}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite">
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           )}
@@ -120,9 +123,12 @@ export function RegisterScreen() {
             <Text style={[styles.label, { color: textColor }]}>Full Name</Text>
             <TextInput
               testID="display-name-input"
+              accessibilityLabel="Full Name"
+              accessibilityHint="Enter your full name"
+              aria-invalid={!!fieldErrors.displayName}
               style={[
                 styles.input,
-                { color: textColor, borderColor: fieldErrors.displayName ? semanticColors.dangerText : borderColor },
+                { color: textColor, borderColor: fieldErrors.displayName ? themeColors.dangerText : borderColor },
               ]}
               placeholder="Alex Smith"
               placeholderTextColor={subtextColor}
@@ -144,9 +150,12 @@ export function RegisterScreen() {
             <Text style={[styles.label, { color: textColor }]}>Email</Text>
             <TextInput
               testID="email-input"
+              accessibilityLabel="Email"
+              accessibilityHint="Enter your email address"
+              aria-invalid={!!fieldErrors.email}
               style={[
                 styles.input,
-                { color: textColor, borderColor: fieldErrors.email ? semanticColors.dangerText : borderColor },
+                { color: textColor, borderColor: fieldErrors.email ? themeColors.dangerText : borderColor },
               ]}
               placeholder="you@example.com"
               placeholderTextColor={subtextColor}
@@ -171,9 +180,12 @@ export function RegisterScreen() {
             <Text style={[styles.label, { color: textColor }]}>Password</Text>
             <TextInput
               testID="password-input"
+              accessibilityLabel="Password"
+              accessibilityHint="Create a password with at least 8 characters"
+              aria-invalid={!!fieldErrors.password}
               style={[
                 styles.input,
-                { color: textColor, borderColor: fieldErrors.password ? semanticColors.dangerText : borderColor },
+                { color: textColor, borderColor: fieldErrors.password ? themeColors.dangerText : borderColor },
               ]}
               placeholder="At least 8 characters"
               placeholderTextColor={subtextColor}
@@ -194,20 +206,23 @@ export function RegisterScreen() {
 
           <Pressable
             testID="submit-register"
+            accessibilityRole="button"
+            accessibilityLabel="Register"
+            accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
             style={({ pressed }) => [
               styles.primaryButton,
               {
                 backgroundColor: isSubmitting
                   ? colors.brand[300]
                   : pressed
-                  ? semanticColors.primaryPressed
-                  : semanticColors.primary,
+                  ? themeColors.primaryPressed
+                  : themeColors.primary,
               },
             ]}
             onPress={handleRegister}
             disabled={isSubmitting}>
             {isSubmitting ? (
-              <ActivityIndicator color={semanticColors.textOnPrimary} />
+              <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
               <Text style={styles.buttonText}>Register</Text>
             )}
@@ -216,6 +231,8 @@ export function RegisterScreen() {
           <View style={styles.footerLinks}>
             <Pressable
               testID="link-to-sign-in"
+              accessibilityRole="link"
+              accessibilityLabel="Already have an account? Sign In"
               onPress={() => router.push('/(auth)/sign-in')}
               style={styles.linkButton}
               disabled={isSubmitting}>

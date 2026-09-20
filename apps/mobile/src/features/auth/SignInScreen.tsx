@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
-import { colors, semanticColors } from '@/design-system/tokens/colors';
+import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -75,11 +75,12 @@ export function SignInScreen() {
     }
   };
 
-  const bg = isDark ? '#12141A' : semanticColors.canvas;
-  const cardBg = isDark ? '#1C1F26' : semanticColors.surface;
-  const textColor = isDark ? '#FFFFFF' : semanticColors.textPrimary;
-  const subtextColor = isDark ? '#8E95A5' : semanticColors.textSecondary;
-  const borderColor = isDark ? '#2D323F' : semanticColors.border;
+  const themeColors = getSemanticColors(isDark);
+  const bg = themeColors.canvas;
+  const cardBg = themeColors.surface;
+  const textColor = themeColors.textPrimary;
+  const subtextColor = themeColors.textSecondary;
+  const borderColor = themeColors.border;
 
   return (
     <KeyboardAvoidingView
@@ -95,7 +96,10 @@ export function SignInScreen() {
           </Text>
 
           {errorMessage && (
-            <View style={styles.errorBanner}>
+            <View
+              style={styles.errorBanner}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite">
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           )}
@@ -104,9 +108,12 @@ export function SignInScreen() {
             <Text style={[styles.label, { color: textColor }]}>Email</Text>
             <TextInput
               testID="email-input"
+              accessibilityLabel="Email"
+              accessibilityHint="Enter your email address"
+              aria-invalid={!!fieldErrors.email}
               style={[
                 styles.input,
-                { color: textColor, borderColor: fieldErrors.email ? semanticColors.dangerText : borderColor },
+                { color: textColor, borderColor: fieldErrors.email ? themeColors.dangerText : borderColor },
               ]}
               placeholder="you@example.com"
               placeholderTextColor={subtextColor}
@@ -131,9 +138,12 @@ export function SignInScreen() {
             <Text style={[styles.label, { color: textColor }]}>Password</Text>
             <TextInput
               testID="password-input"
+              accessibilityLabel="Password"
+              accessibilityHint="Enter your password"
+              aria-invalid={!!fieldErrors.password}
               style={[
                 styles.input,
-                { color: textColor, borderColor: fieldErrors.password ? semanticColors.dangerText : borderColor },
+                { color: textColor, borderColor: fieldErrors.password ? themeColors.dangerText : borderColor },
               ]}
               placeholder="••••••••"
               placeholderTextColor={subtextColor}
@@ -154,20 +164,23 @@ export function SignInScreen() {
 
           <Pressable
             testID="submit-sign-in"
+            accessibilityRole="button"
+            accessibilityLabel="Sign In"
+            accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
             style={({ pressed }) => [
               styles.primaryButton,
               {
                 backgroundColor: isSubmitting
                   ? colors.brand[300]
                   : pressed
-                  ? semanticColors.primaryPressed
-                  : semanticColors.primary,
+                  ? themeColors.primaryPressed
+                  : themeColors.primary,
               },
             ]}
             onPress={handleSignIn}
             disabled={isSubmitting}>
             {isSubmitting ? (
-              <ActivityIndicator color={semanticColors.textOnPrimary} />
+              <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
               <Text style={styles.buttonText}>Sign In</Text>
             )}
@@ -176,6 +189,8 @@ export function SignInScreen() {
           <View style={styles.footerLinks}>
             <Pressable
               testID="link-to-register"
+              accessibilityRole="link"
+              accessibilityLabel="Don't have an account? Register"
               onPress={() => router.push('/(auth)/register')}
               style={styles.linkButton}
               disabled={isSubmitting}>
@@ -187,6 +202,8 @@ export function SignInScreen() {
 
             <Pressable
               testID="link-to-verify-email"
+              accessibilityRole="link"
+              accessibilityLabel="Have a verification token? Verify Email"
               onPress={() => router.push('/(auth)/verify-email')}
               style={styles.linkButton}
               disabled={isSubmitting}>

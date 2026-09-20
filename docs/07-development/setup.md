@@ -2,7 +2,7 @@
 
 ## 1. Configure environment
 
-Copy `.env.example` to `.env` and replace development credentials.
+Copy `.env.example` to `.env` and replace development credentials. Note that `.env.example` is only a template; local `.env` is ignored by Git and must never be committed to the repository.
 
 For any non-`dev` backend profile, set `JWT_SECRET` to an application secret containing at least 32 UTF-8 bytes. Do not commit a production JWT secret. `ACCESS_TOKEN_TTL` and `REFRESH_TOKEN_TTL` use ISO-8601 duration syntax, for example `PT15M` and `P30D`. The local `dev` profile supplies an explicitly development-only JWT secret so the quick-start command remains reproducible.
 
@@ -57,20 +57,21 @@ npm run dev:admin
 
 ## 6. Start Backend
 
-Windows:
+Docker Compose automatically reads `.env` to configure PostgreSQL credentials. However, running Spring Boot directly via Maven does not automatically parse the root `.env` file, which can lead to authentication mismatches (`FATAL: password authentication failed for user "fitness_app"`).
+
+To prevent this, use the recommended development launcher script, which reads the root `.env`, validates that required credentials exist, and securely exports only allowlisted variables (`DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `BACKEND_PORT`) without printing secrets:
+
+Windows (PowerShell) (Recommended):
 ```powershell
-cd services\backend
-$env:SPRING_PROFILES_ACTIVE="dev"
-.\mvnw.cmd spring-boot:run
+.\services\backend\run-dev.ps1
 ```
 
-Unix:
+Unix / macOS (Recommended):
 ```bash
-cd services/backend
-SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+bash ./services/backend/run-dev.sh
 ```
 
-The `dev` profile explicitly activates the development verification-email adapter (`DevelopmentVerificationEmailSender`), which dispatches emails via SMTP to Mailpit, alongside a development-only JWT signing secret. Default and production profiles intentionally fail fast if `JWT_SECRET` is missing/short or no real `VerificationEmailPort` is configured. The development adapter masks recipient email addresses and does not expose or log plaintext verification tokens. Milestone M1A/M1B is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
+The `dev` profile explicitly activates the development verification-email adapter (`DevelopmentVerificationEmailSender`), which dispatches verification emails via SMTP to Mailpit alongside a development-only JWT signing secret. The verification token is visible in Mailpit (`http://localhost:8025`) for development testing and deep linking, but plaintext tokens are strictly never written to backend application logs. Default and production profiles intentionally fail fast if `JWT_SECRET` is missing/short or if no production `VerificationEmailPort` is configured. Milestone M1A/M1B is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
 
 ## 7. Start AI Service
 

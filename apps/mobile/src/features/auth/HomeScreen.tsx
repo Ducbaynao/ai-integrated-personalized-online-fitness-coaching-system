@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/features/auth/AuthContext';
-import { colors, semanticColors } from '@/design-system/tokens/colors';
+import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -30,11 +30,12 @@ export function HomeScreen() {
     }
   };
 
-  const bg = isDark ? '#12141A' : semanticColors.canvas;
-  const cardBg = isDark ? '#1C1F26' : semanticColors.surface;
-  const textColor = isDark ? '#FFFFFF' : semanticColors.textPrimary;
-  const subtextColor = isDark ? '#8E95A5' : semanticColors.textSecondary;
-  const borderColor = isDark ? '#2D323F' : semanticColors.border;
+  const themeColors = getSemanticColors(isDark);
+  const bg = themeColors.canvas;
+  const cardBg = themeColors.surface;
+  const textColor = themeColors.textPrimary;
+  const subtextColor = themeColors.textSecondary;
+  const borderColor = themeColors.border;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
@@ -128,20 +129,23 @@ export function HomeScreen() {
         {/* Logout Action */}
         <Pressable
           testID="logout-button"
+          accessibilityRole="button"
+          accessibilityLabel="Log Out"
+          accessibilityState={{ disabled: isLoggingOut, busy: isLoggingOut }}
           style={({ pressed }) => [
             styles.logoutButton,
             {
               backgroundColor: isLoggingOut
-                ? colors.danger[100]
+                ? themeColors.dangerSurface
                 : pressed
-                ? '#B82E38'
-                : semanticColors.dangerText,
+                ? themeColors.dangerPressed
+                : themeColors.dangerText,
             },
           ]}
           onPress={handleLogout}
           disabled={isLoggingOut}>
           {isLoggingOut ? (
-            <ActivityIndicator color={semanticColors.textOnPrimary} />
+            <ActivityIndicator color={themeColors.textOnPrimary} />
           ) : (
             <Text style={styles.logoutButtonText}>Log Out</Text>
           )}
