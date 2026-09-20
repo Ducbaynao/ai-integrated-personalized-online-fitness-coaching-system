@@ -30,6 +30,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci --prefix apps/mobile
+      - run: npm --prefix apps/mobile test -- --runInBand
       - run: npm run lint:mobile
       - run: npm run typecheck:mobile
 

@@ -105,6 +105,7 @@ paths:
               $ref: '#/components/schemas/LogoutRequest'
       responses:
         '204': { description: Session revoked or already inactive }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
   /auth/token-refreshes:
@@ -694,7 +695,7 @@ components:
       enum: [PENDING_VERIFICATION, ACTIVE, SUSPENDED, DISABLED, DELETION_PENDING, DELETED]
     RoleCode:
       type: string
-      enum: [STUDENT, TRAINER, ADMIN]
+      enum: [STUDENT, TRAINER, ADMIN, SUPER_ADMIN, USER_ADMIN, CONTENT_ADMIN, SUPPORT_ADMIN, MODERATION_ADMIN]
     MeasurementSystem:
       type: string
       enum: [METRIC, IMPERIAL]
