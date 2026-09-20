@@ -128,6 +128,50 @@ public class GlobalExceptionHandler {
                 "INVALID_REFRESH_TOKEN", ex.getMessage(), Instant.now(clock), RequestIdHolder.get()));
     }
 
+    @ExceptionHandler(StudentProfileAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleStudentProfileAlreadyExists(StudentProfileAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "STUDENT_PROFILE_ALREADY_EXISTS",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(StudentCapabilityRevokedException.class)
+    public ResponseEntity<ErrorResponse> handleStudentCapabilityRevoked(StudentCapabilityRevokedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "STUDENT_CAPABILITY_REVOKED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(StudentCapabilityUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleStudentCapabilityUnavailable(StudentCapabilityUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "STUDENT_CAPABILITY_UNAVAILABLE",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(StudentProfileNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleStudentProfileNotFound(StudentProfileNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "STUDENT_PROFILE_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
@@ -135,6 +179,17 @@ public class GlobalExceptionHandler {
             ErrorResponse response = ErrorResponse.of(
                     "EMAIL_ALREADY_REGISTERED",
                     "Email is already registered.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (msg.contains("student_profiles_pkey") || msg.contains("student_profiles")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "STUDENT_PROFILE_ALREADY_EXISTS",
+                    "Student profile already exists for this account.",
                     Instant.now(clock),
                     RequestIdHolder.get(),
                     Collections.emptyList()
@@ -163,6 +218,31 @@ public class GlobalExceptionHandler {
                 Collections.emptyList()
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(ApplicationValidationException.class)
+    public ResponseEntity<ErrorResponse> handleApplicationValidation(ApplicationValidationException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                ex.getMessage() != null ? ex.getMessage() : "Request validation failed",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                ex.getFieldErrors()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(SystemRoleNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSystemRoleNotFound(SystemRoleNotFoundException ex) {
+        log.error("System role missing from database: {}", ex.getMessage());
+        ErrorResponse response = ErrorResponse.of(
+                "INTERNAL_SERVER_ERROR",
+                "System configuration error: required role does not exist.",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
     @ExceptionHandler(Exception.class)
