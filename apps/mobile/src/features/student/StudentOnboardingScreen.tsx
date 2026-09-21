@@ -120,14 +120,14 @@ export function StudentOnboardingScreen() {
           };
 
       await studentProfileApi.createStudentProfile(payload);
-      await refreshUser();
+      await refreshUser('STUDENT');
       router.replace('/(app)');
     } catch (err) {
       if (err instanceof ApiError) {
         // Recovery logic for 409 Conflict: single refreshUser() check
         if (err.status === 409) {
           try {
-            const refreshed = await refreshUser();
+            const refreshed = await refreshUser('STUDENT');
             if (refreshed?.capabilities?.hasStudentProfile) {
               router.replace('/(app)');
               return;

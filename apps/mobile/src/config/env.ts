@@ -12,14 +12,17 @@ import { Platform } from 'react-native';
  * In accordance with security rules, NO sensitive secrets (API private keys,
  * database credentials, JWT signing keys) are bundled in mobile code.
  */
-function resolveApiBaseUrl(): string {
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (envUrl && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
-    return envUrl.replace(/\/+$/, '');
+export function resolveApiBaseUrl(
+  envUrl: string | undefined = process.env.EXPO_PUBLIC_API_BASE_URL,
+  platformOS: typeof Platform.OS = Platform.OS
+): string {
+  const trimmed = envUrl?.trim();
+  if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+    return trimmed.replace(/\/+$/, '');
   }
 
-  // Fallback for emulator vs simulator
-  if (Platform.OS === 'android') {
+  // Fallback when environment variable is absent or invalid
+  if (platformOS === 'android') {
     return 'http://10.0.2.2:8080/api/v1';
   }
   return 'http://127.0.0.1:8080/api/v1';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { requiresStudentOnboarding } from '@/features/auth/routeGuard';
+import { canAccessMainApp, getAuthenticatedHomeRoute } from '@/features/auth/routeGuard';
 
 export default function AppLayout() {
   const { status, user, isLoading } = useAuth();
@@ -14,9 +14,9 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  // Redirect to onboarding if user lacks Student Profile
-  if (requiresStudentOnboarding(user)) {
-    return <Redirect href="/(onboarding)/student" />;
+  // Redirect to onboarding purpose selection if user has no profiles
+  if (!canAccessMainApp(user)) {
+    return <Redirect href={getAuthenticatedHomeRoute(user) as any} />;
   }
 
   return (
@@ -26,6 +26,7 @@ export default function AppLayout() {
       }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="profile" />
+      <Stack.Screen name="trainer-profile" />
     </Stack>
   );
 }

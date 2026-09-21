@@ -1,4 +1,4 @@
-import { tokenStorage } from '@/services/storage';
+import { capabilityStorage, tokenStorage } from '@/services/storage';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
@@ -99,6 +99,77 @@ describe('tokenStorage', () => {
       expect(await tokenStorage.getTokens()).toBeNull();
       expect(await tokenStorage.getAccessToken()).toBeNull();
       expect(await tokenStorage.getRefreshToken()).toBeNull();
+    });
+  });
+});
+
+describe('capabilityStorage', () => {
+  const originalPlatformOS = Platform.OS;
+
+  afterEach(() => {
+    Platform.OS = originalPlatformOS;
+  });
+
+  describe('Native SecureStore path (iOS/Android)', () => {
+    beforeEach(async () => {
+      Platform.OS = 'ios';
+      (SecureStore as unknown as { __resetStore: () => void }).__resetStore();
+      await capabilityStorage.clearActiveCapability();
+    });
+
+    it('saves and retrieves active capability using SecureStore', async () => {
+      await capabilityStorage.saveActiveCapability('TRAINER');
+
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        'active_mobile_capability',
+        'TRAINER'
+      );
+
+      const capability = await capabilityStorage.getActiveCapability();
+      expect(capability).toBe('TRAINER');
+    });
+
+    it('returns null if capability is not set in SecureStore', async () => {
+      expect(await capabilityStorage.getActiveCapability()).toBeNull();
+    });
+
+    it('clears active capability from SecureStore', async () => {
+      await capabilityStorage.saveActiveCapability('STUDENT');
+      expect(await capabilityStorage.getActiveCapability()).toBe('STUDENT');
+
+      await capabilityStorage.clearActiveCapability();
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('active_mobile_capability');
+      expect(await capabilityStorage.getActiveCapability()).toBeNull();
+    });
+  });
+
+  describe('Web In-Memory path (web preview)', () => {
+    beforeEach(async () => {
+      Platform.OS = 'web';
+      jest.clearAllMocks();
+      await capabilityStorage.clearActiveCapability();
+    });
+
+    it('stores and retrieves capability in memory without calling SecureStore', async () => {
+      await capabilityStorage.saveActiveCapability('TRAINER');
+
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+      const capability = await capabilityStorage.getActiveCapability();
+      expect(capability).toBe('TRAINER');
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('returns null when capability is not set on web', async () => {
+      expect(await capabilityStorage.getActiveCapability()).toBeNull();
+    });
+
+    it('clears capability in memory on web without calling SecureStore.deleteItemAsync', async () => {
+      await capabilityStorage.saveActiveCapability('STUDENT');
+      expect(await capabilityStorage.getActiveCapability()).toBe('STUDENT');
+
+      await capabilityStorage.clearActiveCapability();
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(await capabilityStorage.getActiveCapability()).toBeNull();
     });
   });
 });
