@@ -355,6 +355,13 @@ paths:
                 $ref: '#/components/schemas/TrainerApplicationResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden - Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Trainer capability is not active (TRAINER_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404':
           description: A Trainer Profile must exist first
           content:
@@ -379,6 +386,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/TrainerApplicationResponse'
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden - Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Trainer capability is not active (TRAINER_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404':
           description: No Trainer Application exists
           content:

@@ -1,7 +1,9 @@
 package com.fitnesscoaching.platform.modules.trainer.application.port.out;
 
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
+import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +20,6 @@ public interface TrainerProfilePort {
     TrainerProfile save(TrainerProfile profile);
 
     TrainerProfile update(TrainerProfile profile);
+
+    void updateVerificationStatus(UUID trainerId, TrainerVerificationStatus status, Instant updatedAt);
 }

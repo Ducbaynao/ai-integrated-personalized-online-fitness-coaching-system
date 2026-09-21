@@ -227,10 +227,54 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(TrainerApplicationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerApplicationNotFound(TrainerApplicationNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "TRAINER_APPLICATION_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerApplicationAlreadyActiveException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerApplicationAlreadyActive(TrainerApplicationAlreadyActiveException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "TRAINER_APPLICATION_ALREADY_ACTIVE",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(InvalidLifecycleTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidLifecycleTransition(InvalidLifecycleTransitionException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "INVALID_LIFECYCLE_TRANSITION",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String constraintName = extractConstraintName(ex);
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+
+        if (matchesConstraint(constraintName, msg, "uq_trainer_pending_application")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "TRAINER_APPLICATION_ALREADY_ACTIVE",
+                    "An active verification application already exists for this trainer.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
 
         if (matchesConstraint(constraintName, msg, "users_email_key") || msg.contains("email")) {
             ErrorResponse response = ErrorResponse.of(

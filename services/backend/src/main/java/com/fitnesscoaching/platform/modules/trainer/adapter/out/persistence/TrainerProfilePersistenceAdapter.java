@@ -177,4 +177,21 @@ public class TrainerProfilePersistenceAdapter implements TrainerProfilePort {
 
         return profile;
     }
+
+    @Override
+    public void updateVerificationStatus(UUID trainerId, TrainerVerificationStatus status, Instant updatedAt) {
+        String sql = """
+                UPDATE fitness.trainer_profiles SET
+                    verification_status = ?::fitness.trainer_verification_state,
+                    updated_at = ?
+                WHERE user_id = ?
+                """;
+
+        jdbcTemplate.update(
+                sql,
+                status.name(),
+                Timestamp.from(updatedAt),
+                trainerId
+        );
+    }
 }

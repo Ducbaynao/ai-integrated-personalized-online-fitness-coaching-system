@@ -19,7 +19,7 @@ This map groups the physical PostgreSQL schema by business boundary. It is a nav
 | Identity and access | `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, `auth_identities`, `refresh_tokens`, `one_time_tokens`, `user_devices`, `user_settings`, `session_revocation_events` | User identity plus platform security policy. Profile existence is not coaching authority. Tokens are stored as hashes where applicable. | V2, V16 |
 | Account security and lifecycle | `user_account_status_history`, `mfa_factors`, `step_up_authentications`, `security_events` | Platform-authorized lifecycle and security evidence. Sensitive Admin actions may require step-up authentication. | V14 |
 | Student profile | `student_profiles`, `student_availability_windows`, `student_movement_limitations`, `student_equipment`, `student_exercise_preferences` | Student-managed facts and preferences; health-adjacent data requires scoped access. Coaching Mode is not stored here. | V2, V3 |
-| Trainer profile and eligibility | `trainer_profiles`, `trainer_certificates`, `trainer_specialties`, `trainer_specialty_assignments`, `trainer_verification_requests`, `trainer_verification_documents`, `trainer_application_status_history`, `trainer_activity_status_history` | Platform verifies/activates capability. Profile creation or role assignment alone does not permit coaching. | V2, V10, V14 |
+| Trainer profile and eligibility | `trainer_profiles`, `trainer_certificates`, `trainer_specialties`, `trainer_specialty_assignments`, `trainer_applications`, `trainer_application_certificates`, `trainer_verification_documents`, `trainer_application_status_history`, `trainer_activity_status_history` | Platform verifies/activates capability. Profile creation or role assignment alone does not permit coaching. | V2, V10, V14, V18 |
 | Measurement catalog | `measurement_units`, `metric_definitions`, `measurement_methods`, `measurement_sources`, `metric_supported_methods`, `measurement_source_priorities` | Platform-governed catalog used by all measurement sources; definitions do not contain observations. | V3, V16 |
 | Exercise catalog | `exercise_categories`, `muscle_groups`, `equipment`, `exercises`, `exercise_variations`, `exercise_muscles`, `exercise_equipment`, `exercise_media`, `exercise_tags`, `exercise_tag_assignments`, `exercise_guidance`, `exercise_canonical_mappings`, `exercise_merge_events` | Platform-governed content. Referenced exercises are archived or canonically mapped, not destructively deleted. | V3, V15, V16 |
 | Food and nutrient catalog | `food_categories`, `nutrients`, `foods`, `food_nutrients` | Platform-governed deterministic nutrition reference data. AI estimates do not replace confirmed food identity and quantity. | V3 |
@@ -67,10 +67,12 @@ This map groups the physical PostgreSQL schema by business boundary. It is a nav
 | `V14__admin_governance_and_security.sql` | Admin permission workflows, moderation/support, jobs, MFA, and security events |
 | `V15__content_and_ai_governance.sql` | Content merge/version review and AI evaluation/replay governance |
 | `V16__domain_completeness_and_invariants.sql` | Remaining catalogs, check-ins, deduplication, policies, and session revocation |
+| `V17__seed_initial_roles.sql` | Seed initial system roles (STUDENT, TRAINER, ADMIN) |
+| `V18__trainer_application_submission_schema.sql` | Trainer verification state alignment, applicant note, certificates junction, and unique pending application constraint |
 
 ## Change rules
 
-1. Never edit an applied migration; add the next ordered migration starting with `V17`.
+1. Never edit an applied migration; add the next ordered migration starting with `V19`.
 2. A table belongs to one owning module even when other modules read its published contract.
 3. Modules do not access another module's repository directly.
 4. Cross-module changes use application services, commands, or committed domain events.
