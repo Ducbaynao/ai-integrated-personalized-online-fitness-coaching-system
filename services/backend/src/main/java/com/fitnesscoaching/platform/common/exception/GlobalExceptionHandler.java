@@ -172,10 +172,67 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(TrainerProfileAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerProfileAlreadyExists(TrainerProfileAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "TRAINER_PROFILE_ALREADY_EXISTS",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerCapabilityRevokedException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerCapabilityRevoked(TrainerCapabilityRevokedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "TRAINER_CAPABILITY_REVOKED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerCapabilityUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerCapabilityUnavailable(TrainerCapabilityUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "TRAINER_CAPABILITY_UNAVAILABLE",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerProfileNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerProfileNotFound(TrainerProfileNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "TRAINER_PROFILE_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerSlugAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerSlugAlreadyExists(TrainerSlugAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "TRAINER_SLUG_ALREADY_EXISTS",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        String constraintName = extractConstraintName(ex);
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
-        if (msg.contains("users_email_key") || msg.contains("email")) {
+
+        if (matchesConstraint(constraintName, msg, "users_email_key") || msg.contains("email")) {
             ErrorResponse response = ErrorResponse.of(
                     "EMAIL_ALREADY_REGISTERED",
                     "Email is already registered.",
@@ -186,7 +243,7 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
-        if (msg.contains("student_profiles_pkey") || msg.contains("student_profiles")) {
+        if (matchesConstraint(constraintName, msg, "student_profiles_pkey") || msg.contains("student_profiles")) {
             ErrorResponse response = ErrorResponse.of(
                     "STUDENT_PROFILE_ALREADY_EXISTS",
                     "Student profile already exists for this account.",
@@ -197,7 +254,29 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
-        log.error("Data integrity violation", ex);
+        if (matchesConstraint(constraintName, msg, "trainer_profiles_public_slug_key")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "TRAINER_SLUG_ALREADY_EXISTS",
+                    "Public slug is already in use by another trainer profile.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "trainer_profiles_pkey")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "TRAINER_PROFILE_ALREADY_EXISTS",
+                    "Trainer profile already exists for this account.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        log.error("Data integrity violation: constraintName={}, message={}", constraintName, ex.getMessage(), ex);
         ErrorResponse response = ErrorResponse.of(
                 "DATA_INTEGRITY_VIOLATION",
                 "A database constraint was violated.",
@@ -206,6 +285,39 @@ public class GlobalExceptionHandler {
                 Collections.emptyList()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    private String extractConstraintName(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof org.hibernate.exception.ConstraintViolationException cve) {
+                if (cve.getConstraintName() != null) {
+                    return cve.getConstraintName().toLowerCase();
+                }
+            }
+            try {
+                java.lang.reflect.Method getServerErrorMessage = current.getClass().getMethod("getServerErrorMessage");
+                Object serverError = getServerErrorMessage.invoke(current);
+                if (serverError != null) {
+                    java.lang.reflect.Method getConstraint = serverError.getClass().getMethod("getConstraint");
+                    Object constraint = getConstraint.invoke(serverError);
+                    if (constraint instanceof String s && !s.isBlank()) {
+                        return s.toLowerCase();
+                    }
+                }
+            } catch (Exception ignored) {
+                // Not a PostgreSQL ServerErrorMessage provider or method unavailable
+            }
+            current = current.getCause();
+        }
+        return null;
+    }
+
+    private boolean matchesConstraint(String constraintName, String msg, String targetConstraint) {
+        if (constraintName != null && constraintName.equals(targetConstraint)) {
+            return true;
+        }
+        return msg.contains(targetConstraint);
     }
 
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)

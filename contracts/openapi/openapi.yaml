@@ -261,7 +261,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpsertTrainerProfileRequest'
+              $ref: '#/components/schemas/CreateTrainerProfileRequest'
       responses:
         '201':
           description: Trainer Profile created
@@ -271,8 +271,12 @@ paths:
                 $ref: '#/components/schemas/TrainerProfileResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
         '409':
-          description: The current User already has a Trainer Profile
+          description: >-
+            Conflict — Trainer Profile already exists (TRAINER_PROFILE_ALREADY_EXISTS),
+            public slug is already in use (TRAINER_SLUG_ALREADY_EXISTS),
+            or Trainer capability has been revoked (TRAINER_CAPABILITY_REVOKED).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -290,6 +294,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/TrainerProfileResponse'
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Trainer capability is not active (TRAINER_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404': { $ref: '#/components/responses/ProfileNotFound' }
     patch:
       tags: [Trainer Profile]
@@ -300,7 +311,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpsertTrainerProfileRequest'
+              $ref: '#/components/schemas/UpdateTrainerProfileRequest'
       responses:
         '200':
           description: Updated Trainer Profile
@@ -310,7 +321,19 @@ paths:
                 $ref: '#/components/schemas/TrainerProfileResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or Trainer capability is not active (TRAINER_CAPABILITY_UNAVAILABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404': { $ref: '#/components/responses/ProfileNotFound' }
+        '409':
+          description: Conflict — Public slug is already in use by another trainer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /trainer-applications:
     post:
@@ -597,7 +620,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
-    UpsertTrainerProfileRequest:
+    CreateTrainerProfileRequest:
       type: object
       additionalProperties: false
       properties:
@@ -608,6 +631,19 @@ components:
         bio: { type: [string, 'null'], maxLength: 4000 }
         yearsExperience: { type: [number, 'null'], minimum: 0, maximum: 99.99 }
         acceptingStudents: { type: boolean, default: false }
+
+    UpdateTrainerProfileRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        publicSlug:
+          type: [string, 'null']
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          maxLength: 100
+        bio: { type: [string, 'null'], maxLength: 4000 }
+        yearsExperience: { type: [number, 'null'], minimum: 0, maximum: 99.99 }
+        acceptingStudents: { type: boolean }
 
     TrainerProfileResponse:
       type: object
@@ -724,7 +760,7 @@ components:
       enum: [BEGINNER, INTERMEDIATE, ADVANCED]
     TrainerVerificationStatus:
       type: string
-      enum: [NOT_SUBMITTED, PENDING, APPROVED, REJECTED, EXPIRED, REVOKED]
+      enum: [NOT_SUBMITTED, PENDING, VERIFIED, REJECTED, SUSPENDED]
     TrainerActivityStatus:
       type: string
       enum: [ACTIVE, INACTIVE, SUSPENDED]
