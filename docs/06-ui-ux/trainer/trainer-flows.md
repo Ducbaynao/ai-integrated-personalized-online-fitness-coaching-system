@@ -3,9 +3,9 @@
 ## 1. Trainer verification
 
 1. User tạo Trainer Profile.
-2. Nộp application và certifications.
-3. Theo dõi `SUBMITTED`, `UNDER_REVIEW`, `NEEDS_INFORMATION`, `APPROVED` hoặc `REJECTED`.
-4. Chỉ khi verification và activity policy hợp lệ, capability coaching mới hoạt động.
+2. Nộp application và certificates/documents (`POST /api/v1/trainer-applications`). Media binary upload được deferred; endpoint nhận các media identifier đã tồn tại và được cấp phép. Chỉ cho phép nộp application khi trạng thái xác minh của profile là `NOT_SUBMITTED`. Nếu profile đang `PENDING` hoặc đã có active application, hệ thống trả về `409 TRAINER_APPLICATION_ALREADY_ACTIVE`. Nếu profile đang `REJECTED`, `VERIFIED` hoặc `SUSPENDED`, hệ thống chặn với `409 INVALID_LIFECYCLE_TRANSITION`. Quy trình nộp lại hồ sơ (resubmission) sau khi bị `REJECTED` hiện đang deferred sang các milestone sau.
+3. Theo dõi trạng thái verification application (`GET /api/v1/trainer-applications/me/current`): các trạng thái được backend hỗ trợ gồm `NOT_SUBMITTED`, `PENDING`, `VERIFIED`, `REJECTED`, `SUSPENDED` (trạng thái ban đầu sau khi submit là `PENDING`). Quy trình Admin review được deferred sang milestone TRAINER-03.
+4. Việc nộp application không đồng nghĩa với verification approval (`canCoach` vẫn là `false`). Chỉ khi verification status là `VERIFIED` và activity policy là `ACTIVE`, capability coaching mới hoạt động.
 
 ## 2. Daily management by exception
 
