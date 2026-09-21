@@ -2,7 +2,7 @@ import React from 'react';
 import renderer from 'react-test-renderer';
 import Index from '@/app/index';
 import { useAuth } from '@/features/auth/AuthContext';
-import { CurrentUserResponse } from '@/types/auth';
+import { CurrentUserResponse, RoleCode } from '@/types/auth';
 
 const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
@@ -17,20 +17,28 @@ jest.mock('@/features/auth/AuthContext', () => ({
 }));
 
 describe('Session Restoration Navigation Resolution in Index', () => {
-  const createMockUser = (hasStudentProfile: boolean): CurrentUserResponse => ({
-    id: 'restored-user-id',
-    email: 'restored@example.com',
-    displayName: 'Restored User',
-    status: 'ACTIVE',
-    preferredLocale: 'vi-VN',
-    timezone: 'Asia/Ho_Chi_Minh',
-    emailVerifiedAt: '2026-09-20T08:00:00Z',
-    createdAt: '2026-09-20T08:00:00Z',
-    phoneNumber: null,
-    roles: hasStudentProfile ? ['STUDENT'] : [],
+  const createMockUser = (
+    hasStudentProfile: boolean,
+    hasTrainerProfile: boolean = false
+  ): CurrentUserResponse => {
+    const roles: RoleCode[] = [];
+    if (hasStudentProfile) roles.push('STUDENT');
+    if (hasTrainerProfile) roles.push('TRAINER');
+
+    return {
+      id: 'restored-user-id',
+      email: 'restored@example.com',
+      displayName: 'Restored User',
+      status: 'ACTIVE',
+      preferredLocale: 'vi-VN',
+      timezone: 'Asia/Ho_Chi_Minh',
+      emailVerifiedAt: '2026-09-20T08:00:00Z',
+      createdAt: '2026-09-20T08:00:00Z',
+      phoneNumber: null,
+      roles,
     capabilities: {
       hasStudentProfile,
-      hasTrainerProfile: false,
+      hasTrainerProfile,
       canCoach: false,
     },
     settings: {
@@ -39,7 +47,8 @@ describe('Session Restoration Navigation Resolution in Index', () => {
       accessibilityPreferences: {},
       privacyPreferences: {},
     },
-  });
+  };
+};
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,25 +70,53 @@ describe('Session Restoration Navigation Resolution in Index', () => {
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
-  it('resolves and redirects to /(onboarding)/student after session restoration when authenticated user hasStudentProfile is false', () => {
+  it('resolves and redirects to /(onboarding)/select after session restoration when authenticated user has neither profile', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoading: false,
       status: 'AUTHENTICATED',
-      user: createMockUser(false),
+      user: createMockUser(false, false),
     });
 
     renderer.act(() => {
       renderer.create(<Index />);
     });
 
-    expect(mockRedirect).toHaveBeenCalledWith('/(onboarding)/student');
+    expect(mockRedirect).toHaveBeenCalledWith('/(onboarding)/select');
   });
 
-  it('resolves and redirects to /(app) after session restoration when authenticated user hasStudentProfile is true', () => {
+  it('resolves and redirects to /(app) after session restoration when authenticated user has student profile only', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoading: false,
       status: 'AUTHENTICATED',
-      user: createMockUser(true),
+      user: createMockUser(true, false),
+    });
+
+    renderer.act(() => {
+      renderer.create(<Index />);
+    });
+
+    expect(mockRedirect).toHaveBeenCalledWith('/(app)');
+  });
+
+  it('resolves and redirects to /(app) after session restoration when authenticated user has trainer profile only', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoading: false,
+      status: 'AUTHENTICATED',
+      user: createMockUser(false, true),
+    });
+
+    renderer.act(() => {
+      renderer.create(<Index />);
+    });
+
+    expect(mockRedirect).toHaveBeenCalledWith('/(app)');
+  });
+
+  it('resolves and redirects to /(app) after session restoration when authenticated user has dual profiles', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoading: false,
+      status: 'AUTHENTICATED',
+      user: createMockUser(true, true),
     });
 
     renderer.act(() => {

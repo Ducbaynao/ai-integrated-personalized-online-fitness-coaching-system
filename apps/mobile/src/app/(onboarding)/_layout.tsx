@@ -1,7 +1,6 @@
 import React from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
-import { canAccessMainApp } from '@/features/auth/routeGuard';
 
 export default function OnboardingLayout() {
   const { status, user, isLoading } = useAuth();
@@ -14,8 +13,8 @@ export default function OnboardingLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  // If user already has student profile, redirect them to (app)
-  if (canAccessMainApp(user)) {
+  // If user already has both profiles, redirect to (app)
+  if (user?.capabilities?.hasStudentProfile && user?.capabilities?.hasTrainerProfile) {
     return <Redirect href="/(app)" />;
   }
 
@@ -24,7 +23,9 @@ export default function OnboardingLayout() {
       screenOptions={{
         headerShown: false,
       }}>
+      <Stack.Screen name="select" />
       <Stack.Screen name="student" />
+      <Stack.Screen name="trainer" />
     </Stack>
   );
 }

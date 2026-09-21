@@ -83,3 +83,30 @@ export const tokenStorage = {
     ]);
   },
 };
+
+const ACTIVE_CAPABILITY_KEY = 'active_mobile_capability';
+
+export const capabilityStorage = {
+  async saveActiveCapability(capability: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      webMemoryStore.set(ACTIVE_CAPABILITY_KEY, capability);
+      return;
+    }
+    await SecureStore.setItemAsync(ACTIVE_CAPABILITY_KEY, capability);
+  },
+
+  async getActiveCapability(): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return webMemoryStore.get(ACTIVE_CAPABILITY_KEY) ?? null;
+    }
+    return SecureStore.getItemAsync(ACTIVE_CAPABILITY_KEY);
+  },
+
+  async clearActiveCapability(): Promise<void> {
+    if (Platform.OS === 'web') {
+      webMemoryStore.delete(ACTIVE_CAPABILITY_KEY);
+      return;
+    }
+    await SecureStore.deleteItemAsync(ACTIVE_CAPABILITY_KEY);
+  },
+};

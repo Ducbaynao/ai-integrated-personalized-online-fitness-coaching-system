@@ -6,6 +6,8 @@ import { SignInScreen } from '@/features/auth/SignInScreen';
 import { RegisterScreen } from '@/features/auth/RegisterScreen';
 import { VerifyEmailScreen } from '@/features/auth/VerifyEmailScreen';
 import { HomeScreen } from '@/features/auth/HomeScreen';
+import { ChoosePurposeScreen } from '@/features/onboarding/ChoosePurposeScreen';
+import { TrainerOnboardingScreen } from '@/features/trainer/TrainerOnboardingScreen';
 
 // Mock AuthContext for rendering screens
 jest.mock('@/features/auth/AuthContext', () => ({
@@ -163,5 +165,39 @@ describe('Accessibility Attributes on Auth Screens', () => {
     expect(logoutBtn.props.accessibilityRole).toBe('button');
     expect(logoutBtn.props.accessibilityLabel).toBe('Log Out');
     expect(logoutBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
+  });
+
+  it('ChoosePurposeScreen defines proper accessibility roles and labels', () => {
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<ChoosePurposeScreen />);
+    });
+    const root = tree!.root;
+
+    const studentBtn = root.findByProps({ testID: 'select-student-purpose-button' });
+    expect(studentBtn.props.accessibilityRole).toBe('button');
+    expect(studentBtn.props.accessibilityLabel).toBeDefined();
+
+    const trainerBtn = root.findByProps({ testID: 'select-trainer-purpose-button' });
+    expect(trainerBtn.props.accessibilityRole).toBe('button');
+    expect(trainerBtn.props.accessibilityLabel).toBeDefined();
+  });
+
+  it('TrainerOnboardingScreen defines proper accessibility roles and labels', () => {
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<TrainerOnboardingScreen />);
+    });
+    const root = tree!.root;
+
+    const slugInput = root.findByProps({ testID: 'trainer-slug-input' });
+    expect(slugInput.props.accessibilityLabel).toBe('Public Profile Handle');
+
+    const submitBtn = root.findByProps({ testID: 'trainer-submit-button' });
+    expect(submitBtn.props.accessibilityRole).toBe('button');
+    expect(submitBtn.props.accessibilityLabel).toBe('Create Trainer Profile');
+
+    const notice = root.findByProps({ testID: 'coaching-authority-notice' });
+    expect(notice.props.accessibilityRole).toBe('alert');
   });
 });

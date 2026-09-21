@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
+import { CapabilitySwitcher } from '@/components/CapabilitySwitcher';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -39,9 +40,20 @@ export function HomeScreen() {
   const subtextColor = themeColors.textSecondary;
   const borderColor = themeColors.border;
 
+  const isDualRole =
+    Boolean(user?.capabilities?.hasStudentProfile) &&
+    Boolean(user?.capabilities?.hasTrainerProfile);
+
+  const canCrossActivateTrainer =
+    Boolean(user?.capabilities?.hasStudentProfile) &&
+    !user?.capabilities?.hasTrainerProfile;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Capability Switcher for Dual-Role */}
+        {isDualRole && <CapabilitySwitcher />}
+
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={[styles.greeting, { color: textColor }]}>
@@ -122,6 +134,31 @@ export function HomeScreen() {
           </View>
         </View>
 
+        {/* Cross-activation Card (Student -> Trainer) */}
+        {canCrossActivateTrainer && (
+          <View
+            testID="student-cross-activate-card"
+            style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Become a Coach
+            </Text>
+            <Text style={[styles.cardDescription, { color: subtextColor }]}>
+              Are you a fitness trainer? Activate your Trainer Profile on this account to build your
+              coaching presence and prepare for verification.
+            </Text>
+            <Pressable
+              testID="student-cross-activate-trainer-button"
+              accessibilityRole="button"
+              accessibilityLabel="Become a Trainer"
+              onPress={() => router.push('/(onboarding)/trainer')}
+              style={[styles.profileButton, { borderColor: themeColors.primary }]}>
+              <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
+                Set up Trainer Profile →
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Preferences Card */}
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
           <Text style={[styles.sectionTitle, { color: textColor }]}>Preferences</Text>
@@ -198,6 +235,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.h3,
     marginBottom: spacing.xs,
+  },
+  cardDescription: {
+    ...typography.bodySmall,
+    lineHeight: 20,
   },
   row: {
     flexDirection: 'row',
