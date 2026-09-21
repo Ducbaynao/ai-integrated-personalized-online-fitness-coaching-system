@@ -19,7 +19,7 @@ export interface AuthContextType {
   register: (data: RegisterRequest) => Promise<RegistrationResponse>;
   confirmEmail: (token: string) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<CurrentUserResponse>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,9 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('UNAUTHENTICATED');
   }, []);
 
-  const refreshUser = useCallback(async (): Promise<void> => {
+  const refreshUser = useCallback(async (): Promise<CurrentUserResponse> => {
     const currentUser = await authApi.getCurrentUser();
     setUser(currentUser);
+    return currentUser;
   }, []);
 
   return (
