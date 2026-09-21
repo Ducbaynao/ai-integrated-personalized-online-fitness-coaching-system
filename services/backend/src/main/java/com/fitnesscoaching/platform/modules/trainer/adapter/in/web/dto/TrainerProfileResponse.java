@@ -1,5 +1,7 @@
 package com.fitnesscoaching.platform.modules.trainer.adapter.in.web.dto;
 
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
+import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerActivityStatus;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
@@ -21,7 +23,8 @@ public record TrainerProfileResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static TrainerProfileResponse fromDomain(TrainerProfile domain) {
+    public static TrainerProfileResponse fromView(TrainerProfileView view) {
+        TrainerProfile domain = view.profile();
         return new TrainerProfileResponse(
                 domain.userId(),
                 domain.publicSlug(),
@@ -30,10 +33,14 @@ public record TrainerProfileResponse(
                 domain.isAcceptingStudents(),
                 domain.verificationStatus(),
                 domain.activityStatus(),
-                CoachingEligibilityDto.fromDomain(domain.getCoachingEligibility()),
+                CoachingEligibilityDto.fromDomain(view.coachingEligibility()),
                 domain.verifiedAt(),
                 domain.createdAt(),
                 domain.updatedAt()
         );
+    }
+
+    public static TrainerProfileResponse fromView(TrainerProfile profile, CoachingEligibility coachingEligibility) {
+        return fromView(new TrainerProfileView(profile, coachingEligibility));
     }
 }

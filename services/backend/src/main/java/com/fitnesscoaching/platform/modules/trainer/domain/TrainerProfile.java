@@ -18,7 +18,4 @@ public record TrainerProfile(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public CoachingEligibility getCoachingEligibility() {
-        return CoachingEligibility.evaluate(verificationStatus, activityStatus);
-    }
 }

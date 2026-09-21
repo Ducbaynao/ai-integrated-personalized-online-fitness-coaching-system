@@ -3,12 +3,12 @@ package com.fitnesscoaching.platform.modules.trainer.adapter.in.web;
 import com.fitnesscoaching.platform.modules.trainer.adapter.in.web.dto.CreateTrainerProfileRequest;
 import com.fitnesscoaching.platform.modules.trainer.adapter.in.web.dto.TrainerProfileResponse;
 import com.fitnesscoaching.platform.modules.trainer.adapter.in.web.dto.UpdateTrainerProfileRequest;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTrainerProfileUseCase;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.GetTrainerProfileUseCase;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileUseCase;
-import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,16 +49,16 @@ public class TrainerProfileController {
         UUID userId = UUID.fromString(jwt.getSubject());
         CreateTrainerProfileCommand command = request.toCommand(userId);
 
-        TrainerProfile created = createTrainerProfileUseCase.createTrainerProfile(command);
+        TrainerProfileView created = createTrainerProfileUseCase.createTrainerProfile(command);
         URI location = URI.create("/api/v1/trainer-profiles/me");
-        return ResponseEntity.created(location).body(TrainerProfileResponse.fromDomain(created));
+        return ResponseEntity.created(location).body(TrainerProfileResponse.fromView(created));
     }
 
     @GetMapping("/me")
     public ResponseEntity<TrainerProfileResponse> getMyTrainerProfile(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        TrainerProfile profile = getTrainerProfileUseCase.getTrainerProfile(userId);
-        return ResponseEntity.ok(TrainerProfileResponse.fromDomain(profile));
+        TrainerProfileView profile = getTrainerProfileUseCase.getTrainerProfile(userId);
+        return ResponseEntity.ok(TrainerProfileResponse.fromView(profile));
     }
 
     @PatchMapping("/me")
@@ -75,7 +75,7 @@ public class TrainerProfileController {
                 request.toAcceptingStudentsPatch()
         );
 
-        TrainerProfile updated = updateTrainerProfileUseCase.updateTrainerProfile(command);
-        return ResponseEntity.ok(TrainerProfileResponse.fromDomain(updated));
+        TrainerProfileView updated = updateTrainerProfileUseCase.updateTrainerProfile(command);
+        return ResponseEntity.ok(TrainerProfileResponse.fromView(updated));
     }
 }

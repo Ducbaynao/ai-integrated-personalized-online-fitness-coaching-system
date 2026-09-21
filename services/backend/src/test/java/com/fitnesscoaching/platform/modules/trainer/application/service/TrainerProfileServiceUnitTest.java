@@ -12,9 +12,12 @@ import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.trainer.application.model.PatchField;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTrainerProfileCommand;
+import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerCoachingEligibilityQuery;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.out.TrainerProfilePort;
+import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerActivityStatus;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
@@ -34,12 +37,14 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,6 +65,9 @@ class TrainerProfileServiceUnitTest {
     private UserRoleQuery userRoleQuery;
 
     @Mock
+    private TrainerCoachingEligibilityQuery trainerCoachingEligibilityQuery;
+
+    @Mock
     private AuditService auditService;
 
     private final Instant fixedNow = Instant.parse("2026-09-21T10:00:00Z");
@@ -70,11 +78,15 @@ class TrainerProfileServiceUnitTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(trainerCoachingEligibilityQuery.getCoachingEligibility(any(UUID.class)))
+                .thenReturn(new CoachingEligibility(false, List.of("APPLICATION_NOT_SUBMITTED")));
+
         service = new TrainerProfileService(
                 trainerProfilePort,
                 userAccountStatusQuery,
                 userRoleUseCase,
                 userRoleQuery,
+                trainerCoachingEligibilityQuery,
                 auditService,
                 clock
         );
@@ -97,7 +109,8 @@ class TrainerProfileServiceUnitTest {
                 true
         );
 
-        TrainerProfile created = service.createTrainerProfile(command);
+        TrainerProfileView createdView = service.createTrainerProfile(command);
+        TrainerProfile created = createdView.profile();
 
         assertThat(created.userId()).isEqualTo(USER_ID);
         assertThat(created.publicSlug()).isEqualTo("coach-john");
@@ -109,6 +122,8 @@ class TrainerProfileServiceUnitTest {
         assertThat(created.isActive()).isTrue();
         assertThat(created.createdAt()).isEqualTo(fixedNow);
         assertThat(created.updatedAt()).isEqualTo(fixedNow);
+        assertThat(createdView.coachingEligibility().eligible()).isFalse();
+        assertThat(createdView.coachingEligibility().blockingReasons()).contains("APPLICATION_NOT_SUBMITTED");
 
         ArgumentCaptor<AuditRecord> auditCaptor = ArgumentCaptor.forClass(AuditRecord.class);
         verify(auditService).recordAudit(auditCaptor.capture());
@@ -136,9 +151,9 @@ class TrainerProfileServiceUnitTest {
                 false
         );
 
-        TrainerProfile created = service.createTrainerProfile(command);
-        assertThat(created.userId()).isEqualTo(USER_ID);
-        assertThat(created.isAcceptingStudents()).isFalse();
+        TrainerProfileView created = service.createTrainerProfile(command);
+        assertThat(created.profile().userId()).isEqualTo(USER_ID);
+        assertThat(created.profile().isAcceptingStudents()).isFalse();
     }
 
     @Test
@@ -278,10 +293,10 @@ class TrainerProfileServiceUnitTest {
         when(trainerProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(sample));
         when(userRoleQuery.hasActiveRole(USER_ID, "TRAINER")).thenReturn(true);
 
-        TrainerProfile result = service.getTrainerProfile(USER_ID);
-        assertThat(result).isEqualTo(sample);
-        assertThat(result.getCoachingEligibility().eligible()).isFalse();
-        assertThat(result.getCoachingEligibility().blockingReasons()).contains("APPLICATION_NOT_SUBMITTED");
+        TrainerProfileView result = service.getTrainerProfile(USER_ID);
+        assertThat(result.profile()).isEqualTo(sample);
+        assertThat(result.coachingEligibility().eligible()).isFalse();
+        assertThat(result.coachingEligibility().blockingReasons()).contains("APPLICATION_NOT_SUBMITTED");
     }
 
     @Test
@@ -342,13 +357,13 @@ class TrainerProfileServiceUnitTest {
                 PatchField.of(false)
         );
 
-        TrainerProfile updated = service.updateTrainerProfile(command);
+        TrainerProfileView updated = service.updateTrainerProfile(command);
 
-        assertThat(updated.publicSlug()).isEqualTo("coach-old");
-        assertThat(updated.bio()).isEqualTo("Updated bio description");
-        assertThat(updated.yearsExperience()).isEqualTo(new BigDecimal("4.00"));
-        assertThat(updated.isAcceptingStudents()).isFalse();
-        assertThat(updated.updatedAt()).isEqualTo(fixedNow);
+        assertThat(updated.profile().publicSlug()).isEqualTo("coach-old");
+        assertThat(updated.profile().bio()).isEqualTo("Updated bio description");
+        assertThat(updated.profile().yearsExperience()).isEqualTo(new BigDecimal("4.00"));
+        assertThat(updated.profile().isAcceptingStudents()).isFalse();
+        assertThat(updated.profile().updatedAt()).isEqualTo(fixedNow);
     }
 
     @Test
@@ -382,12 +397,12 @@ class TrainerProfileServiceUnitTest {
                 PatchField.omitted()
         );
 
-        TrainerProfile updated = service.updateTrainerProfile(command);
+        TrainerProfileView updated = service.updateTrainerProfile(command);
 
-        assertThat(updated.publicSlug()).isNull();
-        assertThat(updated.bio()).isNull();
-        assertThat(updated.yearsExperience()).isNull();
-        assertThat(updated.isAcceptingStudents()).isTrue(); // omitted remains untouched!
+        assertThat(updated.profile().publicSlug()).isNull();
+        assertThat(updated.profile().bio()).isNull();
+        assertThat(updated.profile().yearsExperience()).isNull();
+        assertThat(updated.profile().isAcceptingStudents()).isTrue(); // omitted remains untouched!
     }
 
     @Test
@@ -440,8 +455,8 @@ class TrainerProfileServiceUnitTest {
                 PatchField.omitted()
         );
 
-        TrainerProfile updated = service.updateTrainerProfile(command);
-        assertThat(updated.publicSlug()).isEqualTo("my-slug");
+        TrainerProfileView updated = service.updateTrainerProfile(command);
+        assertThat(updated.profile().publicSlug()).isEqualTo("my-slug");
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.modules.user.application.model.CurrentUserVi
 import com.fitnesscoaching.platform.modules.user.application.model.UserCapabilitiesView;
 import com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView;
 import com.fitnesscoaching.platform.modules.user.application.port.in.CurrentUserQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.out.CoachingAuthorityQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +23,16 @@ public class CurrentUserReadAdapter implements CurrentUserQuery {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final CoachingAuthorityQuery coachingAuthorityQuery;
 
-    public CurrentUserReadAdapter(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public CurrentUserReadAdapter(
+            JdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper,
+            CoachingAuthorityQuery coachingAuthorityQuery
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.coachingAuthorityQuery = coachingAuthorityQuery;
     }
 
     @Override
@@ -127,11 +134,12 @@ public class CurrentUserReadAdapter implements CurrentUserQuery {
         );
 
         /*
-         * Coaching eligibility policy is deferred to Milestone M2/M3.
-         * In Milestone M1B, canCoach is strictly false at the read model layer
-         * and must never be inferred solely from the TRAINER role or Trainer Profile presence.
+         * Coaching authority is derived from the single Trainer Eligibility Policy.
+         * canCoach is true only when account is ACTIVE, user has active TRAINER role,
+         * trainer profile exists and is active, verificationStatus is VERIFIED,
+         * and activityStatus is ACTIVE.
          */
-        boolean canCoach = false;
+        boolean canCoach = coachingAuthorityQuery.canCoach(userId);
 
         UserCapabilitiesView capabilities = new UserCapabilitiesView(
                 Boolean.TRUE.equals(hasStudent),

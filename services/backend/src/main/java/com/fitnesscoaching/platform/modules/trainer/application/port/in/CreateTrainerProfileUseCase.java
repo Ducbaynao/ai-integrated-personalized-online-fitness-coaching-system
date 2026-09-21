@@ -1,8 +1,8 @@
 package com.fitnesscoaching.platform.modules.trainer.application.port.in;
 
-import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 
 public interface CreateTrainerProfileUseCase {
 
-    TrainerProfile createTrainerProfile(CreateTrainerProfileCommand command);
+    TrainerProfileView createTrainerProfile(CreateTrainerProfileCommand command);
 }

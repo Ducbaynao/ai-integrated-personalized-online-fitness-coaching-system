@@ -20,6 +20,8 @@ import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTr
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.GetTrainerProfileUseCase;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileUseCase;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
+import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerActivityStatus;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
@@ -35,9 +37,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -53,15 +57,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = TrainerProfileController.class)
+@WebMvcTest(TrainerProfileController.class)
 @Import({
         SecurityConfig.class,
+        JacksonConfig.class,
+        ClockConfig.class,
         RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class,
-        ClockConfig.class,
-        GlobalExceptionHandler.class,
-        RequestIdFilter.class,
-        JacksonConfig.class
+        RequestIdFilter.class
 })
 class TrainerProfileControllerUnitTest {
 
@@ -102,6 +105,13 @@ class TrainerProfileControllerUnitTest {
         );
     }
 
+    private TrainerProfileView sampleTrainerProfileView(UUID userId) {
+        return new TrainerProfileView(
+                sampleTrainerProfile(userId),
+                new CoachingEligibility(false, List.of("APPLICATION_NOT_SUBMITTED"))
+        );
+    }
+
     // ==========================================
     // POST /api/v1/trainer-profiles
     // ==========================================
@@ -109,9 +119,8 @@ class TrainerProfileControllerUnitTest {
     @Test
     @DisplayName("POST /trainer-profiles creates trainer profile and returns 201 with Location header and eligible=false")
     void createProfile_success() throws Exception {
-        TrainerProfile created = sampleTrainerProfile(USER_ID);
         when(createTrainerProfileUseCase.createTrainerProfile(any(CreateTrainerProfileCommand.class)))
-                .thenReturn(created);
+                .thenReturn(sampleTrainerProfileView(USER_ID));
 
         String json = """
                 {
@@ -150,9 +159,8 @@ class TrainerProfileControllerUnitTest {
     @Test
     @DisplayName("POST /trainer-profiles defaults acceptingStudents to false when omitted")
     void createProfile_omittedAcceptingStudents_defaultsToFalse() throws Exception {
-        TrainerProfile created = sampleTrainerProfile(USER_ID);
         when(createTrainerProfileUseCase.createTrainerProfile(any(CreateTrainerProfileCommand.class)))
-                .thenReturn(created);
+                .thenReturn(sampleTrainerProfileView(USER_ID));
 
         String json = """
                 {
@@ -322,8 +330,7 @@ class TrainerProfileControllerUnitTest {
     @Test
     @DisplayName("GET /trainer-profiles/me returns profile with coachingEligibility and canCoach=false")
     void getProfile_success() throws Exception {
-        TrainerProfile profile = sampleTrainerProfile(USER_ID);
-        when(getTrainerProfileUseCase.getTrainerProfile(USER_ID)).thenReturn(profile);
+        when(getTrainerProfileUseCase.getTrainerProfile(USER_ID)).thenReturn(sampleTrainerProfileView(USER_ID));
 
         mockMvc.perform(get("/api/v1/trainer-profiles/me")
                         .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -389,7 +396,7 @@ class TrainerProfileControllerUnitTest {
                 Instant.parse("2026-09-21T11:00:00Z")
         );
         when(updateTrainerProfileUseCase.updateTrainerProfile(any(UpdateTrainerProfileCommand.class)))
-                .thenReturn(updated);
+                .thenReturn(new TrainerProfileView(updated, new CoachingEligibility(false, List.of("APPLICATION_NOT_SUBMITTED"))));
 
         String json = """
                 {
@@ -436,7 +443,7 @@ class TrainerProfileControllerUnitTest {
                 Instant.parse("2026-09-21T11:00:00Z")
         );
         when(updateTrainerProfileUseCase.updateTrainerProfile(any(UpdateTrainerProfileCommand.class)))
-                .thenReturn(updated);
+                .thenReturn(new TrainerProfileView(updated, new CoachingEligibility(false, List.of("APPLICATION_NOT_SUBMITTED"))));
 
         String json = """
                 {
