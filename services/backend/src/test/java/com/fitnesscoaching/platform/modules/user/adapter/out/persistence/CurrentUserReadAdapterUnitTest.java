@@ -16,6 +16,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.mockito.quality.Strictness;
 import org.mockito.junit.jupiter.MockitoSettings;
 
+import com.fitnesscoaching.platform.modules.user.application.port.out.CoachingAuthorityQuery;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -36,13 +38,16 @@ class CurrentUserReadAdapterUnitTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private CoachingAuthorityQuery coachingAuthorityQuery;
+
     private ObjectMapper objectMapper;
     private CurrentUserReadAdapter adapter;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        adapter = new CurrentUserReadAdapter(jdbcTemplate, objectMapper);
+        adapter = new CurrentUserReadAdapter(jdbcTemplate, objectMapper, coachingAuthorityQuery);
     }
 
     @Test
@@ -131,6 +136,8 @@ class CurrentUserReadAdapterUnitTest {
                 eq(userId)
         )).thenReturn(false);
 
+        when(coachingAuthorityQuery.canCoach(userId)).thenReturn(false);
+
         Optional<CurrentUserView> result = adapter.findCurrentUserById(userId);
         assertThat(result).isPresent();
         CurrentUserView view = result.get();
@@ -141,6 +148,34 @@ class CurrentUserReadAdapterUnitTest {
         assertThat(view.capabilities().hasStudentProfile()).isTrue();
         assertThat(view.capabilities().hasTrainerProfile()).isFalse();
         assertThat(view.capabilities().canCoach()).isFalse();
+    }
+
+    @Test
+    @DisplayName("canCoach is true when TrainerCoachingEligibilityQuery returns true")
+    void canCoachIsTrueWhenPolicyAllowsIt() {
+        UUID userId = UUID.randomUUID();
+        mockUserAccountQuery(userId);
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT EXISTS(SELECT 1 FROM fitness.student_profiles WHERE user_id = ?)"),
+                eq(Boolean.class),
+                eq(userId)
+        )).thenReturn(false);
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT EXISTS(SELECT 1 FROM fitness.trainer_profiles WHERE user_id = ?)"),
+                eq(Boolean.class),
+                eq(userId)
+        )).thenReturn(true);
+
+        when(coachingAuthorityQuery.canCoach(userId)).thenReturn(true);
+
+        Optional<CurrentUserView> result = adapter.findCurrentUserById(userId);
+        assertThat(result).isPresent();
+        CurrentUserView view = result.get();
+        assertThat(view.capabilities().hasStudentProfile()).isFalse();
+        assertThat(view.capabilities().hasTrainerProfile()).isTrue();
+        assertThat(view.capabilities().canCoach()).isTrue();
     }
 
     @SuppressWarnings("unchecked")

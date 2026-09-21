@@ -571,7 +571,7 @@ components:
                 hasTrainerProfile: { type: boolean }
                 canCoach:
                   type: boolean
-                  description: Derived result; not a stored role or permanent profile property.
+                  description: Derived from canonical coaching eligibility policy; requires active account, active TRAINER role, active profile, VERIFIED status, and ACTIVE activity status.
             settings: { $ref: '#/components/schemas/UserSettings' }
 
     UpdateCurrentUserRequest:
@@ -695,7 +695,10 @@ components:
           items:
             type: string
             enum:
+              - ACCOUNT_NOT_ACTIVE
+              - TRAINER_ROLE_MISSING
               - PROFILE_NOT_FOUND
+              - PROFILE_INACTIVE
               - APPLICATION_NOT_SUBMITTED
               - VERIFICATION_PENDING
               - VERIFICATION_REJECTED

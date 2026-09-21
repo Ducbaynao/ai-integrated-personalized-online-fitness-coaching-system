@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -87,6 +88,9 @@ class CurrentUserIntegrationTest {
 
     @Autowired
     private JwtProperties jwtProperties;
+
+    @Autowired
+    private com.fitnesscoaching.platform.modules.user.application.port.out.CoachingAuthorityQuery coachingAuthorityQuery;
 
     @BeforeEach
     void setUp() throws SQLException {
@@ -159,6 +163,27 @@ class CurrentUserIntegrationTest {
                 INSERT INTO fitness.user_settings (user_id, week_starts_on, measurement_system, accessibility_preferences, privacy_preferences, created_at, updated_at)
                 VALUES (?, ?, ?, ?::jsonb, ?::jsonb, now(), now())
                 """, userId, weekStartsOn, measurementSystem, accessJson, privacyJson);
+    }
+
+    private void insertTrainerProfile(UUID userId, String publicSlug, String verificationStatus, String activityStatus, boolean isActive, boolean isAcceptingStudents) {
+        jdbcTemplate.update("""
+                INSERT INTO fitness.trainer_profiles (
+                    user_id, public_slug, bio, years_experience,
+                    verification_status, activity_status, is_accepting_students, is_active, created_at, updated_at
+                ) VALUES (
+                    ?, ?, 'Experienced trainer.', 5.0,
+                    ?::fitness.trainer_verification_state, ?::fitness.trainer_activity_status, ?, ?, now(), now()
+                )
+                """, userId, publicSlug, verificationStatus, activityStatus, isAcceptingStudents, isActive);
+    }
+
+    private void revokeRole(UUID userId, String roleCode) {
+        jdbcTemplate.update("""
+                UPDATE fitness.user_roles ur
+                SET revoked_at = now()
+                FROM fitness.roles r
+                WHERE ur.role_id = r.id AND ur.user_id = ? AND r.code = ?
+                """, userId, roleCode);
     }
 
     @Test
@@ -307,7 +332,7 @@ class CurrentUserIntegrationTest {
         com.fitnesscoaching.platform.modules.user.application.service.UserService userService =
                 new com.fitnesscoaching.platform.modules.user.application.service.UserService(
                         new com.fitnesscoaching.platform.modules.user.adapter.out.persistence.CurrentUserReadAdapter(
-                                jdbcTemplate, objectMapper),
+                                jdbcTemplate, objectMapper, uid -> false),
                         new com.fitnesscoaching.platform.modules.user.adapter.out.persistence.UserPersistenceAdapter(
                                 jdbcTemplate, objectMapper) {
                             @Override
@@ -413,5 +438,141 @@ class CurrentUserIntegrationTest {
                         .content("{\"settings\": null}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    // ==========================================
+    // Trainer Eligibility Policy (TRAINER-02)
+    // ==========================================
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=true when user has active account, active TRAINER role, and active verified profile")
+    void getCurrentUser_verifiedActiveTrainer_canCoachIsTrue() throws Exception {
+        UUID userId = insertUser("coach_verified@example.com", "Verified Coach", "+84901111111", AccountStatus.ACTIVE);
+        assignRole(userId, "TRAINER");
+        insertTrainerProfile(userId, "coach-verified", "VERIFIED", "ACTIVE", true, true);
+
+        String token = createAccessToken(userId, "coach_verified@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.hasTrainerProfile", is(true)))
+                .andExpect(jsonPath("$.capabilities.canCoach", is(true)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=true even when isAcceptingStudents=false")
+    void getCurrentUser_verifiedTrainer_isAcceptingStudentsFalse_canCoachIsTrue() throws Exception {
+        UUID userId = insertUser("coach_not_accepting@example.com", "Not Accepting", "+84902222222", AccountStatus.ACTIVE);
+        assignRole(userId, "TRAINER");
+        insertTrainerProfile(userId, "coach-not-accepting", "VERIFIED", "ACTIVE", true, false);
+
+        String token = createAccessToken(userId, "coach_not_accepting@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(true)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=false when account status is not ACTIVE")
+    void getCurrentUser_trainerAccountSuspended_canCoachIsFalse() throws Exception {
+        UUID userId = insertUser("coach_suspended_acc@example.com", "Suspended Account", "+84903333333", AccountStatus.SUSPENDED);
+        assignRole(userId, "TRAINER");
+        insertTrainerProfile(userId, "coach-suspended-acc", "VERIFIED", "ACTIVE", true, true);
+
+        String token = createAccessToken(userId, "coach_suspended_acc@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=false when TRAINER role is revoked")
+    void getCurrentUser_trainerRoleRevoked_canCoachIsFalse() throws Exception {
+        UUID userId = insertUser("coach_revoked_role@example.com", "Revoked Role", "+84904444444", AccountStatus.ACTIVE);
+        assignRole(userId, "TRAINER");
+        revokeRole(userId, "TRAINER");
+        insertTrainerProfile(userId, "coach-revoked-role", "VERIFIED", "ACTIVE", true, true);
+
+        String token = createAccessToken(userId, "coach_revoked_role@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=false when trainer profile is inactive")
+    void getCurrentUser_trainerProfileInactive_canCoachIsFalse() throws Exception {
+        UUID userId = insertUser("coach_inactive_prof@example.com", "Inactive Prof", "+84905555555", AccountStatus.ACTIVE);
+        assignRole(userId, "TRAINER");
+        insertTrainerProfile(userId, "coach-inactive-prof", "VERIFIED", "ACTIVE", false, true);
+
+        String token = createAccessToken(userId, "coach_inactive_prof@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=false for non-VERIFIED verification statuses")
+    void getCurrentUser_trainerVerificationNotVerified_canCoachIsFalse() throws Exception {
+        for (String nonVerifiedStatus : List.of("NOT_SUBMITTED", "PENDING", "REJECTED", "SUSPENDED")) {
+            UUID userId = insertUser("coach_verif_" + nonVerifiedStatus.toLowerCase() + "@example.com", "Coach " + nonVerifiedStatus, null, AccountStatus.ACTIVE);
+            assignRole(userId, "TRAINER");
+            insertTrainerProfile(userId, "coach-verif-" + nonVerifiedStatus.toLowerCase(), nonVerifiedStatus, "ACTIVE", true, true);
+
+            String token = createAccessToken(userId, "coach_verif_" + nonVerifiedStatus.toLowerCase() + "@example.com", List.of("TRAINER"));
+
+            mockMvc.perform(get("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns canCoach=false for non-ACTIVE activity statuses")
+    void getCurrentUser_trainerActivityNotActive_canCoachIsFalse() throws Exception {
+        for (String nonActiveActivity : List.of("INACTIVE", "SUSPENDED")) {
+            UUID userId = insertUser("coach_act_" + nonActiveActivity.toLowerCase() + "@example.com", "Coach " + nonActiveActivity, null, AccountStatus.ACTIVE);
+            assignRole(userId, "TRAINER");
+            insertTrainerProfile(userId, "coach-act-" + nonActiveActivity.toLowerCase(), "VERIFIED", nonActiveActivity, true, true);
+
+            String token = createAccessToken(userId, "coach_act_" + nonActiveActivity.toLowerCase() + "@example.com", List.of("TRAINER"));
+
+            mockMvc.perform(get("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+        }
+    }
+
+    @Test
+    @DisplayName("Multi-role: user with STUDENT and TRAINER roles + student profile + verified trainer profile has canCoach=true and preserves student capabilities")
+    void getCurrentUser_multiRole_preservesStudentCapabilityAndRoles() throws Exception {
+        UUID userId = insertUser("dual_verified@example.com", "Dual Verified", "+84909999999", AccountStatus.ACTIVE);
+        assignRole(userId, "STUDENT");
+        assignRole(userId, "TRAINER");
+        insertStudentProfile(userId);
+        insertTrainerProfile(userId, "dual-verified", "VERIFIED", "ACTIVE", true, true);
+
+        String token = createAccessToken(userId, "dual_verified@example.com", List.of("STUDENT", "TRAINER"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roles", hasItem("STUDENT")))
+                .andExpect(jsonPath("$.roles", hasItem("TRAINER")))
+                .andExpect(jsonPath("$.capabilities.hasStudentProfile", is(true)))
+                .andExpect(jsonPath("$.capabilities.hasTrainerProfile", is(true)))
+                .andExpect(jsonPath("$.capabilities.canCoach", is(true)));
     }
 }

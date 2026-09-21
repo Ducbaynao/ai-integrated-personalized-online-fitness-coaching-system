@@ -1,8 +1,8 @@
 package com.fitnesscoaching.platform.modules.trainer.application.port.in;
 
-import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 
 public interface UpdateTrainerProfileUseCase {
 
-    TrainerProfile updateTrainerProfile(UpdateTrainerProfileCommand command);
+    TrainerProfileView updateTrainerProfile(UpdateTrainerProfileCommand command);
 }

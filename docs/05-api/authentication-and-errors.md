@@ -14,7 +14,7 @@ The initial identity flow uses email/password and returns short-lived Access Tok
 - Correct credentials for a non-active account return `403 ACCOUNT_UNAVAILABLE`. Invalid, expired, or revoked refresh credentials return `401 INVALID_REFRESH_TOKEN`.
 - M1B's token-pair response includes the contract's current-user projection published by the `user` module:
   - Active roles come from PostgreSQL (`fitness.user_roles` where `revoked_at IS NULL`).
-  - Capabilities are derived from the active roles and profile existence (`hasStudentProfile`, `hasTrainerProfile`); `canCoach` remains `false` at the application layer with full coaching eligibility deferred to future milestones.
+  - Capabilities are derived from active roles, profile existence (`hasStudentProfile`, `hasTrainerProfile`), and the canonical coaching eligibility policy (`canCoach` evaluates account active status, active TRAINER role, trainer profile existence, active status, verification status `VERIFIED`, activity status `ACTIVE`, and policy restriction).
   - User settings come from PostgreSQL (`fitness.user_settings`); missing optional settings fall back to defaults according to the API contract (`weekStartsOn = 1`, `measurementSystem = 'METRIC'`, empty preferences).
   - Malformed or non-object persisted settings JSON is treated as a server/data integrity failure, not silently accepted as missing settings.
 - Logout is implemented in Milestone M1C.
@@ -32,7 +32,7 @@ The initial identity flow uses email/password and returns short-lived Access Tok
 ### Current User profile and settings (M1)
 
 - `GET /users/me` requires an authenticated Bearer JWT access token. Unauthenticated requests or invalid tokens return `401 UNAUTHORIZED`. The User ID is derived exclusively from the verified JWT subject.
-- **Contract Projection**: Returns `CurrentUserResponse` combining user account identity (`id`, `email`, `displayName`, `status`, `preferredLocale`, `timezone`, `emailVerifiedAt`, `createdAt`, `phoneNumber`), active roles (`fitness.user_roles` where `revoked_at IS NULL`), capabilities (`hasStudentProfile`, `hasTrainerProfile`, and `canCoach: false`), and user settings.
+- **Contract Projection**: Returns `CurrentUserResponse` combining user account identity (`id`, `email`, `displayName`, `status`, `preferredLocale`, `timezone`, `emailVerifiedAt`, `createdAt`, `phoneNumber`), active roles (`fitness.user_roles` where `revoked_at IS NULL`), capabilities (`hasStudentProfile`, `hasTrainerProfile`, and `canCoach` derived from the canonical coaching eligibility policy), and user settings.
 - **Default Settings Fallback**: If the user does not yet have a record in `fitness.user_settings`, the query returns default contract settings (`weekStartsOn = 1`, `measurementSystem = 'METRIC'`, empty maps for `accessibilityPreferences` and `privacyPreferences`).
 - `PATCH /users/me` accepts `UpdateCurrentUserRequest` with partial updates to mutable account profile attributes and settings. Requires at least one property (`minProperties: 1`).
 - **Partial Update Semantics**:

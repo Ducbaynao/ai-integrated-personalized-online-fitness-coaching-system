@@ -13,12 +13,15 @@ import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.CreateTrainerProfileUseCase;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.GetTrainerProfileUseCase;
+import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerCoachingEligibilityQuery;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileCommand;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.UpdateTrainerProfileUseCase;
 import com.fitnesscoaching.platform.modules.trainer.application.port.out.TrainerProfilePort;
+import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerActivityStatus;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
@@ -46,6 +49,7 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
     private final UserAccountStatusQuery userAccountStatusQuery;
     private final UserRoleUseCase userRoleUseCase;
     private final UserRoleQuery userRoleQuery;
+    private final TrainerCoachingEligibilityQuery trainerCoachingEligibilityQuery;
     private final AuditService auditService;
     private final Clock clock;
 
@@ -54,6 +58,7 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
             UserAccountStatusQuery userAccountStatusQuery,
             UserRoleUseCase userRoleUseCase,
             UserRoleQuery userRoleQuery,
+            TrainerCoachingEligibilityQuery trainerCoachingEligibilityQuery,
             AuditService auditService,
             Clock clock
     ) {
@@ -61,12 +66,13 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
         this.userAccountStatusQuery = userAccountStatusQuery;
         this.userRoleUseCase = userRoleUseCase;
         this.userRoleQuery = userRoleQuery;
+        this.trainerCoachingEligibilityQuery = trainerCoachingEligibilityQuery;
         this.auditService = auditService;
         this.clock = clock;
     }
 
     @Override
-    public TrainerProfile createTrainerProfile(CreateTrainerProfileCommand command) {
+    public TrainerProfileView createTrainerProfile(CreateTrainerProfileCommand command) {
         validateCreateCommand(command);
 
         UUID userId = command.userId();
@@ -126,12 +132,13 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
                 .metadataJson("{\"publicSlug\":" + slugJson + ",\"acceptingStudents\":" + accepting + "}")
                 .build());
 
-        return saved;
+        CoachingEligibility eligibility = trainerCoachingEligibilityQuery.getCoachingEligibility(userId);
+        return new TrainerProfileView(saved, eligibility);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public TrainerProfile getTrainerProfile(UUID userId) {
+    public TrainerProfileView getTrainerProfile(UUID userId) {
         if (userId == null) {
             throw new ApplicationValidationException("User ID cannot be null");
         }
@@ -146,11 +153,12 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
                     "Trainer capability is not active for user: " + userId);
         }
 
-        return profile;
+        CoachingEligibility eligibility = trainerCoachingEligibilityQuery.getCoachingEligibility(userId);
+        return new TrainerProfileView(profile, eligibility);
     }
 
     @Override
-    public TrainerProfile updateTrainerProfile(UpdateTrainerProfileCommand command) {
+    public TrainerProfileView updateTrainerProfile(UpdateTrainerProfileCommand command) {
         validateUpdateCommand(command);
 
         UUID userId = command.userId();
@@ -198,7 +206,9 @@ public class TrainerProfileService implements CreateTrainerProfileUseCase, GetTr
                 now
         );
 
-        return trainerProfilePort.update(updated);
+        TrainerProfile saved = trainerProfilePort.update(updated);
+        CoachingEligibility eligibility = trainerCoachingEligibilityQuery.getCoachingEligibility(userId);
+        return new TrainerProfileView(saved, eligibility);
     }
 
     private void verifyActiveAccount(UUID userId) {

@@ -144,6 +144,25 @@ class TrainerProfileIntegrationTest {
                 userId, userId, revoked, roleCode);
     }
 
+    private void insertTrainerProfile(UUID userId, String publicSlug, String verificationStatus, String activityStatus, boolean isActive, boolean isAcceptingStudents) {
+        jdbcTemplate.update("""
+                INSERT INTO fitness.trainer_profiles (
+                    user_id, public_slug, bio, years_experience, is_accepting_students,
+                    verification_status, activity_status, verified_at, verified_by, is_active,
+                    created_at, updated_at
+                )
+                VALUES (
+                    ?, ?, 'Bio text', 5.0, ?,
+                    ?::fitness.trainer_verification_state, ?::fitness.trainer_activity_status,
+                    CASE WHEN ? = 'VERIFIED' THEN now() ELSE NULL END, NULL, ?,
+                    now(), now()
+                )
+                """,
+                userId, publicSlug, isAcceptingStudents,
+                verificationStatus, activityStatus,
+                verificationStatus, isActive);
+    }
+
     // ==========================================
     // 1. Success Flow & Business Invariants
     // ==========================================
@@ -634,5 +653,94 @@ class TrainerProfileIntegrationTest {
         String dbStatus = jdbcTemplate.queryForObject(
                 "SELECT verification_status::text FROM fitness.trainer_profiles WHERE user_id = ?", String.class, userId);
         assertThat(dbStatus).isEqualTo("NOT_SUBMITTED");
+    }
+
+    // ==========================================
+    // 6. Coaching Eligibility Policy Integration
+    // ==========================================
+
+    @Test
+    @DisplayName("GET /trainer-profiles/me when verified and active returns eligible=true and empty blockingReasons")
+    void getMyTrainerProfile_verifiedAndActive_coachingEligibilityEligibleIsTrue() throws Exception {
+        UUID userId = insertUser("verifiedtrainer@example.com", "Verified Trainer", AccountStatus.ACTIVE);
+        assignRoleDirectly(userId, "TRAINER", false);
+        insertTrainerProfile(userId, "coach-verified-eligible", "VERIFIED", "ACTIVE", true, true);
+        String token = createAccessToken(userId, "verifiedtrainer@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/trainer-profiles/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId", is(userId.toString())))
+                .andExpect(jsonPath("$.publicSlug", is("coach-verified-eligible")))
+                .andExpect(jsonPath("$.verificationStatus", is("VERIFIED")))
+                .andExpect(jsonPath("$.activityStatus", is("ACTIVE")))
+                .andExpect(jsonPath("$.coachingEligibility.eligible", is(true)))
+                .andExpect(jsonPath("$.coachingEligibility.blockingReasons", empty()));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(true)));
+    }
+
+    @Test
+    @DisplayName("GET /trainer-profiles/me with acceptingStudents=false still returns eligible=true")
+    void getMyTrainerProfile_isAcceptingStudentsFalse_coachingEligibilityEligibleIsTrue() throws Exception {
+        UUID userId = insertUser("notaccepting@example.com", "Not Accepting Trainer", AccountStatus.ACTIVE);
+        assignRoleDirectly(userId, "TRAINER", false);
+        insertTrainerProfile(userId, "coach-not-accepting", "VERIFIED", "ACTIVE", true, false);
+        String token = createAccessToken(userId, "notaccepting@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/trainer-profiles/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.acceptingStudents", is(false)))
+                .andExpect(jsonPath("$.coachingEligibility.eligible", is(true)))
+                .andExpect(jsonPath("$.coachingEligibility.blockingReasons", empty()));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(true)));
+    }
+
+    @Test
+    @DisplayName("GET /trainer-profiles/me when profile is inactive returns eligible=false with PROFILE_INACTIVE")
+    void getMyTrainerProfile_profileInactive_coachingEligibilityEligibleIsFalse() throws Exception {
+        UUID userId = insertUser("inactiveprofile@example.com", "Inactive Profile Trainer", AccountStatus.ACTIVE);
+        assignRoleDirectly(userId, "TRAINER", false);
+        insertTrainerProfile(userId, "coach-inactive", "VERIFIED", "ACTIVE", false, true);
+        String token = createAccessToken(userId, "inactiveprofile@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/trainer-profiles/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coachingEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.coachingEligibility.blockingReasons", hasItem("PROFILE_INACTIVE")));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+    }
+
+    @Test
+    @DisplayName("GET /trainer-profiles/me when activityStatus is SUSPENDED returns eligible=false with ACTIVITY_SUSPENDED")
+    void getMyTrainerProfile_activitySuspended_coachingEligibilityEligibleIsFalse() throws Exception {
+        UUID userId = insertUser("suspendedactivity@example.com", "Suspended Activity Trainer", AccountStatus.ACTIVE);
+        assignRoleDirectly(userId, "TRAINER", false);
+        insertTrainerProfile(userId, "coach-suspended-act", "VERIFIED", "SUSPENDED", true, true);
+        String token = createAccessToken(userId, "suspendedactivity@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/trainer-profiles/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coachingEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.coachingEligibility.blockingReasons", hasItem("ACTIVITY_SUSPENDED")));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
     }
 }

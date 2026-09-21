@@ -1,10 +1,10 @@
 package com.fitnesscoaching.platform.modules.trainer.application.port.in;
 
-import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerProfileView;
 
 import java.util.UUID;
 
 public interface GetTrainerProfileUseCase {
 
-    TrainerProfile getTrainerProfile(UUID userId);
+    TrainerProfileView getTrainerProfile(UUID userId);
 }
