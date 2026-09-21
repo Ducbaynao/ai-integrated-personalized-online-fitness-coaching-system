@@ -9,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
@@ -16,6 +17,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 
 export function HomeScreen() {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const isDark = useColorScheme() === 'dark';
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -91,6 +93,19 @@ export function HomeScreen() {
               {user?.capabilities?.hasStudentProfile ? 'Active' : 'Not created'}
             </Text>
           </View>
+
+          {user?.capabilities?.hasStudentProfile && (
+            <Pressable
+              testID="view-student-profile-button"
+              accessibilityRole="button"
+              accessibilityLabel="View and Edit Student Profile"
+              style={[styles.profileButton, { borderColor }]}
+              onPress={() => router.push('/profile')}>
+              <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
+                View & Edit Student Profile →
+              </Text>
+            </Pressable>
+          )}
 
           <View style={styles.row}>
             <Text style={[styles.label, { color: subtextColor }]}>Trainer Profile</Text>
@@ -205,6 +220,18 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.brand[700],
     fontWeight: '600',
+  },
+  profileButton: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  profileButtonText: {
+    ...typography.label,
   },
   logoutButton: {
     minHeight: layout.minimumTouchTarget,
