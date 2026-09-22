@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -71,6 +72,25 @@ public class GlobalExceptionHandler {
                 Instant.now(clock),
                 RequestIdHolder.get(),
                 Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String name = ex.getName();
+        String message = "Parameter '" + name + "' is invalid";
+        List<FieldErrorDto> fieldErrors = List.of(new FieldErrorDto(
+                name,
+                "TypeMismatch",
+                "Failed to convert value of type '" + (ex.getValue() != null ? ex.getValue().getClass().getSimpleName() : "null") + "' to required type '" + (ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown") + "'"
+        ));
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                message,
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                fieldErrors
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
@@ -242,6 +262,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTrainerApplicationAlreadyActive(TrainerApplicationAlreadyActiveException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
                 "TRAINER_APPLICATION_ALREADY_ACTIVE",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerApplicationAlreadyDecidedException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerApplicationAlreadyDecided(TrainerApplicationAlreadyDecidedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "TRAINER_APPLICATION_ALREADY_DECIDED",
                 ex.getMessage(),
                 Instant.now(clock),
                 RequestIdHolder.get(),

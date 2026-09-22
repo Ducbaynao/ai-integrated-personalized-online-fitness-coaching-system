@@ -194,4 +194,47 @@ public class TrainerProfilePersistenceAdapter implements TrainerProfilePort {
                 trainerId
         );
     }
+
+    @Override
+    public int updateVerificationDetails(
+            UUID trainerId,
+            TrainerVerificationStatus status,
+            Instant verifiedAt,
+            UUID verifiedBy,
+            Instant updatedAt
+    ) {
+        if (verifiedAt != null) {
+            String sql = """
+                    UPDATE fitness.trainer_profiles SET
+                        verification_status = ?::fitness.trainer_verification_state,
+                        verified_at = ?,
+                        verified_by = ?,
+                        updated_at = ?
+                    WHERE user_id = ?
+                      AND verification_status = 'PENDING'::fitness.trainer_verification_state
+                    """;
+            return jdbcTemplate.update(
+                    sql,
+                    status.name(),
+                    Timestamp.from(verifiedAt),
+                    verifiedBy,
+                    Timestamp.from(updatedAt),
+                    trainerId
+            );
+        } else {
+            String sql = """
+                    UPDATE fitness.trainer_profiles SET
+                        verification_status = ?::fitness.trainer_verification_state,
+                        updated_at = ?
+                    WHERE user_id = ?
+                      AND verification_status = 'PENDING'::fitness.trainer_verification_state
+                    """;
+            return jdbcTemplate.update(
+                    sql,
+                    status.name(),
+                    Timestamp.from(updatedAt),
+                    trainerId
+            );
+        }
+    }
 }

@@ -5,12 +5,17 @@ import com.fitnesscoaching.platform.modules.trainer.domain.TrainerApplication;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +23,7 @@ import java.util.UUID;
 public class TrainerApplicationPersistenceAdapter implements TrainerApplicationPort {
 
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     private final RowMapper<TrainerApplication> applicationRowMapper = (rs, rowNum) -> {
         UUID id = (UUID) rs.getObject("id");
@@ -35,6 +41,7 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
 
         UUID reviewedBy = (UUID) rs.getObject("reviewed_by");
         String rejectionReason = rs.getString("rejection_reason");
+        String reviewNotes = rs.getString("review_notes");
         String applicantNote = rs.getString("applicant_note");
 
         Timestamp createdTs = rs.getTimestamp("created_at");
@@ -51,6 +58,7 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
                 reviewedAt,
                 reviewedBy,
                 rejectionReason,
+                reviewNotes,
                 applicantNote,
                 Collections.emptyList(),
                 Collections.emptyList(),
@@ -61,6 +69,7 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
 
     public TrainerApplicationPersistenceAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.namedParameterJdbcTemplate = new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     @Override
@@ -77,7 +86,7 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
     public Optional<TrainerApplication> findCurrentByTrainerId(UUID trainerId) {
         String sql = """
                 SELECT id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
-                       rejection_reason, applicant_note, created_at, updated_at
+                       rejection_reason, review_notes, applicant_note, created_at, updated_at
                 FROM fitness.trainer_applications
                 WHERE trainer_id = ?
                 ORDER BY CASE WHEN status = 'PENDING'::fitness.trainer_verification_state THEN 0 ELSE 1 END,
@@ -91,24 +100,144 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
             return Optional.empty();
         }
 
-        TrainerApplication app = list.get(0);
-        List<UUID> certIds = loadCertificateIds(app.id());
-        List<UUID> mediaIds = loadDocumentMediaIds(app.id());
+        return Optional.of(populateAttachments(list.get(0)));
+    }
 
-        return Optional.of(new TrainerApplication(
-                app.id(),
-                app.trainerId(),
-                app.status(),
-                app.submittedAt(),
-                app.reviewedAt(),
-                app.reviewedBy(),
-                app.rejectionReason(),
-                app.applicantNote(),
-                certIds,
-                mediaIds,
-                app.createdAt(),
-                app.updatedAt()
-        ));
+    @Override
+    public Optional<TrainerApplication> findById(UUID id) {
+        String sql = """
+                SELECT id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
+                       rejection_reason, review_notes, applicant_note, created_at, updated_at
+                FROM fitness.trainer_applications
+                WHERE id = ?
+                """;
+        List<TrainerApplication> list = jdbcTemplate.query(sql, applicationRowMapper, id);
+        if (list.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(populateAttachments(list.get(0)));
+    }
+
+    @Override
+    public Optional<TrainerApplication> findByIdForUpdate(UUID id) {
+        String sql = """
+                SELECT id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
+                       rejection_reason, review_notes, applicant_note, created_at, updated_at
+                FROM fitness.trainer_applications
+                WHERE id = ?
+                FOR UPDATE
+                """;
+        List<TrainerApplication> list = jdbcTemplate.query(sql, applicationRowMapper, id);
+        if (list.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(populateAttachments(list.get(0)));
+    }
+
+    @Override
+    public List<TrainerApplication> findApplications(TrainerVerificationStatus status, long offset, int limit) {
+        String sql;
+        List<TrainerApplication> apps;
+        if (status != null) {
+            sql = """
+                    SELECT id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
+                           rejection_reason, review_notes, applicant_note, created_at, updated_at
+                    FROM fitness.trainer_applications
+                    WHERE status = ?::fitness.trainer_verification_state
+                    ORDER BY submitted_at ASC, id ASC
+                    LIMIT ? OFFSET ?
+                    """;
+            apps = jdbcTemplate.query(sql, applicationRowMapper, status.name(), limit, offset);
+        } else {
+            sql = """
+                    SELECT id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
+                           rejection_reason, review_notes, applicant_note, created_at, updated_at
+                    FROM fitness.trainer_applications
+                    ORDER BY submitted_at ASC, id ASC
+                    LIMIT ? OFFSET ?
+                    """;
+            apps = jdbcTemplate.query(sql, applicationRowMapper, limit, offset);
+        }
+
+        if (apps.isEmpty()) {
+            return List.of();
+        }
+
+        return populateAttachmentsBatch(apps);
+    }
+
+    @Override
+    public long countApplications(TrainerVerificationStatus status) {
+        if (status != null) {
+            String sql = "SELECT count(*) FROM fitness.trainer_applications WHERE status = ?::fitness.trainer_verification_state";
+            Long count = jdbcTemplate.queryForObject(sql, Long.class, status.name());
+            return count != null ? count : 0L;
+        } else {
+            String sql = "SELECT count(*) FROM fitness.trainer_applications";
+            Long count = jdbcTemplate.queryForObject(sql, Long.class);
+            return count != null ? count : 0L;
+        }
+    }
+
+    @Override
+    public int updateDecision(
+            UUID applicationId,
+            TrainerVerificationStatus newStatus,
+            Instant reviewedAt,
+            UUID reviewedBy,
+            String rejectionReason,
+            String reviewNotes,
+            Instant updatedAt
+    ) {
+        String sql = """
+                UPDATE fitness.trainer_applications SET
+                    status = ?::fitness.trainer_verification_state,
+                    reviewed_at = ?,
+                    reviewed_by = ?,
+                    rejection_reason = ?,
+                    review_notes = ?,
+                    updated_at = ?
+                WHERE id = ? AND status = 'PENDING'::fitness.trainer_verification_state
+                """;
+        return jdbcTemplate.update(
+                sql,
+                newStatus.name(),
+                Timestamp.from(reviewedAt),
+                reviewedBy,
+                rejectionReason,
+                reviewNotes,
+                Timestamp.from(updatedAt),
+                applicationId
+        );
+    }
+
+    @Override
+    public void recordStatusHistory(
+            UUID applicationId,
+            TrainerVerificationStatus fromStatus,
+            TrainerVerificationStatus toStatus,
+            UUID changedBy,
+            String reason,
+            Instant changedAt
+    ) {
+        String sql = """
+                INSERT INTO fitness.trainer_application_status_history (
+                    id, trainer_application_id, from_status, to_status,
+                    changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, ?::fitness.trainer_verification_state, ?::fitness.trainer_verification_state,
+                    ?, ?, ?
+                )
+                """;
+        jdbcTemplate.update(
+                sql,
+                applicationId,
+                fromStatus.name(),
+                toStatus.name(),
+                changedBy,
+                reason,
+                Timestamp.from(changedAt)
+        );
     }
 
     @Override
@@ -116,10 +245,10 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
         String insertAppSql = """
                 INSERT INTO fitness.trainer_applications (
                     id, trainer_id, status, submitted_at, reviewed_at, reviewed_by,
-                    rejection_reason, applicant_note, created_at, updated_at
+                    rejection_reason, review_notes, applicant_note, created_at, updated_at
                 ) VALUES (
                     ?, ?, ?::fitness.trainer_verification_state, ?, ?, ?,
-                    ?, ?, ?, ?
+                    ?, ?, ?, ?, ?
                 )
                 """;
 
@@ -132,6 +261,7 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
                 application.reviewedAt() != null ? Timestamp.from(application.reviewedAt()) : null,
                 application.reviewedBy(),
                 application.rejectionReason(),
+                application.reviewNotes(),
                 application.applicantNote(),
                 Timestamp.from(application.createdAt()),
                 Timestamp.from(application.updatedAt())
@@ -180,6 +310,80 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
         );
 
         return application;
+    }
+
+    private List<TrainerApplication> populateAttachmentsBatch(List<TrainerApplication> apps) {
+        if (apps.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> applicationIds = apps.stream().map(TrainerApplication::id).toList();
+
+        String certSql = """
+                SELECT trainer_application_id, certificate_id
+                FROM fitness.trainer_application_certificates
+                WHERE trainer_application_id IN (:applicationIds)
+                ORDER BY certificate_id
+                """;
+        MapSqlParameterSource certParams = new MapSqlParameterSource("applicationIds", applicationIds);
+        Map<UUID, List<UUID>> certsByAppId = new HashMap<>();
+        namedParameterJdbcTemplate.query(certSql, certParams, rs -> {
+            UUID appId = (UUID) rs.getObject("trainer_application_id");
+            UUID certId = (UUID) rs.getObject("certificate_id");
+            certsByAppId.computeIfAbsent(appId, k -> new ArrayList<>()).add(certId);
+        });
+
+        String docSql = """
+                SELECT trainer_application_id, media_id
+                FROM fitness.trainer_verification_documents
+                WHERE trainer_application_id IN (:applicationIds)
+                ORDER BY media_id
+                """;
+        MapSqlParameterSource docParams = new MapSqlParameterSource("applicationIds", applicationIds);
+        Map<UUID, List<UUID>> docsByAppId = new HashMap<>();
+        namedParameterJdbcTemplate.query(docSql, docParams, rs -> {
+            UUID appId = (UUID) rs.getObject("trainer_application_id");
+            UUID mediaId = (UUID) rs.getObject("media_id");
+            docsByAppId.computeIfAbsent(appId, k -> new ArrayList<>()).add(mediaId);
+        });
+
+        return apps.stream()
+                .map(app -> new TrainerApplication(
+                        app.id(),
+                        app.trainerId(),
+                        app.status(),
+                        app.submittedAt(),
+                        app.reviewedAt(),
+                        app.reviewedBy(),
+                        app.rejectionReason(),
+                        app.reviewNotes(),
+                        app.applicantNote(),
+                        certsByAppId.getOrDefault(app.id(), List.of()),
+                        docsByAppId.getOrDefault(app.id(), List.of()),
+                        app.createdAt(),
+                        app.updatedAt()
+                ))
+                .toList();
+    }
+
+    private TrainerApplication populateAttachments(TrainerApplication app) {
+        List<UUID> certIds = loadCertificateIds(app.id());
+        List<UUID> mediaIds = loadDocumentMediaIds(app.id());
+        return new TrainerApplication(
+                app.id(),
+                app.trainerId(),
+                app.status(),
+                app.submittedAt(),
+                app.reviewedAt(),
+                app.reviewedBy(),
+                app.rejectionReason(),
+                app.reviewNotes(),
+                app.applicantNote(),
+                certIds,
+                mediaIds,
+                app.createdAt(),
+                app.updatedAt()
+        );
     }
 
     private List<UUID> loadCertificateIds(UUID applicationId) {
