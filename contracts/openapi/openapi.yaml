@@ -22,6 +22,8 @@ tags:
     description: Trainer capability activation and profile management on the common account.
   - name: Trainer Application
     description: Submission and status tracking for trainer verification applications.
+  - name: Admin Trainer Verification
+    description: Verification review, approval, and rejection of trainer applications by platform administrators.
 
 paths:
   /auth/registrations:
@@ -399,6 +401,142 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /admin/trainer-applications:
+    get:
+      tags: [Admin Trainer Verification]
+      operationId: getAdminTrainerApplications
+      summary: List trainer verification applications for administrative review
+      description: >-
+        Lists applications filtered by status (defaults to PENDING queue) with
+        deterministic sorting (submitted_at ASC, id ASC) and pagination.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TrainerVerificationStatus'
+          description: Filter applications by verification status. Defaults to PENDING if omitted.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Zero-based page index.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (maximum 100).
+      responses:
+        '200':
+          description: Page of trainer applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTrainerApplicationPageResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or User lacks active ADMIN role (ACCESS_DENIED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/trainer-applications/{applicationId}:
+    get:
+      tags: [Admin Trainer Verification]
+      operationId: getAdminTrainerApplicationDetail
+      summary: Get detailed trainer application view including confidential review notes
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the trainer application.
+      responses:
+        '200':
+          description: Detailed trainer application view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTrainerApplicationResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or User lacks active ADMIN role (ACCESS_DENIED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Application not found (TRAINER_APPLICATION_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/trainer-applications/{applicationId}/decisions:
+    post:
+      tags: [Admin Trainer Verification]
+      operationId: decideTrainerApplication
+      summary: Approve or reject a pending trainer application
+      description: >-
+        Transitions a PENDING application to VERIFIED or REJECTED. Updates trainer
+        profile verification status and timestamps, appends status history, and
+        records an audit entry.
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the trainer application.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideTrainerApplicationRequest'
+      responses:
+        '200':
+          description: Application decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTrainerApplicationResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden — Account state does not permit the requested operation (ACCOUNT_UNAVAILABLE)
+            or User lacks active ADMIN role (ACCESS_DENIED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Application not found (TRAINER_APPLICATION_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: >-
+            Conflict — Application is not in PENDING state, has already been decided
+            (TRAINER_APPLICATION_ALREADY_DECIDED), or trainer profile is not in PENDING state (INVALID_LIFECYCLE_TRANSITION).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -734,6 +872,59 @@ components:
         reviewedAt: { type: [string, 'null'], format: date-time }
         rejectionReason: { type: [string, 'null'] }
         updatedAt: { type: string, format: date-time }
+
+    DecideTrainerApplicationRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+          description: Verification decision.
+        rejectionReason:
+          type: [string, 'null']
+          maxLength: 2000
+          description: Mandatory explanation when decision is REJECT, must be omitted or null for APPROVE.
+        reviewNotes:
+          type: [string, 'null']
+          maxLength: 2000
+          description: Optional administrative notes visible only to admins.
+
+    AdminTrainerApplicationResponse:
+      type: object
+      required: [id, trainerId, status, submittedAt, certificateIds, documentMediaIds, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/TrainerVerificationStatus' }
+        submittedAt: { type: string, format: date-time }
+        reviewedAt: { type: [string, 'null'], format: date-time }
+        reviewedBy: { type: [string, 'null'], format: uuid }
+        rejectionReason: { type: [string, 'null'] }
+        reviewNotes: { type: [string, 'null'] }
+        applicantNote: { type: [string, 'null'] }
+        certificateIds:
+          type: array
+          items: { type: string, format: uuid }
+        documentMediaIds:
+          type: array
+          items: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminTrainerApplicationPageResponse:
+      type: object
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminTrainerApplicationResponse'
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalItems: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     ErrorResponse:
       type: object

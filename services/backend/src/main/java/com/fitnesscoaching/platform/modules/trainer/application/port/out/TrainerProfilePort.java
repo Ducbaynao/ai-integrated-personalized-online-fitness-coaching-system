@@ -22,4 +22,6 @@ public interface TrainerProfilePort {
     TrainerProfile update(TrainerProfile profile);
 
     void updateVerificationStatus(UUID trainerId, TrainerVerificationStatus status, Instant updatedAt);
+
+    int updateVerificationDetails(UUID trainerId, TrainerVerificationStatus status, Instant verifiedAt, UUID verifiedBy, Instant updatedAt);
 }

@@ -4,8 +4,18 @@
 
 1. User tạo Trainer Profile.
 2. Nộp application và certificates/documents (`POST /api/v1/trainer-applications`). Media binary upload được deferred; endpoint nhận các media identifier đã tồn tại và được cấp phép. Chỉ cho phép nộp application khi trạng thái xác minh của profile là `NOT_SUBMITTED`. Nếu profile đang `PENDING` hoặc đã có active application, hệ thống trả về `409 TRAINER_APPLICATION_ALREADY_ACTIVE`. Nếu profile đang `REJECTED`, `VERIFIED` hoặc `SUSPENDED`, hệ thống chặn với `409 INVALID_LIFECYCLE_TRANSITION`. Quy trình nộp lại hồ sơ (resubmission) sau khi bị `REJECTED` hiện đang deferred sang các milestone sau.
-3. Theo dõi trạng thái verification application (`GET /api/v1/trainer-applications/me/current`): các trạng thái được backend hỗ trợ gồm `NOT_SUBMITTED`, `PENDING`, `VERIFIED`, `REJECTED`, `SUSPENDED` (trạng thái ban đầu sau khi submit là `PENDING`). Quy trình Admin review được deferred sang milestone TRAINER-03.
-4. Việc nộp application không đồng nghĩa với verification approval (`canCoach` vẫn là `false`). Chỉ khi verification status là `VERIFIED` và activity policy là `ACTIVE`, capability coaching mới hoạt động.
+3. Theo dõi trạng thái verification application (`GET /api/v1/trainer-applications/me/current`): các trạng thái được backend hỗ trợ gồm `NOT_SUBMITTED`, `PENDING`, `VERIFIED`, `REJECTED`, `SUSPENDED` (trạng thái ban đầu sau khi submit là `PENDING`).
+4. Quy trình Admin review (triển khai tại milestone TRAINER-03 / M1J):
+   - Administrator truy cập hàng đợi thẩm định qua `GET /api/v1/admin/trainer-applications` (mặc định queue `PENDING`, sắp xếp theo thứ tự nộp `submitted_at ASC, id ASC`).
+   - Administrator xem chi tiết hồ sơ bằng `GET /api/v1/admin/trainer-applications/{applicationId}` bao gồm bằng cấp, tài liệu xác minh, thông tin người duyệt và ghi chú nội bộ (`reviewNotes`).
+   - Administrator ra quyết định qua `POST /api/v1/admin/trainer-applications/{applicationId}/decisions`:
+     - Nếu `APPROVE`: application chuyển sang `VERIFIED`, profile chuyển sang `VERIFIED` kèm `verified_at` và `verified_by`.
+     - Nếu `REJECT`: bắt buộc cung cấp `rejectionReason` giải thích lý do; profile chuyển sang `REJECTED`.
+     - Quyết định được bảo vệ chống tranh chấp đồng thời bằng pessimistic lock và conditional update (trả về `409 TRAINER_APPLICATION_ALREADY_DECIDED` nếu application không còn `PENDING`).
+   - Trainer theo dõi kết quả qua `GET /api/v1/trainer-applications/me/current`: thấy được `status` và `rejectionReason` (nếu bị từ chối), nhưng ghi chú quản trị `reviewNotes` hoàn toàn được bảo mật và không bao giờ lộ ra phía trainer.
+5. Việc nộp application hoặc Admin phê duyệt không tự động cấp coaching authority:
+   - Approval chỉ thiết lập `verificationStatus = VERIFIED`.
+   - Quyền huấn luyện (`canCoach`) được quyết định bởi policy engine duy nhất: chỉ trả về `true` khi tài khoản `ACTIVE`, role `TRAINER` active trong DB, profile tồn tại và active (`isActive = true`), `activityStatus = ACTIVE`, và không có restriction. Phê duyệt xác minh không tạo Coaching Relationship.
 
 ## 2. Daily management by exception
 

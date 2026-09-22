@@ -101,3 +101,38 @@ In Milestone M1A, email verification delivery is implemented as follows:
 - **Testing**: Test suites explicitly activate the `test` profile (`@ActiveProfiles("test")`), which provides a dedicated in-memory capturing adapter (`TestVerificationEmailSender`).
 - **Production & Default Environments**: The default/production configuration does not register a fallback or dummy email sender. If a production-ready mail provider is not configured, Spring Boot will fail fast at startup to prevent silent message loss.
 - **Post-Commit Delivery & Deferrals**: M1A dispatches verification emails post-commit to ensure transaction integrity. If dispatch fails, the system increments the Micrometer metric `auth.email.verification.delivery.failures` and logs a structured warning. External durable outbox delivery, persistent retry queues, and user-initiated resend workflows remain deferred beyond M1B. M1A/M1B are explicitly **not production-email-ready**.
+
+## Admin Trainer Verification behavior (M1J)
+
+Milestone M1J implements administrative review, approval, and rejection of trainer verification applications.
+
+### Endpoints
+- `GET /api/v1/admin/trainer-applications`:
+  - Lists applications with optional `status` filter (defaults to `PENDING` queue).
+  - Deterministic ordering: `submitted_at ASC, id ASC` (FIFO queue for administrative attention).
+  - Pagination: `page` (0-indexed, default `0`), `size` (default `20`, maximum `100`).
+  - Response contains page metadata (`items`, `page`, `size`, `totalItems`, `totalPages`).
+- `GET /api/v1/admin/trainer-applications/{applicationId}`:
+  - Detailed view of a single trainer application, exposing administrative review notes (`reviewNotes`), reviewer identity (`reviewedBy`), timestamps, attached certificates, and verification documents.
+- `POST /api/v1/admin/trainer-applications/{applicationId}/decisions`:
+  - Records verification decision (`APPROVE` or `REJECT`).
+  - Validation: When `decision` is `REJECT`, `rejectionReason` is required and non-blank (max 2000 characters). When `decision` is `APPROVE`, `rejectionReason` must be null or omitted. `reviewNotes` is optional (max 2000 characters).
+
+### Security and Authorization
+- All endpoints enforce `@PreAuthorize("hasRole('ADMIN')")` at the controller layer.
+- At the domain/service layer, `AdminTrainerVerificationService` verifies both:
+  1. The authenticated account is in `ACTIVE` state in PostgreSQL (`AccountUnavailableException` -> `403 ACCOUNT_UNAVAILABLE`).
+  2. The authenticated user has an active, non-revoked `ADMIN` role in `fitness.user_roles` (`AccessDeniedException` -> `403 ACCESS_DENIED`).
+- Stale tokens with revoked roles or suspended accounts are rejected against the system of record.
+
+### Concurrency and Transaction Boundary
+- State transitions are strictly atomic within a `@Transactional` boundary.
+- Concurrency protection combines row-level locking (`SELECT ... FOR UPDATE`) with conditional update (`UPDATE fitness.trainer_applications SET ... WHERE id = ? AND status = 'PENDING'`).
+- If an application is not in `PENDING` state or another administrator decides it concurrently, the loser receives `409 TRAINER_APPLICATION_ALREADY_DECIDED`.
+- State updates mutate `trainer_applications`, update `trainer_profiles` (`verification_status = VERIFIED` with `verified_at`/`verified_by`, or `REJECTED` with null verification timestamp), record immutable `trainer_application_status_history`, and emit `audit_logs` (`TRAINER_APPLICATION_APPROVED` or `TRAINER_APPLICATION_REJECTED`).
+- Any failure during audit logging or downstream operations triggers a complete transaction rollback.
+
+### Boundary and Decoupling Invariants
+- Admin verification sets profile verification status only. It **never** creates coaching relationships and **never** directly grants coaching authority.
+- `canCoach` remains derived from the canonical coaching eligibility policy: even an approved trainer cannot coach if their profile is inactive, their activity status is not `ACTIVE`, or their account is suspended.
+- Administrative review notes (`reviewNotes`) are strictly confidential and never exposed to trainers via self-service endpoints (`GET /trainer-applications/me/current`).

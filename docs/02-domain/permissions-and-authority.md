@@ -53,3 +53,12 @@ Private chat, Progress Photos, detailed Nutrition, Measurements, or other sensit
 
 High-risk operations such as changing Admin permissions, suspending accounts, revoking Trainer verification, publishing Knowledge, deleting/anonymizing a User, or changing critical configuration require step-up authentication under the security policy.
 
+### Trainer verification administration (M1J)
+
+The Administrator has platform authority to review trainer verification applications and record verification decisions:
+- **Decision Scope**: The Administrator decides whether submitted trainer credentials meet platform standards, transitioning applications from `PENDING` to `VERIFIED` or `REJECTED`.
+- **Platform Authority vs Coaching Authority**: An administrative approval sets `trainer_profiles.verification_status = VERIFIED` but **never** creates coaching relationships and **never** directly confers coaching authority. Coaching authority (`canCoach`) remains derived exclusively by the canonical coaching eligibility policy engine.
+- **Mandatory Rejection Rationale**: Rejections require an explicit `rejectionReason` that is surfaced to the applicant in self-service views.
+- **Administrative Confidentiality**: Administrative review notes (`reviewNotes`) are strictly restricted to authorized administrators and platform audit logs; they are never exposed to applicant trainers.
+- **Concurrency & Audit Guard**: Verification decisions require pessimistic row locking and status preconditions (`status = 'PENDING'`), append immutable status history, and emit audit log records that roll back atomically if logging fails.
+
