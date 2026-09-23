@@ -291,6 +291,39 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(ActiveFitnessGoalAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleActiveFitnessGoalAlreadyExists(ActiveFitnessGoalAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "ACTIVE_FITNESS_GOAL_ALREADY_EXISTS",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(FitnessGoalNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleFitnessGoalNotFound(FitnessGoalNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "FITNESS_GOAL_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(FitnessGoalAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleFitnessGoalAccessDenied(FitnessGoalAccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "ACCESS_DENIED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String constraintName = extractConstraintName(ex);
@@ -349,6 +382,28 @@ public class GlobalExceptionHandler {
                     Collections.emptyList()
             );
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_student_active_fitness_goal")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "ACTIVE_FITNESS_GOAL_ALREADY_EXISTS",
+                    "An active fitness goal already exists for this student.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_target_metric")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "VALIDATION_FAILED",
+                    "Duplicate target metric definition specified for this goal version.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
         log.error("Data integrity violation: constraintName={}, message={}", constraintName, ex.getMessage(), ex);

@@ -136,3 +136,46 @@ Milestone M1J implements administrative review, approval, and rejection of train
 - Admin verification sets profile verification status only. It **never** creates coaching relationships and **never** directly grants coaching authority.
 - `canCoach` remains derived from the canonical coaching eligibility policy: even an approved trainer cannot coach if their profile is inactive, their activity status is not `ACTIVE`, or their account is suspended.
 - Administrative review notes (`reviewNotes`) are strictly confidential and never exposed to trainers via self-service endpoints (`GET /trainer-applications/me/current`).
+
+## Student Fitness Goal behavior (GOAL-01)
+
+Milestone GOAL-01 implements the backend foundation for Student-owned Fitness Goals and measurable Goal Targets.
+
+### Endpoints
+- `POST /api/v1/fitness-goals`:
+  - Creates a new Student-owned Fitness Goal with version 1, objectives, and targets.
+  - Can be initialized in `DRAFT` or `ACTIVE` state (`activateImmediately: true`).
+  - Validation requires:
+    - Non-empty title (up to 200 characters).
+    - Start date is required; optional target date must be strictly after start date (`targetDate > startDate`); positive duration days.
+    - Timeline consistency: when both `targetDate` and `durationDays` are provided, `durationDays` must exactly equal `ChronoUnit.DAYS.between(startDate, targetDate)`; if mismatched, returns `400 VALIDATION_FAILED` (code `Mismatch`). If only one is provided, the missing value is automatically calculated.
+    - Exactly one `PRIMARY` objective (and optional `SECONDARY` objectives).
+    - Valid, active `goal_types`.
+    - No duplicate goal types within version objectives.
+    - If targets are provided: valid active `metric_definitions`, matching `measurement_units` dimension, at least one target value (`targetValue`, `targetMinValue`, `targetMaxValue`), range consistency (`targetMinValue <= targetMaxValue`), positive repetitions, valid timeline (`targetDate >= startDate`).
+    - No duplicate target metrics within version targets.
+    - Missing measurement values are unknown, never zero.
+  - When activating immediately: checks that the student does not already have an active goal.
+- `GET /api/v1/fitness-goals/me/current`:
+  - Retrieves the authenticated student's current active fitness goal with current version, objectives, and targets.
+  - Returns `404 FITNESS_GOAL_NOT_FOUND` if no active goal exists.
+- `GET /api/v1/fitness-goals/{goalId}`:
+  - Retrieves details of a fitness goal by ID.
+  - Strictly verifies ownership (`student_id == authenticatedUserId`). Cross-student access is denied (`403 ACCESS_DENIED`).
+- `POST /api/v1/fitness-goals/{goalId}/activate`:
+  - Transitions a `DRAFT` goal to `ACTIVE`.
+  - Verifies ownership and validates that no active goal currently exists for the student.
+  - Locks current version (`locked_at = now()`, `locked_by = studentId`, `lock_reason = 'ACTIVATED'`).
+  - Appends to `fitness_goal_status_history` and records immutable audit log.
+
+### Authority and Invariants
+- Student owns and finally activates Fitness Goals in both `SELF_DIRECTED` and `HUMAN_COACH` modes.
+- Trainers, AI, and Administrators cannot create, activate, or directly mutate Student fitness goals.
+- At most one `ACTIVE` fitness goal per student concurrently (enforced by `uq_student_active_fitness_goal` partial index and application concurrency checks).
+- Concurrency safety during activation:
+  - Concurrent activation of the same goal is serialized via atomic compare-and-set (`WHERE id = ? AND status = 'DRAFT'`), resulting in one `200 OK` and one `409 INVALID_LIFECYCLE_TRANSITION`. Exactly one status history row and one audit log are created.
+  - Concurrent activation of different goals for the same student is protected by the PostgreSQL partial unique index `uq_student_active_fitness_goal`, resulting in one `200 OK` and one `409 ACTIVE_FITNESS_GOAL_ALREADY_EXISTS`.
+- Version locking invariants:
+  - When a goal is active, its current version is locked (`locked_at IS NOT NULL`).
+  - Objectives and targets are inserted before the version is locked, respecting `protect_goal_objective_content` and `protect_goal_target_content` triggers.
+  - All operations are strictly atomic within `@Transactional` boundaries; audit logging failure rolls back the entire database transaction.
