@@ -17,6 +17,24 @@ import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 
+const ACCOUNT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Đang hoạt động',
+  PENDING_VERIFICATION: 'Chờ xác minh',
+  SUSPENDED: 'Đã tạm khóa',
+  DISABLED: 'Đã vô hiệu hóa',
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  STUDENT: 'Học viên',
+  TRAINER: 'Huấn luyện viên',
+  ADMIN: 'Quản trị viên',
+};
+
+const MEASUREMENT_LABELS: Record<string, string> = {
+  METRIC: 'Hệ mét',
+  IMPERIAL: 'Hệ Anh',
+};
+
 export function HomeScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -57,38 +75,44 @@ export function HomeScreen() {
         {/* Header Section */}
         <View style={styles.header}>
           <Text style={[styles.greeting, { color: textColor }]}>
-            Welcome, {user?.displayName || 'Athlete'}!
+            Chào {user?.displayName || 'bạn'}!
           </Text>
           <Text style={[styles.subtitle, { color: subtextColor }]}>
-            AI Integrated Personalized Online Fitness Coaching
+            Không gian tập luyện cá nhân của bạn
           </Text>
         </View>
 
         {/* Account Details Card */}
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Account Details</Text>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Thông tin tài khoản</Text>
 
           <View style={styles.row}>
             <Text style={[styles.label, { color: subtextColor }]}>Email</Text>
-            <Text style={[styles.value, { color: textColor }]}>{user?.email ?? 'Unknown'}</Text>
+            <Text style={[styles.value, { color: textColor }]}>{user?.email ?? 'Chưa có'}</Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Status</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Trạng thái</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{user?.status ?? 'ACTIVE'}</Text>
+              <Text style={styles.badgeText}>
+                {user?.status
+                  ? ACCOUNT_STATUS_LABELS[user.status] ?? user.status
+                  : 'Không xác định'}
+              </Text>
             </View>
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Roles</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Vai trò</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.roles?.length ? user.roles.join(', ') : 'None'}
+              {user?.roles?.length
+                ? user.roles.map((role) => ROLE_LABELS[role] ?? role).join(', ')
+                : 'Chưa có'}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Timezone</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Múi giờ</Text>
             <Text style={[styles.value, { color: textColor }]}>
               {user?.timezone ?? 'Asia/Ho_Chi_Minh'}
             </Text>
@@ -97,12 +121,12 @@ export function HomeScreen() {
 
         {/* Capabilities Card */}
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Capabilities</Text>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Hồ sơ và quyền sử dụng</Text>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Student Profile</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Hồ sơ học viên</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.hasStudentProfile ? 'Active' : 'Not created'}
+              {user?.capabilities?.hasStudentProfile ? 'Đã kích hoạt' : 'Chưa tạo'}
             </Text>
           </View>
 
@@ -110,26 +134,26 @@ export function HomeScreen() {
             <Pressable
               testID="view-student-profile-button"
               accessibilityRole="button"
-              accessibilityLabel="View and Edit Student Profile"
+              accessibilityLabel="Xem và chỉnh sửa hồ sơ học viên"
               style={[styles.profileButton, { borderColor }]}
               onPress={() => router.push('/profile')}>
               <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                View & Edit Student Profile →
+                Xem và chỉnh sửa hồ sơ →
               </Text>
             </Pressable>
           )}
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Trainer Profile</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Hồ sơ huấn luyện viên</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.hasTrainerProfile ? 'Active' : 'Not created'}
+              {user?.capabilities?.hasTrainerProfile ? 'Đã kích hoạt' : 'Chưa tạo'}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Coaching Authority</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Quyền huấn luyện</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.canCoach ? 'Authorized' : 'Unauthorized'}
+              {user?.capabilities?.canCoach ? 'Đã được cấp' : 'Chưa được cấp'}
             </Text>
           </View>
         </View>
@@ -140,20 +164,19 @@ export function HomeScreen() {
             testID="student-cross-activate-card"
             style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>
-              Become a Coach
+              Trở thành huấn luyện viên
             </Text>
             <Text style={[styles.cardDescription, { color: subtextColor }]}>
-              Are you a fitness trainer? Activate your Trainer Profile on this account to build your
-              coaching presence and prepare for verification.
+              Kích hoạt Hồ sơ huấn luyện viên trên chính tài khoản này để chuẩn bị cho quy trình xác minh.
             </Text>
             <Pressable
               testID="student-cross-activate-trainer-button"
               accessibilityRole="button"
-              accessibilityLabel="Become a Trainer"
+              accessibilityLabel="Tạo hồ sơ huấn luyện viên"
               onPress={() => router.push('/(onboarding)/trainer')}
               style={[styles.profileButton, { borderColor: themeColors.primary }]}>
               <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                Set up Trainer Profile →
+                Tạo hồ sơ huấn luyện viên →
               </Text>
             </Pressable>
           </View>
@@ -161,19 +184,22 @@ export function HomeScreen() {
 
         {/* Preferences Card */}
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Preferences</Text>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Tùy chọn</Text>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Measurement System</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Hệ đo lường</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.settings?.measurementSystem ?? 'METRIC'}
+              {user?.settings?.measurementSystem
+                ? MEASUREMENT_LABELS[user.settings.measurementSystem] ??
+                  user.settings.measurementSystem
+                : 'Hệ mét'}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Week Starts On</Text>
+            <Text style={[styles.label, { color: subtextColor }]}>Ngày bắt đầu tuần</Text>
             <Text style={[styles.value, { color: textColor }]}>
-              {user?.settings?.weekStartsOn === 1 ? 'Monday' : 'Sunday'}
+              {user?.settings?.weekStartsOn === 1 ? 'Thứ Hai' : 'Chủ Nhật'}
             </Text>
           </View>
         </View>
@@ -182,7 +208,7 @@ export function HomeScreen() {
         <Pressable
           testID="logout-button"
           accessibilityRole="button"
-          accessibilityLabel="Log Out"
+          accessibilityLabel="Đăng xuất"
           accessibilityState={{ disabled: isLoggingOut, busy: isLoggingOut }}
           style={({ pressed }) => [
             styles.logoutButton,
@@ -199,7 +225,7 @@ export function HomeScreen() {
           {isLoggingOut ? (
             <ActivityIndicator color={themeColors.textOnPrimary} />
           ) : (
-            <Text style={styles.logoutButtonText}>Log Out</Text>
+            <Text style={styles.logoutButtonText}>Đăng xuất</Text>
           )}
         </Pressable>
       </ScrollView>

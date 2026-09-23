@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { authApi, registerSessionExpiredHandler } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
 import {
+  ApiError,
   CurrentUserResponse,
   LoginRequest,
   RegisterRequest,
@@ -10,19 +11,26 @@ import {
 } from '@/types/auth';
 import { ActiveCapability, resolveActiveCapability } from './routeGuard';
 
-export type AuthStatus = 'INITIALIZING' | 'UNAUTHENTICATED' | 'AUTHENTICATED';
+export type AuthStatus =
+  | 'INITIALIZING'
+  | 'RESTORE_FAILED'
+  | 'UNAUTHENTICATED'
+  | 'AUTHENTICATED';
 
 export interface AuthContextType {
   status: AuthStatus;
   user: CurrentUserResponse | null;
   activeCapability: ActiveCapability | null;
   isLoading: boolean;
+  restoreError: string | null;
+  sessionNotice: string | null;
   login: (data: LoginRequest) => Promise<TokenPairResponse>;
   register: (data: RegisterRequest) => Promise<RegistrationResponse>;
   confirmEmail: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: (preferredCapability?: ActiveCapability | null) => Promise<CurrentUserResponse>;
   setActiveCapability: (capability: ActiveCapability) => Promise<void>;
+  retrySessionRestore: () => Promise<void>;
 }
 
 async function safeGetActiveCapability(): Promise<string | null> {
@@ -55,6 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('INITIALIZING');
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [activeCapability, setActiveCapabilityState] = useState<ActiveCapability | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   const userRef = useRef<CurrentUserResponse | null>(user);
   useEffect(() => {
@@ -66,6 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRef.current = null;
     setUser(null);
     setActiveCapabilityState(null);
+    setRestoreError(null);
+    setSessionNotice('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     setStatus('UNAUTHENTICATED');
   }, []);
 
@@ -76,65 +88,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [handleSessionExpired]);
 
-  // Initial session hydration
-  useEffect(() => {
-    let isMounted = true;
+  const restoreSession = useCallback(async (): Promise<void> => {
+    setStatus('INITIALIZING');
+    setRestoreError(null);
 
-    async function hydrateSession() {
-      let currentUser: CurrentUserResponse;
-      try {
-        const tokens = await tokenStorage.getTokens();
-        if (!tokens) {
-          if (isMounted) {
-            setStatus('UNAUTHENTICATED');
-          }
-          return;
-        }
-
-        // Genuine auth failure (invalid tokens, refresh failure) triggers session cleanup
-        currentUser = await authApi.getCurrentUser();
-      } catch {
-        // Hydration failed (token invalid, refresh failed)
-        await tokenStorage.clearTokens().catch(() => {});
-        await safeClearActiveCapability();
+    let currentUser: CurrentUserResponse;
+    try {
+      const tokens = await tokenStorage.getTokens();
+      if (!tokens) {
         userRef.current = null;
-        if (isMounted) {
-          setUser(null);
-          setActiveCapabilityState(null);
-          setStatus('UNAUTHENTICATED');
-        }
+        setUser(null);
+        setActiveCapabilityState(null);
+        setStatus('UNAUTHENTICATED');
         return;
       }
 
-      // Capability persistence failure must never fail authentication or wipe valid tokens
-      userRef.current = currentUser;
-      const persisted = await safeGetActiveCapability();
-      const resolved = resolveActiveCapability(currentUser, persisted);
+      currentUser = await authApi.getCurrentUser();
+    } catch (error) {
+      const isTerminalAuthFailure =
+        error instanceof ApiError && (error.status === 401 || error.status === 403);
 
-      if (
-        currentUser.capabilities?.hasStudentProfile &&
-        currentUser.capabilities?.hasTrainerProfile &&
-        resolved
-      ) {
-        await safeSaveActiveCapability(resolved);
+      if (!isTerminalAuthFailure) {
+        setRestoreError('Không thể kiểm tra phiên đăng nhập. Hãy kiểm tra mạng và thử lại.');
+        setStatus('RESTORE_FAILED');
+        return;
       }
 
-      if (isMounted) {
-        setUser(currentUser);
-        setActiveCapabilityState(resolved);
-        setStatus('AUTHENTICATED');
-      }
+      await tokenStorage.clearTokens().catch(() => {});
+      await safeClearActiveCapability();
+      userRef.current = null;
+      setUser(null);
+      setActiveCapabilityState(null);
+      setSessionNotice('Phiên đăng nhập không còn hiệu lực. Vui lòng đăng nhập lại.');
+      setStatus('UNAUTHENTICATED');
+      return;
     }
 
-    hydrateSession();
+    // Capability persistence failure must never fail authentication or wipe valid tokens.
+    userRef.current = currentUser;
+    const persisted = await safeGetActiveCapability();
+    const resolved = resolveActiveCapability(currentUser, persisted);
 
-    return () => {
-      isMounted = false;
-    };
+    if (
+      currentUser.capabilities?.hasStudentProfile &&
+      currentUser.capabilities?.hasTrainerProfile &&
+      resolved
+    ) {
+      await safeSaveActiveCapability(resolved);
+    }
+
+    setUser(currentUser);
+    setActiveCapabilityState(resolved);
+    setRestoreError(null);
+    setStatus('AUTHENTICATED');
   }, []);
+
+  useEffect(() => {
+    const initialRestore = Promise.resolve().then(restoreSession);
+    initialRestore.catch(() => {
+      setRestoreError('Không thể khôi phục phiên đăng nhập. Vui lòng thử lại.');
+      setStatus('RESTORE_FAILED');
+    });
+  }, [restoreSession]);
 
   const login = useCallback(async (data: LoginRequest): Promise<TokenPairResponse> => {
     const tokenPair = await authApi.login(data);
+    setSessionNotice(null);
+    setRestoreError(null);
     userRef.current = tokenPair.user;
 
     const persisted = await safeGetActiveCapability();
@@ -170,6 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userRef.current = null;
       setUser(null);
       setActiveCapabilityState(null);
+      setRestoreError(null);
+      setSessionNotice(null);
       setStatus('UNAUTHENTICATED');
     }
   }, []);
@@ -225,12 +247,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         activeCapability,
         isLoading: status === 'INITIALIZING',
+        restoreError,
+        sessionNotice,
         login,
         register,
         confirmEmail,
         logout,
         refreshUser,
         setActiveCapability,
+        retrySessionRestore: restoreSession,
       }}>
       {children}
     </AuthContext.Provider>
