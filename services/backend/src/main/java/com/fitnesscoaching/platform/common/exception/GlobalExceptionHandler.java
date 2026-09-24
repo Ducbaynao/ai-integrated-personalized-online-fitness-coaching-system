@@ -324,6 +324,105 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(GoalProposalNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleGoalProposalNotFound(GoalProposalNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "GOAL_PROPOSAL_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalProposalAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleGoalProposalAccessDenied(GoalProposalAccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "GOAL_PROPOSAL_ACCESS_DENIED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(InvalidGoalProposalDecisionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidGoalProposalDecision(InvalidGoalProposalDecisionException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(
+                "INVALID_GOAL_PROPOSAL_DECISION",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalProposalAlreadyDecidedException.class)
+    public ResponseEntity<ErrorResponse> handleGoalProposalAlreadyDecided(GoalProposalAlreadyDecidedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_PROPOSAL_ALREADY_DECIDED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalProposalExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleGoalProposalExpired(GoalProposalExpiredException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_PROPOSAL_EXPIRED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(StaleGoalProposalException.class)
+    public ResponseEntity<ErrorResponse> handleStaleGoalProposal(StaleGoalProposalException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "STALE_GOAL_PROPOSAL",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(TrainerNotEligibleException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerNotEligible(TrainerNotEligibleException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "TRAINER_NOT_ELIGIBLE",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(CoachingRelationshipRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleCoachingRelationshipRequired(CoachingRelationshipRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "COACHING_RELATIONSHIP_REQUIRED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(DataSharingPermissionRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleDataSharingPermissionRequired(DataSharingPermissionRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "DATA_SHARING_PERMISSION_REQUIRED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String constraintName = extractConstraintName(ex);
@@ -399,6 +498,28 @@ public class GlobalExceptionHandler {
             ErrorResponse response = ErrorResponse.of(
                     "VALIDATION_FAILED",
                     "Duplicate target metric definition specified for this goal version.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_proposal_target_metric")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "VALIDATION_FAILED",
+                    "Duplicate target metric definition specified for this goal proposal.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_proposal_primary_objective")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "VALIDATION_FAILED",
+                    "Only one PRIMARY objective is allowed for a goal proposal.",
                     Instant.now(clock),
                     RequestIdHolder.get(),
                     Collections.emptyList()

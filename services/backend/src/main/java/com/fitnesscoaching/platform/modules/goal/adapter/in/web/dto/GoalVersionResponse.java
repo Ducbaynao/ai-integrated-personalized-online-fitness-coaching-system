@@ -11,6 +11,7 @@ import java.util.UUID;
 public record GoalVersionResponse(
         UUID id,
         int versionNumber,
+        String title,
         LocalDate startDate,
         LocalDate targetDate,
         Integer durationDays,
@@ -28,6 +29,49 @@ public record GoalVersionResponse(
         List<GoalObjectiveResponse> objectives,
         List<GoalTargetResponse> targets
 ) {
+    public GoalVersionResponse(
+            UUID id,
+            int versionNumber,
+            LocalDate startDate,
+            LocalDate targetDate,
+            Integer durationDays,
+            Instant effectiveFrom,
+            Instant effectiveUntil,
+            LocalDate resumeDate,
+            String changeReason,
+            String changeSummary,
+            UUID createdBy,
+            UUID sourceProposalId,
+            Instant createdAt,
+            Instant lockedAt,
+            UUID lockedBy,
+            VersionLockReason lockReason,
+            List<GoalObjectiveResponse> objectives,
+            List<GoalTargetResponse> targets
+    ) {
+        this(
+                id,
+                versionNumber,
+                null,
+                startDate,
+                targetDate,
+                durationDays,
+                effectiveFrom,
+                effectiveUntil,
+                resumeDate,
+                changeReason,
+                changeSummary,
+                createdBy,
+                sourceProposalId,
+                createdAt,
+                lockedAt,
+                lockedBy,
+                lockReason,
+                objectives,
+                targets
+        );
+    }
+
     public static GoalVersionResponse fromDomain(FitnessGoalVersion version) {
         if (version == null) {
             return null;
@@ -35,6 +79,7 @@ public record GoalVersionResponse(
         return new GoalVersionResponse(
                 version.id(),
                 version.versionNumber(),
+                version.title(),
                 version.startDate(),
                 version.targetDate(),
                 version.durationDays(),

@@ -179,3 +179,67 @@ Milestone GOAL-01 implements the backend foundation for Student-owned Fitness Go
   - When a goal is active, its current version is locked (`locked_at IS NOT NULL`).
   - Objectives and targets are inserted before the version is locked, respecting `protect_goal_objective_content` and `protect_goal_target_content` triggers.
   - All operations are strictly atomic within `@Transactional` boundaries; audit logging failure rolls back the entire database transaction.
+
+## Goal Proposal and Student Confirmation (GOAL-02)
+
+Milestone GOAL-02 implements the collaborative goal proposal and student confirmation workflow between Trainers and Students.
+
+### Endpoints
+- `POST /api/v1/fitness-goals/{goalId}/proposals`:
+  - Allows an authorized Trainer to propose modifications to an existing active Student Fitness Goal.
+  - Validates all 7 trainer authority layers against the PostgreSQL system of record:
+    1. Trainer account status `ACTIVE`.
+    2. Trainer role `TRAINER` active.
+    3. Trainer profile exists and active.
+    4. Canonical coaching eligibility verified (`canCoach == true`).
+    5. Active coaching relationship (`status = 'ACTIVE'`).
+    6. Current coaching period in `HUMAN_COACH` mode.
+    7. Active data-sharing permission (`FITNESS_GOAL` scope, `decision = 'ALLOW'`).
+  - Requires `reason` and valid proposed objectives and targets (at least 1 objective, exactly 1 PRIMARY, valid metrics, units, ranges, and no duplicates).
+  - Active goal and its current version remain completely untouched while proposal is `PENDING`.
+  - Returns `201 Created` with Location header `/api/v1/fitness-goal-proposals/{id}` and full proposal representation.
+- `GET /api/v1/fitness-goal-proposals/me`:
+  - Lists proposals for the authenticated student with optional `status` filter (`PENDING`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`).
+  - Deterministic ordering: `created_at DESC, id DESC`.
+  - Safe pagination with checked bounds and metadata (`items`, `page`, `size`, `totalItems`, `totalPages`).
+- `GET /api/v1/fitness-goal-proposals/{proposalId}`:
+  - Retrieves detailed goal proposal including current-versus-proposed comparison data (`baseVersion`).
+  - Authorization: Only the owning Student or the proposing Trainer can access (`403 ACCESS_DENIED`).
+- `POST /api/v1/fitness-goal-proposals/{proposalId}/decisions`:
+  - Student accepts or rejects the goal proposal (`decision: ACCEPT | REJECT`, `decisionNote` required on REJECT, max 2000 chars).
+  - Authorization: Strictly restricted to the owning Student. Re-verifies student capability against PostgreSQL. Trainers and Admins are rejected (`403 GOAL_PROPOSAL_ACCESS_DENIED`).
+
+### Decision Invariants and State Transitions
+- **REJECT**:
+  - Proposal atomically transitions `PENDING -> REJECTED` via CAS.
+  - Records `decided_at = now()`, `decided_by = studentId`, `decision_note = decisionNote`.
+  - Appends to `fitness.goal_proposal_status_history`.
+  - Fitness goal and current version remain completely untouched.
+  - Records immutable audit log `GOAL_PROPOSAL_REJECTED`.
+- **ACCEPT**:
+  - Proposal atomically transitions `PENDING -> ACCEPTED` via CAS.
+  - Concurrency & freshness check: Verifies that `base_goal_version_id` is still the current active version (`effective_until IS NULL`). If the goal has been superseded in the meantime, rejects with `409 STALE_GOAL_PROPOSAL`.
+  - Closes base version: sets `effective_until = now()` via atomic CAS.
+  - Creates next `FitnessGoalVersion`:
+    - `version_number = base_version_number + 1`.
+    - `effective_from = now()`, `effective_until = NULL`.
+    - Preserves historical title or adopts `proposedTitle` if provided.
+    - Copies proposed objectives into `fitness.goal_objectives` and targets into `fitness.goal_targets`.
+    - Locks new version: `locked_at = now()`, `locked_by = studentId`, `lock_reason = 'APPROVED'`.
+  - Updates goal title in `fitness.fitness_goals` if `proposedTitle` was specified.
+  - Appends to `fitness.goal_proposal_status_history`.
+  - Records immutable audit logs: `GOAL_PROPOSAL_ACCEPTED` and `FITNESS_GOAL_VERSION_CREATED`.
+- **Atomicity and Rollback**:
+  - The entire acceptance/rejection sequence runs within a single `@Transactional` boundary.
+  - Any error, including audit logging failure, causes full rollback.
+
+### Error Codes
+- `GOAL_PROPOSAL_NOT_FOUND` (404): Proposal ID does not exist.
+- `GOAL_PROPOSAL_ACCESS_DENIED` (403): User is not authorized to view or decide proposal.
+- `INVALID_GOAL_PROPOSAL_DECISION` (400): Unsupported or malformed decision value.
+- `GOAL_PROPOSAL_ALREADY_DECIDED` (409): Proposal is no longer in PENDING status.
+- `GOAL_PROPOSAL_EXPIRED` (409): Proposal has passed its expiration timestamp.
+- `STALE_GOAL_PROPOSAL` (409): Goal base version is no longer active; cannot accept stale proposal.
+- `TRAINER_NOT_ELIGIBLE` (403): Trainer fails canonical coaching eligibility policy.
+- `COACHING_RELATIONSHIP_REQUIRED` (403): Trainer has no active coaching relationship or human coaching period with student.
+- `DATA_SHARING_PERMISSION_REQUIRED` (403): Student has not granted active FITNESS_GOAL data-sharing permission to trainer.

@@ -632,12 +632,161 @@ paths:
                 $ref: '#/components/schemas/FitnessGoalResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/AccountUnavailable' }
+  /fitness-goals/{goalId}/proposals:
+    post:
+      tags: [Fitness Goal Proposal]
+      operationId: createGoalProposal
+      summary: Create a goal proposal for an active student fitness goal
+      description: >-
+        Allows an authorized, eligible Trainer with an active coaching relationship,
+        active human coaching period, and active data-sharing permission to propose
+        modifications to an active fitness goal.
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalProposalRequest'
+      responses:
+        '201':
+          description: Goal proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProposalResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: >-
+            Forbidden - Trainer is not eligible, coaching relationship is required,
+            or data sharing permission is missing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
         '409':
+          description: Conflict - Fitness goal is not in ACTIVE status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /fitness-goal-proposals/me:
+    get:
+      tags: [Fitness Goal Proposal]
+      operationId: getMyGoalProposals
+      summary: List fitness goal proposals for the authenticated student
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProposalStatus'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated list of goal proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProposalPageResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /fitness-goal-proposals/{proposalId}:
+    get:
+      tags: [Fitness Goal Proposal]
+      operationId: getGoalProposalDetail
+      summary: Get goal proposal detail with current-versus-proposed comparison data
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Goal proposal detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProposalResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Requester is not the proposal student or creator trainer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Not Found - Goal proposal not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /fitness-goal-proposals/{proposalId}/decisions:
+    post:
+      tags: [Fitness Goal Proposal]
+      operationId: decideGoalProposal
+      summary: Accept or reject a fitness goal proposal
+      description: >-
+        Allows the owning student to ACCEPT or REJECT a pending goal proposal.
+        ACCEPT atomically creates a new fitness goal version and closes the base version.
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideGoalProposalRequest'
+      responses:
+        '200':
+          description: Goal proposal decided successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProposalResponse'
+        '400':
+          description: Bad Request - Invalid decision format
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Only owning student may decide personal goal proposal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Not Found - Goal proposal not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
           description: >-
-            Conflict - An active fitness goal already exists for this student (ACTIVE_FITNESS_GOAL_ALREADY_EXISTS)
-            or the goal is not in DRAFT status (INVALID_LIFECYCLE_TRANSITION).
+            Conflict - Goal proposal already decided (GOAL_PROPOSAL_ALREADY_DECIDED),
+            expired (GOAL_PROPOSAL_EXPIRED), or base goal version is stale (STALE_GOAL_PROPOSAL).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -1204,6 +1353,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         versionNumber: { type: integer }
+        title: { type: [string, 'null'] }
         startDate: { type: string, format: date }
         targetDate: { type: [string, 'null'], format: date }
         durationDays: { type: [integer, 'null'] }
@@ -1242,6 +1392,117 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         currentVersion: { $ref: '#/components/schemas/GoalVersionResponse' }
+
+    ProposalStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, CANCELLED, EXPIRED]
+
+    ProposalSource:
+      type: string
+      enum: [STUDENT, TRAINER, AI_ASSISTANCE, SYSTEM]
+
+    ProposalDecision:
+      type: string
+      enum: [ACCEPT, REJECT]
+
+    CreateGoalProposalRequest:
+      type: object
+      required: [reason, objectives]
+      properties:
+        proposedTitle: { type: [string, 'null'], maxLength: 200 }
+        proposedStartDate: { type: [string, 'null'], format: date }
+        proposedTargetDate: { type: [string, 'null'], format: date }
+        proposedDurationDays: { type: [integer, 'null'], minimum: 1 }
+        reason: { type: string }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        objectives:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateGoalObjectiveRequest' }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/CreateGoalTargetRequest' }
+
+    DecideGoalProposalRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { $ref: '#/components/schemas/ProposalDecision' }
+        decisionNote: { type: [string, 'null'], maxLength: 2000 }
+
+    GoalProposalObjectiveResponse:
+      type: object
+      required: [id, goalTypeId, goalTypeCode, goalTypeName, priority, sortOrder]
+      properties:
+        id: { type: string, format: uuid }
+        goalTypeId: { type: integer }
+        goalTypeCode: { type: string }
+        goalTypeName: { type: string }
+        priority: { $ref: '#/components/schemas/ObjectivePriority' }
+        sortOrder: { type: integer }
+        notes: { type: [string, 'null'] }
+
+    GoalProposalTargetResponse:
+      type: object
+      required: [id, metricDefinitionId, metricCode, metricDisplayName, unitId, unitCode, unitSymbol]
+      properties:
+        id: { type: string, format: uuid }
+        metricDefinitionId: { type: integer }
+        metricCode: { type: string }
+        metricDisplayName: { type: string }
+        exerciseVariationId: { type: [string, 'null'], format: uuid }
+        startValue: { type: [number, 'null'] }
+        targetValue: { type: [number, 'null'] }
+        targetMinValue: { type: [number, 'null'] }
+        targetMaxValue: { type: [number, 'null'] }
+        unitId: { type: integer }
+        unitCode: { type: string }
+        unitSymbol: { type: string }
+        targetRepetitions: { type: [integer, 'null'] }
+        targetDate: { type: [string, 'null'], format: date }
+        notes: { type: [string, 'null'] }
+
+    GoalProposalResponse:
+      type: object
+      required: [id, studentId, fitnessGoalId, source, reason, status, createdAt, updatedAt, objectives, targets]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        fitnessGoalId: { type: string, format: uuid }
+        baseGoalVersionId: { type: [string, 'null'], format: uuid }
+        source: { $ref: '#/components/schemas/ProposalSource' }
+        createdBy: { type: string, format: uuid }
+        proposedTitle: { type: [string, 'null'] }
+        proposedStartDate: { type: [string, 'null'], format: date }
+        proposedTargetDate: { type: [string, 'null'], format: date }
+        proposedDurationDays: { type: [integer, 'null'] }
+        reason: { type: string }
+        status: { $ref: '#/components/schemas/ProposalStatus' }
+        decidedBy: { type: [string, 'null'], format: uuid }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decisionNote: { type: [string, 'null'] }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        objectives:
+          type: array
+          items: { $ref: '#/components/schemas/GoalProposalObjectiveResponse' }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/GoalProposalTargetResponse' }
+        baseVersion: { $ref: '#/components/schemas/GoalVersionResponse' }
+
+    GoalProposalPageResponse:
+      type: object
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/GoalProposalResponse' }
+        page: { type: integer }
+        size: { type: integer }
+        totalItems: { type: integer }
+        totalPages: { type: integer }
 
 security:
   - bearerAuth: []
