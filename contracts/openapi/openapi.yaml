@@ -24,6 +24,8 @@ tags:
     description: Submission and status tracking for trainer verification applications.
   - name: Admin Trainer Verification
     description: Verification review, approval, and rejection of trainer applications by platform administrators.
+  - name: Fitness Goal
+    description: Student-owned fitness goal management, versioning, objectives, and measurable targets.
 
 paths:
   /auth/registrations:
@@ -537,6 +539,109 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /fitness-goals:
+    post:
+      tags: [Fitness Goal]
+      operationId: createFitnessGoal
+      summary: Create a student fitness goal
+      description: >-
+        Creates a new Student-owned Fitness Goal with version, objectives, and targets.
+        Can be initialized in DRAFT or ACTIVE state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFitnessGoalRequest'
+      responses:
+        '201':
+          description: Fitness goal created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { $ref: '#/components/responses/ProfileNotFound' }
+        '409':
+          $ref: '#/components/responses/ActiveFitnessGoalAlreadyExists'
+
+  /fitness-goals/me/current:
+    get:
+      tags: [Fitness Goal]
+      operationId: getCurrentFitnessGoal
+      summary: Get current active fitness goal for the authenticated student
+      responses:
+        '200':
+          description: Current active fitness goal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+
+  /fitness-goals/{goalId}:
+    get:
+      tags: [Fitness Goal]
+      operationId: getFitnessGoalDetail
+      summary: Get fitness goal details by ID
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Fitness goal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+
+  /fitness-goals/{goalId}/activate:
+    post:
+      tags: [Fitness Goal]
+      operationId: activateFitnessGoal
+      summary: Activate a draft fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateFitnessGoalRequest'
+      responses:
+        '200':
+          description: Fitness goal activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+        '409':
+          description: >-
+            Conflict - An active fitness goal already exists for this student (ACTIVE_FITNESS_GOAL_ALREADY_EXISTS)
+            or the goal is not in DRAFT status (INVALID_LIFECYCLE_TRANSITION).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -590,6 +695,16 @@ components:
       headers:
         Retry-After:
           schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ActiveFitnessGoalAlreadyExists:
+      description: An active fitness goal already exists for this student (ACTIVE_FITNESS_GOAL_ALREADY_EXISTS)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    FitnessGoalNotFound:
+      description: Fitness goal not found (FITNESS_GOAL_NOT_FOUND)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -972,6 +1087,161 @@ components:
     TrainerActivityStatus:
       type: string
       enum: [ACTIVE, INACTIVE, SUSPENDED]
+
+    GoalLifecycleStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, PAUSED, COMPLETED, ENDED, ABANDONED, REPLACED, ARCHIVED]
+
+    ObjectivePriority:
+      type: string
+      enum: [PRIMARY, SECONDARY]
+
+    VersionLockReason:
+      type: string
+      enum: [APPROVED, ACTIVATED, SUPERSEDED, MIGRATED]
+
+    CreateGoalObjectiveRequest:
+      type: object
+      required: [priority]
+      properties:
+        goalTypeId: { type: integer, format: int32 }
+        goalTypeCode: { type: string }
+        priority: { $ref: '#/components/schemas/ObjectivePriority' }
+        sortOrder: { type: integer, minimum: 0 }
+        notes: { type: string, maxLength: 2000 }
+
+    CreateGoalTargetRequest:
+      type: object
+      properties:
+        metricDefinitionId: { type: integer, format: int32 }
+        metricCode: { type: string }
+        exerciseVariationId: { type: string, format: uuid }
+        startValue: { type: number }
+        targetValue: { type: number }
+        targetMinValue: { type: number }
+        targetMaxValue: { type: number }
+        unitId: { type: integer, format: int32 }
+        unitCode: { type: string }
+        targetRepetitions: { type: integer, minimum: 1 }
+        targetDate: { type: string, format: date }
+        notes: { type: string, maxLength: 2000 }
+
+    CreateFitnessGoalRequest:
+      type: object
+      required: [title, startDate, objectives]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        startDate:
+          type: string
+          format: date
+        targetDate:
+          type: string
+          format: date
+          description: Optional target date. When provided, must be strictly after startDate. If durationDays is also provided, targetDate must equal startDate + durationDays.
+        durationDays:
+          type: integer
+          minimum: 1
+          description: Optional duration in days. If targetDate is also provided, durationDays must equal the exact day difference between startDate and targetDate.
+        activateImmediately:
+          type: boolean
+          default: false
+        objectives:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateGoalObjectiveRequest'
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateGoalTargetRequest'
+
+    ActivateFitnessGoalRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+
+    GoalObjectiveResponse:
+      type: object
+      required: [id, goalTypeId, goalTypeCode, goalTypeName, priority, sortOrder]
+      properties:
+        id: { type: string, format: uuid }
+        goalTypeId: { type: integer, format: int32 }
+        goalTypeCode: { type: string }
+        goalTypeName: { type: string }
+        priority: { $ref: '#/components/schemas/ObjectivePriority' }
+        sortOrder: { type: integer }
+        notes: { type: [string, 'null'] }
+
+    GoalTargetResponse:
+      type: object
+      required: [id, metricDefinitionId, metricCode, metricDisplayName, unitId, unitCode, unitSymbol, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        metricDefinitionId: { type: integer, format: int32 }
+        metricCode: { type: string }
+        metricDisplayName: { type: string }
+        exerciseVariationId: { type: [string, 'null'], format: uuid }
+        startValue: { type: [number, 'null'] }
+        targetValue: { type: [number, 'null'] }
+        targetMinValue: { type: [number, 'null'] }
+        targetMaxValue: { type: [number, 'null'] }
+        unitId: { type: integer, format: int32 }
+        unitCode: { type: string }
+        unitSymbol: { type: string }
+        targetRepetitions: { type: [integer, 'null'] }
+        targetDate: { type: [string, 'null'], format: date }
+        notes: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
+    GoalVersionResponse:
+      type: object
+      required: [id, versionNumber, startDate, effectiveFrom, createdAt, objectives, targets]
+      properties:
+        id: { type: string, format: uuid }
+        versionNumber: { type: integer }
+        startDate: { type: string, format: date }
+        targetDate: { type: [string, 'null'], format: date }
+        durationDays: { type: [integer, 'null'] }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveUntil: { type: [string, 'null'], format: date-time }
+        resumeDate: { type: [string, 'null'], format: date }
+        changeReason: { type: [string, 'null'] }
+        changeSummary: { type: [string, 'null'] }
+        createdBy: { type: string, format: uuid }
+        sourceProposalId: { type: [string, 'null'], format: uuid }
+        createdAt: { type: string, format: date-time }
+        lockedAt: { type: [string, 'null'], format: date-time }
+        lockedBy: { type: [string, 'null'], format: uuid }
+        lockReason: { type: [string, 'null'] }
+        objectives:
+          type: array
+          items: { $ref: '#/components/schemas/GoalObjectiveResponse' }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/GoalTargetResponse' }
+
+    FitnessGoalResponse:
+      type: object
+      required: [id, studentId, title, status, createdBy, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/GoalLifecycleStatus' }
+        createdBy: { type: string, format: uuid }
+        activatedAt: { type: [string, 'null'], format: date-time }
+        pausedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        statusReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        currentVersion: { $ref: '#/components/schemas/GoalVersionResponse' }
 
 security:
   - bearerAuth: []
