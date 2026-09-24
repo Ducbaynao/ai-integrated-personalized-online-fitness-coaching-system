@@ -368,6 +368,39 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(SameGoalJourneyTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleSameGoalJourneyTransition(SameGoalJourneyTransitionException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "SAME_GOAL_JOURNEY_NOT_PERMITTED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalTransitionConflictException.class)
+    public ResponseEntity<ErrorResponse> handleGoalTransitionConflict(GoalTransitionConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_TRANSITION_CONFLICT",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalTransitionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleGoalTransitionNotFound(GoalTransitionNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "GOAL_TRANSITION_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(GoalProposalNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleGoalProposalNotFound(GoalProposalNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
@@ -580,6 +613,39 @@ public class GlobalExceptionHandler {
                     Collections.emptyList()
             );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_transitions_previous_goal")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "GOAL_TRANSITION_CONFLICT",
+                    "A transition has already been created for this previous goal.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_transitions_new_goal")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "GOAL_TRANSITION_CONFLICT",
+                    "The target goal is already the result of an existing transition.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_transitions_proposal")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "GOAL_TRANSITION_CONFLICT",
+                    "A transition has already been created for this proposal.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
         log.error("Data integrity violation: constraintName={}, message={}", constraintName, ex.getMessage(), ex);

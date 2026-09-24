@@ -14,18 +14,25 @@ import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionE
 import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
+import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
+import com.fitnesscoaching.platform.common.exception.SameGoalJourneyTransitionException;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionPageResponse;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionResponse;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetFitnessGoalDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
@@ -97,6 +104,15 @@ class FitnessGoalControllerUnitTest {
 
     @MockitoBean
     private CreateGoalVersionUseCase createGoalVersionUseCase;
+
+    @MockitoBean
+    private CreateGoalTransitionUseCase createGoalTransitionUseCase;
+
+    @MockitoBean
+    private GetGoalTransitionsUseCase getGoalTransitionsUseCase;
+
+    @MockitoBean
+    private GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase;
 
     @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
@@ -508,5 +524,123 @@ class FitnessGoalControllerUnitTest {
                         .content(json))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/transitions - success creates transition and returns 201 Created")
+    void createGoalTransition_success_returns201() throws Exception {
+        UUID newGoalId = UUID.randomUUID();
+        UUID transitionId = UUID.randomUUID();
+        GoalTransition transition = new GoalTransition(
+                transitionId, goalId, newGoalId, "New journey: Fat Loss", null, studentId, Instant.now(), "Notes"
+        );
+        FitnessGoal newGoal = buildDummyGoal(GoalStatus.ACTIVE);
+        GoalTransitionResult result = new GoalTransitionResult(transition, newGoal);
+
+        when(createGoalTransitionUseCase.createGoalTransition(any())).thenReturn(result);
+
+        String json = """
+                {
+                    "title": "Fat Loss Journey",
+                    "startDate": "2026-10-01",
+                    "targetDate": "2026-12-31",
+                    "durationDays": 91,
+                    "transitionReason": "Switching to Fat Loss",
+                    "notes": "Transition notes",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "FAT_LOSS",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/transitions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", is("/api/v1/fitness-goals/" + goalId + "/transitions/" + transitionId)))
+                .andExpect(jsonPath("$.id", is(transitionId.toString())))
+                .andExpect(jsonPath("$.previousGoalId", is(goalId.toString())))
+                .andExpect(jsonPath("$.newGoalId", is(newGoalId.toString())))
+                .andExpect(jsonPath("$.transitionReason", is("New journey: Fat Loss")))
+                .andExpect(jsonPath("$.newGoal", notNullValue()));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/transitions - same primary goal type throws 409 SAME_GOAL_JOURNEY_NOT_PERMITTED")
+    void createGoalTransition_samePrimaryType_returns409() throws Exception {
+        when(createGoalTransitionUseCase.createGoalTransition(any()))
+                .thenThrow(new SameGoalJourneyTransitionException("Cannot transition to a new journey with the same primary goal type; use goal versioning instead"));
+
+        String json = """
+                {
+                    "title": "Muscle Gain Continuation",
+                    "startDate": "2026-10-01",
+                    "transitionReason": "Same journey transition attempt",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/transitions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("SAME_GOAL_JOURNEY_NOT_PERMITTED")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/transitions - returns 200 OK with transitions list")
+    void getGoalTransitions_success_returns200() throws Exception {
+        UUID transitionId = UUID.randomUUID();
+        GoalTransition transition = new GoalTransition(
+                transitionId, goalId, UUID.randomUUID(), "Transition to Fat Loss", null, studentId, Instant.now(), null
+        );
+
+        when(getGoalTransitionsUseCase.getGoalTransitions(any())).thenReturn(List.of(transition));
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/transitions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id", is(transitionId.toString())))
+                .andExpect(jsonPath("$[0].previousGoalId", is(goalId.toString())));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/transitions/{transitionId} - returns 200 OK")
+    void getGoalTransitionDetail_success_returns200() throws Exception {
+        UUID transitionId = UUID.randomUUID();
+        GoalTransition transition = new GoalTransition(
+                transitionId, goalId, UUID.randomUUID(), "Transition to Fat Loss", null, studentId, Instant.now(), "Notes"
+        );
+
+        when(getGoalTransitionDetailUseCase.getGoalTransitionDetail(any())).thenReturn(transition);
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/transitions/" + transitionId)
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(transitionId.toString())))
+                .andExpect(jsonPath("$.transitionReason", is("Transition to Fat Loss")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/transitions/{transitionId} - not found returns 404")
+    void getGoalTransitionDetail_notFound_returns404() throws Exception {
+        UUID transitionId = UUID.randomUUID();
+        when(getGoalTransitionDetailUseCase.getGoalTransitionDetail(any()))
+                .thenThrow(new GoalTransitionNotFoundException("Goal transition not found: " + transitionId));
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/transitions/" + transitionId)
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_TRANSITION_NOT_FOUND")));
     }
 }

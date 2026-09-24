@@ -334,6 +334,157 @@ public class FitnessGoalProposalService implements
                 throw new GoalVersionNoChangesException("Proposed goal version contains no changes from the current active version");
             }
 
+            Short proposalPrimaryGoalTypeId = proposalToValidate.objectives().stream()
+                    .filter(o -> o.priority() == ObjectivePriority.PRIMARY)
+                    .map(GoalProposalObjective::goalTypeId)
+                    .findFirst()
+                    .orElse(null);
+
+            Short basePrimaryGoalTypeId = baseVersion.objectives().stream()
+                    .filter(o -> o.priority() == ObjectivePriority.PRIMARY)
+                    .map(GoalObjective::goalTypeId)
+                    .findFirst()
+                    .orElse(null);
+
+            boolean isNewJourney = basePrimaryGoalTypeId != null
+                    && proposalPrimaryGoalTypeId != null
+                    && !basePrimaryGoalTypeId.equals(proposalPrimaryGoalTypeId);
+
+            if (isNewJourney) {
+                String newTitle = (proposal.proposedTitle() != null && !proposal.proposedTitle().isBlank())
+                        ? proposal.proposedTitle().trim()
+                        : baseVersion.title();
+
+                List<GoalObjective> domainObjectives = proposal.objectives() != null
+                        ? proposal.objectives().stream()
+                                .map(o -> new GoalObjective(
+                                        UUID.randomUUID(), null, o.goalTypeId(), o.goalTypeCode(), o.goalTypeName(),
+                                        o.priority(), o.sortOrder(), o.notes()))
+                                .toList()
+                        : List.of();
+
+                List<GoalTarget> domainTargets = proposal.targets() != null
+                        ? proposal.targets().stream()
+                                .map(t -> new GoalTarget(
+                                        UUID.randomUUID(), null, t.metricDefinitionId(), t.metricCode(), t.metricDisplayName(),
+                                        t.exerciseVariationId(), t.startValue(), t.targetValue(), t.targetMinValue(),
+                                        t.targetMaxValue(), t.unitId(), t.unitCode(), t.unitSymbol(),
+                                        t.targetRepetitions(), t.targetDate(), t.notes(), null))
+                                .toList()
+                        : List.of();
+
+                UUID newGoalId = UUID.randomUUID();
+                UUID newVersionId = UUID.randomUUID();
+
+                FitnessGoalVersion newVersion = new FitnessGoalVersion(
+                        newVersionId,
+                        newGoalId,
+                        1,
+                        newTitle,
+                        proposal.proposedStartDate(),
+                        proposal.proposedTargetDate(),
+                        proposal.proposedDurationDays(),
+                        Instant.now(),
+                        null,
+                        null,
+                        "INITIAL_CREATION",
+                        proposal.reason(),
+                        command.studentId(),
+                        proposal.id(),
+                        Instant.now(),
+                        Instant.now(),
+                        command.studentId(),
+                        VersionLockReason.ACTIVATED,
+                        domainObjectives,
+                        domainTargets
+                );
+
+                FitnessGoal newGoal = new FitnessGoal(
+                        newGoalId,
+                        command.studentId(),
+                        newTitle,
+                        GoalStatus.ACTIVE,
+                        command.studentId(),
+                        Instant.now(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        Instant.now(),
+                        Instant.now(),
+                        newVersion
+                );
+
+                com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult transitionResult =
+                        proposalPort.acceptProposalAsNewJourney(
+                                proposalToValidate,
+                                command.studentId(),
+                                note,
+                                newGoal,
+                                newVersion,
+                                domainObjectives,
+                                domainTargets
+                        );
+
+                auditService.recordAudit(AuditRecord.builder()
+                        .actorUserId(command.studentId())
+                        .actorRole("STUDENT")
+                        .action("FITNESS_GOAL_REPLACED")
+                        .targetType("FITNESS_GOAL")
+                        .targetId(proposal.fitnessGoalId())
+                        .requestId(RequestIdHolder.getAsUuid())
+                        .occurredAt(Instant.now())
+                        .metadataJson("{\"previousGoalId\":\"" + proposal.fitnessGoalId() + "\",\"newGoalId\":\"" + newGoalId + "\",\"proposalId\":\"" + command.proposalId() + "\"}")
+                        .build());
+
+                auditService.recordAudit(AuditRecord.builder()
+                        .actorUserId(command.studentId())
+                        .actorRole("STUDENT")
+                        .action("FITNESS_GOAL_CREATED")
+                        .targetType("FITNESS_GOAL")
+                        .targetId(newGoalId)
+                        .requestId(RequestIdHolder.getAsUuid())
+                        .occurredAt(Instant.now())
+                        .metadataJson("{\"goalId\":\"" + newGoalId + "\",\"studentId\":\"" + command.studentId() + "\",\"proposalId\":\"" + command.proposalId() + "\"}")
+                        .build());
+
+                auditService.recordAudit(AuditRecord.builder()
+                        .actorUserId(command.studentId())
+                        .actorRole("STUDENT")
+                        .action("FITNESS_GOAL_ACTIVATED")
+                        .targetType("FITNESS_GOAL")
+                        .targetId(newGoalId)
+                        .requestId(RequestIdHolder.getAsUuid())
+                        .occurredAt(Instant.now())
+                        .metadataJson("{\"goalId\":\"" + newGoalId + "\",\"status\":\"ACTIVE\"}")
+                        .build());
+
+                auditService.recordAudit(AuditRecord.builder()
+                        .actorUserId(command.studentId())
+                        .actorRole("STUDENT")
+                        .action("GOAL_TRANSITION_CREATED")
+                        .targetType("GOAL_TRANSITION")
+                        .targetId(transitionResult.transition().id())
+                        .requestId(RequestIdHolder.getAsUuid())
+                        .occurredAt(Instant.now())
+                        .metadataJson("{\"transitionId\":\"" + transitionResult.transition().id() + "\",\"previousGoalId\":\"" + proposal.fitnessGoalId() + "\",\"newGoalId\":\"" + newGoalId + "\",\"proposalId\":\"" + command.proposalId() + "\"}")
+                        .build());
+
+                auditService.recordAudit(AuditRecord.builder()
+                        .actorUserId(command.studentId())
+                        .actorRole("STUDENT")
+                        .action("GOAL_PROPOSAL_ACCEPTED")
+                        .targetType("GOAL_PROPOSAL")
+                        .targetId(command.proposalId())
+                        .requestId(RequestIdHolder.getAsUuid())
+                        .occurredAt(Instant.now())
+                        .metadataJson("{\"proposalId\":\"" + command.proposalId() + "\",\"goalId\":\"" + proposal.fitnessGoalId() + "\",\"newGoalId\":\"" + newGoalId + "\",\"decisionNote\":\"" + escapeJson(note) + "\"}")
+                        .build());
+
+                return proposalPort.findById(command.proposalId())
+                        .orElseThrow(() -> new IllegalStateException("Failed to load accepted proposal: " + command.proposalId()));
+            }
+
             FitnessGoalVersion newVersion = proposalPort.acceptProposal(proposalToValidate, command.studentId(), note);
 
             auditService.recordAudit(AuditRecord.builder()

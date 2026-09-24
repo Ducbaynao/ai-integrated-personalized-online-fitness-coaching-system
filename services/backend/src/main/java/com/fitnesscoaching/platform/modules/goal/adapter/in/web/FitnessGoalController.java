@@ -37,6 +37,18 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.UUID;
 
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.CreateGoalTransitionRequest;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalTransitionResponse;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/fitness-goals")
 public class FitnessGoalController {
@@ -48,6 +60,9 @@ public class FitnessGoalController {
     private final GetGoalVersionsUseCase getGoalVersionsUseCase;
     private final GetGoalVersionDetailUseCase getGoalVersionDetailUseCase;
     private final CreateGoalVersionUseCase createGoalVersionUseCase;
+    private final CreateGoalTransitionUseCase createGoalTransitionUseCase;
+    private final GetGoalTransitionsUseCase getGoalTransitionsUseCase;
+    private final GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase;
 
     public FitnessGoalController(
             CreateFitnessGoalUseCase createFitnessGoalUseCase,
@@ -56,7 +71,10 @@ public class FitnessGoalController {
             ActivateFitnessGoalUseCase activateFitnessGoalUseCase,
             GetGoalVersionsUseCase getGoalVersionsUseCase,
             GetGoalVersionDetailUseCase getGoalVersionDetailUseCase,
-            CreateGoalVersionUseCase createGoalVersionUseCase
+            CreateGoalVersionUseCase createGoalVersionUseCase,
+            CreateGoalTransitionUseCase createGoalTransitionUseCase,
+            GetGoalTransitionsUseCase getGoalTransitionsUseCase,
+            GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase
     ) {
         this.createFitnessGoalUseCase = createFitnessGoalUseCase;
         this.getFitnessGoalDetailUseCase = getFitnessGoalDetailUseCase;
@@ -65,6 +83,9 @@ public class FitnessGoalController {
         this.getGoalVersionsUseCase = getGoalVersionsUseCase;
         this.getGoalVersionDetailUseCase = getGoalVersionDetailUseCase;
         this.createGoalVersionUseCase = createGoalVersionUseCase;
+        this.createGoalTransitionUseCase = createGoalTransitionUseCase;
+        this.getGoalTransitionsUseCase = getGoalTransitionsUseCase;
+        this.getGoalTransitionDetailUseCase = getGoalTransitionDetailUseCase;
     }
 
     @PostMapping
@@ -159,5 +180,46 @@ public class FitnessGoalController {
 
         URI location = URI.create("/api/v1/fitness-goals/" + goalId + "/versions/" + created.id());
         return ResponseEntity.created(location).body(GoalVersionResponse.fromDomain(created));
+    }
+
+    @PostMapping("/{goalId}/transitions")
+    public ResponseEntity<GoalTransitionResponse> createGoalTransition(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID goalId,
+            @Valid @RequestBody CreateGoalTransitionRequest request
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        CreateGoalTransitionCommand command = request.toCommand(studentId, goalId);
+        GoalTransitionResult result = createGoalTransitionUseCase.createGoalTransition(command);
+
+        URI location = URI.create("/api/v1/fitness-goals/" + goalId + "/transitions/" + result.transition().id());
+        return ResponseEntity.created(location).body(GoalTransitionResponse.fromDomain(result.transition(), result.newGoal()));
+    }
+
+    @GetMapping("/{goalId}/transitions")
+    public ResponseEntity<List<GoalTransitionResponse>> getGoalTransitions(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID goalId
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        GetGoalTransitionsQuery query = new GetGoalTransitionsQuery(studentId, goalId);
+        List<GoalTransition> transitions = getGoalTransitionsUseCase.getGoalTransitions(query);
+        List<GoalTransitionResponse> response = transitions.stream()
+                .map(GoalTransitionResponse::fromDomain)
+                .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{goalId}/transitions/{transitionId}")
+    public ResponseEntity<GoalTransitionResponse> getGoalTransitionDetail(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID goalId,
+            @PathVariable UUID transitionId
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        GetGoalTransitionDetailQuery query = new GetGoalTransitionDetailQuery(studentId, goalId, transitionId);
+        GoalTransition transition = getGoalTransitionDetailUseCase.getGoalTransitionDetail(query);
+
+        return ResponseEntity.ok(GoalTransitionResponse.fromDomain(transition));
     }
 }

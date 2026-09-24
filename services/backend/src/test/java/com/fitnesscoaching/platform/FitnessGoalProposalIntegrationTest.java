@@ -1365,8 +1365,8 @@ class FitnessGoalProposalIntegrationTest {
     }
 
     @Test
-    @DisplayName("Acceptance revalidation: proposal proposing different PRIMARY goal type returns 409 NEW_GOAL_JOURNEY_REQUIRED")
-    void acceptProposal_changingPrimaryGoalType_returns409NewGoalJourneyRequired() throws Exception {
+    @DisplayName("Proposal acceptance: proposal with different PRIMARY goal type creates new journey transition and new goal")
+    void acceptProposal_changingPrimaryGoalType_transitionsToNewJourneyAndCreatesNewGoal() throws Exception {
         UUID studentId = createActiveStudentUser("student.diffpri@example.com");
         UUID trainerId = createActiveTrainerUser("trainer.diffpri@example.com", true, true);
         createCoachingContext(trainerId, studentId, true, true);
@@ -1405,23 +1405,53 @@ class FitnessGoalProposalIntegrationTest {
                 )
                 """, proposalId, fatLossId);
 
-        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, null);
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Looks great, let's switch");
         mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
                         .header("Authorization", "Bearer " + studentToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(acceptReq)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode", is("NEW_GOAL_JOURNEY_REQUIRED")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("ACCEPTED")));
 
-        // Verify proposal is still PENDING
+        // Verify proposal is ACCEPTED
         String status = jdbcTemplate.queryForObject(
                 "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
-        assertThat(status).isEqualTo("PENDING");
+        assertThat(status).isEqualTo("ACCEPTED");
 
-        // Verify version count is still 1
-        Integer vCount = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
-        assertThat(vCount).isEqualTo(1);
+        // Verify old goal is REPLACED
+        String oldGoalStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(oldGoalStatus).isEqualTo("REPLACED");
+
+        // Verify old goal V1 is closed (effective_until is not null)
+        Instant effectiveUntil = jdbcTemplate.queryForObject(
+                "SELECT effective_until FROM fitness.fitness_goal_versions WHERE id = ?", Instant.class, v1Id);
+        assertThat(effectiveUntil).isNotNull();
+
+        // Verify transition record exists linking old goal, new goal, and proposal
+        UUID newGoalId = jdbcTemplate.queryForObject(
+                "SELECT new_goal_id FROM fitness.goal_transitions WHERE previous_goal_id = ? AND proposal_id = ?",
+                UUID.class, goalId, proposalId);
+        assertThat(newGoalId).isNotNull();
+
+        // Verify new goal is ACTIVE and owned by student
+        String newGoalStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.fitness_goals WHERE id = ? AND student_id = ?",
+                String.class, newGoalId, studentId);
+        assertThat(newGoalStatus).isEqualTo("ACTIVE");
+
+        // Verify new goal has Version 1 with FAT_LOSS objective
+        Integer newVCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                Integer.class, newGoalId);
+        assertThat(newVCount).isEqualTo(1);
+
+        short newPrimaryType = jdbcTemplate.queryForObject("""
+                SELECT o.goal_type_id FROM fitness.goal_objectives o
+                JOIN fitness.fitness_goal_versions v ON v.id = o.goal_version_id
+                WHERE v.fitness_goal_id = ? AND o.priority = 'PRIMARY'::fitness.objective_priority
+                """, Short.class, newGoalId);
+        assertThat(newPrimaryType).isEqualTo(fatLossId);
     }
 
     @Test
@@ -1604,5 +1634,268 @@ class FitnessGoalProposalIntegrationTest {
                         .content(objectMapper.writeValueAsString(req4)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("Rollback: Audit failure during proposal new journey ACCEPT rolls back transition, new goal, and old goal status")
+    void acceptProposal_newJourney_auditFailureRollsBack() throws Exception {
+        UUID studentId = createActiveStudentUser("student.auditnewjourney@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.auditnewjourney@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Original Muscle Gain Goal for Audit Rollback");
+
+        String studentToken = createAccessToken(studentId, "student.auditnewjourney@example.com", List.of("STUDENT"));
+
+        UUID v1Id = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                UUID.class, goalId);
+
+        short fatLossId = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.goal_types WHERE code = 'FAT_LOSS'", Short.class);
+
+        UUID proposalId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposals (
+                    id, student_id, fitness_goal_id, base_goal_version_id, source, created_by,
+                    proposed_title, proposed_start_date, proposed_target_date, proposed_duration_days,
+                    reason, status, expires_at, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'TRAINER'::fitness.proposal_source, ?,
+                    'Switch to Fat Loss Audit Fail', '2026-10-01', '2027-01-31', 122,
+                    'Proposing new journey that will fail audit', 'PENDING'::fitness.proposal_status, now() + interval '7 days', now(), now()
+                )
+                """, proposalId, studentId, goalId, v1Id, trainerId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposal_status_history (
+                    id, goal_proposal_id, from_status, to_status, changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, NULL, 'PENDING'::fitness.proposal_status, ?, 'Initial creation', now()
+                )
+                """, proposalId, trainerId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposal_objectives (
+                    id, goal_proposal_id, goal_type_id, priority, sort_order
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, 'PRIMARY'::fitness.objective_priority, 0
+                )
+                """, proposalId, fatLossId);
+
+        // Mock auditService failure
+        doThrow(new RuntimeException("Simulated audit write failure during proposal new journey"))
+                .when(auditService).recordAudit(any());
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Accept should fail on audit");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isInternalServerError());
+
+        // 1. Proposal remains PENDING
+        String pStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
+        assertThat(pStatus).isEqualTo("PENDING");
+
+        // 2. Old goal remains ACTIVE
+        String oldGoalStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(oldGoalStatus).isEqualTo("ACTIVE");
+
+        // 3. Old goal V1 remains current
+        Boolean v1StillCurrent = jdbcTemplate.queryForObject(
+                "SELECT (effective_until IS NULL) FROM fitness.fitness_goal_versions WHERE id = ?", Boolean.class, v1Id);
+        assertThat(v1StillCurrent).isTrue();
+
+        // 4. No transition record created
+        Integer transitionCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.goal_transitions WHERE previous_goal_id = ?", Integer.class, goalId);
+        assertThat(transitionCount).isEqualTo(0);
+
+        // 5. No new goal created for this student
+        Integer totalStudentGoals = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goals WHERE student_id = ?", Integer.class, studentId);
+        assertThat(totalStudentGoals).isEqualTo(1);
+
+        // 6. Proposal status history only has initial creation
+        Integer historyCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId);
+        assertThat(historyCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Proposal acceptance: reason > 100 characters in new journey records PROPOSAL_ACCEPTED and preserves full notes")
+    void acceptProposal_newJourney_longReason_usesStableReasonAndPreservesFullNotes() throws Exception {
+        UUID studentId = createActiveStudentUser("student.longreasonnj@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.longreasonnj@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Original Muscle Gain For Long Reason New Journey");
+
+        String studentToken = createAccessToken(studentId, "student.longreasonnj@example.com", List.of("STUDENT"));
+
+        UUID v1Id = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                UUID.class, goalId);
+
+        short fatLossId = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.goal_types WHERE code = 'FAT_LOSS'", Short.class);
+
+        String longReason = "Transition reason exceeding 100 characters: " + "X".repeat(120);
+
+        UUID proposalId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposals (
+                    id, student_id, fitness_goal_id, base_goal_version_id, source, created_by,
+                    proposed_title, proposed_start_date, proposed_target_date, proposed_duration_days,
+                    reason, status, expires_at, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'TRAINER'::fitness.proposal_source, ?,
+                    'Switch to Fat Loss Long Reason', '2026-10-01', '2027-01-31', 122,
+                    ?, 'PENDING'::fitness.proposal_status, now() + interval '7 days', now(), now()
+                )
+                """, proposalId, studentId, goalId, v1Id, trainerId, longReason);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposal_objectives (
+                    id, goal_proposal_id, goal_type_id, priority, sort_order
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, 'PRIMARY'::fitness.objective_priority, 0
+                )
+                """, proposalId, fatLossId);
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Accepted with long reason");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("ACCEPTED")));
+
+        // 1. Verify goal_transitions.transition_reason is 'PROPOSAL_ACCEPTED' (length <= 100)
+        String transitionReason = jdbcTemplate.queryForObject(
+                "SELECT transition_reason FROM fitness.goal_transitions WHERE proposal_id = ?",
+                String.class, proposalId);
+        assertThat(transitionReason).isEqualTo("PROPOSAL_ACCEPTED");
+        assertThat(transitionReason.length()).isLessThanOrEqualTo(100);
+
+        // 2. Verify goal_transitions.notes preserves the full reason
+        String notes = jdbcTemplate.queryForObject(
+                "SELECT notes FROM fitness.goal_transitions WHERE proposal_id = ?",
+                String.class, proposalId);
+        assertThat(notes).isEqualTo(longReason);
+
+        // 3. Verify old goal status_reason preserves the full reason
+        String oldGoalStatusReason = jdbcTemplate.queryForObject(
+                "SELECT status_reason FROM fitness.fitness_goals WHERE id = ?",
+                String.class, goalId);
+        assertThat(oldGoalStatusReason).isEqualTo(longReason);
+
+        // 4. Verify new goal version 1 has lock_reason = 'ACTIVATED'
+        UUID newGoalId = jdbcTemplate.queryForObject(
+                "SELECT new_goal_id FROM fitness.goal_transitions WHERE proposal_id = ?",
+                UUID.class, proposalId);
+        String lockReason = jdbcTemplate.queryForObject(
+                "SELECT lock_reason::text FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                String.class, newGoalId);
+        assertThat(lockReason).isEqualTo("ACTIVATED");
+    }
+
+    @Test
+    @DisplayName("Concurrency: Concurrent ACCEPT on same new journey proposal allows only one to succeed")
+    void concurrency_concurrentAcceptOnProposal_newJourney_onlyOneWins() throws Exception {
+        UUID studentId = createActiveStudentUser("student.concurrnj@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.concurrnj@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Original Goal for Concurrency");
+
+        String studentToken = createAccessToken(studentId, "student.concurrnj@example.com", List.of("STUDENT"));
+
+        UUID v1Id = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                UUID.class, goalId);
+
+        short fatLossId = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.goal_types WHERE code = 'FAT_LOSS'", Short.class);
+
+        UUID proposalId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposals (
+                    id, student_id, fitness_goal_id, base_goal_version_id, source, created_by,
+                    proposed_title, proposed_start_date, proposed_target_date, proposed_duration_days,
+                    reason, status, expires_at, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'TRAINER'::fitness.proposal_source, ?,
+                    'Concurrent Switch to Fat Loss', '2026-10-01', '2027-01-31', 122,
+                    'Reason for concurrency', 'PENDING'::fitness.proposal_status, now() + interval '7 days', now(), now()
+                )
+                """, proposalId, studentId, goalId, v1Id, trainerId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposal_objectives (
+                    id, goal_proposal_id, goal_type_id, priority, sort_order
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, 'PRIMARY'::fitness.objective_priority, 0
+                )
+                """, proposalId, fatLossId);
+
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger conflictCount = new AtomicInteger();
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    DecideGoalProposalRequest req = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Concurrent accept");
+                    var mvcRes = mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                                    .header("Authorization", "Bearer " + studentToken)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(req)))
+                            .andReturn();
+                    if (mvcRes.getResponse().getStatus() == 200) {
+                        successCount.incrementAndGet();
+                    } else if (mvcRes.getResponse().getStatus() == 409) {
+                        conflictCount.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        readyLatch.await();
+        startLatch.countDown();
+        doneLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(conflictCount.get()).isEqualTo(1);
+
+        // Verify only 1 new goal created
+        Integer totalStudentGoals = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goals WHERE student_id = ?", Integer.class, studentId);
+        assertThat(totalStudentGoals).isEqualTo(2); // 1 original + 1 new
+
+        // Old goal is REPLACED
+        String oldStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(oldStatus).isEqualTo("REPLACED");
+
+        // Exactly 1 transition record
+        Integer transitionCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.goal_transitions WHERE previous_goal_id = ?", Integer.class, goalId);
+        assertThat(transitionCount).isEqualTo(1);
+
+        // Proposal is ACCEPTED
+        String proposalStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
+        assertThat(proposalStatus).isEqualTo("ACCEPTED");
     }
 }
