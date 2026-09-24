@@ -589,6 +589,18 @@ public class GoalProposalPersistenceAdapter implements GoalProposalPort {
                     now(), NULL, NULL, NULL
                 )
                 """;
+        String changeReason;
+        String changeSummary;
+        if (proposal.reason() != null && proposal.reason().length() <= 100) {
+            changeReason = proposal.reason();
+            changeSummary = "Accepted proposal " + proposal.id();
+        } else {
+            changeReason = "ACCEPTED_PROPOSAL";
+            changeSummary = proposal.reason() != null
+                    ? "Accepted proposal " + proposal.id() + ": " + proposal.reason()
+                    : "Accepted proposal " + proposal.id();
+        }
+
         jdbcTemplate.update(insertVersionSql,
                 newVersionId,
                 proposal.fitnessGoalId(),
@@ -597,8 +609,8 @@ public class GoalProposalPersistenceAdapter implements GoalProposalPort {
                 startDate,
                 targetDate,
                 durationDays,
-                proposal.reason(),
-                "Accepted proposal " + proposal.id(),
+                changeReason,
+                changeSummary,
                 studentId,
                 proposal.id()
         );

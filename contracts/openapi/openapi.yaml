@@ -632,6 +632,116 @@ paths:
                 $ref: '#/components/schemas/FitnessGoalResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /fitness-goals/{goalId}/versions:
+    get:
+      tags: [Fitness Goal]
+      operationId: getGoalVersions
+      summary: List version history for a fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paginated goal versions ordered newest to oldest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalVersionPageResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+    post:
+      tags: [Fitness Goal]
+      operationId: createGoalVersion
+      summary: Create a new same-journey version for an active fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalVersionRequest'
+      responses:
+        '201':
+          description: Goal version created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalVersionResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+        '409':
+          description: >-
+            Conflict - Goal version conflict or concurrent modification (GOAL_VERSION_CONFLICT),
+            new goal journey required (NEW_GOAL_JOURNEY_REQUIRED),
+            no changes detected (GOAL_VERSION_NO_CHANGES),
+            or invalid lifecycle transition (INVALID_LIFECYCLE_TRANSITION).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /fitness-goals/{goalId}/versions/{versionId}:
+    get:
+      tags: [Fitness Goal]
+      operationId: getGoalVersionDetail
+      summary: Get details of a specific fitness goal version
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Goal version details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalVersionResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404': { $ref: '#/components/responses/GoalVersionNotFound' }
+
   /fitness-goals/{goalId}/proposals:
     post:
       tags: [Fitness Goal Proposal]
@@ -786,7 +896,9 @@ paths:
         '409':
           description: >-
             Conflict - Goal proposal already decided (GOAL_PROPOSAL_ALREADY_DECIDED),
-            expired (GOAL_PROPOSAL_EXPIRED), or base goal version is stale (STALE_GOAL_PROPOSAL).
+            expired (GOAL_PROPOSAL_EXPIRED), base goal version is stale (STALE_GOAL_PROPOSAL),
+            proposed primary goal type differs from base journey (NEW_GOAL_JOURNEY_REQUIRED),
+            or proposed version contains no changes (GOAL_VERSION_NO_CHANGES).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -854,6 +966,16 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     FitnessGoalNotFound:
       description: Fitness goal not found (FITNESS_GOAL_NOT_FOUND)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    GoalVersionNotFound:
+      description: Goal version not found (GOAL_VERSION_NOT_FOUND)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    GoalVersionConflict:
+      description: Goal version conflict or concurrent modification (GOAL_VERSION_CONFLICT)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -1265,10 +1387,10 @@ components:
         metricDefinitionId: { type: integer, format: int32 }
         metricCode: { type: string }
         exerciseVariationId: { type: string, format: uuid }
-        startValue: { type: number }
-        targetValue: { type: number }
-        targetMinValue: { type: number }
-        targetMaxValue: { type: number }
+        startValue: { type: number, exclusiveMinimum: 0 }
+        targetValue: { type: number, exclusiveMinimum: 0 }
+        targetMinValue: { type: number, exclusiveMinimum: 0 }
+        targetMaxValue: { type: number, exclusiveMinimum: 0 }
         unitId: { type: integer, format: int32 }
         unitCode: { type: string }
         targetRepetitions: { type: integer, minimum: 1 }
@@ -1349,7 +1471,7 @@ components:
 
     GoalVersionResponse:
       type: object
-      required: [id, versionNumber, startDate, effectiveFrom, createdAt, objectives, targets]
+      required: [id, versionNumber, startDate, effectiveFrom, createdAt, isCurrent, objectives, targets]
       properties:
         id: { type: string, format: uuid }
         versionNumber: { type: integer }
@@ -1368,12 +1490,43 @@ components:
         lockedAt: { type: [string, 'null'], format: date-time }
         lockedBy: { type: [string, 'null'], format: uuid }
         lockReason: { type: [string, 'null'] }
+        isCurrent: { type: boolean }
         objectives:
           type: array
           items: { $ref: '#/components/schemas/GoalObjectiveResponse' }
         targets:
           type: array
           items: { $ref: '#/components/schemas/GoalTargetResponse' }
+
+    GoalVersionPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/GoalVersionResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer, minimum: 0 }
+
+    CreateGoalVersionRequest:
+      type: object
+      required: [changeReason, objectives]
+      properties:
+        title: { type: string, maxLength: 200 }
+        startDate: { type: string, format: date }
+        targetDate: { type: string, format: date }
+        durationDays: { type: integer, minimum: 1 }
+        changeReason: { type: string, maxLength: 100 }
+        changeSummary: { type: string, maxLength: 2000 }
+        objectives:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateGoalObjectiveRequest' }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/CreateGoalTargetRequest' }
 
     FitnessGoalResponse:
       type: object

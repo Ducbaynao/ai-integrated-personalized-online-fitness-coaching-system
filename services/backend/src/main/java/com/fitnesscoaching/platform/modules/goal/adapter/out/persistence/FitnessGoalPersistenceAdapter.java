@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.goal.adapter.out.persistence;
 
+import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
@@ -18,6 +19,8 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,6 +98,69 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 targetDate,
                 notes,
                 createdAt
+        );
+    };
+
+    private static final RowMapper<FitnessGoalVersion> VERSION_ROW_MAPPER = (rs, rowNum) -> {
+        UUID vId = (UUID) rs.getObject("id");
+        UUID fgId = (UUID) rs.getObject("fitness_goal_id");
+        int versionNumber = rs.getInt("version_number");
+        String title = rs.getString("title");
+
+        Date stDate = rs.getDate("start_date");
+        LocalDate startDate = stDate != null ? stDate.toLocalDate() : null;
+
+        Date tgDate = rs.getDate("target_date");
+        LocalDate targetDate = tgDate != null ? tgDate.toLocalDate() : null;
+
+        int dur = rs.getInt("duration_days");
+        Integer durationDays = rs.wasNull() ? null : dur;
+
+        Timestamp effFromTs = rs.getTimestamp("effective_from");
+        Instant effectiveFrom = effFromTs != null ? effFromTs.toInstant() : null;
+
+        Timestamp effUntilTs = rs.getTimestamp("effective_until");
+        Instant effectiveUntil = effUntilTs != null ? effUntilTs.toInstant() : null;
+
+        Date resDate = rs.getDate("resume_date");
+        LocalDate resumeDate = resDate != null ? resDate.toLocalDate() : null;
+
+        String changeReason = rs.getString("change_reason");
+        String changeSummary = rs.getString("change_summary");
+        UUID createdBy = (UUID) rs.getObject("created_by");
+        UUID sourceProposalId = (UUID) rs.getObject("source_proposal_id");
+
+        Timestamp crTs = rs.getTimestamp("created_at");
+        Instant createdAt = crTs != null ? crTs.toInstant() : null;
+
+        Timestamp lkTs = rs.getTimestamp("locked_at");
+        Instant lockedAt = lkTs != null ? lkTs.toInstant() : null;
+
+        UUID lockedBy = (UUID) rs.getObject("locked_by");
+        String lockReasonStr = rs.getString("lock_reason");
+        VersionLockReason lockReason = lockReasonStr != null ? VersionLockReason.valueOf(lockReasonStr) : null;
+
+        return new FitnessGoalVersion(
+                vId,
+                fgId,
+                versionNumber,
+                title,
+                startDate,
+                targetDate,
+                durationDays,
+                effectiveFrom,
+                effectiveUntil,
+                resumeDate,
+                changeReason,
+                changeSummary,
+                createdBy,
+                sourceProposalId,
+                createdAt,
+                lockedAt,
+                lockedBy,
+                lockReason,
+                List.of(),
+                List.of()
         );
     };
 
@@ -420,68 +486,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 ORDER BY version_number DESC
                 LIMIT 1
                 """;
-        List<FitnessGoalVersion> versions = jdbcTemplate.query(versionSql, (rs, rowNum) -> {
-            UUID vId = (UUID) rs.getObject("id");
-            UUID fgId = (UUID) rs.getObject("fitness_goal_id");
-            int versionNumber = rs.getInt("version_number");
-            String title = rs.getString("title");
-
-            Date stDate = rs.getDate("start_date");
-            LocalDate startDate = stDate != null ? stDate.toLocalDate() : null;
-
-            Date tgDate = rs.getDate("target_date");
-            LocalDate targetDate = tgDate != null ? tgDate.toLocalDate() : null;
-
-            int dur = rs.getInt("duration_days");
-            Integer durationDays = rs.wasNull() ? null : dur;
-
-            Timestamp effFromTs = rs.getTimestamp("effective_from");
-            Instant effectiveFrom = effFromTs != null ? effFromTs.toInstant() : null;
-
-            Timestamp effUntilTs = rs.getTimestamp("effective_until");
-            Instant effectiveUntil = effUntilTs != null ? effUntilTs.toInstant() : null;
-
-            Date resDate = rs.getDate("resume_date");
-            LocalDate resumeDate = resDate != null ? resDate.toLocalDate() : null;
-
-            String changeReason = rs.getString("change_reason");
-            String changeSummary = rs.getString("change_summary");
-            UUID createdBy = (UUID) rs.getObject("created_by");
-            UUID sourceProposalId = (UUID) rs.getObject("source_proposal_id");
-
-            Timestamp crTs = rs.getTimestamp("created_at");
-            Instant createdAt = crTs != null ? crTs.toInstant() : null;
-
-            Timestamp lkTs = rs.getTimestamp("locked_at");
-            Instant lockedAt = lkTs != null ? lkTs.toInstant() : null;
-
-            UUID lockedBy = (UUID) rs.getObject("locked_by");
-            String lockReasonStr = rs.getString("lock_reason");
-            VersionLockReason lockReason = lockReasonStr != null ? VersionLockReason.valueOf(lockReasonStr) : null;
-
-            return new FitnessGoalVersion(
-                    vId,
-                    fgId,
-                    versionNumber,
-                    title,
-                    startDate,
-                    targetDate,
-                    durationDays,
-                    effectiveFrom,
-                    effectiveUntil,
-                    resumeDate,
-                    changeReason,
-                    changeSummary,
-                    createdBy,
-                    sourceProposalId,
-                    createdAt,
-                    lockedAt,
-                    lockedBy,
-                    lockReason,
-                    List.of(),
-                    List.of()
-            );
-        }, goalId);
+        List<FitnessGoalVersion> versions = jdbcTemplate.query(versionSql, VERSION_ROW_MAPPER, goalId);
 
         if (versions.isEmpty()) {
             return Optional.empty();
@@ -513,6 +518,282 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 objectives,
                 targets
         ));
+    }
+
+    @Override
+    public List<FitnessGoalVersion> findVersionsByGoalId(UUID goalId, int limit, long offset) {
+        String sql = """
+                SELECT id, fitness_goal_id, version_number, title, start_date, target_date,
+                       duration_days, effective_from, effective_until, resume_date,
+                       change_reason, change_summary, created_by, source_proposal_id,
+                       created_at, locked_at, locked_by, lock_reason
+                FROM fitness.fitness_goal_versions
+                WHERE fitness_goal_id = ?
+                ORDER BY version_number DESC
+                LIMIT ? OFFSET ?
+                """;
+        List<FitnessGoalVersion> versions = jdbcTemplate.query(sql, VERSION_ROW_MAPPER, goalId, limit, offset);
+        if (versions.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> versionIds = versions.stream().map(FitnessGoalVersion::id).toList();
+
+        // Batch load objectives to prevent N+1 queries
+        String objSql = """
+                SELECT o.id, o.goal_version_id, o.goal_type_id,
+                       gt.code as goal_type_code, gt.name as goal_type_name,
+                       o.priority, o.sort_order, o.notes
+                FROM fitness.goal_objectives o
+                JOIN fitness.goal_types gt ON gt.id = o.goal_type_id
+                WHERE o.goal_version_id = ANY (?)
+                ORDER BY o.sort_order ASC, o.id ASC
+                """;
+        Map<UUID, List<GoalObjective>> objectivesByVersion = new HashMap<>();
+        jdbcTemplate.query(
+                con -> {
+                    var ps = con.prepareStatement(objSql);
+                    ps.setArray(1, con.createArrayOf("uuid", versionIds.toArray()));
+                    return ps;
+                },
+                rs -> {
+                    UUID vId = (UUID) rs.getObject("goal_version_id");
+                    GoalObjective obj = OBJECTIVE_ROW_MAPPER.mapRow(rs, 0);
+                    objectivesByVersion.computeIfAbsent(vId, k -> new ArrayList<>()).add(obj);
+                }
+        );
+
+        // Batch load targets to prevent N+1 queries
+        String tgtSql = """
+                SELECT t.id, t.goal_version_id, t.metric_definition_id,
+                       md.code as metric_code, md.display_name as metric_display_name,
+                       t.exercise_variation_id, t.start_value, t.target_value,
+                       t.target_min_value, t.target_max_value,
+                       t.unit_id, u.code as unit_code, u.symbol as unit_symbol,
+                       t.target_repetitions, t.target_date, t.notes, t.created_at
+                FROM fitness.goal_targets t
+                JOIN fitness.metric_definitions md ON md.id = t.metric_definition_id
+                JOIN fitness.measurement_units u ON u.id = t.unit_id
+                WHERE t.goal_version_id = ANY (?)
+                ORDER BY t.created_at ASC, t.id ASC
+                """;
+        Map<UUID, List<GoalTarget>> targetsByVersion = new HashMap<>();
+        jdbcTemplate.query(
+                con -> {
+                    var ps = con.prepareStatement(tgtSql);
+                    ps.setArray(1, con.createArrayOf("uuid", versionIds.toArray()));
+                    return ps;
+                },
+                rs -> {
+                    UUID vId = (UUID) rs.getObject("goal_version_id");
+                    GoalTarget tgt = TARGET_ROW_MAPPER.mapRow(rs, 0);
+                    targetsByVersion.computeIfAbsent(vId, k -> new ArrayList<>()).add(tgt);
+                }
+        );
+
+        return versions.stream().map(v -> new FitnessGoalVersion(
+                v.id(),
+                v.fitnessGoalId(),
+                v.versionNumber(),
+                v.title(),
+                v.startDate(),
+                v.targetDate(),
+                v.durationDays(),
+                v.effectiveFrom(),
+                v.effectiveUntil(),
+                v.resumeDate(),
+                v.changeReason(),
+                v.changeSummary(),
+                v.createdBy(),
+                v.sourceProposalId(),
+                v.createdAt(),
+                v.lockedAt(),
+                v.lockedBy(),
+                v.lockReason(),
+                objectivesByVersion.getOrDefault(v.id(), List.of()),
+                targetsByVersion.getOrDefault(v.id(), List.of())
+        )).toList();
+    }
+
+    @Override
+    public long countVersionsByGoalId(UUID goalId) {
+        String sql = "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?";
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, goalId);
+        return count != null ? count : 0L;
+    }
+
+    @Override
+    public Optional<FitnessGoalVersion> findVersionById(UUID goalId, UUID versionId) {
+        String sql = """
+                SELECT id, fitness_goal_id, version_number, title, start_date, target_date,
+                       duration_days, effective_from, effective_until, resume_date,
+                       change_reason, change_summary, created_by, source_proposal_id,
+                       created_at, locked_at, locked_by, lock_reason
+                FROM fitness.fitness_goal_versions
+                WHERE fitness_goal_id = ? AND id = ?
+                """;
+        List<FitnessGoalVersion> versions = jdbcTemplate.query(sql, VERSION_ROW_MAPPER, goalId, versionId);
+        if (versions.isEmpty()) {
+            return Optional.empty();
+        }
+
+        FitnessGoalVersion v = versions.get(0);
+        List<GoalObjective> objectives = loadObjectives(v.id());
+        List<GoalTarget> targets = loadTargets(v.id());
+
+        return Optional.of(new FitnessGoalVersion(
+                v.id(),
+                v.fitnessGoalId(),
+                v.versionNumber(),
+                v.title(),
+                v.startDate(),
+                v.targetDate(),
+                v.durationDays(),
+                v.effectiveFrom(),
+                v.effectiveUntil(),
+                v.resumeDate(),
+                v.changeReason(),
+                v.changeSummary(),
+                v.createdBy(),
+                v.sourceProposalId(),
+                v.createdAt(),
+                v.lockedAt(),
+                v.lockedBy(),
+                v.lockReason(),
+                objectives,
+                targets
+        ));
+    }
+
+    @Override
+    @Transactional
+    public FitnessGoalVersion createNewGoalVersion(UUID goalId, UUID studentId, FitnessGoalVersion newVersion, UUID currentVersionId) {
+        // 1. CAS close current version (effective_until = now())
+        String closeVersionSql = """
+                UPDATE fitness.fitness_goal_versions
+                SET effective_until = now()
+                WHERE id = ? AND fitness_goal_id = ? AND effective_until IS NULL
+                """;
+        int closed = jdbcTemplate.update(closeVersionSql, currentVersionId, goalId);
+        if (closed == 0) {
+            throw new GoalVersionConflictException("Current goal version has changed; unable to create version");
+        }
+
+        // 2. Insert new version (with lock fields NULL initially to allow inserting child objectives and targets)
+        UUID newVersionId = newVersion.id() != null ? newVersion.id() : UUID.randomUUID();
+        String insertVersionSql = """
+                INSERT INTO fitness.fitness_goal_versions (
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
+                    duration_days, effective_from, effective_until, resume_date,
+                    change_reason, change_summary, created_by, source_proposal_id,
+                    created_at, locked_at, locked_by, lock_reason
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?,
+                    ?, now(), NULL, NULL,
+                    ?, ?, ?, NULL,
+                    now(), NULL, NULL, NULL
+                )
+                """;
+        jdbcTemplate.update(
+                insertVersionSql,
+                newVersionId,
+                goalId,
+                newVersion.versionNumber(),
+                newVersion.title(),
+                Date.valueOf(newVersion.startDate()),
+                newVersion.targetDate() != null ? Date.valueOf(newVersion.targetDate()) : null,
+                newVersion.durationDays(),
+                newVersion.changeReason(),
+                newVersion.changeSummary(),
+                studentId
+        );
+
+        // 3. Insert objectives (allowed because newVersion is currently unlocked)
+        if (newVersion.objectives() != null && !newVersion.objectives().isEmpty()) {
+            String insertObjectiveSql = """
+                    INSERT INTO fitness.goal_objectives (
+                        id, goal_version_id, goal_type_id, priority, sort_order, notes
+                    ) VALUES (
+                        ?, ?, ?, ?::fitness.objective_priority, ?, ?
+                    )
+                    """;
+            for (GoalObjective obj : newVersion.objectives()) {
+                UUID objId = obj.id() != null ? obj.id() : UUID.randomUUID();
+                jdbcTemplate.update(
+                        insertObjectiveSql,
+                        objId,
+                        newVersionId,
+                        obj.goalTypeId(),
+                        obj.priority().name(),
+                        obj.sortOrder(),
+                        obj.notes()
+                );
+            }
+        }
+
+        // 4. Insert targets (allowed because newVersion is currently unlocked)
+        if (newVersion.targets() != null && !newVersion.targets().isEmpty()) {
+            String insertTargetSql = """
+                    INSERT INTO fitness.goal_targets (
+                        id, goal_version_id, metric_definition_id, exercise_variation_id,
+                        start_value, target_value, target_min_value, target_max_value,
+                        unit_id, target_repetitions, target_date, notes, created_at
+                    ) VALUES (
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?, now()
+                    )
+                    """;
+            for (GoalTarget tgt : newVersion.targets()) {
+                UUID tgtId = tgt.id() != null ? tgt.id() : UUID.randomUUID();
+                jdbcTemplate.update(
+                        insertTargetSql,
+                        tgtId,
+                        newVersionId,
+                        tgt.metricDefinitionId(),
+                        tgt.exerciseVariationId(),
+                        tgt.startValue(),
+                        tgt.targetValue(),
+                        tgt.targetMinValue(),
+                        tgt.targetMaxValue(),
+                        tgt.unitId(),
+                        tgt.targetRepetitions(),
+                        tgt.targetDate() != null ? Date.valueOf(tgt.targetDate()) : null,
+                        tgt.notes()
+                );
+            }
+        }
+
+        // 5. Lock the new version with APPROVED
+        String lockVersionSql = """
+                UPDATE fitness.fitness_goal_versions
+                SET locked_at = now(),
+                    locked_by = ?,
+                    lock_reason = 'APPROVED'::fitness.version_lock_reason
+                WHERE id = ?
+                """;
+        jdbcTemplate.update(lockVersionSql, studentId, newVersionId);
+
+        // 6. Update fitness_goals title and updated_at
+        if (newVersion.title() != null && !newVersion.title().isBlank()) {
+            String updateGoalSql = """
+                    UPDATE fitness.fitness_goals
+                    SET title = ?, updated_at = now()
+                    WHERE id = ?
+                    """;
+            jdbcTemplate.update(updateGoalSql, newVersion.title(), goalId);
+        } else {
+            String updateGoalSql = """
+                    UPDATE fitness.fitness_goals
+                    SET updated_at = now()
+                    WHERE id = ?
+                    """;
+            jdbcTemplate.update(updateGoalSql, goalId);
+        }
+
+        // 7. Load and return newly created version
+        return findVersionById(goalId, newVersionId)
+                .orElseThrow(() -> new IllegalStateException("Failed to load newly created goal version: " + newVersionId));
     }
 
     private List<GoalObjective> loadObjectives(UUID versionId) {

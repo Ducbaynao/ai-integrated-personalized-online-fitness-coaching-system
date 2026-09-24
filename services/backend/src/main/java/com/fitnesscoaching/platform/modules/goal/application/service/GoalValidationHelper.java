@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.goal.application.service;
 
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.FieldErrorDto;
+import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalObjectiveCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTargetCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalCatalogPort;
@@ -11,11 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 public class GoalValidationHelper {
@@ -62,9 +59,9 @@ public class GoalValidationHelper {
             long days = ChronoUnit.DAYS.between(startDate, targetDate);
             if (days != durationDays) {
                 throw new ApplicationValidationException(
-                        "Target date and duration days are inconsistent",
+                        "Duration days does not match target date",
                         List.of(new FieldErrorDto("durationDays", "Mismatch",
-                                "Target date and duration days must be consistent (expected " + days + " days)"))
+                                "Duration days does not match target date (expected " + days + " days)"))
                 );
             }
         } else if (targetDate != null) {
@@ -116,22 +113,18 @@ public class GoalValidationHelper {
             effectiveDuration = proposedDurationDays;
             effectiveStart = effectiveTarget.minusDays(effectiveDuration);
         } else if (hasStart) {
-            // Only startDate changed: keep base duration and compute targetDate
             effectiveStart = proposedStartDate;
             effectiveDuration = baseDurationDays != null ? baseDurationDays : (int) ChronoUnit.DAYS.between(baseStartDate, baseTargetDate);
             effectiveTarget = effectiveStart.plusDays(effectiveDuration);
         } else if (hasTarget) {
-            // Only targetDate changed: keep base start date and compute duration
             effectiveStart = baseStartDate;
             effectiveTarget = proposedTargetDate;
             effectiveDuration = (int) ChronoUnit.DAYS.between(effectiveStart, effectiveTarget);
         } else if (hasDuration) {
-            // Only duration changed: keep base start date and compute targetDate
             effectiveStart = baseStartDate;
             effectiveDuration = proposedDurationDays;
             effectiveTarget = effectiveStart.plusDays(effectiveDuration);
         } else {
-            // None changed: keep base snapshot
             effectiveStart = baseStartDate;
             effectiveTarget = baseTargetDate;
             effectiveDuration = baseDurationDays != null ? baseDurationDays : (int) ChronoUnit.DAYS.between(baseStartDate, baseTargetDate);
@@ -231,6 +224,70 @@ public class GoalValidationHelper {
         return domainObjectives;
     }
 
+    public void validateTargetValues(
+            String fieldPrefix,
+            BigDecimal startValue,
+            BigDecimal targetValue,
+            BigDecimal targetMinValue,
+            BigDecimal targetMaxValue,
+            Integer targetRepetitions,
+            LocalDate targetDate,
+            LocalDate startDate
+    ) {
+        boolean hasTargetValue = targetValue != null || targetMinValue != null || targetMaxValue != null;
+        if (!hasTargetValue) {
+            throw new ApplicationValidationException(
+                    "At least one target value must be specified",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetValue", "NotNull", "At least one target value must be specified"))
+            );
+        }
+
+        if (startValue != null && startValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApplicationValidationException(
+                    "Start value must be positive",
+                    List.of(new FieldErrorDto(fieldPrefix + ".startValue", "Positive", "Start value must be positive"))
+            );
+        }
+        if (targetValue != null && targetValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApplicationValidationException(
+                    "Target value must be positive",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetValue", "Positive", "Target value must be positive"))
+            );
+        }
+        if (targetMinValue != null && targetMinValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApplicationValidationException(
+                    "Target min value must be positive",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetMinValue", "Positive", "Target min value must be positive"))
+            );
+        }
+        if (targetMaxValue != null && targetMaxValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ApplicationValidationException(
+                    "Target max value must be positive",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetMaxValue", "Positive", "Target max value must be positive"))
+            );
+        }
+        if (targetMinValue != null && targetMaxValue != null && targetMaxValue.compareTo(targetMinValue) < 0) {
+            throw new ApplicationValidationException(
+                    "Target max value cannot be less than min value",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetMaxValue", "InvalidRange", "Target max value cannot be less than min value"))
+            );
+        }
+
+        if (targetRepetitions != null && targetRepetitions <= 0) {
+            throw new ApplicationValidationException(
+                    "Target repetitions must be positive",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetRepetitions", "Positive", "Target repetitions must be positive"))
+            );
+        }
+
+        if (targetDate != null && startDate != null && targetDate.isBefore(startDate)) {
+            throw new ApplicationValidationException(
+                    "Target date cannot be before goal start date",
+                    List.of(new FieldErrorDto(fieldPrefix + ".targetDate", "InvalidRange", "Target date cannot be before start date"))
+            );
+        }
+    }
+
     public List<GoalTarget> validateAndBuildTargets(List<CreateGoalTargetCommand> targets, LocalDate startDate) {
         List<GoalTarget> domainTargets = new ArrayList<>();
         if (targets == null || targets.isEmpty()) {
@@ -290,37 +347,16 @@ public class GoalValidationHelper {
                 );
             }
 
-            boolean hasTargetValue = tgtCmd.targetValue() != null
-                    || tgtCmd.targetMinValue() != null
-                    || tgtCmd.targetMaxValue() != null;
-            if (!hasTargetValue) {
-                throw new ApplicationValidationException(
-                        "At least one target value must be specified",
-                        List.of(new FieldErrorDto(fieldPrefix + ".targetValue", "NotNull", "At least one target value must be specified"))
-                );
-            }
-
-            if (tgtCmd.targetMinValue() != null && tgtCmd.targetMaxValue() != null
-                    && tgtCmd.targetMaxValue().compareTo(tgtCmd.targetMinValue()) < 0) {
-                throw new ApplicationValidationException(
-                        "Target max value must be greater than or equal to min value",
-                        List.of(new FieldErrorDto(fieldPrefix + ".targetMaxValue", "InvalidRange", "Target max value cannot be less than min value"))
-                );
-            }
-
-            if (tgtCmd.targetRepetitions() != null && tgtCmd.targetRepetitions() <= 0) {
-                throw new ApplicationValidationException(
-                        "Target repetitions must be positive",
-                        List.of(new FieldErrorDto(fieldPrefix + ".targetRepetitions", "Positive", "Target repetitions must be positive"))
-                );
-            }
-
-            if (tgtCmd.targetDate() != null && tgtCmd.targetDate().isBefore(startDate)) {
-                throw new ApplicationValidationException(
-                        "Target date cannot be before goal start date",
-                        List.of(new FieldErrorDto(fieldPrefix + ".targetDate", "InvalidRange", "Target date cannot be before start date"))
-                );
-            }
+            validateTargetValues(
+                    fieldPrefix,
+                    tgtCmd.startValue(),
+                    tgtCmd.targetValue(),
+                    tgtCmd.targetMinValue(),
+                    tgtCmd.targetMaxValue(),
+                    tgtCmd.targetRepetitions(),
+                    tgtCmd.targetDate(),
+                    startDate
+            );
 
             domainTargets.add(new GoalTarget(
                     UUID.randomUUID(),
@@ -344,6 +380,22 @@ public class GoalValidationHelper {
         }
 
         return domainTargets;
+    }
+
+    public void validateSameJourneyIdentity(FitnessGoalVersion baseVersion, Short newPrimaryGoalTypeId) {
+        if (baseVersion == null || newPrimaryGoalTypeId == null) {
+            return;
+        }
+        Short currentPrimaryGoalTypeId = baseVersion.objectives().stream()
+                .filter(o -> o.priority() == ObjectivePriority.PRIMARY)
+                .map(GoalObjective::goalTypeId)
+                .findFirst()
+                .orElse(null);
+        if (currentPrimaryGoalTypeId != null && !currentPrimaryGoalTypeId.equals(newPrimaryGoalTypeId)) {
+            throw new NewGoalJourneyRequiredException(
+                    "Primary goal type cannot be changed within the same journey; a new goal and goal transition is required"
+            );
+        }
     }
 
     public void validateProposalForAcceptance(GoalProposal proposal) {
@@ -401,9 +453,15 @@ public class GoalValidationHelper {
         }
 
         Set<Short> seenGoalTypeIds = new HashSet<>();
+        Short proposalPrimaryGoalTypeId = null;
+
         for (int i = 0; i < proposal.objectives().size(); i++) {
             GoalProposalObjective obj = proposal.objectives().get(i);
             String fieldPrefix = "objectives[" + i + "]";
+
+            if (obj.priority() == ObjectivePriority.PRIMARY) {
+                proposalPrimaryGoalTypeId = obj.goalTypeId();
+            }
 
             var goalTypeOpt = goalCatalogPort.findGoalTypeById(obj.goalTypeId());
             if (goalTypeOpt.isEmpty()) {
@@ -427,7 +485,12 @@ public class GoalValidationHelper {
             }
         }
 
-        // 3. Re-validate targets
+        // 3. Same-journey identity check against base version
+        if (proposal.baseVersion() != null && proposalPrimaryGoalTypeId != null) {
+            validateSameJourneyIdentity(proposal.baseVersion(), proposalPrimaryGoalTypeId);
+        }
+
+        // 4. Re-validate targets
         if (proposal.targets() != null && !proposal.targets().isEmpty()) {
             Set<Integer> seenMetricIds = new HashSet<>();
             for (int i = 0; i < proposal.targets().size(); i++) {
@@ -471,49 +534,144 @@ public class GoalValidationHelper {
                     );
                 }
 
-                if (tgt.startValue() != null && tgt.startValue().compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ApplicationValidationException(
-                            "Start value must be positive",
-                            List.of(new FieldErrorDto(fieldPrefix + ".startValue", "Positive", "Start value must be positive"))
-                    );
-                }
-                if (tgt.targetValue() != null && tgt.targetValue().compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ApplicationValidationException(
-                            "Target value must be positive",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetValue", "Positive", "Target value must be positive"))
-                    );
-                }
-                if (tgt.targetMinValue() != null && tgt.targetMinValue().compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ApplicationValidationException(
-                            "Target min value must be positive",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetMinValue", "Positive", "Target min value must be positive"))
-                    );
-                }
-                if (tgt.targetMaxValue() != null && tgt.targetMaxValue().compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new ApplicationValidationException(
-                            "Target max value must be positive",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetMaxValue", "Positive", "Target max value must be positive"))
-                    );
-                }
-                if (tgt.targetMinValue() != null && tgt.targetMaxValue() != null && tgt.targetMaxValue().compareTo(tgt.targetMinValue()) < 0) {
-                    throw new ApplicationValidationException(
-                            "Target max value must be greater than or equal to target min value",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetMaxValue", "InvalidRange", "Target max value must be >= target min value"))
-                    );
-                }
-                if (tgt.targetValue() == null && tgt.targetMinValue() == null && tgt.targetMaxValue() == null) {
-                    throw new ApplicationValidationException(
-                            "At least one target value must be specified",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetValue", "NotNull", "At least one target value must be specified"))
-                    );
-                }
-                if (tgt.targetDate() != null && tgt.targetDate().isBefore(startDate)) {
-                    throw new ApplicationValidationException(
-                            "Target date cannot be before goal start date",
-                            List.of(new FieldErrorDto(fieldPrefix + ".targetDate", "InvalidDate", "Target date cannot be before goal start date"))
-                    );
-                }
+                validateTargetValues(
+                        fieldPrefix,
+                        tgt.startValue(),
+                        tgt.targetValue(),
+                        tgt.targetMinValue(),
+                        tgt.targetMaxValue(),
+                        tgt.targetRepetitions(),
+                        tgt.targetDate(),
+                        startDate
+                );
             }
         }
+    }
+
+    public boolean hasProposalVersionChanges(FitnessGoalVersion baseVersion, GoalProposal proposal) {
+        if (baseVersion == null) {
+            return true;
+        }
+
+        String resolvedTitle = (proposal.proposedTitle() != null && !proposal.proposedTitle().isBlank())
+                ? proposal.proposedTitle().trim()
+                : baseVersion.title();
+
+        ResolvedTimeline resolvedTimeline = resolveAndValidateProposalTimeline(
+                proposal.proposedStartDate(),
+                proposal.proposedTargetDate(),
+                proposal.proposedDurationDays(),
+                baseVersion.startDate(),
+                baseVersion.targetDate(),
+                baseVersion.durationDays()
+        );
+
+        List<GoalObjective> domainObjectives = proposal.objectives() != null
+                ? proposal.objectives().stream()
+                        .map(o -> new GoalObjective(
+                                o.id(), null, o.goalTypeId(), o.goalTypeCode(), o.goalTypeName(),
+                                o.priority(), o.sortOrder(), o.notes()))
+                        .toList()
+                : List.of();
+
+        List<GoalTarget> domainTargets = proposal.targets() != null
+                ? proposal.targets().stream()
+                        .map(t -> new GoalTarget(
+                                t.id(), null, t.metricDefinitionId(), t.metricCode(), t.metricDisplayName(),
+                                t.exerciseVariationId(), t.startValue(), t.targetValue(), t.targetMinValue(),
+                                t.targetMaxValue(), t.unitId(), t.unitCode(), t.unitSymbol(),
+                                t.targetRepetitions(), t.targetDate(), t.notes(), null))
+                        .toList()
+                : List.of();
+
+        return hasVersionChanges(baseVersion, resolvedTitle, resolvedTimeline, domainObjectives, domainTargets);
+    }
+
+    public boolean hasVersionChanges(
+            FitnessGoalVersion currentVersion,
+            String newTitle,
+            ResolvedTimeline newTimeline,
+            List<GoalObjective> newObjectives,
+            List<GoalTarget> newTargets
+    ) {
+        if (currentVersion == null) {
+            return true;
+        }
+
+        // 1. Title
+        String normNewTitle = normalizeString(newTitle);
+        String normCurrTitle = normalizeString(currentVersion.title());
+        if (!Objects.equals(normNewTitle, normCurrTitle)) {
+            return true;
+        }
+
+        // 2. Timeline
+        if (!Objects.equals(newTimeline.startDate(), currentVersion.startDate())
+                || !Objects.equals(newTimeline.targetDate(), currentVersion.targetDate())
+                || !Objects.equals(newTimeline.durationDays(), currentVersion.durationDays())) {
+            return true;
+        }
+
+        // 3. Objectives
+        List<GoalObjective> currObjs = currentVersion.objectives() != null
+                ? currentVersion.objectives().stream().sorted(Comparator.comparing(GoalObjective::goalTypeId)).toList()
+                : List.of();
+        List<GoalObjective> newObjs = newObjectives != null
+                ? newObjectives.stream().sorted(Comparator.comparing(GoalObjective::goalTypeId)).toList()
+                : List.of();
+        if (currObjs.size() != newObjs.size()) {
+            return true;
+        }
+        for (int i = 0; i < currObjs.size(); i++) {
+            GoalObjective c = currObjs.get(i);
+            GoalObjective n = newObjs.get(i);
+            if (!Objects.equals(c.goalTypeId(), n.goalTypeId())
+                    || c.priority() != n.priority()
+                    || !Objects.equals(c.sortOrder(), n.sortOrder())
+                    || !Objects.equals(normalizeString(c.notes()), normalizeString(n.notes()))) {
+                return true;
+            }
+        }
+
+        // 4. Targets
+        List<GoalTarget> currTgts = currentVersion.targets() != null
+                ? currentVersion.targets().stream().sorted(Comparator.comparing(GoalTarget::metricDefinitionId)).toList()
+                : List.of();
+        List<GoalTarget> newTgts = newTargets != null
+                ? newTargets.stream().sorted(Comparator.comparing(GoalTarget::metricDefinitionId)).toList()
+                : List.of();
+        if (currTgts.size() != newTgts.size()) {
+            return true;
+        }
+        for (int i = 0; i < currTgts.size(); i++) {
+            GoalTarget c = currTgts.get(i);
+            GoalTarget n = newTgts.get(i);
+            if (!Objects.equals(c.metricDefinitionId(), n.metricDefinitionId())
+                    || !Objects.equals(c.exerciseVariationId(), n.exerciseVariationId())
+                    || !areBigDecimalsEqual(c.startValue(), n.startValue())
+                    || !areBigDecimalsEqual(c.targetValue(), n.targetValue())
+                    || !areBigDecimalsEqual(c.targetMinValue(), n.targetMinValue())
+                    || !areBigDecimalsEqual(c.targetMaxValue(), n.targetMaxValue())
+                    || !Objects.equals(c.unitId(), n.unitId())
+                    || !Objects.equals(c.targetRepetitions(), n.targetRepetitions())
+                    || !Objects.equals(c.targetDate(), n.targetDate())
+                    || !Objects.equals(normalizeString(c.notes()), normalizeString(n.notes()))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean areBigDecimalsEqual(BigDecimal a, BigDecimal b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.compareTo(b) == 0;
+    }
+
+    private static String normalizeString(String s) {
+        if (s == null) return null;
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

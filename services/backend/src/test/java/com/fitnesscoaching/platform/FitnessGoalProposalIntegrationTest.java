@@ -1363,4 +1363,246 @@ class FitnessGoalProposalIntegrationTest {
         Integer hCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId);
         assertThat(hCount).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Acceptance revalidation: proposal proposing different PRIMARY goal type returns 409 NEW_GOAL_JOURNEY_REQUIRED")
+    void acceptProposal_changingPrimaryGoalType_returns409NewGoalJourneyRequired() throws Exception {
+        UUID studentId = createActiveStudentUser("student.diffpri@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.diffpri@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Original Muscle Gain Goal");
+
+        String studentToken = createAccessToken(studentId, "student.diffpri@example.com", List.of("STUDENT"));
+
+        // Get V1 id
+        UUID v1Id = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1",
+                UUID.class, goalId);
+
+        // Get FAT_LOSS id
+        short fatLossId = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.goal_types WHERE code = 'FAT_LOSS'", Short.class);
+
+        // Directly insert a PENDING proposal that changes primary goal type to FAT_LOSS
+        UUID proposalId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposals (
+                    id, student_id, fitness_goal_id, base_goal_version_id, source, created_by,
+                    proposed_title, proposed_start_date, proposed_target_date, proposed_duration_days,
+                    reason, status, expires_at, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'TRAINER'::fitness.proposal_source, ?,
+                    'Switch to Fat Loss', '2026-10-01', '2027-01-31', 122,
+                    'Proposing new journey', 'PENDING'::fitness.proposal_status, now() + interval '7 days', now(), now()
+                )
+                """, proposalId, studentId, goalId, v1Id, trainerId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.goal_proposal_objectives (
+                    id, goal_proposal_id, goal_type_id, priority, sort_order
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, 'PRIMARY'::fitness.objective_priority, 0
+                )
+                """, proposalId, fatLossId);
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, null);
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("NEW_GOAL_JOURNEY_REQUIRED")));
+
+        // Verify proposal is still PENDING
+        String status = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
+        assertThat(status).isEqualTo("PENDING");
+
+        // Verify version count is still 1
+        Integer vCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(vCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Proposal acceptance: reason > 100 characters records <= 100 char change_reason and full summary")
+    void acceptProposal_withLongReason_recordsShortChangeReasonAndFullSummary() throws Exception {
+        UUID studentId = createActiveStudentUser("student.longreason@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.longreason@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal for Long Reason Acceptance");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.longreason@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.longreason@example.com", List.of("STUDENT"));
+
+        String longReason = "R".repeat(150);
+        CreateGoalProposalRequest propReq = new CreateGoalProposalRequest(
+                "Revised Goal Title",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                longReason,
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(propReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, null);
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("ACCEPTED")));
+
+        // Verify version 2 has change_reason <= 100 chars
+        String changeReason = jdbcTemplate.queryForObject(
+                "SELECT change_reason FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 2",
+                String.class, goalId);
+        assertThat(changeReason).isNotNull();
+        assertThat(changeReason.length()).isLessThanOrEqualTo(100);
+
+        String changeSummary = jdbcTemplate.queryForObject(
+                "SELECT change_summary FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 2",
+                String.class, goalId);
+        assertThat(changeSummary).contains(longReason);
+    }
+
+    @Test
+    @DisplayName("Proposal acceptance: identical snapshot to base version returns 409 GOAL_VERSION_NO_CHANGES and rolls back")
+    void acceptProposal_noOpIdenticalSnapshot_returns409GoalVersionNoChanges() throws Exception {
+        UUID studentId = createActiveStudentUser("student.noop@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.noop@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        String goalTitle = "Identical Goal For NoOp";
+        UUID goalId = createActiveGoal(studentId, goalTitle);
+
+        String trainerToken = createAccessToken(trainerId, "trainer.noop@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.noop@example.com", List.of("STUDENT"));
+
+        // Trainer proposes exact same snapshot as base version created by createActiveGoal
+        CreateGoalProposalRequest propReq = new CreateGoalProposalRequest(
+                goalTitle,
+                LocalDate.now(),
+                LocalDate.now().plusDays(90),
+                90,
+                "No actual changes proposed",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, (short) 1, null, null, null, null))
+        );
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(propReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, null);
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_VERSION_NO_CHANGES")));
+
+        // Transaction rollback verification:
+        // 1. Proposal remains PENDING
+        String pStatus = jdbcTemplate.queryForObject(
+                "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
+        assertThat(pStatus).isEqualTo("PENDING");
+
+        // 2. Base version remains current (effective_until IS NULL, version_number = 1)
+        Integer v1Current = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1 AND effective_until IS NULL",
+                Integer.class, goalId);
+        assertThat(v1Current).isEqualTo(1);
+
+        // 3. No new version created in fitness_goal_versions (total versions = 1)
+        Integer vCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?",
+                Integer.class, goalId);
+        assertThat(vCount).isEqualTo(1);
+
+        // 4. Proposal status history only has initial PENDING entry
+        Integer hCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?",
+                Integer.class, proposalId);
+        assertThat(hCount).isEqualTo(1);
+
+        // 5. Audit logs have no GOAL_PROPOSAL_ACCEPTED or FITNESS_GOAL_VERSION_CREATED
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE action IN ('GOAL_PROPOSAL_ACCEPTED', 'FITNESS_GOAL_VERSION_CREATED')",
+                Integer.class);
+        assertThat(auditCount).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Proposal creation target validations: rejects zero and negative values for startValue, targetValue, targetMinValue, targetMaxValue")
+    void createGoalProposal_targetValidations_rejectsZeroAndNegativeValues() throws Exception {
+        UUID studentId = createActiveStudentUser("student.targetval@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.targetval@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal for Target Val");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.targetval@example.com", List.of("TRAINER"));
+
+        // Case 1: startValue = 0
+        CreateGoalProposalRequest req1 = new CreateGoalProposalRequest(
+                "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.ZERO, BigDecimal.valueOf(70), null, null, (short) 1, null, null, null, null))
+        );
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // Case 2: targetValue = -1
+        CreateGoalProposalRequest req2 = new CreateGoalProposalRequest(
+                "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(-1), null, null, (short) 1, null, null, null, null))
+        );
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // Case 3: targetMinValue = 0
+        CreateGoalProposalRequest req3 = new CreateGoalProposalRequest(
+                "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.ZERO, BigDecimal.valueOf(90), (short) 1, null, null, null, null))
+        );
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req3)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // Case 4: targetMaxValue = -5
+        CreateGoalProposalRequest req4 = new CreateGoalProposalRequest(
+                "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.valueOf(10), BigDecimal.valueOf(-5), (short) 1, null, null, null, null))
+        );
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req4)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
 }

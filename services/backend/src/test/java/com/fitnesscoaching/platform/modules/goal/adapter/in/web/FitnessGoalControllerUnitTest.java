@@ -14,10 +14,20 @@ import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionE
 import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
+import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
+import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
+import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
+import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionPageResponse;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionResponse;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetFitnessGoalDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalObjective;
@@ -78,6 +88,15 @@ class FitnessGoalControllerUnitTest {
 
     @MockitoBean
     private ActivateFitnessGoalUseCase activateFitnessGoalUseCase;
+
+    @MockitoBean
+    private GetGoalVersionsUseCase getGoalVersionsUseCase;
+
+    @MockitoBean
+    private GetGoalVersionDetailUseCase getGoalVersionDetailUseCase;
+
+    @MockitoBean
+    private CreateGoalVersionUseCase createGoalVersionUseCase;
 
     @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
@@ -271,5 +290,223 @@ class FitnessGoalControllerUnitTest {
                         .with(jwt().jwt(b -> b.subject(studentId.toString()))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/versions - returns 200 with versions page")
+    void getGoalVersions_success_returns200() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        FitnessGoalVersion domainVersion = new FitnessGoalVersion(
+                versionId, goalId, 1, "Goal V1", LocalDate.now(), LocalDate.now().plusDays(90), 90,
+                Instant.now(), null, null, "INITIAL", null, studentId, null,
+                Instant.now(), null, null, null, List.of(), List.of()
+        );
+        GoalVersionPage pageModel = new GoalVersionPage(
+                List.of(domainVersion), 0, 20, 1L, 1
+        );
+        when(getGoalVersionsUseCase.getGoalVersions(any())).thenReturn(pageModel);
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id", is(versionId.toString())))
+                .andExpect(jsonPath("$.items[0].versionNumber", is(1)))
+                .andExpect(jsonPath("$.items[0].isCurrent", is(true)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/versions/{versionId} - returns 200 with version detail")
+    void getGoalVersionDetail_success_returns200() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        FitnessGoalVersion domainVersion = new FitnessGoalVersion(
+                versionId, goalId, 2, "Goal V2", LocalDate.now(), LocalDate.now().plusDays(120), 120,
+                Instant.now(), null, null, "Extended timeline", null, studentId, null,
+                Instant.now(), Instant.now(), studentId, null, List.of(), List.of()
+        );
+        when(getGoalVersionDetailUseCase.getGoalVersionDetail(any())).thenReturn(domainVersion);
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/versions/" + versionId)
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(versionId.toString())))
+                .andExpect(jsonPath("$.versionNumber", is(2)))
+                .andExpect(jsonPath("$.isCurrent", is(true)))
+                .andExpect(jsonPath("$.durationDays", is(120)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals/{goalId}/versions/{versionId} - returns 404 when version not found")
+    void getGoalVersionDetail_notFound_returns404() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        when(getGoalVersionDetailUseCase.getGoalVersionDetail(any()))
+                .thenThrow(new GoalVersionNotFoundException("Goal version not found: " + versionId));
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/versions/" + versionId)
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_VERSION_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 201 on success")
+    void createGoalVersion_success_returns201() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        FitnessGoalVersion created = new FitnessGoalVersion(
+                versionId, goalId, 2, "Revised Goal", LocalDate.now(), LocalDate.now().plusDays(120), 120,
+                Instant.now(), null, null, "Extending program", null, studentId, null,
+                Instant.now(), Instant.now(), studentId, null, List.of(), List.of()
+        );
+        when(createGoalVersionUseCase.createGoalVersion(any())).thenReturn(created);
+
+        String json = """
+                {
+                    "title": "Revised Goal",
+                    "durationDays": 120,
+                    "changeReason": "Extending program",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/fitness-goals/" + goalId + "/versions/" + versionId))
+                .andExpect(jsonPath("$.id", is(versionId.toString())))
+                .andExpect(jsonPath("$.versionNumber", is(2)))
+                .andExpect(jsonPath("$.isCurrent", is(true)));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 400 when missing changeReason")
+    void createGoalVersion_missingReason_returns400() throws Exception {
+        String json = """
+                {
+                    "title": "Revised Goal",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 409 on version conflict")
+    void createGoalVersion_conflict_returns409() throws Exception {
+        when(createGoalVersionUseCase.createGoalVersion(any()))
+                .thenThrow(new GoalVersionConflictException("Current goal version has changed; unable to create version"));
+
+        String json = """
+                {
+                    "changeReason": "Concurrent update test",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_VERSION_CONFLICT")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 409 on new journey required")
+    void createGoalVersion_newJourneyRequired_returns409() throws Exception {
+        when(createGoalVersionUseCase.createGoalVersion(any()))
+                .thenThrow(new NewGoalJourneyRequiredException("Primary goal type cannot be changed within the same journey; a new goal and goal transition is required"));
+
+        String json = """
+                {
+                    "changeReason": "Switch to fat loss",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "FAT_LOSS",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("NEW_GOAL_JOURNEY_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 409 on no changes")
+    void createGoalVersion_noChanges_returns409() throws Exception {
+        when(createGoalVersionUseCase.createGoalVersion(any()))
+                .thenThrow(new GoalVersionNoChangesException("No changes detected in goal version"));
+
+        String json = """
+                {
+                    "changeReason": "Duplicate version",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_VERSION_NO_CHANGES")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/versions - returns 400 when changeReason exceeds 100 characters")
+    void createGoalVersion_reasonExceeds100Chars_returns400() throws Exception {
+        String longReason = "A".repeat(101);
+        String json = """
+                {
+                    "changeReason": "%s",
+                    "objectives": [
+                        {
+                            "goalTypeCode": "MUSCLE_GAIN",
+                            "priority": "PRIMARY"
+                        }
+                    ]
+                }
+                """.formatted(longReason);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
     }
 }

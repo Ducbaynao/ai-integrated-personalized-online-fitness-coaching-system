@@ -26,4 +26,12 @@ public interface FitnessGoalPersistencePort {
     Optional<FitnessGoal> findCurrentActiveByStudentId(UUID studentId);
 
     boolean hasActiveGoal(UUID studentId);
+
+    List<FitnessGoalVersion> findVersionsByGoalId(UUID goalId, int limit, long offset);
+
+    long countVersionsByGoalId(UUID goalId);
+
+    Optional<FitnessGoalVersion> findVersionById(UUID goalId, UUID versionId);
+
+    FitnessGoalVersion createNewGoalVersion(UUID goalId, UUID studentId, FitnessGoalVersion newVersion, UUID currentVersionId);
 }
