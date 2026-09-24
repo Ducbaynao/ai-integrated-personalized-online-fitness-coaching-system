@@ -1,13 +1,16 @@
 package com.fitnesscoaching.platform.modules.goal.adapter.out.persistence;
 
+import com.fitnesscoaching.platform.common.exception.GoalTransitionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalObjective;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalTarget;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import com.fitnesscoaching.platform.modules.goal.domain.ObjectivePriority;
 import com.fitnesscoaching.platform.modules.goal.domain.VersionLockReason;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -161,6 +164,29 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 lockReason,
                 List.of(),
                 List.of()
+        );
+    };
+
+    private static final RowMapper<GoalTransition> TRANSITION_ROW_MAPPER = (rs, rowNum) -> {
+        UUID id = (UUID) rs.getObject("id");
+        UUID previousGoalId = (UUID) rs.getObject("previous_goal_id");
+        UUID newGoalId = (UUID) rs.getObject("new_goal_id");
+        String transitionReason = rs.getString("transition_reason");
+        UUID proposalId = (UUID) rs.getObject("proposal_id");
+        UUID initiatedBy = (UUID) rs.getObject("initiated_by");
+        Timestamp transitionedTs = rs.getTimestamp("transitioned_at");
+        Instant transitionedAt = transitionedTs != null ? transitionedTs.toInstant() : null;
+        String notes = rs.getString("notes");
+
+        return new GoalTransition(
+                id,
+                previousGoalId,
+                newGoalId,
+                transitionReason,
+                proposalId,
+                initiatedBy,
+                transitionedAt,
+                notes
         );
     };
 
@@ -824,5 +850,212 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 ORDER BY t.created_at ASC, t.id ASC
                 """;
         return jdbcTemplate.query(sql, TARGET_ROW_MAPPER, versionId);
+    }
+
+    @Override
+    @Transactional
+    public GoalTransitionResult createDirectGoalTransition(
+            UUID previousGoalId,
+            UUID studentId,
+            String transitionReason,
+            String notes,
+            FitnessGoal newGoal,
+            FitnessGoalVersion newVersion,
+            List<GoalObjective> objectives,
+            List<GoalTarget> targets
+    ) {
+        // 1. CAS update previous goal from ACTIVE to REPLACED
+        String replacePreviousSql = """
+                UPDATE fitness.fitness_goals
+                SET status = 'REPLACED'::fitness.lifecycle_status,
+                    ended_at = now(),
+                    status_reason = ?,
+                    updated_at = now()
+                WHERE id = ? AND status = 'ACTIVE'::fitness.lifecycle_status
+                """;
+        int replaced = jdbcTemplate.update(replacePreviousSql, transitionReason, previousGoalId);
+        if (replaced == 0) {
+            throw new GoalTransitionConflictException("Source goal is no longer active or has already been transitioned");
+        }
+
+        // 2. CAS close previous goal's current version (effective_until = now())
+        String closeVersionSql = """
+                UPDATE fitness.fitness_goal_versions
+                SET effective_until = now()
+                WHERE fitness_goal_id = ? AND effective_until IS NULL
+                """;
+        int versionClosed = jdbcTemplate.update(closeVersionSql, previousGoalId);
+        if (versionClosed == 0) {
+            throw new GoalTransitionConflictException("Source goal current version is no longer active or missing");
+        }
+
+        // 3. Record status history on previous goal
+        String insertPrevHistorySql = """
+                INSERT INTO fitness.fitness_goal_status_history (
+                    id, fitness_goal_id, from_status, to_status, changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, 'ACTIVE'::fitness.lifecycle_status, 'REPLACED'::fitness.lifecycle_status, ?, ?, now()
+                )
+                """;
+        jdbcTemplate.update(insertPrevHistorySql, previousGoalId, studentId, transitionReason);
+
+        // 4. Insert new goal aggregate into fitness_goals as ACTIVE
+        UUID newGoalId = newGoal.id() != null ? newGoal.id() : UUID.randomUUID();
+        String insertNewGoalSql = """
+                INSERT INTO fitness.fitness_goals (
+                    id, student_id, title, status, created_by, activated_at,
+                    paused_at, completed_at, ended_at, status_reason, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, 'ACTIVE'::fitness.lifecycle_status, ?, now(),
+                    NULL, NULL, NULL, NULL, now(), now()
+                )
+                """;
+        jdbcTemplate.update(insertNewGoalSql, newGoalId, studentId, newGoal.title(), studentId);
+
+        // 5. Insert new goal version 1 (unlocked initially)
+        UUID newVersionId = newVersion.id() != null ? newVersion.id() : UUID.randomUUID();
+        String insertVersionSql = """
+                INSERT INTO fitness.fitness_goal_versions (
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
+                    duration_days, effective_from, effective_until, resume_date,
+                    change_reason, change_summary, created_by, source_proposal_id,
+                    created_at, locked_at, locked_by, lock_reason
+                ) VALUES (
+                    ?, ?, 1, ?, ?, ?,
+                    ?, now(), NULL, NULL,
+                    'INITIAL_CREATION', ?, ?, NULL,
+                    now(), NULL, NULL, NULL
+                )
+                """;
+        String summary = "Started new journey from transition of goal " + previousGoalId;
+        jdbcTemplate.update(
+                insertVersionSql,
+                newVersionId,
+                newGoalId,
+                newVersion.title() != null ? newVersion.title() : newGoal.title(),
+                Date.valueOf(newVersion.startDate()),
+                newVersion.targetDate() != null ? Date.valueOf(newVersion.targetDate()) : null,
+                newVersion.durationDays(),
+                summary,
+                studentId
+        );
+
+        // 6. Insert objectives
+        if (objectives != null && !objectives.isEmpty()) {
+            String insertObjectiveSql = """
+                    INSERT INTO fitness.goal_objectives (
+                        id, goal_version_id, goal_type_id, priority, sort_order, notes
+                    ) VALUES (
+                        ?, ?, ?, ?::fitness.objective_priority, ?, ?
+                    )
+                    """;
+            for (GoalObjective obj : objectives) {
+                UUID objId = obj.id() != null ? obj.id() : UUID.randomUUID();
+                jdbcTemplate.update(
+                        insertObjectiveSql,
+                        objId,
+                        newVersionId,
+                        obj.goalTypeId(),
+                        obj.priority().name(),
+                        obj.sortOrder(),
+                        obj.notes()
+                );
+            }
+        }
+
+        // 7. Insert targets
+        if (targets != null && !targets.isEmpty()) {
+            String insertTargetSql = """
+                    INSERT INTO fitness.goal_targets (
+                        id, goal_version_id, metric_definition_id, exercise_variation_id,
+                        start_value, target_value, target_min_value, target_max_value,
+                        unit_id, target_repetitions, target_date, notes, created_at
+                    ) VALUES (
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?, now()
+                    )
+                    """;
+            for (GoalTarget tgt : targets) {
+                UUID tgtId = tgt.id() != null ? tgt.id() : UUID.randomUUID();
+                jdbcTemplate.update(
+                        insertTargetSql,
+                        tgtId,
+                        newVersionId,
+                        tgt.metricDefinitionId(),
+                        tgt.exerciseVariationId(),
+                        tgt.startValue(),
+                        tgt.targetValue(),
+                        tgt.targetMinValue(),
+                        tgt.targetMaxValue(),
+                        tgt.unitId(),
+                        tgt.targetRepetitions(),
+                        tgt.targetDate() != null ? Date.valueOf(tgt.targetDate()) : null,
+                        tgt.notes()
+                );
+            }
+        }
+
+        // 8. Lock new version with ACTIVATED
+        String lockVersionSql = """
+                UPDATE fitness.fitness_goal_versions
+                SET locked_at = now(),
+                    locked_by = ?,
+                    lock_reason = 'ACTIVATED'::fitness.version_lock_reason
+                WHERE id = ?
+                """;
+        jdbcTemplate.update(lockVersionSql, studentId, newVersionId);
+
+        // 9. Record status history on new goal (DRAFT -> ACTIVE)
+        String insertNewHistorySql = """
+                INSERT INTO fitness.fitness_goal_status_history (
+                    id, fitness_goal_id, from_status, to_status, changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, 'DRAFT'::fitness.lifecycle_status, 'ACTIVE'::fitness.lifecycle_status, ?, ?, now()
+                )
+                """;
+        jdbcTemplate.update(insertNewHistorySql, newGoalId, studentId, "Initial goal creation and activation via transition");
+
+        // 10. Insert into fitness.goal_transitions
+        UUID transitionId = UUID.randomUUID();
+        String insertTransitionSql = """
+                INSERT INTO fitness.goal_transitions (
+                    id, previous_goal_id, new_goal_id, transition_reason, proposal_id,
+                    initiated_by, transitioned_at, notes
+                ) VALUES (
+                    ?, ?, ?, ?, NULL, ?, now(), ?
+                )
+                """;
+        jdbcTemplate.update(insertTransitionSql, transitionId, previousGoalId, newGoalId, transitionReason, studentId, notes);
+
+        // 11. Load and return result
+        FitnessGoal loadedNewGoal = findById(newGoalId).orElseThrow(() -> new IllegalStateException("Failed to load new goal: " + newGoalId));
+        GoalTransition loadedTransition = findTransitionById(transitionId).orElseThrow(() -> new IllegalStateException("Failed to load transition: " + transitionId));
+
+        return new GoalTransitionResult(loadedTransition, loadedNewGoal);
+    }
+
+    @Override
+    public Optional<GoalTransition> findTransitionById(UUID transitionId) {
+        String sql = """
+                SELECT id, previous_goal_id, new_goal_id, transition_reason,
+                       proposal_id, initiated_by, transitioned_at, notes
+                FROM fitness.goal_transitions
+                WHERE id = ?
+                """;
+        List<GoalTransition> list = jdbcTemplate.query(sql, TRANSITION_ROW_MAPPER, transitionId);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
+    public List<GoalTransition> findTransitionsByGoalId(UUID goalId) {
+        String sql = """
+                SELECT id, previous_goal_id, new_goal_id, transition_reason,
+                       proposal_id, initiated_by, transitioned_at, notes
+                FROM fitness.goal_transitions
+                WHERE previous_goal_id = ? OR new_goal_id = ?
+                ORDER BY transitioned_at DESC, id DESC
+                """;
+        return jdbcTemplate.query(sql, TRANSITION_ROW_MAPPER, goalId, goalId);
     }
 }

@@ -485,12 +485,7 @@ public class GoalValidationHelper {
             }
         }
 
-        // 3. Same-journey identity check against base version
-        if (proposal.baseVersion() != null && proposalPrimaryGoalTypeId != null) {
-            validateSameJourneyIdentity(proposal.baseVersion(), proposalPrimaryGoalTypeId);
-        }
-
-        // 4. Re-validate targets
+        // 3. Re-validate targets
         if (proposal.targets() != null && !proposal.targets().isEmpty()) {
             Set<Integer> seenMetricIds = new HashSet<>();
             for (int i = 0; i < proposal.targets().size(); i++) {

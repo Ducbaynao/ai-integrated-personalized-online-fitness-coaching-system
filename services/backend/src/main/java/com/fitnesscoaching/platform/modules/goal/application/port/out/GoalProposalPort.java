@@ -1,7 +1,11 @@
 package com.fitnesscoaching.platform.modules.goal.application.port.out;
 
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalObjective;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalProposal;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTarget;
 import com.fitnesscoaching.platform.modules.goal.domain.ProposalStatus;
 
 import java.util.List;
@@ -21,4 +25,14 @@ public interface GoalProposalPort {
     boolean rejectProposal(UUID proposalId, UUID studentId, String decisionNote);
 
     FitnessGoalVersion acceptProposal(GoalProposal proposal, UUID studentId, String decisionNote);
+
+    GoalTransitionResult acceptProposalAsNewJourney(
+            GoalProposal proposal,
+            UUID studentId,
+            String decisionNote,
+            FitnessGoal newGoal,
+            FitnessGoalVersion newVersion,
+            List<GoalObjective> objectives,
+            List<GoalTarget> targets
+    );
 }

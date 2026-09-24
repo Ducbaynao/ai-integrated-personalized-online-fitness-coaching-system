@@ -5,22 +5,31 @@ import com.fitnesscoaching.platform.common.exception.ApplicationValidationExcept
 import com.fitnesscoaching.platform.common.exception.FieldErrorDto;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalNotFoundException;
+import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
 import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
+import com.fitnesscoaching.platform.common.exception.SameGoalJourneyTransitionException;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetFitnessGoalDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
@@ -33,6 +42,7 @@ import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalObjective;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalTarget;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import com.fitnesscoaching.platform.modules.goal.domain.ObjectivePriority;
 import com.fitnesscoaching.platform.modules.goal.domain.VersionLockReason;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +65,10 @@ public class FitnessGoalService implements
         ActivateFitnessGoalUseCase,
         GetGoalVersionsUseCase,
         GetGoalVersionDetailUseCase,
-        CreateGoalVersionUseCase {
+        CreateGoalVersionUseCase,
+        CreateGoalTransitionUseCase,
+        GetGoalTransitionsUseCase,
+        GetGoalTransitionDetailUseCase {
 
     private final GoalStudentAuthorityPort goalStudentAuthorityPort;
     private final GoalCatalogPort goalCatalogPort;
@@ -539,6 +552,250 @@ public class FitnessGoalService implements
                 .build());
 
         return created;
+    }
+
+    @Override
+    public GoalTransitionResult createGoalTransition(CreateGoalTransitionCommand command) {
+        // 1. Basic validation
+        if (command.sourceGoalId() == null) {
+            throw new ApplicationValidationException("Source goal ID is required",
+                    List.of(new FieldErrorDto("sourceGoalId", "NotNull", "Source goal ID is required")));
+        }
+        if (command.studentId() == null) {
+            throw new ApplicationValidationException("Student ID is required",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "Student ID is required")));
+        }
+        if (command.transitionReason() == null || command.transitionReason().trim().isEmpty()) {
+            throw new ApplicationValidationException("Transition reason is required",
+                    List.of(new FieldErrorDto("transitionReason", "NotBlank", "Transition reason is required")));
+        }
+        if (command.transitionReason().trim().length() > 100) {
+            throw new ApplicationValidationException("Transition reason must not exceed 100 characters",
+                    List.of(new FieldErrorDto("transitionReason", "Size", "Transition reason must not exceed 100 characters")));
+        }
+        if (command.notes() != null && command.notes().trim().length() > 2000) {
+            throw new ApplicationValidationException("Notes must not exceed 2000 characters",
+                    List.of(new FieldErrorDto("notes", "Size", "Notes must not exceed 2000 characters")));
+        }
+        if (command.title() == null || command.title().trim().isEmpty()) {
+            throw new ApplicationValidationException("Goal title is required",
+                    List.of(new FieldErrorDto("title", "NotBlank", "Goal title is required")));
+        }
+        if (command.title().trim().length() > 200) {
+            throw new ApplicationValidationException("Goal title must not exceed 200 characters",
+                    List.of(new FieldErrorDto("title", "Size", "Goal title must not exceed 200 characters")));
+        }
+
+        // 2. Student authority check
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(command.studentId());
+
+        // 3. Load previous goal and verify ownership
+        FitnessGoal previousGoal = fitnessGoalPersistencePort.findById(command.sourceGoalId())
+                .orElseThrow(() -> new FitnessGoalNotFoundException("Fitness goal not found: " + command.sourceGoalId()));
+
+        if (!previousGoal.studentId().equals(command.studentId())) {
+            throw new FitnessGoalAccessDeniedException("Student does not own this fitness goal");
+        }
+
+        // 4. Status check: only ACTIVE goals can transition to a new journey
+        if (previousGoal.status() != GoalStatus.ACTIVE) {
+            throw new InvalidLifecycleTransitionException("Cannot transition a goal that is not ACTIVE; current status is: " + previousGoal.status());
+        }
+
+        // 5. Load current version of previous goal to get current primary goal type
+        FitnessGoalVersion currentVersion = previousGoal.currentVersion();
+        if (currentVersion == null) {
+            currentVersion = fitnessGoalPersistencePort.findVersionsByGoalId(previousGoal.id(), 1, 0).stream().findFirst().orElse(null);
+        }
+        Short currentPrimaryGoalTypeId = null;
+        if (currentVersion != null && currentVersion.objectives() != null) {
+            currentPrimaryGoalTypeId = currentVersion.objectives().stream()
+                    .filter(o -> o.priority() == ObjectivePriority.PRIMARY)
+                    .map(GoalObjective::goalTypeId)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        // 6. Validate new objectives
+        List<GoalObjective> domainObjectives = validationHelper.validateAndBuildObjectives(command.objectives());
+        Short newPrimaryGoalTypeId = domainObjectives.stream()
+                .filter(o -> o.priority() == ObjectivePriority.PRIMARY)
+                .map(GoalObjective::goalTypeId)
+                .findFirst()
+                .orElse(null);
+
+        // 7. Enforce new journey rule: PRIMARY goal type MUST differ
+        if (currentPrimaryGoalTypeId != null && currentPrimaryGoalTypeId.equals(newPrimaryGoalTypeId)) {
+            throw new SameGoalJourneyTransitionException("Cannot transition to a new journey with the same primary goal type; use goal versioning instead");
+        }
+
+        // 8. Validate timeline
+        var timeline = validationHelper.resolveAndValidateTimeline(command.startDate(), command.targetDate(), command.durationDays());
+
+        // 9. Validate targets
+        List<GoalTarget> domainTargets = validationHelper.validateAndBuildTargets(command.targets(), timeline.startDate());
+
+        Instant now = Instant.now(clock);
+        UUID newGoalId = UUID.randomUUID();
+        UUID newVersionId = UUID.randomUUID();
+        String newTitle = command.title().trim();
+
+        FitnessGoalVersion newVersion = new FitnessGoalVersion(
+                newVersionId,
+                newGoalId,
+                1,
+                newTitle,
+                timeline.startDate(),
+                timeline.targetDate(),
+                timeline.durationDays(),
+                now,
+                null,
+                null,
+                "INITIAL_CREATION",
+                command.transitionReason().trim(),
+                command.studentId(),
+                null,
+                now,
+                now,
+                command.studentId(),
+                VersionLockReason.ACTIVATED,
+                domainObjectives,
+                domainTargets
+        );
+
+        FitnessGoal newGoal = new FitnessGoal(
+                newGoalId,
+                command.studentId(),
+                newTitle,
+                GoalStatus.ACTIVE,
+                command.studentId(),
+                now,
+                null,
+                null,
+                null,
+                null,
+                now,
+                now,
+                newVersion
+        );
+
+        // 10. Persist atomically
+        GoalTransitionResult result = fitnessGoalPersistencePort.createDirectGoalTransition(
+                previousGoal.id(),
+                command.studentId(),
+                command.transitionReason().trim(),
+                command.notes() != null ? command.notes().trim() : null,
+                newGoal,
+                newVersion,
+                domainObjectives,
+                domainTargets
+        );
+
+        // 11. Record audit logs
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("FITNESS_GOAL_REPLACED")
+                .targetType("FITNESS_GOAL")
+                .targetId(previousGoal.id())
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson("{\"previousGoalId\":\"" + previousGoal.id() + "\",\"newGoalId\":\"" + newGoalId + "\",\"reason\":\"" + escapeJson(command.transitionReason()) + "\"}")
+                .build());
+
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("FITNESS_GOAL_CREATED")
+                .targetType("FITNESS_GOAL")
+                .targetId(newGoalId)
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson("{\"goalId\":\"" + newGoalId + "\",\"studentId\":\"" + command.studentId() + "\",\"title\":\"" + escapeJson(newTitle) + "\"}")
+                .build());
+
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("FITNESS_GOAL_ACTIVATED")
+                .targetType("FITNESS_GOAL")
+                .targetId(newGoalId)
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson("{\"goalId\":\"" + newGoalId + "\",\"status\":\"ACTIVE\"}")
+                .build());
+
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("GOAL_TRANSITION_CREATED")
+                .targetType("GOAL_TRANSITION")
+                .targetId(result.transition().id())
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson("{\"transitionId\":\"" + result.transition().id() + "\",\"previousGoalId\":\"" + previousGoal.id() + "\",\"newGoalId\":\"" + newGoalId + "\",\"transitionReason\":\"" + escapeJson(command.transitionReason()) + "\"}")
+                .build());
+
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GoalTransition> getGoalTransitions(GetGoalTransitionsQuery query) {
+        if (query.goalId() == null) {
+            throw new ApplicationValidationException("Goal ID is required",
+                    List.of(new FieldErrorDto("goalId", "NotNull", "Goal ID is required")));
+        }
+        if (query.studentId() == null) {
+            throw new ApplicationValidationException("Student ID is required",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "Student ID is required")));
+        }
+
+        FitnessGoal goal = fitnessGoalPersistencePort.findById(query.goalId())
+                .orElseThrow(() -> new FitnessGoalNotFoundException("Fitness goal not found: " + query.goalId()));
+
+        if (!goal.studentId().equals(query.studentId())) {
+            throw new FitnessGoalAccessDeniedException("Access denied: You are not authorized to view transitions for this goal");
+        }
+
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(query.studentId());
+
+        return fitnessGoalPersistencePort.findTransitionsByGoalId(query.goalId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GoalTransition getGoalTransitionDetail(GetGoalTransitionDetailQuery query) {
+        if (query.goalId() == null) {
+            throw new ApplicationValidationException("Goal ID is required",
+                    List.of(new FieldErrorDto("goalId", "NotNull", "Goal ID is required")));
+        }
+        if (query.transitionId() == null) {
+            throw new ApplicationValidationException("Transition ID is required",
+                    List.of(new FieldErrorDto("transitionId", "NotNull", "Transition ID is required")));
+        }
+        if (query.studentId() == null) {
+            throw new ApplicationValidationException("Student ID is required",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "Student ID is required")));
+        }
+
+        FitnessGoal goal = fitnessGoalPersistencePort.findById(query.goalId())
+                .orElseThrow(() -> new FitnessGoalNotFoundException("Fitness goal not found: " + query.goalId()));
+
+        if (!goal.studentId().equals(query.studentId())) {
+            throw new FitnessGoalAccessDeniedException("Access denied: You are not authorized to view this goal transition");
+        }
+
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(query.studentId());
+
+        GoalTransition transition = fitnessGoalPersistencePort.findTransitionById(query.transitionId())
+                .orElseThrow(() -> new GoalTransitionNotFoundException("Goal transition not found: " + query.transitionId()));
+
+        if (!transition.previousGoalId().equals(query.goalId()) && !transition.newGoalId().equals(query.goalId())) {
+            throw new GoalTransitionNotFoundException("Goal transition does not belong to specified goal: " + query.transitionId());
+        }
+
+        return transition;
     }
 
     private String escapeJson(String input) {

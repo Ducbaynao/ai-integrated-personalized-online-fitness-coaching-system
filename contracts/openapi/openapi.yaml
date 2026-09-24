@@ -742,6 +742,115 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404': { $ref: '#/components/responses/GoalVersionNotFound' }
 
+  /fitness-goals/{goalId}/transitions:
+    get:
+      tags: [Fitness Goal]
+      operationId: getGoalTransitions
+      summary: List transition history for a fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of goal transitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GoalTransitionResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+    post:
+      tags: [Fitness Goal]
+      operationId: createGoalTransition
+      summary: Transition an active fitness goal to a new journey
+      description: >-
+        Transitions an active fitness goal to REPLACED and creates a new goal starting at Version 1
+        with a different PRIMARY goal type, preserving all history.
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalTransitionRequest'
+      responses:
+        '201':
+          description: Goal transition created and new goal activated
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalTransitionResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+        '409':
+          description: >-
+            Conflict - Same goal journey not permitted (SAME_GOAL_JOURNEY_NOT_PERMITTED),
+            goal transition conflict (GOAL_TRANSITION_CONFLICT),
+            or invalid lifecycle transition (INVALID_LIFECYCLE_TRANSITION).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /fitness-goals/{goalId}/transitions/{transitionId}:
+    get:
+      tags: [Fitness Goal]
+      operationId: getGoalTransitionDetail
+      summary: Get details of a specific goal transition
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: transitionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Goal transition details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalTransitionResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Access denied (ACCESS_DENIED) or account unavailable (ACCOUNT_UNAVAILABLE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Goal transition not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /fitness-goals/{goalId}/proposals:
     post:
       tags: [Fitness Goal Proposal]
@@ -858,7 +967,8 @@ paths:
       summary: Accept or reject a fitness goal proposal
       description: >-
         Allows the owning student to ACCEPT or REJECT a pending goal proposal.
-        ACCEPT atomically creates a new fitness goal version and closes the base version.
+        ACCEPT atomically creates a new same-journey fitness goal version (if primary goal type matches)
+        or transitions the previous goal to REPLACED and creates a new goal starting at Version 1 (if primary goal type changes).
       parameters:
         - name: proposalId
           in: path
@@ -1527,6 +1637,38 @@ components:
         targets:
           type: array
           items: { $ref: '#/components/schemas/CreateGoalTargetRequest' }
+
+    CreateGoalTransitionRequest:
+      type: object
+      required: [title, startDate, transitionReason, objectives]
+      properties:
+        title: { type: string, maxLength: 200 }
+        startDate: { type: string, format: date }
+        targetDate: { type: string, format: date }
+        durationDays: { type: integer, minimum: 1 }
+        transitionReason: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 2000 }
+        objectives:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateGoalObjectiveRequest' }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/CreateGoalTargetRequest' }
+
+    GoalTransitionResponse:
+      type: object
+      required: [id, previousGoalId, newGoalId, transitionReason, initiatedBy, transitionedAt]
+      properties:
+        id: { type: string, format: uuid }
+        previousGoalId: { type: string, format: uuid }
+        newGoalId: { type: string, format: uuid }
+        transitionReason: { type: string }
+        proposalId: { type: [string, 'null'], format: uuid }
+        initiatedBy: { type: string, format: uuid }
+        transitionedAt: { type: string, format: date-time }
+        notes: { type: [string, 'null'] }
+        newGoal: { $ref: '#/components/schemas/FitnessGoalResponse' }
 
     FitnessGoalResponse:
       type: object

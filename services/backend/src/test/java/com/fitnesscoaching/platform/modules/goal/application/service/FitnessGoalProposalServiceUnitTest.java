@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.common.exception.*;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalProposalPage;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.*;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalProposalPort;
@@ -573,5 +574,77 @@ class FitnessGoalProposalServiceUnitTest {
 
         assertThatThrownBy(() -> service.decideProposal(cmd))
                 .isInstanceOf(GoalProposalAlreadyDecidedException.class);
+    }
+
+    @Test
+    @DisplayName("decideProposal: ACCEPT with different PRIMARY goal type triggers new journey transition and 5 audits")
+    void decideProposal_accept_differentPrimaryGoalType_triggersNewJourneyTransition() {
+        UUID proposalId = UUID.randomUUID();
+        UUID newGoalId = UUID.randomUUID();
+        UUID transitionId = UUID.randomUUID();
+
+        GoalObjective basePrimary = new GoalObjective(
+                UUID.randomUUID(), versionId, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion baseVer = new FitnessGoalVersion(
+                versionId, goalId, 1, "Base Title", LocalDate.now(), LocalDate.now().plusDays(90), 90,
+                Instant.now(), null, null, "Initial", "Summary", studentId, null,
+                Instant.now(), Instant.now(), studentId, VersionLockReason.ACTIVATED,
+                List.of(basePrimary), List.of()
+        );
+
+        GoalProposalObjective proposalPrimary = new GoalProposalObjective(
+                UUID.randomUUID(), proposalId, (short) 2, "FAT_LOSS", "Fat Loss",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        GoalProposal pending = new GoalProposal(
+                proposalId, studentId, goalId, versionId, ProposalSource.TRAINER,
+                trainerId, "New Journey Title", LocalDate.now(), LocalDate.now().plusDays(45), 45,
+                "Need fat loss now", ProposalStatus.PENDING, null, null, null, null, Instant.now(), Instant.now(),
+                List.of(proposalPrimary), List.of(), baseVer
+        );
+        GoalProposal accepted = new GoalProposal(
+                proposalId, studentId, goalId, versionId, ProposalSource.TRAINER,
+                trainerId, "New Journey Title", LocalDate.now(), LocalDate.now().plusDays(45), 45,
+                "Need fat loss now", ProposalStatus.ACCEPTED, studentId, Instant.now(), "Approved new journey", null, Instant.now(), Instant.now(),
+                List.of(proposalPrimary), List.of(), baseVer
+        );
+
+        GoalTransition transition = new GoalTransition(
+                transitionId, goalId, newGoalId, "Need fat loss now", proposalId, studentId, Instant.now(), "Need fat loss now"
+        );
+        FitnessGoal newGoal = new FitnessGoal(
+                newGoalId, studentId, "New Journey Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(), null, null, null, null, Instant.now(), Instant.now(), null
+        );
+        GoalTransitionResult transitionResult = new GoalTransitionResult(transition, newGoal);
+
+        doNothing().when(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        when(proposalPort.findById(proposalId)).thenReturn(Optional.of(pending), Optional.of(accepted));
+        doNothing().when(validationHelper).validateProposalForAcceptance(pending);
+        when(validationHelper.hasProposalVersionChanges(eq(baseVer), any())).thenReturn(true);
+        when(proposalPort.acceptProposalAsNewJourney(any(), eq(studentId), eq("Approved new journey"), any(), any(), any(), any()))
+                .thenReturn(transitionResult);
+
+        DecideGoalProposalCommand cmd = new DecideGoalProposalCommand(proposalId, studentId, ProposalDecision.ACCEPT, "Approved new journey");
+        GoalProposal result = service.decideProposal(cmd);
+
+        assertThat(result.status()).isEqualTo(ProposalStatus.ACCEPTED);
+        verify(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        verify(proposalPort).acceptProposalAsNewJourney(any(), eq(studentId), eq("Approved new journey"), any(), any(), any(), any());
+
+        ArgumentCaptor<AuditRecord> auditCaptor = ArgumentCaptor.forClass(AuditRecord.class);
+        verify(auditService, times(5)).recordAudit(auditCaptor.capture());
+
+        List<AuditRecord> records = auditCaptor.getAllValues();
+        assertThat(records).extracting(AuditRecord::action)
+                .containsExactly(
+                        "FITNESS_GOAL_REPLACED",
+                        "FITNESS_GOAL_CREATED",
+                        "FITNESS_GOAL_ACTIVATED",
+                        "GOAL_TRANSITION_CREATED",
+                        "GOAL_PROPOSAL_ACCEPTED"
+                );
     }
 }

@@ -7,17 +7,24 @@ import com.fitnesscoaching.platform.common.exception.FitnessGoalNotFoundExceptio
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
+import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
 import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
+import com.fitnesscoaching.platform.common.exception.SameGoalJourneyTransitionException;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalObjectiveCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTargetCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalCatalogPort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalStudentAuthorityPort;
@@ -951,5 +958,210 @@ class FitnessGoalServiceUnitTest {
         assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
                 .isInstanceOf(ApplicationValidationException.class)
                 .hasMessageContaining("Target max value cannot be less than min value");
+    }
+
+    @Test
+    @DisplayName("Create goal transition: success replaces previous goal and activates new goal")
+    void createGoalTransition_success_replacesGoalAndActivatesNew() {
+        UUID previousGoalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, previousGoalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal previousGoal = new FitnessGoal(
+                previousGoalId, studentId, "Old Journey", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(previousGoalId)).thenReturn(Optional.of(previousGoal));
+        mockValidCatalogs();
+
+        UUID transitionId = UUID.randomUUID();
+        UUID newGoalId = UUID.randomUUID();
+        GoalTransition transition = new GoalTransition(
+                transitionId, previousGoalId, newGoalId, "Switching to Fat Loss", null, studentId, Instant.now(clock), "Notes"
+        );
+        FitnessGoal newGoal = new FitnessGoal(
+                newGoalId, studentId, "Fat Loss Journey", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        GoalTransitionResult expectedResult = new GoalTransitionResult(transition, newGoal);
+
+        when(fitnessGoalPersistencePort.createDirectGoalTransition(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(expectedResult);
+
+        CreateGoalTransitionCommand command = new CreateGoalTransitionCommand(
+                studentId, previousGoalId, "Switching to Fat Loss", "Notes", "Fat Loss Journey",
+                startDate, targetDate, 91,
+                List.of(new CreateGoalObjectiveCommand((short) 2, "FAT_LOSS", ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        GoalTransitionResult actual = fitnessGoalService.createGoalTransition(command);
+
+        assertThat(actual).isNotNull();
+        assertThat(actual.transition().id()).isEqualTo(transitionId);
+        assertThat(actual.transition().previousGoalId()).isEqualTo(previousGoalId);
+        assertThat(actual.transition().newGoalId()).isEqualTo(newGoalId);
+        verify(goalStudentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        verify(fitnessGoalPersistencePort).createDirectGoalTransition(eq(previousGoalId), eq(studentId), eq("Switching to Fat Loss"), eq("Notes"), any(), any(), any(), any());
+        verify(auditService).recordAudit(argThat(r -> r.action().equals("FITNESS_GOAL_REPLACED")));
+        verify(auditService).recordAudit(argThat(r -> r.action().equals("FITNESS_GOAL_CREATED")));
+        verify(auditService).recordAudit(argThat(r -> r.action().equals("FITNESS_GOAL_ACTIVATED")));
+        verify(auditService).recordAudit(argThat(r -> r.action().equals("GOAL_TRANSITION_CREATED")));
+    }
+
+    @Test
+    @DisplayName("Create goal transition: throws SameGoalJourneyTransitionException if primary goal type is unchanged")
+    void createGoalTransition_samePrimaryType_throwsSameGoalJourneyException() {
+        UUID previousGoalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, previousGoalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal previousGoal = new FitnessGoal(
+                previousGoalId, studentId, "Old Journey", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(previousGoalId)).thenReturn(Optional.of(previousGoal));
+        mockValidCatalogs();
+
+        CreateGoalTransitionCommand command = new CreateGoalTransitionCommand(
+                studentId, previousGoalId, "Switching", "Notes", "Same Primary",
+                startDate, targetDate, 91,
+                List.of(new CreateGoalObjectiveCommand((short) 1, "MUSCLE_GAIN", ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalTransition(command))
+                .isInstanceOf(SameGoalJourneyTransitionException.class)
+                .hasMessageContaining("Cannot transition to a new journey with the same primary goal type; use goal versioning instead");
+    }
+
+    @Test
+    @DisplayName("Create goal transition: throws InvalidLifecycleTransitionException if previous goal is not ACTIVE")
+    void createGoalTransition_nonActiveGoal_throwsInvalidLifecycleTransitionException() {
+        UUID previousGoalId = UUID.randomUUID();
+        FitnessGoal previousGoal = new FitnessGoal(
+                previousGoalId, studentId, "Paused Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock), Instant.now(clock), null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(previousGoalId)).thenReturn(Optional.of(previousGoal));
+
+        CreateGoalTransitionCommand command = new CreateGoalTransitionCommand(
+                studentId, previousGoalId, "Switching", null, "New Journey",
+                startDate, targetDate, 91,
+                List.of(new CreateGoalObjectiveCommand((short) 2, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalTransition(command))
+                .isInstanceOf(InvalidLifecycleTransitionException.class)
+                .hasMessageContaining("Cannot transition a goal that is not ACTIVE");
+    }
+
+    @Test
+    @DisplayName("Create goal transition: throws FitnessGoalAccessDeniedException if student is not owner")
+    void createGoalTransition_notOwner_throwsAccessDenied() {
+        UUID previousGoalId = UUID.randomUUID();
+        UUID otherStudentId = UUID.randomUUID();
+        FitnessGoal previousGoal = new FitnessGoal(
+                previousGoalId, otherStudentId, "Other Student Goal", GoalStatus.ACTIVE, otherStudentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(previousGoalId)).thenReturn(Optional.of(previousGoal));
+
+        CreateGoalTransitionCommand command = new CreateGoalTransitionCommand(
+                studentId, previousGoalId, "Switching", null, "New Journey",
+                startDate, targetDate, 91,
+                List.of(new CreateGoalObjectiveCommand((short) 2, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalTransition(command))
+                .isInstanceOf(FitnessGoalAccessDeniedException.class)
+                .hasMessageContaining("Student does not own this fitness goal");
+    }
+
+    @Test
+    @DisplayName("Get goal transitions: returns transitions list for owner")
+    void getGoalTransitions_success_returnsList() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        GoalTransition transition = new GoalTransition(
+                UUID.randomUUID(), goalId, UUID.randomUUID(), "Reason", null, studentId, Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.findTransitionsByGoalId(goalId)).thenReturn(List.of(transition));
+
+        List<GoalTransition> actual = fitnessGoalService.getGoalTransitions(new GetGoalTransitionsQuery(studentId, goalId));
+
+        assertThat(actual).hasSize(1);
+        assertThat(actual.get(0).id()).isEqualTo(transition.id());
+    }
+
+    @Test
+    @DisplayName("Get goal transition detail: returns transition detail for owner")
+    void getGoalTransitionDetail_success_returnsDetail() {
+        UUID goalId = UUID.randomUUID();
+        UUID transitionId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        GoalTransition transition = new GoalTransition(
+                transitionId, goalId, UUID.randomUUID(), "Reason", null, studentId, Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.findTransitionById(transitionId)).thenReturn(Optional.of(transition));
+
+        GoalTransition actual = fitnessGoalService.getGoalTransitionDetail(new GetGoalTransitionDetailQuery(studentId, goalId, transitionId));
+
+        assertThat(actual).isNotNull();
+        assertThat(actual.id()).isEqualTo(transitionId);
+    }
+
+    @Test
+    @DisplayName("Get goal transition detail: throws GoalTransitionNotFoundException if transition does not exist")
+    void getGoalTransitionDetail_notFound_throwsNotFound() {
+        UUID goalId = UUID.randomUUID();
+        UUID transitionId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.findTransitionById(transitionId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fitnessGoalService.getGoalTransitionDetail(new GetGoalTransitionDetailQuery(studentId, goalId, transitionId)))
+                .isInstanceOf(GoalTransitionNotFoundException.class)
+                .hasMessageContaining("Goal transition not found");
+    }
+
+    private static <T> T argThat(org.mockito.ArgumentMatcher<T> matcher) {
+        return org.mockito.Mockito.argThat(matcher);
     }
 }
