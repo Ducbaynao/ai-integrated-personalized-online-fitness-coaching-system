@@ -134,12 +134,12 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
         // 2. Insert fitness_goal_versions as unlocked
         String insertVersionSql = """
                 INSERT INTO fitness.fitness_goal_versions (
-                    id, fitness_goal_id, version_number, start_date, target_date,
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
                     duration_days, effective_from, effective_until, resume_date,
                     change_reason, change_summary, created_by, source_proposal_id,
                     created_at, locked_at, locked_by, lock_reason
                 ) VALUES (
-                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
                     ?, now(), NULL, NULL,
                     ?, ?, ?, ?,
                     now(), NULL, NULL, NULL
@@ -150,6 +150,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 versionId,
                 goalId,
                 version.versionNumber() > 0 ? version.versionNumber() : 1,
+                version.title() != null ? version.title() : goal.title(),
                 Date.valueOf(version.startDate()),
                 version.targetDate() != null ? Date.valueOf(version.targetDate()) : null,
                 version.durationDays(),
@@ -410,7 +411,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
 
     private Optional<FitnessGoalVersion> loadCurrentVersion(UUID goalId) {
         String versionSql = """
-                SELECT id, fitness_goal_id, version_number, start_date, target_date,
+                SELECT id, fitness_goal_id, version_number, title, start_date, target_date,
                        duration_days, effective_from, effective_until, resume_date,
                        change_reason, change_summary, created_by, source_proposal_id,
                        created_at, locked_at, locked_by, lock_reason
@@ -423,6 +424,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
             UUID vId = (UUID) rs.getObject("id");
             UUID fgId = (UUID) rs.getObject("fitness_goal_id");
             int versionNumber = rs.getInt("version_number");
+            String title = rs.getString("title");
 
             Date stDate = rs.getDate("start_date");
             LocalDate startDate = stDate != null ? stDate.toLocalDate() : null;
@@ -461,6 +463,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                     vId,
                     fgId,
                     versionNumber,
+                    title,
                     startDate,
                     targetDate,
                     durationDays,
@@ -492,6 +495,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 v.id(),
                 v.fitnessGoalId(),
                 v.versionNumber(),
+                v.title(),
                 v.startDate(),
                 v.targetDate(),
                 v.durationDays(),
