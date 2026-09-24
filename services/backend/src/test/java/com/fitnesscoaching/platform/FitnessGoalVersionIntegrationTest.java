@@ -697,7 +697,6 @@ class FitnessGoalVersionIntegrationTest {
         AtomicInteger otherCount = new AtomicInteger(0);
 
         for (int i = 0; i < threadCount; i++) {
-            final int index = i;
             executor.submit(() -> {
                 readyLatch.countDown();
                 try {
@@ -707,16 +706,16 @@ class FitnessGoalVersionIntegrationTest {
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content("""
                                             {
-                                              "title": "Concurrent Revision %d",
+                                              "title": "Concurrent Revision",
                                               "startDate": "2026-10-01",
                                               "targetDate": "2027-01-31",
                                               "durationDays": 122,
-                                              "changeReason": "Concurrent attempt %d",
+                                              "changeReason": "Concurrent attempt",
                                               "objectives": [
                                                 { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
                                               ]
                                             }
-                                            """.formatted(index, index)))
+                                            """))
                             .andReturn();
 
                     int statusCode = res.getResponse().getStatus();
@@ -739,6 +738,7 @@ class FitnessGoalVersionIntegrationTest {
         startLatch.countDown();
         doneLatch.await(10, TimeUnit.SECONDS);
         executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
 
         assertThat(successCount.get()).isEqualTo(1);
         assertThat(conflictCount.get()).isEqualTo(1);
