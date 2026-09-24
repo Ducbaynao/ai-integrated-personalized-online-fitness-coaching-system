@@ -4,12 +4,20 @@ import com.fitnesscoaching.platform.common.exception.ActiveFitnessGoalAlreadyExi
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalNotFoundException;
+import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
+import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
+import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
+import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalObjectiveCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTargetCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalCatalogPort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalStudentAuthorityPort;
@@ -82,13 +90,21 @@ class FitnessGoalServiceUnitTest {
     }
 
     private void mockValidCatalogs() {
+        lenient().when(goalCatalogPort.findGoalTypeById((short) 1))
+                .thenReturn(Optional.of(new GoalCatalogPort.GoalTypeCatalogView((short) 1, "MUSCLE_GAIN", "Muscle Gain", true)));
+        lenient().when(goalCatalogPort.findGoalTypeById((short) 2))
+                .thenReturn(Optional.of(new GoalCatalogPort.GoalTypeCatalogView((short) 2, "FAT_LOSS", "Fat Loss", true)));
         lenient().when(goalCatalogPort.findGoalTypeByCode("MUSCLE_GAIN"))
                 .thenReturn(Optional.of(new GoalCatalogPort.GoalTypeCatalogView((short) 1, "MUSCLE_GAIN", "Muscle Gain", true)));
         lenient().when(goalCatalogPort.findGoalTypeByCode("FAT_LOSS"))
                 .thenReturn(Optional.of(new GoalCatalogPort.GoalTypeCatalogView((short) 2, "FAT_LOSS", "Fat Loss", true)));
 
+        lenient().when(goalCatalogPort.findMetricDefinitionById(1))
+                .thenReturn(Optional.of(new GoalCatalogPort.MetricDefinitionCatalogView(1, "WEIGHT", "Weight", (short) 1, "MASS", true)));
         lenient().when(goalCatalogPort.findMetricDefinitionByCode("WEIGHT"))
                 .thenReturn(Optional.of(new GoalCatalogPort.MetricDefinitionCatalogView(1, "WEIGHT", "Weight", (short) 1, "MASS", true)));
+        lenient().when(goalCatalogPort.findMeasurementUnitById((short) 1))
+                .thenReturn(Optional.of(new GoalCatalogPort.MeasurementUnitCatalogView((short) 1, "KG", "kg", "MASS")));
         lenient().when(goalCatalogPort.findMeasurementUnitByCode("KG"))
                 .thenReturn(Optional.of(new GoalCatalogPort.MeasurementUnitCatalogView((short) 1, "KG", "kg", "MASS")));
     }
@@ -567,5 +583,373 @@ class FitnessGoalServiceUnitTest {
         assertThatThrownBy(() -> fitnessGoalService.activateFitnessGoal(new ActivateFitnessGoalCommand(studentId, goalId, null)))
                 .isInstanceOf(InvalidLifecycleTransitionException.class)
                 .hasMessageContaining("Cannot activate fitness goal in status: ACTIVE");
+    }
+
+    @Test
+    @DisplayName("Get goal versions: successfully lists versions with pagination metadata")
+    void getGoalVersions_success() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                UUID.randomUUID(), goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(), List.of()
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.countVersionsByGoalId(goalId)).thenReturn(1L);
+        when(fitnessGoalPersistencePort.findVersionsByGoalId(goalId, 20, 0)).thenReturn(List.of(v1));
+
+        GoalVersionPage response = fitnessGoalService.getGoalVersions(new GetGoalVersionsQuery(studentId, goalId, 0, 20));
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.totalElements()).isEqualTo(1L);
+        assertThat(response.totalPages()).isEqualTo(1);
+        assertThat(response.items().get(0).effectiveUntil()).isNull();
+        verify(goalStudentAuthorityPort).verifyStudentCanManageGoals(studentId);
+    }
+
+    @Test
+    @DisplayName("Get goal versions: throws FitnessGoalAccessDeniedException when student is not owner")
+    void getGoalVersions_nonOwner_throwsAccessDenied() {
+        UUID goalId = UUID.randomUUID();
+        UUID otherStudentId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, otherStudentId, "Goal Title", GoalStatus.ACTIVE, otherStudentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+
+        assertThatThrownBy(() -> fitnessGoalService.getGoalVersions(new GetGoalVersionsQuery(studentId, goalId, 0, 20)))
+                .isInstanceOf(FitnessGoalAccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("Get goal version detail: successfully returns version detail")
+    void getGoalVersionDetail_success() {
+        UUID goalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        FitnessGoalVersion v = new FitnessGoalVersion(
+                versionId, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(), List.of()
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.findVersionById(goalId, versionId)).thenReturn(Optional.of(v));
+
+        FitnessGoalVersion result = fitnessGoalService.getGoalVersionDetail(new GetGoalVersionDetailQuery(studentId, goalId, versionId));
+
+        assertThat(result.id()).isEqualTo(versionId);
+        assertThat(result.versionNumber()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Get goal version detail: throws GoalVersionNotFoundException when version not found")
+    void getGoalVersionDetail_notFound_throwsNotFound() {
+        UUID goalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Goal Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        when(fitnessGoalPersistencePort.findVersionById(goalId, versionId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fitnessGoalService.getGoalVersionDetail(new GetGoalVersionDetailQuery(studentId, goalId, versionId)))
+                .isInstanceOf(GoalVersionNotFoundException.class)
+                .hasMessageContaining("Goal version not found");
+    }
+
+    @Test
+    @DisplayName("Create goal version: successfully creates same-journey version on ACTIVE goal")
+    void createGoalVersion_success() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+
+        LocalDate newTargetDate = startDate.plusDays(120);
+        FitnessGoalVersion v2 = new FitnessGoalVersion(
+                UUID.randomUUID(), goalId, 2, "Revised Title", startDate, newTargetDate, 120,
+                Instant.now(clock), null, null, "Extending duration", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.APPROVED,
+                List.of(), List.of()
+        );
+
+        when(fitnessGoalPersistencePort.createNewGoalVersion(eq(goalId), eq(studentId), any(), eq(v1Id))).thenReturn(v2);
+
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Revised Title", startDate, newTargetDate, 120,
+                "Extending duration", "Changed from 90 to 120 days",
+                List.of(new CreateGoalObjectiveCommand((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        FitnessGoalVersion created = fitnessGoalService.createGoalVersion(command);
+
+        assertThat(created.versionNumber()).isEqualTo(2);
+        assertThat(created.durationDays()).isEqualTo(120);
+        verify(fitnessGoalPersistencePort).createNewGoalVersion(eq(goalId), eq(studentId), any(), eq(v1Id));
+        verify(auditService).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Create goal version: throws InvalidLifecycleTransitionException when goal is not ACTIVE")
+    void createGoalVersion_nonActive_throwsInvalidTransition() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal draftGoal = new FitnessGoal(
+                goalId, studentId, "Draft Title", GoalStatus.DRAFT, studentId,
+                null, null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(draftGoal));
+
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Title", startDate, targetDate, 91,
+                "Reason", null, List.of(), List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(InvalidLifecycleTransitionException.class)
+                .hasMessageContaining("Goal versions can only be created for an ACTIVE fitness goal");
+    }
+
+    @Test
+    @DisplayName("Create goal version: propagates GoalVersionConflictException on CAS race")
+    void createGoalVersion_casConflict_propagatesConflictException() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+        when(fitnessGoalPersistencePort.createNewGoalVersion(any(), any(), any(), any()))
+                .thenThrow(new GoalVersionConflictException("Current goal version has changed; unable to create version"));
+
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Title", startDate, targetDate, 91,
+                "Reason", null,
+                List.of(new CreateGoalObjectiveCommand((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(GoalVersionConflictException.class);
+    }
+
+    @Test
+    @DisplayName("Create goal version: throws NewGoalJourneyRequiredException when changing PRIMARY goal type")
+    void createGoalVersion_changePrimaryGoalType_throwsNewGoalJourneyRequired() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+
+        // Attempting to change PRIMARY to FAT_LOSS (short id 2)
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Shift to fat loss", startDate, targetDate.plusDays(30), 121,
+                "Changing strategy", null,
+                List.of(new CreateGoalObjectiveCommand((short) 2, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(NewGoalJourneyRequiredException.class)
+                .hasMessageContaining("Primary goal type cannot be changed within the same journey");
+    }
+
+    @Test
+    @DisplayName("Create goal version: succeeds when keeping same PRIMARY goal type and altering secondary objectives")
+    void createGoalVersion_samePrimaryWithSecondaryChanges_succeeds() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+
+        FitnessGoalVersion v2 = new FitnessGoalVersion(
+                UUID.randomUUID(), goalId, 2, "V2 with secondary", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "Added secondary objective", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.APPROVED,
+                List.of(), List.of()
+        );
+        when(fitnessGoalPersistencePort.createNewGoalVersion(eq(goalId), eq(studentId), any(), eq(v1Id))).thenReturn(v2);
+
+        // Keep MUSCLE_GAIN (id 1) as PRIMARY, add FAT_LOSS (id 2) as SECONDARY
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "V2 with secondary", startDate, targetDate, 91,
+                "Added secondary objective", null,
+                List.of(
+                        new CreateGoalObjectiveCommand((short) 1, null, ObjectivePriority.PRIMARY, 0, null),
+                        new CreateGoalObjectiveCommand((short) 2, null, ObjectivePriority.SECONDARY, 1, "Keep fat low")
+                ),
+                List.of()
+        );
+
+        FitnessGoalVersion created = fitnessGoalService.createGoalVersion(command);
+        assertThat(created.versionNumber()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Create goal version: throws GoalVersionNoChangesException when no differences detected")
+    void createGoalVersion_noChangesDetected_throwsNoChangesException() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "Active Title", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+
+        // Exact same title, timeline, objectives, targets
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Active Title", startDate, targetDate, 91,
+                "Just checking", null,
+                List.of(new CreateGoalObjectiveCommand((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(GoalVersionNoChangesException.class)
+                .hasMessageContaining("no changes from the current active version");
+    }
+
+    @Test
+    @DisplayName("Create goal version: throws ApplicationValidationException when changeReason exceeds 100 characters")
+    void createGoalVersion_reasonExceeds100Chars_throwsValidationException() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock),
+                new FitnessGoalVersion(UUID.randomUUID(), goalId, 1, "V1", startDate, targetDate, 91,
+                        Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                        Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED, List.of(), List.of())
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+
+        String longReason = "R".repeat(101);
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Title", startDate, targetDate, 91,
+                longReason, null, List.of(), List.of()
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Change reason must not exceed 100 characters");
+    }
+
+    @Test
+    @DisplayName("Create goal version: throws ApplicationValidationException on invalid target values")
+    void createGoalVersion_invalidTargetValues_throwsValidationException() {
+        UUID goalId = UUID.randomUUID();
+        UUID v1Id = UUID.randomUUID();
+        GoalObjective currentPrimary = new GoalObjective(
+                UUID.randomUUID(), v1Id, (short) 1, "MUSCLE_GAIN", "Muscle Gain",
+                ObjectivePriority.PRIMARY, 0, null
+        );
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                v1Id, goalId, 1, "V1", startDate, targetDate, 91,
+                Instant.now(clock), null, null, "INITIAL", null, studentId, null,
+                Instant.now(clock), Instant.now(clock), studentId, VersionLockReason.ACTIVATED,
+                List.of(currentPrimary), List.of()
+        );
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Active Title", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), v1
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(goal));
+        mockValidCatalogs();
+
+        // Target min > target max
+        CreateGoalVersionCommand command = new CreateGoalVersionCommand(
+                studentId, goalId, "Revised", startDate, targetDate.plusDays(30), 121,
+                "Target adjustment", null,
+                List.of(new CreateGoalObjectiveCommand((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetCommand(
+                        1, null, null,
+                        BigDecimal.valueOf(70), BigDecimal.valueOf(80),
+                        BigDecimal.valueOf(85), BigDecimal.valueOf(75), // min > max
+                        (short) 1, null, 10, null, null
+                ))
+        );
+
+        assertThatThrownBy(() -> fitnessGoalService.createGoalVersion(command))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Target max value cannot be less than min value");
     }
 }

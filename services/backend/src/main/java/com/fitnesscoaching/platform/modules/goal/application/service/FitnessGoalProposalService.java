@@ -305,10 +305,36 @@ public class FitnessGoalProposalService implements
         }
 
         if (command.decision() == ProposalDecision.ACCEPT) {
-            // Re-validate proposal snapshot (timeline, active catalog types/metrics, targets, units) before acceptance
-            validationHelper.validateProposalForAcceptance(proposal);
+            FitnessGoalVersion baseVersion = proposal.baseVersion();
+            if (baseVersion == null && proposal.baseGoalVersionId() != null) {
+                baseVersion = goalPort.findVersionById(proposal.fitnessGoalId(), proposal.baseGoalVersionId()).orElse(null);
+            }
+            if (baseVersion == null) {
+                throw new StaleGoalProposalException("Base goal version not found or no longer available: " + proposal.baseGoalVersionId());
+            }
+            if (baseVersion.effectiveUntil() != null) {
+                throw new StaleGoalProposalException("Base goal version is no longer active; cannot accept stale proposal");
+            }
 
-            FitnessGoalVersion newVersion = proposalPort.acceptProposal(proposal, command.studentId(), note);
+            GoalProposal proposalToValidate = new GoalProposal(
+                    proposal.id(), proposal.studentId(), proposal.fitnessGoalId(), proposal.baseGoalVersionId(),
+                    proposal.source(), proposal.createdBy(), proposal.proposedTitle(),
+                    proposal.proposedStartDate(), proposal.proposedTargetDate(), proposal.proposedDurationDays(),
+                    proposal.reason(), proposal.status(), proposal.decidedBy(), proposal.decidedAt(),
+                    proposal.decisionNote(), proposal.expiresAt(), proposal.createdAt(), proposal.updatedAt(),
+                    proposal.objectives(), proposal.targets(), baseVersion
+            );
+
+            // Re-validate proposal snapshot (timeline, active catalog types/metrics, targets, units, same-journey identity) before acceptance
+            validationHelper.validateProposalForAcceptance(proposalToValidate);
+
+            // Canonical snapshot change detection (prevent accepting no-op proposal)
+            boolean hasChanges = validationHelper.hasProposalVersionChanges(baseVersion, proposalToValidate);
+            if (!hasChanges) {
+                throw new GoalVersionNoChangesException("Proposed goal version contains no changes from the current active version");
+            }
+
+            FitnessGoalVersion newVersion = proposalPort.acceptProposal(proposalToValidate, command.studentId(), note);
 
             auditService.recordAudit(AuditRecord.builder()
                     .actorUserId(command.studentId())

@@ -26,9 +26,55 @@ public record GoalVersionResponse(
         Instant lockedAt,
         UUID lockedBy,
         VersionLockReason lockReason,
+        boolean isCurrent,
         List<GoalObjectiveResponse> objectives,
         List<GoalTargetResponse> targets
 ) {
+    public GoalVersionResponse(
+            UUID id,
+            int versionNumber,
+            String title,
+            LocalDate startDate,
+            LocalDate targetDate,
+            Integer durationDays,
+            Instant effectiveFrom,
+            Instant effectiveUntil,
+            LocalDate resumeDate,
+            String changeReason,
+            String changeSummary,
+            UUID createdBy,
+            UUID sourceProposalId,
+            Instant createdAt,
+            Instant lockedAt,
+            UUID lockedBy,
+            VersionLockReason lockReason,
+            List<GoalObjectiveResponse> objectives,
+            List<GoalTargetResponse> targets
+    ) {
+        this(
+                id,
+                versionNumber,
+                title,
+                startDate,
+                targetDate,
+                durationDays,
+                effectiveFrom,
+                effectiveUntil,
+                resumeDate,
+                changeReason,
+                changeSummary,
+                createdBy,
+                sourceProposalId,
+                createdAt,
+                lockedAt,
+                lockedBy,
+                lockReason,
+                effectiveUntil == null,
+                objectives,
+                targets
+        );
+    }
+
     public GoalVersionResponse(
             UUID id,
             int versionNumber,
@@ -67,6 +113,7 @@ public record GoalVersionResponse(
                 lockedAt,
                 lockedBy,
                 lockReason,
+                effectiveUntil == null,
                 objectives,
                 targets
         );
@@ -94,6 +141,7 @@ public record GoalVersionResponse(
                 version.lockedAt(),
                 version.lockedBy(),
                 version.lockReason(),
+                version.effectiveUntil() == null,
                 version.objectives() != null ? version.objectives().stream().map(GoalObjectiveResponse::fromDomain).toList() : List.of(),
                 version.targets() != null ? version.targets().stream().map(GoalTargetResponse::fromDomain).toList() : List.of()
         );

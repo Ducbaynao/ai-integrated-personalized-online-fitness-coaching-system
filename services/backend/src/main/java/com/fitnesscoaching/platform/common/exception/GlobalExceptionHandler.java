@@ -324,6 +324,50 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(GoalVersionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleGoalVersionNotFound(GoalVersionNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "GOAL_VERSION_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalVersionConflictException.class)
+    public ResponseEntity<ErrorResponse> handleGoalVersionConflict(GoalVersionConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_VERSION_CONFLICT",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(NewGoalJourneyRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleNewGoalJourneyRequired(NewGoalJourneyRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "NEW_GOAL_JOURNEY_REQUIRED",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
+    @ExceptionHandler(GoalVersionNoChangesException.class)
+    public ResponseEntity<ErrorResponse> handleGoalVersionNoChanges(GoalVersionNoChangesException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_VERSION_NO_CHANGES",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(GoalProposalNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleGoalProposalNotFound(GoalProposalNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
@@ -487,6 +531,17 @@ public class GlobalExceptionHandler {
             ErrorResponse response = ErrorResponse.of(
                     "ACTIVE_FITNESS_GOAL_ALREADY_EXISTS",
                     "An active fitness goal already exists for this student.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        if (matchesConstraint(constraintName, msg, "uq_goal_current_version")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "GOAL_VERSION_CONFLICT",
+                    "A current goal version already exists or was modified concurrently.",
                     Instant.now(clock),
                     RequestIdHolder.get(),
                     Collections.emptyList()

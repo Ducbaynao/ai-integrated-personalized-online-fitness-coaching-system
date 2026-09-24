@@ -1005,4 +1005,106 @@ class FitnessGoalIntegrationTest {
                 "SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
         assertThat(totalHistoryCount).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Validation check: numeric target values zero or negative rejected with 400 VALIDATION_FAILED")
+    void createGoal_targetValidations_rejectsZeroAndNegativeValues() throws Exception {
+        UUID studentId = createActiveStudentUser("student.tgtneg@example.com");
+        String token = createAccessToken(studentId, "student.tgtneg@example.com", List.of("STUDENT"));
+
+        // startValue <= 0
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Zero Start Value Goal",
+                                  "startDate": "2026-10-01",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ],
+                                  "targets": [
+                                    {
+                                      "metricCode": "WEIGHT",
+                                      "startValue": 0.0,
+                                      "targetValue": 75.0,
+                                      "unitCode": "KG"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // targetValue <= 0
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Negative Target Value Goal",
+                                  "startDate": "2026-10-01",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ],
+                                  "targets": [
+                                    {
+                                      "metricCode": "WEIGHT",
+                                      "targetValue": -5.0,
+                                      "unitCode": "KG"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // targetMinValue <= 0
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Zero Target Min Value Goal",
+                                  "startDate": "2026-10-01",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ],
+                                  "targets": [
+                                    {
+                                      "metricCode": "WEIGHT",
+                                      "targetMinValue": 0.0,
+                                      "targetMaxValue": 75.0,
+                                      "unitCode": "KG"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // targetMaxValue <= 0
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Negative Target Max Value Goal",
+                                  "startDate": "2026-10-01",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ],
+                                  "targets": [
+                                    {
+                                      "metricCode": "WEIGHT",
+                                      "targetMinValue": -10.0,
+                                      "targetMaxValue": -2.0,
+                                      "unitCode": "KG"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
 }

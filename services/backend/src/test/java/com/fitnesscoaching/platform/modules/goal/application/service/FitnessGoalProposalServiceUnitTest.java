@@ -474,6 +474,7 @@ class FitnessGoalProposalServiceUnitTest {
         doNothing().when(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
         when(proposalPort.findById(proposalId)).thenReturn(Optional.of(pending), Optional.of(accepted));
         doNothing().when(validationHelper).validateProposalForAcceptance(pending);
+        when(validationHelper.hasProposalVersionChanges(eq(currentVersion), any())).thenReturn(true);
         when(proposalPort.acceptProposal(pending, studentId, "Looks good")).thenReturn(newVersion);
 
         DecideGoalProposalCommand cmd = new DecideGoalProposalCommand(proposalId, studentId, ProposalDecision.ACCEPT, "Looks good");
@@ -482,6 +483,7 @@ class FitnessGoalProposalServiceUnitTest {
         assertThat(result.status()).isEqualTo(ProposalStatus.ACCEPTED);
         verify(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
         verify(validationHelper).validateProposalForAcceptance(pending);
+        verify(validationHelper).hasProposalVersionChanges(eq(currentVersion), any());
         verify(proposalPort).acceptProposal(pending, studentId, "Looks good");
 
         ArgumentCaptor<AuditRecord> auditCaptor = ArgumentCaptor.forClass(AuditRecord.class);
@@ -490,6 +492,30 @@ class FitnessGoalProposalServiceUnitTest {
         List<AuditRecord> records = auditCaptor.getAllValues();
         assertThat(records).extracting(AuditRecord::action)
                 .containsExactly("GOAL_PROPOSAL_ACCEPTED", "FITNESS_GOAL_VERSION_CREATED");
+    }
+
+    @Test
+    @DisplayName("decideProposal: ACCEPT with identical snapshot throws GoalVersionNoChangesException (409)")
+    void decideProposal_accept_noChanges_throwsGoalVersionNoChanges() {
+        UUID proposalId = UUID.randomUUID();
+        GoalProposal pending = new GoalProposal(
+                proposalId, studentId, goalId, versionId, ProposalSource.TRAINER,
+                trainerId, "Identical Title", LocalDate.now(), LocalDate.now().plusDays(30), 30,
+                "Reason", ProposalStatus.PENDING, null, null, null, null, Instant.now(), Instant.now(),
+                List.of(), List.of(), currentVersion
+        );
+
+        doNothing().when(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        when(proposalPort.findById(proposalId)).thenReturn(Optional.of(pending));
+        doNothing().when(validationHelper).validateProposalForAcceptance(any());
+        when(validationHelper.hasProposalVersionChanges(eq(currentVersion), any())).thenReturn(false);
+
+        DecideGoalProposalCommand cmd = new DecideGoalProposalCommand(proposalId, studentId, ProposalDecision.ACCEPT, "Looks good");
+        assertThatThrownBy(() -> service.decideProposal(cmd))
+                .isInstanceOf(GoalVersionNoChangesException.class);
+
+        verify(proposalPort, never()).acceptProposal(any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
     }
 
     @Test

@@ -12,9 +12,13 @@ public record CreateGoalTargetRequest(
         Integer metricDefinitionId,
         String metricCode,
         UUID exerciseVariationId,
+        @Positive(message = "Start value must be positive")
         BigDecimal startValue,
+        @Positive(message = "Target value must be positive")
         BigDecimal targetValue,
+        @Positive(message = "Target min value must be positive")
         BigDecimal targetMinValue,
+        @Positive(message = "Target max value must be positive")
         BigDecimal targetMaxValue,
         Short unitId,
         String unitCode,
