@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.goal.adapter.out.persistence;
 
+import com.fitnesscoaching.platform.common.exception.GoalLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalTransitionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
@@ -1057,5 +1058,94 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 ORDER BY transitioned_at DESC, id DESC
                 """;
         return jdbcTemplate.query(sql, TRANSITION_ROW_MAPPER, goalId, goalId);
+    }
+
+    @Override
+    @Transactional
+    public FitnessGoal pauseGoal(UUID goalId, UUID studentId, String reason, Instant pausedAt) {
+        String pauseGoalSql = """
+                UPDATE fitness.fitness_goals
+                SET status = 'PAUSED'::fitness.lifecycle_status,
+                    paused_at = ?,
+                    status_reason = ?,
+                    updated_at = ?
+                WHERE id = ?
+                  AND student_id = ?
+                  AND status = 'ACTIVE'::fitness.lifecycle_status
+                  AND deleted_at IS NULL
+                """;
+        int goalUpdated = jdbcTemplate.update(
+                pauseGoalSql,
+                Timestamp.from(pausedAt),
+                reason,
+                Timestamp.from(pausedAt),
+                goalId,
+                studentId
+        );
+        if (goalUpdated == 0) {
+            throw new GoalLifecycleConflictException(
+                    "Cannot pause fitness goal: goal status is no longer ACTIVE or was concurrently modified.");
+        }
+
+        String insertHistorySql = """
+                INSERT INTO fitness.fitness_goal_status_history (
+                    id, fitness_goal_id, from_status, to_status, changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, 'ACTIVE'::fitness.lifecycle_status, 'PAUSED'::fitness.lifecycle_status, ?, ?, ?
+                )
+                """;
+        jdbcTemplate.update(
+                insertHistorySql,
+                goalId,
+                studentId,
+                reason,
+                Timestamp.from(pausedAt)
+        );
+
+        return findById(goalId).orElseThrow(() -> new IllegalStateException("Failed to load paused fitness goal: " + goalId));
+    }
+
+    @Override
+    @Transactional
+    public FitnessGoal resumeGoal(UUID goalId, UUID studentId, String reason, Instant resumedAt) {
+        String resumeGoalSql = """
+                UPDATE fitness.fitness_goals
+                SET status = 'ACTIVE'::fitness.lifecycle_status,
+                    paused_at = NULL,
+                    status_reason = ?,
+                    updated_at = ?
+                WHERE id = ?
+                  AND student_id = ?
+                  AND status = 'PAUSED'::fitness.lifecycle_status
+                  AND deleted_at IS NULL
+                """;
+        int goalUpdated = jdbcTemplate.update(
+                resumeGoalSql,
+                reason,
+                Timestamp.from(resumedAt),
+                goalId,
+                studentId
+        );
+        if (goalUpdated == 0) {
+            throw new GoalLifecycleConflictException(
+                    "Cannot resume fitness goal: goal status is no longer PAUSED or was concurrently modified.");
+        }
+
+        String insertHistorySql = """
+                INSERT INTO fitness.fitness_goal_status_history (
+                    id, fitness_goal_id, from_status, to_status, changed_by, reason, changed_at
+                ) VALUES (
+                    gen_random_uuid(), ?, 'PAUSED'::fitness.lifecycle_status, 'ACTIVE'::fitness.lifecycle_status, ?, ?, ?
+                )
+                """;
+        jdbcTemplate.update(
+                insertHistorySql,
+                goalId,
+                studentId,
+                reason,
+                Timestamp.from(resumedAt)
+        );
+
+        return findById(goalId).orElseThrow(() -> new IllegalStateException("Failed to load resumed fitness goal: " + goalId));
     }
 }

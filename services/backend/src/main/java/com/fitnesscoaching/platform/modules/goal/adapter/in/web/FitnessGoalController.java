@@ -7,6 +7,8 @@ import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.CreateGoalVe
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.FitnessGoalResponse;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionPageResponse;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalVersionResponse;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.PauseFitnessGoalRequest;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.ResumeFitnessGoalRequest;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ActivateFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateFitnessGoalCommand;
@@ -19,6 +21,10 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVers
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
@@ -63,6 +69,8 @@ public class FitnessGoalController {
     private final CreateGoalTransitionUseCase createGoalTransitionUseCase;
     private final GetGoalTransitionsUseCase getGoalTransitionsUseCase;
     private final GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase;
+    private final PauseFitnessGoalUseCase pauseFitnessGoalUseCase;
+    private final ResumeFitnessGoalUseCase resumeFitnessGoalUseCase;
 
     public FitnessGoalController(
             CreateFitnessGoalUseCase createFitnessGoalUseCase,
@@ -74,7 +82,9 @@ public class FitnessGoalController {
             CreateGoalVersionUseCase createGoalVersionUseCase,
             CreateGoalTransitionUseCase createGoalTransitionUseCase,
             GetGoalTransitionsUseCase getGoalTransitionsUseCase,
-            GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase
+            GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase,
+            PauseFitnessGoalUseCase pauseFitnessGoalUseCase,
+            ResumeFitnessGoalUseCase resumeFitnessGoalUseCase
     ) {
         this.createFitnessGoalUseCase = createFitnessGoalUseCase;
         this.getFitnessGoalDetailUseCase = getFitnessGoalDetailUseCase;
@@ -86,6 +96,8 @@ public class FitnessGoalController {
         this.createGoalTransitionUseCase = createGoalTransitionUseCase;
         this.getGoalTransitionsUseCase = getGoalTransitionsUseCase;
         this.getGoalTransitionDetailUseCase = getGoalTransitionDetailUseCase;
+        this.pauseFitnessGoalUseCase = pauseFitnessGoalUseCase;
+        this.resumeFitnessGoalUseCase = resumeFitnessGoalUseCase;
     }
 
     @PostMapping
@@ -133,6 +145,32 @@ public class FitnessGoalController {
         FitnessGoal activated = activateFitnessGoalUseCase.activateFitnessGoal(command);
 
         return ResponseEntity.ok(FitnessGoalResponse.fromDomain(activated));
+    }
+
+    @PostMapping("/{goalId}/pause")
+    public ResponseEntity<FitnessGoalResponse> pauseFitnessGoal(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID goalId,
+            @Valid @RequestBody PauseFitnessGoalRequest request
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        PauseFitnessGoalCommand command = request.toCommand(studentId, goalId);
+        FitnessGoal paused = pauseFitnessGoalUseCase.pauseFitnessGoal(command);
+
+        return ResponseEntity.ok(FitnessGoalResponse.fromDomain(paused));
+    }
+
+    @PostMapping("/{goalId}/resume")
+    public ResponseEntity<FitnessGoalResponse> resumeFitnessGoal(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID goalId,
+            @Valid @RequestBody ResumeFitnessGoalRequest request
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        ResumeFitnessGoalCommand command = request.toCommand(studentId, goalId);
+        FitnessGoal resumed = resumeFitnessGoalUseCase.resumeFitnessGoal(command);
+
+        return ResponseEntity.ok(FitnessGoalResponse.fromDomain(resumed));
     }
 
     @GetMapping("/{goalId}/versions")

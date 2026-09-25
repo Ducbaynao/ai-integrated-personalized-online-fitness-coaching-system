@@ -46,6 +46,31 @@ stateDiagram-v2
 - New journey: close/replace old Goal, create new Goal, and record Goal Transition.
 - Pause or inactivity does not delete elapsed calendar time or Workout/Measurement history.
 
+### Goal Pause and Resume (GOAL-05)
+- **Lifecycle Transition**: `ACTIVE -> PAUSED -> ACTIVE`.
+  - Pause is allowed only when status is `ACTIVE`.
+  - Resume is allowed only when status is `PAUSED`.
+- **Authority Policy**:
+  - Strictly restricted to the Student who owns the personal Fitness Goal.
+  - Non-owner Students: HTTP 403 (`ACCESS_DENIED`).
+  - Personal Trainers or Platform Administrators without Student capability: HTTP 403 (`STUDENT_CAPABILITY_UNAVAILABLE`).
+  - Student account suspended/unavailable: HTTP 403 (`ACCOUNT_UNAVAILABLE`).
+  - Missing student profile: HTTP 404 (`STUDENT_PROFILE_NOT_FOUND`).
+  - Unauthenticated requests: HTTP 401 (`UNAUTHORIZED`).
+  - AI service has no business authority.
+- **Timeline & Target-Date Policy**:
+  - Pausing does not erase elapsed calendar time. Calendar duration and active training duration are distinct concepts.
+  - Resume does NOT automatically shift or extend `target_date` or target dates of `GoalTarget`.
+  - `duration_days` remains unchanged.
+  - If a student wishes to adjust target dates or timeline after resuming, that represents a strategic same-journey change requiring a new Goal Version (GOAL-03).
+  - Locked goal versions (`locked_at IS NOT NULL`) are never directly mutated; `resume_date` is not written to locked versions.
+- **Data Integrity & Missing Data Policy**:
+  - Missing workouts, measurements, or nutrition logs during a pause period remain `UNKNOWN` / `NULL`, never materialized as zero.
+  - Status history (`fitness.fitness_goal_status_history`) preserves the complete immutable record of all pause intervals (`ACTIVE -> PAUSED` and `PAUSED -> ACTIVE` with actor, timestamp, and reason).
+  - Active duration can be calculated deterministically by excluding paused intervals recorded in status history (for the Milestone 5 Progress Engine).
+- **Client & Scope Boundary**:
+  - GOAL-05 implements backend domain, API, concurrency, persistence, and audit. Mobile UI integration is deferred to GOAL-06.
+
 ## Workout Plan and execution
 
 Workout Plan has ordered versions for significant change. Planned sessions generated from a version retain that source reference. Minor adjustments record a scoped change without rewriting the version that originally produced historical sessions.

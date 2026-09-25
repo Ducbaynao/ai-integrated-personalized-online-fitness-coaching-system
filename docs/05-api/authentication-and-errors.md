@@ -243,3 +243,63 @@ Milestone GOAL-02 implements the collaborative goal proposal and student confirm
 - `TRAINER_NOT_ELIGIBLE` (403): Trainer fails canonical coaching eligibility policy.
 - `COACHING_RELATIONSHIP_REQUIRED` (403): Trainer has no active coaching relationship or human coaching period with student.
 - `DATA_SHARING_PERMISSION_REQUIRED` (403): Student has not granted active FITNESS_GOAL data-sharing permission to trainer.
+
+## Goal Pause and Resume (GOAL-05)
+
+Milestone GOAL-05 implements the lifecycle transitions between `ACTIVE` and `PAUSED` for Student Fitness Goals.
+
+### Endpoints
+- `POST /api/v1/fitness-goals/{goalId}/pause`:
+  - Pauses an active student fitness goal.
+  - Requires request body with non-blank `reason` (max 1000 characters).
+  - Precondition: Goal must be in `ACTIVE` status.
+  - In a single transaction:
+    - Verifies student authority and goal ownership.
+    - Conditionally updates `status = 'PAUSED'`, sets `paused_at = now()` from injected Clock, updates `status_reason`, and bumps `updated_at`.
+    - Appends to `fitness.fitness_goal_status_history`: `from_status = ACTIVE`, `to_status = PAUSED`, `changed_by = studentId`, `reason`, `changed_at`.
+    - Records immutable audit record `FITNESS_GOAL_PAUSED` with reason and status transition.
+  - Returns `200 OK` with `FitnessGoalResponse`.
+
+- `POST /api/v1/fitness-goals/{goalId}/resume`:
+  - Resumes a paused student fitness goal.
+  - Requires request body with non-blank `reason` (max 1000 characters).
+  - Preconditions:
+    - Goal must be in `PAUSED` status.
+    - Student must not have another concurrently active fitness goal.
+  - In a single transaction:
+    - Verifies student authority and goal ownership.
+    - Conditionally updates `status = 'ACTIVE'`, clears `paused_at = NULL`, updates `status_reason`, and bumps `updated_at`.
+    - Appends to `fitness.fitness_goal_status_history`: `from_status = PAUSED`, `to_status = ACTIVE`, `changed_by = studentId`, `reason`, `changed_at`.
+    - Records immutable audit record `FITNESS_GOAL_RESUMED` with reason, status transition, and `pausedDurationSeconds` (if `paused_at` was present).
+  - Returns `200 OK` with `FitnessGoalResponse`.
+
+### Authority & Lifecycle Invariants
+- **Authority**:
+  - Only the owning Student may directly invoke pause and resume.
+  - Non-owner Student: `403 ACCESS_DENIED`.
+  - Trainer or Administrator without Student capability: `403 STUDENT_CAPABILITY_UNAVAILABLE`.
+  - Student account suspended or unavailable: `403 ACCOUNT_UNAVAILABLE`.
+  - Student profile not found: `404 STUDENT_PROFILE_NOT_FOUND`.
+  - Unauthenticated request: `401 UNAUTHORIZED`.
+  - AI service has no business authority.
+- **Concurrency & Stale Requests**:
+  - CAS conditional update checks expected status (`ACTIVE` for pause, `PAUSED` for resume).
+  - Losing a race or encountering a stale request throws `GoalLifecycleConflictException`, returning `409 GOAL_LIFECYCLE_CONFLICT`.
+- **Target Date & History Invariants**:
+  - Resume does not alter `target_date` or `duration_days`.
+  - Goal versions are NOT created or unlocked by pause/resume.
+  - Missing workout/nutrition/measurement data during a pause period remains `UNKNOWN` / `NULL`, never zero.
+  - Status history is immutable (append-only) and preserves all pause intervals for downstream active-duration calculations.
+- **Transaction Rollback**:
+  - Status update, status history insertion, and audit logging commit or rollback together atomically.
+
+### Error Codes
+- `FITNESS_GOAL_NOT_FOUND` (404): Goal ID does not exist.
+- `STUDENT_PROFILE_NOT_FOUND` (404): Authenticated user does not have a student profile.
+- `ACCESS_DENIED` (403): Authenticated student does not own the fitness goal.
+- `STUDENT_CAPABILITY_UNAVAILABLE` (403): User lacks active STUDENT capability (e.g., Trainer or Administrator).
+- `ACCOUNT_UNAVAILABLE` (403): User account is suspended or unavailable.
+- `UNAUTHORIZED` (401): Missing or invalid authentication token.
+- `GOAL_LIFECYCLE_CONFLICT` (409): Goal is not in expected status (not ACTIVE for pause, not PAUSED for resume) or concurrent modification occurred.
+- `ACTIVE_FITNESS_GOAL_ALREADY_EXISTS` (409): Student already has another active fitness goal upon resume.
+- `VALIDATION_FAILED` (400): Missing or invalid request fields (blank reason or reason exceeding 1000 characters).

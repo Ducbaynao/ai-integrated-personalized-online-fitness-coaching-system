@@ -633,6 +633,88 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  /fitness-goals/{goalId}/pause:
+    post:
+      tags: [Fitness Goal]
+      operationId: pauseFitnessGoal
+      summary: Pause an active fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseFitnessGoalRequest'
+      responses:
+        '200':
+          description: Fitness goal paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Only owning student may pause personal fitness goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Not Found - Fitness goal or student profile not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Conflict - Goal is not in ACTIVE status or concurrent modification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /fitness-goals/{goalId}/resume:
+    post:
+      tags: [Fitness Goal]
+      operationId: resumeFitnessGoal
+      summary: Resume a paused fitness goal
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumeFitnessGoalRequest'
+      responses:
+        '200':
+          description: Fitness goal resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Forbidden - Only owning student may resume personal fitness goal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Not Found - Fitness goal or student profile not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Conflict - Goal is not in PAUSED status, active goal already exists, or concurrent modification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /fitness-goals/{goalId}/versions:
     get:
       tags: [Fitness Goal]
@@ -1545,6 +1627,28 @@ components:
         reason:
           type: string
           maxLength: 1000
+
+    PauseFitnessGoalRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Reason for pausing the fitness goal
+          example: Temporary injury recovery
+
+    ResumeFitnessGoalRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Reason for resuming the fitness goal
+          example: Cleared to resume full training
 
     GoalObjectiveResponse:
       type: object
