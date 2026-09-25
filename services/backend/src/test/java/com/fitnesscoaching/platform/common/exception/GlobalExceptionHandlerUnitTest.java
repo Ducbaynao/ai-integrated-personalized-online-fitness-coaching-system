@@ -100,4 +100,17 @@ class GlobalExceptionHandlerUnitTest {
         assertThat(response.getBody().errorCode()).isNotEqualTo("TRAINER_PROFILE_ALREADY_EXISTS");
         assertThat(response.getBody().errorCode()).isEqualTo("DATA_INTEGRITY_VIOLATION");
     }
+
+    @Test
+    @DisplayName("GoalLifecycleConflictException maps to 409 GOAL_LIFECYCLE_CONFLICT")
+    void handleGoalLifecycleConflictException_mapsTo409GoalLifecycleConflict() {
+        GoalLifecycleConflictException ex = new GoalLifecycleConflictException("Goal is not in active state");
+
+        ResponseEntity<ErrorResponse> response = handler.handleGoalLifecycleConflict(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().errorCode()).isEqualTo("GOAL_LIFECYCLE_CONFLICT");
+        assertThat(response.getBody().message()).isEqualTo("Goal is not in active state");
+    }
 }

@@ -346,6 +346,17 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(GoalLifecycleConflictException.class)
+    public ResponseEntity<ErrorResponse> handleGoalLifecycleConflict(GoalLifecycleConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "GOAL_LIFECYCLE_CONFLICT",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(NewGoalJourneyRequiredException.class)
     public ResponseEntity<ErrorResponse> handleNewGoalJourneyRequired(NewGoalJourneyRequiredException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(

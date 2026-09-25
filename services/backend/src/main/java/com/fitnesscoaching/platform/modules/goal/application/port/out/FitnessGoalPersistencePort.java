@@ -51,4 +51,8 @@ public interface FitnessGoalPersistencePort {
     Optional<GoalTransition> findTransitionById(UUID transitionId);
 
     List<GoalTransition> findTransitionsByGoalId(UUID goalId);
+
+    FitnessGoal pauseGoal(UUID goalId, UUID studentId, String reason, java.time.Instant pausedAt);
+
+    FitnessGoal resumeGoal(UUID goalId, UUID studentId, String reason, java.time.Instant resumedAt);
 }

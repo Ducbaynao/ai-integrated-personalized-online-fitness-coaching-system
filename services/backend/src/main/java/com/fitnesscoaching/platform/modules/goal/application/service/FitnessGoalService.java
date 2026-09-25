@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.common.exception.ApplicationValidationExcept
 import com.fitnesscoaching.platform.common.exception.FieldErrorDto;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalNotFoundException;
+import com.fitnesscoaching.platform.common.exception.GoalLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
@@ -34,6 +35,10 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVers
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalCatalogPort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalStudentAuthorityPort;
@@ -50,6 +55,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -68,7 +74,9 @@ public class FitnessGoalService implements
         CreateGoalVersionUseCase,
         CreateGoalTransitionUseCase,
         GetGoalTransitionsUseCase,
-        GetGoalTransitionDetailUseCase {
+        GetGoalTransitionDetailUseCase,
+        PauseFitnessGoalUseCase,
+        ResumeFitnessGoalUseCase {
 
     private final GoalStudentAuthorityPort goalStudentAuthorityPort;
     private final GoalCatalogPort goalCatalogPort;
@@ -796,6 +804,152 @@ public class FitnessGoalService implements
         }
 
         return transition;
+    }
+
+    @Override
+    public FitnessGoal pauseFitnessGoal(PauseFitnessGoalCommand command) {
+        if (command == null) {
+            throw new ApplicationValidationException("Command cannot be null");
+        }
+        if (command.studentId() == null) {
+            throw new ApplicationValidationException("studentId cannot be null",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "studentId cannot be null")));
+        }
+        if (command.goalId() == null) {
+            throw new ApplicationValidationException("goalId cannot be null",
+                    List.of(new FieldErrorDto("goalId", "NotNull", "goalId cannot be null")));
+        }
+        if (command.reason() == null || command.reason().isBlank()) {
+            throw new ApplicationValidationException("Reason is required",
+                    List.of(new FieldErrorDto("reason", "NotBlank", "Reason is required")));
+        }
+        if (command.reason().trim().length() > 1000) {
+            throw new ApplicationValidationException("Reason must not exceed 1000 characters",
+                    List.of(new FieldErrorDto("reason", "Size", "Reason must not exceed 1000 characters")));
+        }
+
+        // 1. Verify student identity, active account, and student profile
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(command.studentId());
+
+        // 2. Fetch goal and check student ownership
+        FitnessGoal goal = fitnessGoalPersistencePort.findById(command.goalId())
+                .orElseThrow(() -> new FitnessGoalNotFoundException("Fitness goal not found: " + command.goalId()));
+
+        if (!goal.studentId().equals(command.studentId())) {
+            throw new FitnessGoalAccessDeniedException("Access denied to fitness goal: " + command.goalId());
+        }
+
+        // 3. State machine validation: only ACTIVE goals can be paused
+        if (goal.status() != GoalStatus.ACTIVE) {
+            throw new GoalLifecycleConflictException(
+                    "Cannot pause fitness goal: goal is not in ACTIVE status. Current status: " + goal.status());
+        }
+
+        // 4. Atomic conditional update & status history in persistence
+        Instant now = Instant.now(clock);
+        FitnessGoal paused = fitnessGoalPersistencePort.pauseGoal(
+                command.goalId(),
+                command.studentId(),
+                command.reason().trim(),
+                now
+        );
+
+        // 5. Record immutable audit
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("FITNESS_GOAL_PAUSED")
+                .targetType("FITNESS_GOAL")
+                .targetId(command.goalId())
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson("{\"fromStatus\":\"ACTIVE\",\"toStatus\":\"PAUSED\",\"reason\":\"" + escapeJson(command.reason().trim()) + "\"}")
+                .build());
+
+        return paused;
+    }
+
+    @Override
+    public FitnessGoal resumeFitnessGoal(ResumeFitnessGoalCommand command) {
+        if (command == null) {
+            throw new ApplicationValidationException("Command cannot be null");
+        }
+        if (command.studentId() == null) {
+            throw new ApplicationValidationException("studentId cannot be null",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "studentId cannot be null")));
+        }
+        if (command.goalId() == null) {
+            throw new ApplicationValidationException("goalId cannot be null",
+                    List.of(new FieldErrorDto("goalId", "NotNull", "goalId cannot be null")));
+        }
+        if (command.reason() == null || command.reason().isBlank()) {
+            throw new ApplicationValidationException("Reason is required",
+                    List.of(new FieldErrorDto("reason", "NotBlank", "Reason is required")));
+        }
+        if (command.reason().trim().length() > 1000) {
+            throw new ApplicationValidationException("Reason must not exceed 1000 characters",
+                    List.of(new FieldErrorDto("reason", "Size", "Reason must not exceed 1000 characters")));
+        }
+
+        // 1. Verify student identity, active account, and student profile
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(command.studentId());
+
+        // 2. Fetch goal and check student ownership
+        FitnessGoal goal = fitnessGoalPersistencePort.findById(command.goalId())
+                .orElseThrow(() -> new FitnessGoalNotFoundException("Fitness goal not found: " + command.goalId()));
+
+        if (!goal.studentId().equals(command.studentId())) {
+            throw new FitnessGoalAccessDeniedException("Access denied to fitness goal: " + command.goalId());
+        }
+
+        // 3. State machine validation: only PAUSED goals can be resumed
+        if (goal.status() != GoalStatus.PAUSED) {
+            throw new GoalLifecycleConflictException(
+                    "Cannot resume fitness goal: goal is not in PAUSED status. Current status: " + goal.status());
+        }
+
+        // 4. Verify no active goal conflict across the student
+        if (fitnessGoalPersistencePort.hasActiveGoal(command.studentId())) {
+            throw new ActiveFitnessGoalAlreadyExistsException(
+                    "Student already has an active fitness goal. Complete, abandon, or pause the existing goal before activating or resuming another one."
+            );
+        }
+
+        // 5. Atomic conditional update & status history in persistence
+        Instant now = Instant.now(clock);
+        FitnessGoal resumed = fitnessGoalPersistencePort.resumeGoal(
+                command.goalId(),
+                command.studentId(),
+                command.reason().trim(),
+                now
+        );
+
+        // 6. Calculate paused duration if pausedAt is present
+        Long pausedDurationSeconds = null;
+        if (goal.pausedAt() != null) {
+            pausedDurationSeconds = Math.max(0, Duration.between(goal.pausedAt(), now).getSeconds());
+        }
+
+        String metadataJson;
+        if (pausedDurationSeconds != null) {
+            metadataJson = "{\"fromStatus\":\"PAUSED\",\"toStatus\":\"ACTIVE\",\"reason\":\"" + escapeJson(command.reason().trim()) + "\",\"pausedDurationSeconds\":" + pausedDurationSeconds + "}";
+        } else {
+            metadataJson = "{\"fromStatus\":\"PAUSED\",\"toStatus\":\"ACTIVE\",\"reason\":\"" + escapeJson(command.reason().trim()) + "\"}";
+        }
+
+        // 7. Record immutable audit
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.studentId())
+                .actorRole("STUDENT")
+                .action("FITNESS_GOAL_RESUMED")
+                .targetType("FITNESS_GOAL")
+                .targetId(command.goalId())
+                .requestId(RequestIdHolder.getAsUuid())
+                .occurredAt(now)
+                .metadataJson(metadataJson)
+                .build());
+
+        return resumed;
     }
 
     private String escapeJson(String input) {

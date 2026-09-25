@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.common.exception.ActiveFitnessGoalAlreadyExi
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.FitnessGoalNotFoundException;
+import com.fitnesscoaching.platform.common.exception.GoalLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
@@ -11,6 +12,7 @@ import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundExcep
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
 import com.fitnesscoaching.platform.common.exception.NewGoalJourneyRequiredException;
 import com.fitnesscoaching.platform.common.exception.SameGoalJourneyTransitionException;
+import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalVersionPage;
@@ -24,6 +26,8 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTran
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalCommand;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalCatalogPort;
@@ -1159,6 +1163,361 @@ class FitnessGoalServiceUnitTest {
         assertThatThrownBy(() -> fitnessGoalService.getGoalTransitionDetail(new GetGoalTransitionDetailQuery(studentId, goalId, transitionId)))
                 .isInstanceOf(GoalTransitionNotFoundException.class)
                 .hasMessageContaining("Goal transition not found");
+    }
+
+    // ==========================================
+    // GOAL-05: Pause and Resume Unit Tests
+    // ==========================================
+
+    @Test
+    @DisplayName("Pause goal: success pauses active goal, sets paused_at, status_reason, and records audit")
+    void pauseFitnessGoal_success() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Knee strain recovery";
+        FitnessGoal activeGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock).minusSeconds(86400), null, null, null, null,
+                Instant.now(clock).minusSeconds(86400), Instant.now(clock).minusSeconds(86400), null
+        );
+
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                activeGoal.activatedAt(), Instant.now(clock), null, null, reason,
+                activeGoal.createdAt(), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(activeGoal));
+        when(fitnessGoalPersistencePort.pauseGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenReturn(pausedGoal);
+
+        FitnessGoal result = fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, reason));
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(GoalStatus.PAUSED);
+        assertThat(result.pausedAt()).isEqualTo(Instant.now(clock));
+        assertThat(result.statusReason()).isEqualTo(reason);
+
+        verify(goalStudentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        verify(fitnessGoalPersistencePort).pauseGoal(goalId, studentId, reason, Instant.now(clock));
+        verify(auditService).recordAudit(argThat((AuditRecord record) ->
+                record.actorUserId().equals(studentId)
+                        && "STUDENT".equals(record.actorRole())
+                        && "FITNESS_GOAL_PAUSED".equals(record.action())
+                        && "FITNESS_GOAL".equals(record.targetType())
+                        && record.targetId().equals(goalId)
+                        && record.metadataJson().contains("PAUSED")
+                        && record.metadataJson().contains("Knee strain recovery")
+        ));
+    }
+
+    @Test
+    @DisplayName("Resume goal: success resumes paused goal, clears paused_at, calculates paused duration, and records audit")
+    void resumeFitnessGoal_success() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Recovery complete";
+        Instant pausedAt = Instant.now(clock).minusSeconds(7200); // 2 hours ago
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock).minusSeconds(86400), pausedAt, null, null, "Injury",
+                Instant.now(clock).minusSeconds(86400), pausedAt, null
+        );
+
+        FitnessGoal resumedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                pausedGoal.activatedAt(), null, null, null, reason,
+                pausedGoal.createdAt(), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(pausedGoal));
+        when(fitnessGoalPersistencePort.hasActiveGoal(studentId)).thenReturn(false);
+        when(fitnessGoalPersistencePort.resumeGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenReturn(resumedGoal);
+
+        FitnessGoal result = fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, reason));
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(GoalStatus.ACTIVE);
+        assertThat(result.pausedAt()).isNull();
+        assertThat(result.statusReason()).isEqualTo(reason);
+
+        verify(goalStudentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        verify(fitnessGoalPersistencePort).hasActiveGoal(studentId);
+        verify(fitnessGoalPersistencePort).resumeGoal(goalId, studentId, reason, Instant.now(clock));
+        verify(auditService).recordAudit(argThat((AuditRecord record) ->
+                record.actorUserId().equals(studentId)
+                        && "STUDENT".equals(record.actorRole())
+                        && "FITNESS_GOAL_RESUMED".equals(record.action())
+                        && "FITNESS_GOAL".equals(record.targetType())
+                        && record.targetId().equals(goalId)
+                        && record.metadataJson().contains("ACTIVE")
+                        && record.metadataJson().contains("Recovery complete")
+                        && record.metadataJson().contains("\"pausedDurationSeconds\":7200")
+        ));
+    }
+
+    @Test
+    @DisplayName("Pause goal: throws GoalLifecycleConflictException when goal is not ACTIVE")
+    void pauseFitnessGoal_whenNotActive_throwsConflict() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal draftGoal = new FitnessGoal(
+                goalId, studentId, "Draft Goal", GoalStatus.DRAFT, studentId,
+                null, null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(draftGoal));
+
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, "Pause draft")))
+                .isInstanceOf(GoalLifecycleConflictException.class)
+                .hasMessageContaining("Cannot pause fitness goal: goal is not in ACTIVE status");
+
+        verify(fitnessGoalPersistencePort, never()).pauseGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Resume goal: throws GoalLifecycleConflictException when goal is not PAUSED")
+    void resumeFitnessGoal_whenNotPaused_throwsConflict() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal activeGoal = new FitnessGoal(
+                goalId, studentId, "Active Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(activeGoal));
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, "Resume active")))
+                .isInstanceOf(GoalLifecycleConflictException.class)
+                .hasMessageContaining("Cannot resume fitness goal: goal is not in PAUSED status");
+
+        verify(fitnessGoalPersistencePort, never()).resumeGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Resume goal: throws ActiveFitnessGoalAlreadyExistsException when another active goal exists")
+    void resumeFitnessGoal_whenActiveGoalAlreadyExists_throwsConflict() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Paused Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock).minusSeconds(86400), Instant.now(clock).minusSeconds(3600), null, null, null,
+                Instant.now(clock).minusSeconds(86400), Instant.now(clock).minusSeconds(3600), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(pausedGoal));
+        when(fitnessGoalPersistencePort.hasActiveGoal(studentId)).thenReturn(true);
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, "Resume")))
+                .isInstanceOf(ActiveFitnessGoalAlreadyExistsException.class)
+                .hasMessageContaining("Student already has an active fitness goal");
+
+        verify(fitnessGoalPersistencePort, never()).resumeGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Pause goal: throws FitnessGoalAccessDeniedException when student is not the owner")
+    void pauseFitnessGoal_whenStudentNotOwner_throwsAccessDenied() {
+        UUID goalId = UUID.randomUUID();
+        UUID otherStudentId = UUID.randomUUID();
+        FitnessGoal otherGoal = new FitnessGoal(
+                goalId, otherStudentId, "Other Goal", GoalStatus.ACTIVE, otherStudentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(otherGoal));
+
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, "Pause")))
+                .isInstanceOf(FitnessGoalAccessDeniedException.class)
+                .hasMessageContaining("Access denied to fitness goal");
+
+        verify(fitnessGoalPersistencePort, never()).pauseGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Resume goal: throws FitnessGoalAccessDeniedException when student is not the owner")
+    void resumeFitnessGoal_whenStudentNotOwner_throwsAccessDenied() {
+        UUID goalId = UUID.randomUUID();
+        UUID otherStudentId = UUID.randomUUID();
+        FitnessGoal otherGoal = new FitnessGoal(
+                goalId, otherStudentId, "Other Goal", GoalStatus.PAUSED, otherStudentId,
+                Instant.now(clock), Instant.now(clock), null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(otherGoal));
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, "Resume")))
+                .isInstanceOf(FitnessGoalAccessDeniedException.class)
+                .hasMessageContaining("Access denied to fitness goal");
+
+        verify(fitnessGoalPersistencePort, never()).resumeGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Pause goal: throws FitnessGoalNotFoundException when goal does not exist")
+    void pauseFitnessGoal_whenGoalNotFound_throwsNotFound() {
+        UUID goalId = UUID.randomUUID();
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, "Pause")))
+                .isInstanceOf(FitnessGoalNotFoundException.class)
+                .hasMessageContaining("Fitness goal not found");
+
+        verify(fitnessGoalPersistencePort, never()).pauseGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Resume goal: throws FitnessGoalNotFoundException when goal does not exist")
+    void resumeFitnessGoal_whenGoalNotFound_throwsNotFound() {
+        UUID goalId = UUID.randomUUID();
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, "Resume")))
+                .isInstanceOf(FitnessGoalNotFoundException.class)
+                .hasMessageContaining("Fitness goal not found");
+
+        verify(fitnessGoalPersistencePort, never()).resumeGoal(any(), any(), any(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Pause goal: validates reason blank or exceeding 1000 characters")
+    void pauseFitnessGoal_validationErrors() {
+        UUID goalId = UUID.randomUUID();
+
+        // Null command
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(null))
+                .isInstanceOf(ApplicationValidationException.class);
+
+        // Blank reason
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, "   ")))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Reason is required");
+
+        // Exceeding 1000 chars
+        String longReason = "A".repeat(1001);
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, longReason)))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Reason must not exceed 1000 characters");
+    }
+
+    @Test
+    @DisplayName("Resume goal: validates reason blank or exceeding 1000 characters")
+    void resumeFitnessGoal_validationErrors() {
+        UUID goalId = UUID.randomUUID();
+
+        // Null command
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(null))
+                .isInstanceOf(ApplicationValidationException.class);
+
+        // Blank reason
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, "")))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Reason is required");
+
+        // Exceeding 1000 chars
+        String longReason = "A".repeat(1001);
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, longReason)))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Reason must not exceed 1000 characters");
+    }
+
+    @Test
+    @DisplayName("Pause goal: propagates GoalLifecycleConflictException if persistence CAS update fails")
+    void pauseFitnessGoal_persistenceConflict_propagatesException() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Injury recovery";
+        FitnessGoal activeGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(activeGoal));
+        when(fitnessGoalPersistencePort.pauseGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenThrow(new GoalLifecycleConflictException("Cannot pause fitness goal: goal status is no longer ACTIVE or was concurrently modified."));
+
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, reason)))
+                .isInstanceOf(GoalLifecycleConflictException.class)
+                .hasMessageContaining("Cannot pause fitness goal: goal status is no longer ACTIVE");
+
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Resume goal: propagates GoalLifecycleConflictException if persistence CAS update fails")
+    void resumeFitnessGoal_persistenceConflict_propagatesException() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Cleared to train";
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock), Instant.now(clock), null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(pausedGoal));
+        when(fitnessGoalPersistencePort.hasActiveGoal(studentId)).thenReturn(false);
+        when(fitnessGoalPersistencePort.resumeGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenThrow(new GoalLifecycleConflictException("Cannot resume fitness goal: goal status is no longer PAUSED or was concurrently modified."));
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, reason)))
+                .isInstanceOf(GoalLifecycleConflictException.class)
+                .hasMessageContaining("Cannot resume fitness goal: goal status is no longer PAUSED");
+
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Pause goal: throws exception and triggers rollback when audit logging fails")
+    void pauseFitnessGoal_auditFailure_throwsException() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Injury recovery";
+        FitnessGoal activeGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                activeGoal.activatedAt(), Instant.now(clock), null, null, reason,
+                activeGoal.createdAt(), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(activeGoal));
+        when(fitnessGoalPersistencePort.pauseGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenReturn(pausedGoal);
+        org.mockito.Mockito.doThrow(new RuntimeException("Audit persistence failed"))
+                .when(auditService).recordAudit(any());
+
+        assertThatThrownBy(() -> fitnessGoalService.pauseFitnessGoal(new PauseFitnessGoalCommand(studentId, goalId, reason)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Audit persistence failed");
+    }
+
+    @Test
+    @DisplayName("Resume goal: throws exception and triggers rollback when audit logging fails")
+    void resumeFitnessGoal_auditFailure_throwsException() {
+        UUID goalId = UUID.randomUUID();
+        String reason = "Recovery complete";
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock), Instant.now(clock), null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        FitnessGoal resumedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                pausedGoal.activatedAt(), null, null, null, reason,
+                pausedGoal.createdAt(), Instant.now(clock), null
+        );
+
+        when(fitnessGoalPersistencePort.findById(goalId)).thenReturn(Optional.of(pausedGoal));
+        when(fitnessGoalPersistencePort.hasActiveGoal(studentId)).thenReturn(false);
+        when(fitnessGoalPersistencePort.resumeGoal(eq(goalId), eq(studentId), eq(reason), any(Instant.class)))
+                .thenReturn(resumedGoal);
+        org.mockito.Mockito.doThrow(new RuntimeException("Audit persistence failed"))
+                .when(auditService).recordAudit(any());
+
+        assertThatThrownBy(() -> fitnessGoalService.resumeFitnessGoal(new ResumeFitnessGoalCommand(studentId, goalId, reason)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Audit persistence failed");
     }
 
     private static <T> T argThat(org.mockito.ArgumentMatcher<T> matcher) {

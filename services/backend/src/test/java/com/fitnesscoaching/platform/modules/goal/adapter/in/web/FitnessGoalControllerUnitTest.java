@@ -14,6 +14,7 @@ import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionE
 import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
+import com.fitnesscoaching.platform.common.exception.GoalLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalTransitionNotFoundException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionConflictException;
 import com.fitnesscoaching.platform.common.exception.GoalVersionNoChangesException;
@@ -35,6 +36,8 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTran
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalObjective;
@@ -113,6 +116,12 @@ class FitnessGoalControllerUnitTest {
 
     @MockitoBean
     private GetGoalTransitionDetailUseCase getGoalTransitionDetailUseCase;
+
+    @MockitoBean
+    private PauseFitnessGoalUseCase pauseFitnessGoalUseCase;
+
+    @MockitoBean
+    private ResumeFitnessGoalUseCase resumeFitnessGoalUseCase;
 
     @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
@@ -642,5 +651,201 @@ class FitnessGoalControllerUnitTest {
                         .with(jwt().jwt(b -> b.subject(studentId.toString()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode", is("GOAL_TRANSITION_NOT_FOUND")));
+    }
+
+    // ==========================================
+    // GOAL-05: Pause and Resume Unit Tests
+    // ==========================================
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - success returns 200 and PAUSED status")
+    void pauseGoal_success_returns200() throws Exception {
+        FitnessGoal pausedGoal = buildDummyGoal(GoalStatus.PAUSED);
+        when(pauseFitnessGoalUseCase.pauseFitnessGoal(any())).thenReturn(pausedGoal);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Injury recovery\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(goalId.toString())))
+                .andExpect(jsonPath("$.status", is("PAUSED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - success returns 200 and ACTIVE status")
+    void resumeGoal_success_returns200() throws Exception {
+        FitnessGoal resumedGoal = buildDummyGoal(GoalStatus.ACTIVE);
+        when(resumeFitnessGoalUseCase.resumeFitnessGoal(any())).thenReturn(resumedGoal);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Recovered and cleared to train\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(goalId.toString())))
+                .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - unauthenticated returns 401")
+    void pauseGoal_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Injury recovery\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - unauthenticated returns 401")
+    void resumeGoal_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Recovered and cleared to train\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - blank reason returns 400")
+    void pauseGoal_blankReason_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - blank reason returns 400")
+    void resumeGoal_blankReason_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - reason exceeding 1000 characters returns 400")
+    void pauseGoal_reasonExceeds1000_returns400() throws Exception {
+        String longReason = "A".repeat(1001);
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + longReason + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - reason exceeding 1000 characters returns 400")
+    void resumeGoal_reasonExceeds1000_returns400() throws Exception {
+        String longReason = "A".repeat(1001);
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + longReason + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - goal not found returns 404")
+    void pauseGoal_notFound_returns404() throws Exception {
+        when(pauseFitnessGoalUseCase.pauseFitnessGoal(any()))
+                .thenThrow(new FitnessGoalNotFoundException("Fitness goal not found: " + goalId));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Injury recovery\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("FITNESS_GOAL_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - goal not found returns 404")
+    void resumeGoal_notFound_returns404() throws Exception {
+        when(resumeFitnessGoalUseCase.resumeFitnessGoal(any()))
+                .thenThrow(new FitnessGoalNotFoundException("Fitness goal not found: " + goalId));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Ready to train\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("FITNESS_GOAL_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - access denied for non-owner returns 403")
+    void pauseGoal_accessDenied_returns403() throws Exception {
+        when(pauseFitnessGoalUseCase.pauseFitnessGoal(any()))
+                .thenThrow(new FitnessGoalAccessDeniedException("Access denied to fitness goal: " + goalId));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Injury recovery\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - access denied for non-owner returns 403")
+    void resumeGoal_accessDenied_returns403() throws Exception {
+        when(resumeFitnessGoalUseCase.resumeFitnessGoal(any()))
+                .thenThrow(new FitnessGoalAccessDeniedException("Access denied to fitness goal: " + goalId));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Ready to train\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/pause - goal not ACTIVE returns 409 GOAL_LIFECYCLE_CONFLICT")
+    void pauseGoal_conflictNotActive_returns409() throws Exception {
+        when(pauseFitnessGoalUseCase.pauseFitnessGoal(any()))
+                .thenThrow(new GoalLifecycleConflictException("Cannot pause fitness goal: goal is not in ACTIVE status. Current status: DRAFT"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Injury recovery\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - goal not PAUSED returns 409 GOAL_LIFECYCLE_CONFLICT")
+    void resumeGoal_conflictNotPaused_returns409() throws Exception {
+        when(resumeFitnessGoalUseCase.resumeFitnessGoal(any()))
+                .thenThrow(new GoalLifecycleConflictException("Cannot resume fitness goal: goal is not in PAUSED status. Current status: ACTIVE"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Ready to train\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/fitness-goals/{goalId}/resume - active goal already exists returns 409 ACTIVE_FITNESS_GOAL_ALREADY_EXISTS")
+    void resumeGoal_activeGoalAlreadyExists_returns409() throws Exception {
+        when(resumeFitnessGoalUseCase.resumeFitnessGoal(any()))
+                .thenThrow(new ActiveFitnessGoalAlreadyExistsException("Student already has an active fitness goal."));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Ready to train\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("ACTIVE_FITNESS_GOAL_ALREADY_EXISTS")));
     }
 }
