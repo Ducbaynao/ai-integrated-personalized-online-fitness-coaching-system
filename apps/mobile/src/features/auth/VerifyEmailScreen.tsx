@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
+import { getAuthErrorMessage } from '@/features/auth/authMessages';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -43,7 +44,7 @@ export function VerifyEmailScreen() {
 
     const trimmedToken = token.trim();
     if (!trimmedToken) {
-      setErrorMessage('Please enter the verification token');
+      setErrorMessage('Vui lòng nhập mã xác minh.');
       return;
     }
 
@@ -57,10 +58,10 @@ export function VerifyEmailScreen() {
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMessage(
-          err.message || 'Verification failed. The token may be expired or already used.'
+          getAuthErrorMessage(err, 'Xác minh thất bại. Mã có thể đã hết hạn hoặc đã được sử dụng.')
         );
       } else {
-        setErrorMessage('An unexpected error occurred. Please try again.');
+        setErrorMessage('Đã xảy ra lỗi ngoài dự kiến. Vui lòng thử lại.');
       }
     } finally {
       setIsSubmitting(false);
@@ -82,9 +83,9 @@ export function VerifyEmailScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.title, { color: textColor }]}>Verify Email</Text>
+          <Text style={[styles.title, { color: textColor }]}>Xác minh email</Text>
           <Text style={[styles.subtitle, { color: subtextColor }]}>
-            Confirm your email address to activate your account
+            Xác nhận địa chỉ email để kích hoạt tài khoản
           </Text>
 
           {infoMessage && (
@@ -112,15 +113,14 @@ export function VerifyEmailScreen() {
                 accessibilityRole="summary"
                 accessibilityLiveRegion="polite">
                 <Text style={styles.successBannerText}>
-                  Your email address has been successfully verified! You can now sign in to your
-                  account.
+                  Email đã được xác minh thành công. Bạn có thể đăng nhập ngay bây giờ.
                 </Text>
               </View>
 
               <Pressable
                 testID="go-to-sign-in-button"
                 accessibilityRole="button"
-                accessibilityLabel="Proceed to Sign In"
+                accessibilityLabel="Tiếp tục đến màn hình đăng nhập"
                 style={({ pressed }) => [
                   styles.primaryButton,
                   {
@@ -130,19 +130,19 @@ export function VerifyEmailScreen() {
                   },
                 ]}
                 onPress={() => router.replace('/(auth)/sign-in')}>
-                <Text style={styles.buttonText}>Proceed to Sign In</Text>
+                <Text style={styles.buttonText}>Tiếp tục đăng nhập</Text>
               </Pressable>
             </View>
           ) : (
             <>
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: textColor }]}>Verification Token</Text>
+                <Text style={[styles.label, { color: textColor }]}>Mã xác minh</Text>
                 <TextInput
                   testID="token-input"
-                  accessibilityLabel="Verification Token"
-                  accessibilityHint="Enter or paste the verification token received in your email"
+                  accessibilityLabel="Mã xác minh"
+                  accessibilityHint="Nhập hoặc dán mã xác minh nhận được trong email"
                   style={[styles.input, { color: textColor, borderColor }]}
-                  placeholder="Paste or enter verification token"
+                  placeholder="Dán hoặc nhập mã xác minh"
                   placeholderTextColor={subtextColor}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -159,7 +159,7 @@ export function VerifyEmailScreen() {
               <Pressable
                 testID="submit-verify"
                 accessibilityRole="button"
-                accessibilityLabel="Confirm Verification"
+                accessibilityLabel="Xác nhận mã xác minh"
                 accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -176,7 +176,7 @@ export function VerifyEmailScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator color={themeColors.textOnPrimary} />
                 ) : (
-                  <Text style={styles.buttonText}>Confirm Verification</Text>
+                  <Text style={styles.buttonText}>Xác nhận</Text>
                 )}
               </Pressable>
 
@@ -184,12 +184,12 @@ export function VerifyEmailScreen() {
                 <Pressable
                   testID="back-to-sign-in"
                   accessibilityRole="link"
-                  accessibilityLabel="Back to Sign In"
+                  accessibilityLabel="Quay lại đăng nhập"
                   onPress={() => router.push('/(auth)/sign-in')}
                   style={styles.linkButton}
                   disabled={isSubmitting}>
                   <Text style={styles.linkText}>
-                    Back to <Text style={styles.linkTextBold}>Sign In</Text>
+                    Quay lại <Text style={styles.linkTextBold}>Đăng nhập</Text>
                   </Text>
                 </Pressable>
               </View>

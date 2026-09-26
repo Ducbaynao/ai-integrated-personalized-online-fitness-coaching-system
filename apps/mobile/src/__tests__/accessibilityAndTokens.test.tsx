@@ -6,6 +6,7 @@ import { SignInScreen } from '@/features/auth/SignInScreen';
 import { RegisterScreen } from '@/features/auth/RegisterScreen';
 import { VerifyEmailScreen } from '@/features/auth/VerifyEmailScreen';
 import { HomeScreen } from '@/features/auth/HomeScreen';
+import { SessionGateScreen } from '@/features/auth/SessionGateScreen';
 import { ChoosePurposeScreen } from '@/features/onboarding/ChoosePurposeScreen';
 import { TrainerOnboardingScreen } from '@/features/trainer/TrainerOnboardingScreen';
 
@@ -68,6 +69,26 @@ describe('Design Tokens & Semantic Colors', () => {
 });
 
 describe('Accessibility Attributes on Auth Screens', () => {
+  it('SessionGateScreen exposes a retryable alert when restoration fails', () => {
+    const onRetry = jest.fn();
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SessionGateScreen mode="error" message="Không có kết nối." onRetry={onRetry} />
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ testID: 'session-restore-error-screen' }).props.accessibilityRole).toBe(
+      'alert'
+    );
+
+    renderer.act(() => {
+      root.findByProps({ testID: 'retry-session-restore' }).props.onPress();
+    });
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
   it('SignInScreen defines proper accessibility roles and labels', () => {
     let tree: renderer.ReactTestRenderer;
     renderer.act(() => {
@@ -82,13 +103,13 @@ describe('Accessibility Attributes on Auth Screens', () => {
 
     // Password Input
     const passwordInput = root.findByProps({ testID: 'password-input' });
-    expect(passwordInput.props.accessibilityLabel).toBe('Password');
+    expect(passwordInput.props.accessibilityLabel).toBe('Mật khẩu');
     expect(passwordInput.props.accessibilityHint).toBeDefined();
 
     // Submit Button
     const submitBtn = root.findByProps({ testID: 'submit-sign-in' });
     expect(submitBtn.props.accessibilityRole).toBe('button');
-    expect(submitBtn.props.accessibilityLabel).toBe('Sign In');
+    expect(submitBtn.props.accessibilityLabel).toBe('Đăng nhập');
     expect(submitBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
     // Register Link
@@ -109,7 +130,7 @@ describe('Accessibility Attributes on Auth Screens', () => {
 
     // Display Name Input
     const nameInput = root.findByProps({ testID: 'display-name-input' });
-    expect(nameInput.props.accessibilityLabel).toBe('Full Name');
+    expect(nameInput.props.accessibilityLabel).toBe('Họ và tên');
     expect(nameInput.props.accessibilityHint).toBeDefined();
 
     // Email Input
@@ -118,12 +139,12 @@ describe('Accessibility Attributes on Auth Screens', () => {
 
     // Password Input
     const passwordInput = root.findByProps({ testID: 'password-input' });
-    expect(passwordInput.props.accessibilityLabel).toBe('Password');
+    expect(passwordInput.props.accessibilityLabel).toBe('Mật khẩu');
 
     // Submit Button
     const submitBtn = root.findByProps({ testID: 'submit-register' });
     expect(submitBtn.props.accessibilityRole).toBe('button');
-    expect(submitBtn.props.accessibilityLabel).toBe('Register');
+    expect(submitBtn.props.accessibilityLabel).toBe('Đăng ký');
     expect(submitBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
     // Sign In Link
@@ -140,13 +161,13 @@ describe('Accessibility Attributes on Auth Screens', () => {
 
     // Token Input
     const tokenInput = root.findByProps({ testID: 'token-input' });
-    expect(tokenInput.props.accessibilityLabel).toBe('Verification Token');
+    expect(tokenInput.props.accessibilityLabel).toBe('Mã xác minh');
     expect(tokenInput.props.accessibilityHint).toBeDefined();
 
     // Submit Button
     const submitBtn = root.findByProps({ testID: 'submit-verify' });
     expect(submitBtn.props.accessibilityRole).toBe('button');
-    expect(submitBtn.props.accessibilityLabel).toBe('Confirm Verification');
+    expect(submitBtn.props.accessibilityLabel).toBe('Xác nhận mã xác minh');
     expect(submitBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
     // Back to Sign In Link
@@ -163,7 +184,7 @@ describe('Accessibility Attributes on Auth Screens', () => {
 
     const logoutBtn = root.findByProps({ testID: 'logout-button' });
     expect(logoutBtn.props.accessibilityRole).toBe('button');
-    expect(logoutBtn.props.accessibilityLabel).toBe('Log Out');
+    expect(logoutBtn.props.accessibilityLabel).toBe('Đăng xuất');
     expect(logoutBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
   });
 

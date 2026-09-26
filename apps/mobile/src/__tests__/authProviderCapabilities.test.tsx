@@ -4,7 +4,7 @@ import renderer from 'react-test-renderer';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { authApi } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
-import { CurrentUserResponse } from '@/types/auth';
+import { ApiError, CurrentUserResponse } from '@/types/auth';
 import * as SecureStore from 'expo-secure-store';
 
 jest.mock('@/services/apiClient', () => ({
@@ -19,17 +19,30 @@ jest.mock('@/services/apiClient', () => ({
 }));
 
 function TestConsumer() {
-  const { status, user, activeCapability, refreshUser, setActiveCapability, login } = useAuth();
+  const {
+    status,
+    user,
+    activeCapability,
+    restoreError,
+    sessionNotice,
+    refreshUser,
+    setActiveCapability,
+    retrySessionRestore,
+    login,
+  } = useAuth();
   return (
     <View testID="test-consumer">
       <Text testID="auth-status">{status}</Text>
       <Text testID="active-capability">{activeCapability ?? 'NONE'}</Text>
+      <Text testID="restore-error">{restoreError ?? 'NONE'}</Text>
+      <Text testID="session-notice">{sessionNotice ?? 'NONE'}</Text>
       <Text testID="has-student">{String(user?.capabilities?.hasStudentProfile)}</Text>
       <Text testID="has-trainer">{String(user?.capabilities?.hasTrainerProfile)}</Text>
       <Pressable testID="refresh-as-trainer" onPress={() => refreshUser('TRAINER')} />
       <Pressable testID="refresh-as-student" onPress={() => refreshUser('STUDENT')} />
       <Pressable testID="switch-to-trainer" onPress={() => setActiveCapability('TRAINER')} />
       <Pressable testID="switch-to-student" onPress={() => setActiveCapability('STUDENT')} />
+      <Pressable testID="retry-session" onPress={() => retrySessionRestore()} />
       <Pressable
         testID="login-dual-role"
         onPress={() => login({ email: 'integration@example.com', password: 'Password123!' })}
@@ -387,5 +400,55 @@ describe('AuthProvider Capabilities Integration Tests (Finding 1 & 2)', () => {
       accessToken: 'valid-access-token',
       refreshToken: 'valid-refresh-token',
     });
+  });
+
+  it('11. Keeps credentials and supports retry when session restoration fails temporarily', async () => {
+    (authApi.getCurrentUser as jest.Mock)
+      .mockRejectedValueOnce(new ApiError(0, 'Network unavailable'))
+      .mockResolvedValueOnce(createMockUser(true, false));
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ testID: 'auth-status' }).props.children).toBe('RESTORE_FAILED');
+    expect(root.findByProps({ testID: 'restore-error' }).props.children).not.toBe('NONE');
+    expect(await tokenStorage.getTokens()).toEqual({
+      accessToken: 'valid-access-token',
+      refreshToken: 'valid-refresh-token',
+    });
+
+    await renderer.act(async () => {
+      await root.findByProps({ testID: 'retry-session' }).props.onPress();
+    });
+
+    expect(root.findByProps({ testID: 'auth-status' }).props.children).toBe('AUTHENTICATED');
+    expect(root.findByProps({ testID: 'restore-error' }).props.children).toBe('NONE');
+  });
+
+  it('12. Clears credentials and shows a sign-in notice for a terminal restoration failure', async () => {
+    (authApi.getCurrentUser as jest.Mock).mockRejectedValueOnce(
+      new ApiError(401, 'Session revoked')
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      );
+    });
+
+    const root = tree!.root;
+    expect(root.findByProps({ testID: 'auth-status' }).props.children).toBe('UNAUTHENTICATED');
+    expect(root.findByProps({ testID: 'session-notice' }).props.children).not.toBe('NONE');
+    expect(await tokenStorage.getTokens()).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
+import { getAuthErrorMessage, localizeFieldErrors } from '@/features/auth/authMessages';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -37,15 +38,15 @@ export function RegisterScreen() {
     // Client validation
     const errors: Record<string, string> = {};
     if (!displayName.trim()) {
-      errors.displayName = 'Full name is required';
+      errors.displayName = 'Vui lòng nhập họ và tên.';
     }
     if (!email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Vui lòng nhập email.';
     }
     if (!password) {
-      errors.password = 'Password is required';
+      errors.password = 'Vui lòng nhập mật khẩu.';
     } else if (password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
+      errors.password = 'Mật khẩu phải có ít nhất 8 ký tự.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -69,21 +70,17 @@ export function RegisterScreen() {
         pathname: '/(auth)/verify-email',
         params: {
           registeredEmail: email.trim(),
-          successMessage: 'Account created! Please check your email (Mailpit in dev) for the verification link or token.',
+          successMessage: 'Tài khoản đã được tạo. Hãy kiểm tra email để lấy liên kết hoặc mã xác minh.',
         },
       });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.errorResponse?.fieldErrors && err.errorResponse.fieldErrors.length > 0) {
-          const map: Record<string, string> = {};
-          err.errorResponse.fieldErrors.forEach((fe) => {
-            map[fe.field] = fe.message;
-          });
-          setFieldErrors(map);
+          setFieldErrors(localizeFieldErrors(err.errorResponse.fieldErrors));
         }
-        setErrorMessage(err.message || 'Registration failed. Please check your information.');
+        setErrorMessage(getAuthErrorMessage(err, 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.'));
       } else {
-        setErrorMessage('An unexpected error occurred. Please try again.');
+        setErrorMessage('Đã xảy ra lỗi ngoài dự kiến. Vui lòng thử lại.');
       }
     } finally {
       setIsSubmitting(false);
@@ -105,9 +102,9 @@ export function RegisterScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.title, { color: textColor }]}>Create Account</Text>
+          <Text style={[styles.title, { color: textColor }]}>Tạo tài khoản</Text>
           <Text style={[styles.subtitle, { color: subtextColor }]}>
-            Join AI Fitness Coaching for personalized fitness training
+            Bắt đầu trải nghiệm tập luyện phù hợp với mục tiêu của bạn
           </Text>
 
           {errorMessage && (
@@ -120,11 +117,11 @@ export function RegisterScreen() {
           )}
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Full Name</Text>
+            <Text style={[styles.label, { color: textColor }]}>Họ và tên</Text>
             <TextInput
               testID="display-name-input"
-              accessibilityLabel="Full Name"
-              accessibilityHint="Enter your full name"
+              accessibilityLabel="Họ và tên"
+              accessibilityHint="Nhập họ và tên của bạn"
               aria-invalid={!!fieldErrors.displayName}
               style={[
                 styles.input,
@@ -151,7 +148,7 @@ export function RegisterScreen() {
             <TextInput
               testID="email-input"
               accessibilityLabel="Email"
-              accessibilityHint="Enter your email address"
+              accessibilityHint="Nhập địa chỉ email của bạn"
               aria-invalid={!!fieldErrors.email}
               style={[
                 styles.input,
@@ -177,17 +174,17 @@ export function RegisterScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Password</Text>
+            <Text style={[styles.label, { color: textColor }]}>Mật khẩu</Text>
             <TextInput
               testID="password-input"
-              accessibilityLabel="Password"
-              accessibilityHint="Create a password with at least 8 characters"
+              accessibilityLabel="Mật khẩu"
+              accessibilityHint="Tạo mật khẩu có ít nhất 8 ký tự"
               aria-invalid={!!fieldErrors.password}
               style={[
                 styles.input,
                 { color: textColor, borderColor: fieldErrors.password ? themeColors.dangerText : borderColor },
               ]}
-              placeholder="At least 8 characters"
+              placeholder="Ít nhất 8 ký tự"
               placeholderTextColor={subtextColor}
               secureTextEntry
               value={password}
@@ -207,7 +204,7 @@ export function RegisterScreen() {
           <Pressable
             testID="submit-register"
             accessibilityRole="button"
-            accessibilityLabel="Register"
+            accessibilityLabel="Đăng ký"
             accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
             style={({ pressed }) => [
               styles.primaryButton,
@@ -224,7 +221,7 @@ export function RegisterScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
-              <Text style={styles.buttonText}>Register</Text>
+              <Text style={styles.buttonText}>Đăng ký</Text>
             )}
           </Pressable>
 
@@ -232,12 +229,12 @@ export function RegisterScreen() {
             <Pressable
               testID="link-to-sign-in"
               accessibilityRole="link"
-              accessibilityLabel="Already have an account? Sign In"
+              accessibilityLabel="Đã có tài khoản? Đăng nhập"
               onPress={() => router.push('/(auth)/sign-in')}
               style={styles.linkButton}
               disabled={isSubmitting}>
               <Text style={styles.linkText}>
-                Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
+                Đã có tài khoản? <Text style={styles.linkTextBold}>Đăng nhập</Text>
               </Text>
             </Pressable>
           </View>
