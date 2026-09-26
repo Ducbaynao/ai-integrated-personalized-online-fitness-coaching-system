@@ -9,14 +9,15 @@ Build interfaces that match the product's coaching, fitness, nutrition, AI, and 
 
 ## Required workflow
 
-1. Read `../../../docs/06-ui-ux/README.md`, `design-principles.md`, `design-tokens.md`, and `component-specifications.md`.
-2. Identify the actor and surface: Student Mobile, Trainer Mobile, or Admin Web.
-3. Read the matching actor flow and screen specification.
-4. Locate the screen ID in `screen-inventory.md` and relevant row in `references/traceability-matrix.md`.
-5. Read [domain invariants](references/domain-invariants.md) before changing authority, lifecycle, approval, data-quality, or AI behavior.
-6. Reuse tokens and shared components. Do not hardcode a parallel visual system.
+1. Load `digital-fitness-core` before making product or implementation decisions.
+2. Read `../../../docs/06-ui-ux/README.md`, `design-principles.md`, `design-tokens.md`, and `component-specifications.md`.
+3. Identify the actor, feature, surface, screen ID, navigation entry, and relevant traceability row.
+4. Read the matching actor flow/screen specification and [domain invariants](references/domain-invariants.md) when authority, lifecycle, approval, data quality, or AI behavior is involved.
+5. For design-to-code or visual comparison work, follow [implementation workflow](references/implementation-workflow.md) to inspect the relevant Figma frame/component, distinguish verified design from gaps, and map it to existing code.
+6. Reuse project tokens and shared components. Do not hardcode a parallel visual system or copy generated Figma code directly.
 7. Implement all applicable states from `screen-states.md` and accessibility rules from `accessibility.md`.
-8. Review the result with [review checklist](references/review-checklist.md).
+8. Compare the implementation with the Figma screenshot and emulator/browser at supported sizes, then review with [review checklist](references/review-checklist.md).
+9. Update UI/UX documentation when a verified token, reusable component, navigation contract, or screen inventory entry changes.
 
 ## Routing
 
@@ -25,7 +26,7 @@ Build interfaces that match the product's coaching, fitness, nutrition, AI, and 
 - Admin work: read `../../../docs/06-ui-ux/admin/admin-flows.md` and `admin-screens.md`.
 - New navigation or screen: also update `screen-inventory.md` and `references/traceability-matrix.md`.
 - New reusable component or token: update its specification and code token source in the same change.
-- Implementation planning: read [implementation workflow](references/implementation-workflow.md).
+- Figma inspection, implementation planning, or visual verification: read [implementation workflow](references/implementation-workflow.md).
 
 ## Non-negotiable decisions
 
