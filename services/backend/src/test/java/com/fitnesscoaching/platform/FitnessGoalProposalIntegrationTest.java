@@ -2015,4 +2015,549 @@ class FitnessGoalProposalIntegrationTest {
                 .andExpect(jsonPath("$.totalPages", is(0)))
                 .andExpect(jsonPath("$.items", hasSize(0)));
     }
+
+    // ==================== GOAL-07 TEST HARDENING ====================
+
+    private UUID createActiveAdminUser(String email) {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users (id, email, password_hash, display_name, phone_number, status, preferred_locale, timezone, created_at, updated_at)
+                VALUES (?, ?, ?, 'Test Admin', '+84909876544', 'ACTIVE'::fitness.account_status, 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now())
+                """,
+                userId, email, passwordEncoder.encode("Password123!"));
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
+                SELECT ?, r.id, ?, now()
+                FROM fitness.roles r
+                WHERE r.code = 'ADMIN'
+                """,
+                userId, userId);
+
+        return userId;
+    }
+
+    @Test
+    @DisplayName("Authority: Trainer without coaching relationship is rejected with 403 COACHING_RELATIONSHIP_REQUIRED")
+    void trainerAuthority_noCoachingRelationship_rejected() throws Exception {
+        UUID studentId = createActiveStudentUser("student.norel@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.norel@example.com", true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal No Relationship");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.norel@example.com", List.of("TRAINER"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Proposed Title",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal without coaching relationship",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Authority: Trainer with ENDED or PAUSED coaching relationship is rejected with 403 COACHING_RELATIONSHIP_REQUIRED")
+    void trainerAuthority_endedOrPausedRelationship_rejected() throws Exception {
+        UUID studentId = createActiveStudentUser("student.relended@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.relended@example.com", true, true);
+        UUID relId = createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal Ended Rel");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.relended@example.com", List.of("TRAINER"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Proposed Title",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal with non-active relationship",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        // 1. ENDED relationship
+        jdbcTemplate.update("UPDATE fitness.coaching_relationships SET status = 'ENDED'::fitness.coaching_relationship_status WHERE id = ?", relId);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
+
+        // 2. PAUSED relationship
+        jdbcTemplate.update("UPDATE fitness.coaching_relationships SET status = 'PAUSED'::fitness.coaching_relationship_status WHERE id = ?", relId);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Authority: Trainer with expired coaching period is rejected with 403 COACHING_RELATIONSHIP_REQUIRED")
+    void trainerAuthority_expiredCoachingPeriod_rejected() throws Exception {
+        UUID studentId = createActiveStudentUser("student.periodexp@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.periodexp@example.com", true, true);
+        UUID relId = createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal Expired Period");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.periodexp@example.com", List.of("TRAINER"));
+
+        // Expire coaching period
+        jdbcTemplate.update("UPDATE fitness.coaching_periods SET started_at = now() - interval '2 days', ended_at = now() - interval '1 day' WHERE coaching_relationship_id = ?", relId);
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Proposed Title",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal with expired coaching period",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Authority: Trainer with revoked or expired data sharing permission is rejected with 403 DATA_SHARING_PERMISSION_REQUIRED")
+    void trainerAuthority_revokedOrExpiredDataSharingPermission_rejected() throws Exception {
+        UUID studentId = createActiveStudentUser("student.permexp@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.permexp@example.com", true, true);
+        UUID relId = createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal Perm Expired");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.permexp@example.com", List.of("TRAINER"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Proposed Title",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal with invalid permission",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        // 1. Revoked permission
+        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET revoked_at = now() - interval '10 minutes' WHERE relationship_id = ?", relId);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
+
+        // 2. Expired valid_until
+        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET revoked_at = NULL, valid_from = now() - interval '2 days', valid_until = now() - interval '1 day' WHERE relationship_id = ?", relId);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Cross-trainer isolation: unassigned Trainer cannot propose for or view another trainer's student proposal")
+    void trainerAuthority_unassignedTrainerCannotProposeOrView() throws Exception {
+        UUID student1Id = createActiveStudentUser("student.isolation1@example.com");
+        UUID trainer1Id = createActiveTrainerUser("trainer.assigned1@example.com", true, true);
+        createCoachingContext(trainer1Id, student1Id, true, true);
+        UUID goal1Id = createActiveGoal(student1Id, "Student 1 Active Goal");
+
+        UUID student2Id = createActiveStudentUser("student.isolation2@example.com");
+        UUID trainer2Id = createActiveTrainerUser("trainer.unassigned2@example.com", true, true);
+        createCoachingContext(trainer2Id, student2Id, true, true);
+
+        String trainer1Token = createAccessToken(trainer1Id, "trainer.assigned1@example.com", List.of("TRAINER"));
+        String trainer2Token = createAccessToken(trainer2Id, "trainer.unassigned2@example.com", List.of("TRAINER"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Trainer 2 Intrusion Attempt",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Trying to propose cross-student",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        // Trainer 2 cannot propose for Student 1's goal
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goal1Id)
+                        .header("Authorization", "Bearer " + trainer2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
+
+        // Trainer 1 creates proposal
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goal1Id)
+                        .header("Authorization", "Bearer " + trainer1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID prop1Id = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // Trainer 2 cannot view Trainer 1's proposal detail
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", prop1Id)
+                        .header("Authorization", "Bearer " + trainer2Token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Proposal authority: Trainer and Admin cannot decide proposal (403 Forbidden)")
+    void proposalDecision_trainerAndAdminCannotDecideProposal() throws Exception {
+        UUID studentId = createActiveStudentUser("student.decideguard@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.decideguard@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Decide Guard Goal");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.decideguard@example.com", List.of("TRAINER"));
+
+        // Trainer creates proposal
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Proposal To Decide",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+        );
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        UUID adminId = createActiveAdminUser("admin.decideguard@example.com");
+        String adminToken = createAccessToken(adminId, "admin.decideguard@example.com", List.of("ADMIN"));
+
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Accepting on behalf of student");
+
+        // Trainer cannot decide proposal
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+
+        // Admin cannot decide proposal
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+
+        // Admin cannot create proposal
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+    }
+
+    @Test
+    @DisplayName("Security check: unauthenticated requests to proposal endpoints return 401 UNAUTHORIZED")
+    void proposals_unauthenticatedRequests_return401() throws Exception {
+        UUID randomId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", randomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/{id}", randomId))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{id}/decisions", randomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Terminal state enforcement: deciding an already ACCEPTED proposal returns 409 GOAL_PROPOSAL_ALREADY_DECIDED")
+    void decideProposal_alreadyAccepted_returns409GoalProposalAlreadyDecided() throws Exception {
+        UUID studentId = createActiveStudentUser("student.alreadyacc@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.alreadyacc@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Base Goal Accepted");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.alreadyacc@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.alreadyacc@example.com", List.of("STUDENT"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Title Accepted",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Valid proposal reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+        );
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // 1. Accept proposal -> 200 OK
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Accepting initial");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("ACCEPTED")));
+
+        int versionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(versionCount).isEqualTo(2);
+
+        int historyCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId);
+        assertThat(historyCount).isEqualTo(2); // PENDING, ACCEPTED
+
+        // 2. Re-accept -> 409 Conflict
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_PROPOSAL_ALREADY_DECIDED")));
+
+        // 3. Reject on already ACCEPTED -> 409 Conflict
+        DecideGoalProposalRequest rejectReq = new DecideGoalProposalRequest(ProposalDecision.REJECT, "Trying to reject accepted");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(rejectReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_PROPOSAL_ALREADY_DECIDED")));
+
+        // Persisted state intact: no extra versions, no extra history entries
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Terminal state enforcement: deciding an already REJECTED proposal returns 409 GOAL_PROPOSAL_ALREADY_DECIDED")
+    void decideProposal_alreadyRejected_returns409GoalProposalAlreadyDecided() throws Exception {
+        UUID studentId = createActiveStudentUser("student.alreadyrej@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.alreadyrej@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Base Goal Rejected");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.alreadyrej@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.alreadyrej@example.com", List.of("STUDENT"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Title Rejected",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Valid proposal reason",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+        );
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // 1. Reject proposal -> 200 OK
+        DecideGoalProposalRequest rejectReq = new DecideGoalProposalRequest(ProposalDecision.REJECT, "First rejection note");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(rejectReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("REJECTED")));
+
+        int versionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(versionCount).isEqualTo(1); // No new version on reject
+
+        int historyCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId);
+        assertThat(historyCount).isEqualTo(2); // PENDING, REJECTED
+
+        // 2. Re-reject -> 409 Conflict
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(rejectReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_PROPOSAL_ALREADY_DECIDED")));
+
+        // 3. Accept on already REJECTED -> 409 Conflict
+        DecideGoalProposalRequest acceptReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, "Trying to accept rejected");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(acceptReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_PROPOSAL_ALREADY_DECIDED")));
+
+        // Persisted state intact: no version created, history count remains 2
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.goal_proposal_status_history WHERE goal_proposal_id = ?", Integer.class, proposalId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: creating proposal for non-ACTIVE goals (DRAFT, PAUSED, terminal) is rejected with 409")
+    void createGoalProposal_nonActiveGoal_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.nonactiveprop@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.nonactiveprop@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+
+        String trainerToken = createAccessToken(trainerId, "trainer.nonactiveprop@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.nonactiveprop@example.com", List.of("STUDENT"));
+
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Title NonActive",
+                LocalDate.now(),
+                LocalDate.now().plusDays(60),
+                60,
+                "Proposal on non-active goal",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+        );
+
+        // 1. DRAFT goal
+        MvcResult draftRes = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Draft Goal Prop",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID draftGoalId = UUID.fromString((String) objectMapper.readValue(draftRes.getResponse().getContentAsString(), Map.class).get("id"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", draftGoalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+        // 2. PAUSED goal
+        UUID activeGoalId = createActiveGoal(studentId, "Goal To Pause");
+        mockMvc.perform(post("/api/v1/fitness-goals/" + activeGoalId + "/pause")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Pausing goal\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", activeGoalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+        // 3. Terminal goal
+        for (String terminalState : List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED")) {
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?", terminalState, activeGoalId);
+
+            mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", activeGoalId)
+                            .header("Authorization", "Bearer " + trainerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(proposalReq)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+        }
+    }
+
+    @Test
+    @DisplayName("Proposal rejection: preserves current active goal, version, objectives, and targets completely intact")
+    void decideProposal_reject_preservesCurrentActiveGoalAndVersion() throws Exception {
+        UUID studentId = createActiveStudentUser("student.rejintact@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.rejintact@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Stable Goal Pre Reject");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.rejintact@example.com", List.of("TRAINER"));
+        String studentToken = createAccessToken(studentId, "student.rejintact@example.com", List.of("STUDENT"));
+
+        // Trainer proposes change
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Radical Changes",
+                LocalDate.now(),
+                LocalDate.now().plusDays(45),
+                45,
+                "Intense short-term cycle",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(70), null, null, (short) 1, null, null, null, null))
+        );
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // Student rejects proposal with note
+        DecideGoalProposalRequest rejectReq = new DecideGoalProposalRequest(ProposalDecision.REJECT, "I prefer the current plan");
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", proposalId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(rejectReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("REJECTED")));
+
+        // Verify goal and versions in database
+        String goalStatus = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        String goalTitle = jdbcTemplate.queryForObject("SELECT title FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(goalStatus).isEqualTo("ACTIVE");
+        assertThat(goalTitle).isEqualTo("Stable Goal Pre Reject");
+
+        Integer versionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(versionCount).isEqualTo(1);
+
+        Boolean isCurrent = jdbcTemplate.queryForObject("SELECT (effective_until IS NULL) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1", Boolean.class, goalId);
+        assertThat(isCurrent).isTrue();
+    }
 }

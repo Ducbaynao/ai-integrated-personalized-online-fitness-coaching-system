@@ -1108,4 +1108,146 @@ class FitnessGoalVersionIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
     }
+
+    private UUID createActiveAdminUser(String email) {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users (id, email, password_hash, display_name, phone_number, status, preferred_locale, timezone, created_at, updated_at)
+                VALUES (?, ?, ?, 'System Admin', '+84900000001', 'ACTIVE'::fitness.account_status, 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now())
+                """,
+                userId, email, passwordEncoder.encode("Password123!"));
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
+                SELECT ?, r.id, ?, now()
+                FROM fitness.roles r
+                WHERE r.code = 'ADMIN'
+                """,
+                userId, userId);
+
+        return userId;
+    }
+
+    @Test
+    @DisplayName("Lifecycle validation: cannot create version on PAUSED goal (409 INVALID_LIFECYCLE_TRANSITION)")
+    void createGoalVersion_pausedGoal_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.pausedver@example.com");
+        String token = createAccessToken(studentId, "student.pausedver@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, token, "Active Goal Before Pause");
+
+        jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = 'PAUSED'::fitness.lifecycle_status WHERE id = ?", goalId);
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Version on Paused Goal",
+                                  "startDate": "2026-10-01",
+                                  "targetDate": "2027-01-31",
+                                  "durationDays": 122,
+                                  "changeReason": "Attempt on paused goal",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+    }
+
+    @Test
+    @DisplayName("Lifecycle validation: cannot create version on terminal goals (COMPLETED, ENDED, ABANDONED, REPLACED) (409 INVALID_LIFECYCLE_TRANSITION)")
+    void createGoalVersion_terminalGoals_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.terminalver@example.com");
+        String token = createAccessToken(studentId, "student.terminalver@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, token, "Active Goal Before Terminal");
+
+        List<String> terminalStatuses = List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED");
+
+        for (String terminalStatus : terminalStatuses) {
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?",
+                    terminalStatus, goalId);
+
+            mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Version on Terminal Goal",
+                                      "startDate": "2026-10-01",
+                                      "targetDate": "2027-01-31",
+                                      "durationDays": 122,
+                                      "changeReason": "Attempt on terminal goal",
+                                      "objectives": [
+                                        { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                      ]
+                                    }
+                                    """))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+        }
+    }
+
+    @Test
+    @DisplayName("Authorization: Admin cannot create goal version -> 403 STUDENT_CAPABILITY_UNAVAILABLE")
+    void authorization_adminCannotCreateGoalVersion() throws Exception {
+        UUID studentId = createActiveStudentUser("student.adminver@example.com");
+        String studentToken = createAccessToken(studentId, "student.adminver@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, studentToken, "Student Goal For Admin Version Attempt");
+
+        UUID adminId = createActiveAdminUser("admin.vercheck@example.com");
+        String adminToken = createAccessToken(adminId, "admin.vercheck@example.com", List.of("ADMIN"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Admin Version Attempt",
+                                  "startDate": "2026-10-01",
+                                  "targetDate": "2027-01-31",
+                                  "durationDays": 122,
+                                  "changeReason": "Admin direct version attempt",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("Authorization: Unauthenticated version requests return 401 Unauthorized")
+    void authorization_unauthenticatedRequests_return401() throws Exception {
+        UUID studentId = createActiveStudentUser("student.unauthver@example.com");
+        String token = createAccessToken(studentId, "student.unauthver@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, token, "Goal For Unauth Version Check");
+
+        // 1. Unauthenticated POST /api/v1/fitness-goals/{goalId}/versions
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/versions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Unauthenticated Version",
+                                  "startDate": "2026-10-01",
+                                  "targetDate": "2027-01-31",
+                                  "durationDays": 122,
+                                  "changeReason": "Unauthenticated attempt",
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        // 2. Unauthenticated GET /api/v1/fitness-goals/{goalId}/versions
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/versions"))
+                .andExpect(status().isUnauthorized());
+
+        // 3. Unauthenticated GET /api/v1/fitness-goals/{goalId}/versions/{versionId}
+        mockMvc.perform(get("/api/v1/fitness-goals/" + goalId + "/versions/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
 }

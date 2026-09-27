@@ -71,6 +71,55 @@ stateDiagram-v2
 - **Client & Scope Boundary**:
   - GOAL-05 implements backend domain, API, concurrency, persistence, and audit. Mobile UI integration is deferred to GOAL-06.
 
+### Goal Authorization & Lifecycle Verification Matrix (GOAL-07)
+
+The following matrix documents the verified invariants across role permissions, coaching relationships, coaching periods, data sharing permissions, goal states, and side effect guarantees:
+
+| Operation | Actor Role | Relationship / Period / Permission | Goal / Proposal State | Expected Status & Error Code | Persisted Side Effects & Integrity |
+|---|---|---|---|---|---|
+| Create Goal (`activateImmediately=true`) | Unauthenticated | N/A | None | 401 Unauthorized | No DB write |
+| Create Goal (`activateImmediately=true`) | TRAINER / ADMIN | N/A | None | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | No DB write |
+| Create Goal (`activateImmediately=true`) | STUDENT | N/A | Existing ACTIVE goal | 409 `ACTIVE_FITNESS_GOAL_ALREADY_EXISTS` | Zero partial writes; existing goal untouched |
+| Create Goal (`activateImmediately=true`) (Concurrent) | STUDENT | N/A | None | 1x 201 Created, 1x 409 `ACTIVE_FITNESS_GOAL_ALREADY_EXISTS` | Concurrency lock allows exactly 1 active goal |
+| Activate Goal | STUDENT | N/A | DRAFT | 200 OK | Status -> ACTIVE, status history appended, audit log created |
+| Activate Goal | STUDENT | N/A | ACTIVE | 409 `INVALID_LIFECYCLE_TRANSITION` | No state change, no duplicate history |
+| Activate Goal | STUDENT | N/A | PAUSED | 409 `INVALID_LIFECYCLE_TRANSITION` | Must use `/resume`; no state change |
+| Activate Goal | STUDENT | N/A | COMPLETED, ENDED, ABANDONED, REPLACED | 409 `INVALID_LIFECYCLE_TRANSITION` | Terminal goals cannot be activated |
+| Activate Goal | TRAINER / ADMIN | N/A | DRAFT | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | No DB write |
+| Pause Goal | STUDENT (Owner) | N/A | ACTIVE | 200 OK | Status -> PAUSED, status history appended, audit log created |
+| Pause Goal | STUDENT (Owner) | N/A | PAUSED | 409 `GOAL_LIFECYCLE_CONFLICT` | No state change, no duplicate history |
+| Pause Goal | STUDENT (Owner) | N/A | DRAFT / Terminal | 409 `GOAL_LIFECYCLE_CONFLICT` | Cannot pause non-active goal |
+| Pause Goal | Non-owner STUDENT | N/A | ACTIVE | 403 `ACCESS_DENIED` | No state change |
+| Pause Goal | TRAINER / ADMIN | N/A | ACTIVE | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | No state change |
+| Resume Goal | STUDENT (Owner) | N/A | PAUSED | 200 OK | Status -> ACTIVE, status history appended, audit log created |
+| Resume Goal | STUDENT (Owner) | N/A | ACTIVE / DRAFT / Terminal | 409 `GOAL_LIFECYCLE_CONFLICT` | Cannot resume non-paused goal |
+| Resume Goal | Non-owner STUDENT | N/A | PAUSED | 403 `ACCESS_DENIED` | No state change |
+| Resume Goal | TRAINER / ADMIN | N/A | PAUSED | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | No state change |
+| Create Version | STUDENT (Owner) | N/A | ACTIVE | 201 Created | New version open (`effective_until IS NULL`), previous version closed, audit logged |
+| Create Version | STUDENT (Owner) | N/A | PAUSED | 409 `INVALID_LIFECYCLE_TRANSITION` | No new version; version creation prohibited while paused |
+| Create Version | STUDENT (Owner) | N/A | DRAFT / Terminal | 409 `INVALID_LIFECYCLE_TRANSITION` | Non-active goals cannot be versioned |
+| Create Version | Non-owner STUDENT | N/A | ACTIVE | 403 `ACCESS_DENIED` | No DB write |
+| Create Version | TRAINER / ADMIN | N/A | ACTIVE | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | Direct versioning requires student ownership |
+| Create Transition | STUDENT (Owner) | N/A | ACTIVE | 201 Created | Old goal -> REPLACED, new goal -> ACTIVE, transition row created, workout/nutrition plans retained on old goal |
+| Create Transition | STUDENT (Owner) | N/A | PAUSED | 409 `INVALID_LIFECYCLE_TRANSITION` | Cannot transition paused goal |
+| Create Transition | STUDENT (Owner) | N/A | Terminal | 409 `INVALID_LIFECYCLE_TRANSITION` | Cannot transition terminal goal |
+| Create Transition | TRAINER / ADMIN | N/A | ACTIVE | 403 `STUDENT_CAPABILITY_UNAVAILABLE` | Direct transition requires Student ownership |
+| Create Proposal | TRAINER | ACTIVE relationship, active period, valid data sharing | Student goal ACTIVE | 201 Created | Proposal PENDING created, audit logged |
+| Create Proposal | TRAINER | No relationship | Student goal ACTIVE | 403 `COACHING_RELATIONSHIP_REQUIRED` | No DB write |
+| Create Proposal | TRAINER | Relationship ENDED / PAUSED | Student goal ACTIVE | 403 `COACHING_RELATIONSHIP_REQUIRED` | No DB write |
+| Create Proposal | TRAINER | Period expired (`ended_at < now()`) | Student goal ACTIVE | 403 `COACHING_RELATIONSHIP_REQUIRED` | No DB write |
+| Create Proposal | TRAINER | Permission revoked / expired | Student goal ACTIVE | 403 `DATA_SHARING_PERMISSION_REQUIRED` | No DB write |
+| Create Proposal | TRAINER | Unassigned Trainer | Student goal ACTIVE | 403 `COACHING_RELATIONSHIP_REQUIRED` | Cross-trainer isolation enforced |
+| Create Proposal | ADMIN | N/A | Student goal ACTIVE | 403 `ACCESS_DENIED` | Admin cannot propose coaching changes |
+| Create Proposal | TRAINER | Valid coaching relationship | Student goal PAUSED / Terminal | 409 `INVALID_LIFECYCLE_TRANSITION` | Cannot propose changes to non-active goal |
+| Decide Proposal (Accept) | STUDENT (Owner) | N/A | Proposal PENDING, goal ACTIVE | 200 OK | Proposal -> ACCEPTED; creates new version or replaces goal depending on intent; proposal status history appended |
+| Decide Proposal (Reject) | STUDENT (Owner) | N/A | Proposal PENDING, goal ACTIVE | 200 OK | Proposal -> REJECTED; proposal status history appended; student goal, versions, targets remain unchanged |
+| Decide Proposal | STUDENT (Owner) | N/A | Proposal ACCEPTED / REJECTED | 409 `GOAL_PROPOSAL_ALREADY_DECIDED` | Terminal proposal state cannot be decided again |
+| Decide Proposal | TRAINER / ADMIN | N/A | Proposal PENDING | 403 `ACCESS_DENIED` | Only Student has decision authority |
+
+> [!NOTE]
+> **Duplicate Lifecycle Replay Safety:** The current contract handles repeated or duplicate lifecycle mutations (activate, pause, resume) safely by returning deterministic 409 Conflict status codes with zero duplicate status history or audit log creation. This establishes duplicate lifecycle replay safety; client-specified `Idempotency-Key` headers are not part of the current REST contract and are not claimed.
+
 ## Workout Plan and execution
 
 Workout Plan has ordered versions for significant change. Planned sessions generated from a version retain that source reference. Minor adjustments record a scoped change without rewriting the version that originally produced historical sessions.
