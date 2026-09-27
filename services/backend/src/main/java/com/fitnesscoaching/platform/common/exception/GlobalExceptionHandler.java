@@ -313,6 +313,17 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(ExerciseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleExerciseNotFound(ExerciseNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "EXERCISE_NOT_FOUND",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(FitnessGoalAccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleFitnessGoalAccessDenied(FitnessGoalAccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(

@@ -31,6 +31,8 @@
 
 ## Component instructions
 
+- Project skills live under `.agent/skills/`. Read `.agent/skills/digital-fitness-core/SKILL.md` for every project task, then load the focused skill for the area being changed.
+- For Student Mobile, Trainer Mobile, Admin Web, navigation, UX flows, design tokens, shared UI components, accessibility, or Figma-to-code work, also read `.agent/skills/digital-fitness-ui/SKILL.md` and the references it routes to.
 - Follow `apps/mobile/AGENTS.md` before changing Expo code.
 - Add component-specific `AGENTS.md` files only when the component needs additional rules.
 

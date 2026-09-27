@@ -33,7 +33,7 @@ export function CapabilitySwitcher() {
     <View
       testID="capability-switcher"
       accessibilityRole="radiogroup"
-      accessibilityLabel="Switch active profile capability"
+      accessibilityLabel="Chuyển hồ sơ đang sử dụng"
       style={[
         styles.container,
         {
@@ -45,7 +45,7 @@ export function CapabilitySwitcher() {
         testID="switch-to-student"
         accessibilityRole="radio"
         accessibilityState={{ selected: isStudentActive }}
-        accessibilityLabel="Student Mode"
+        accessibilityLabel="Hồ sơ học viên"
         onPress={() => handleSelect('STUDENT')}
         style={[
           styles.tab,
@@ -63,7 +63,7 @@ export function CapabilitySwitcher() {
               fontWeight: isStudentActive ? '700' : '500',
             },
           ]}>
-          Student Mode
+          Học viên
         </Text>
       </Pressable>
 
@@ -71,7 +71,7 @@ export function CapabilitySwitcher() {
         testID="switch-to-trainer"
         accessibilityRole="radio"
         accessibilityState={{ selected: isTrainerActive }}
-        accessibilityLabel="Trainer Mode"
+        accessibilityLabel="Hồ sơ huấn luyện viên"
         onPress={() => handleSelect('TRAINER')}
         style={[
           styles.tab,
@@ -89,7 +89,7 @@ export function CapabilitySwitcher() {
               fontWeight: isTrainerActive ? '700' : '500',
             },
           ]}>
-          Trainer Mode
+          Huấn luyện viên
         </Text>
       </Pressable>
     </View>

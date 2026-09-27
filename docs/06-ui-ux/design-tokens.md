@@ -2,6 +2,8 @@
 
 Token triển khai mẫu nằm tại `apps/mobile/src/design-system/tokens`. Mọi component phải lấy giá trị từ token thay vì hardcode.
 
+Các giá trị dưới đây là token sản phẩm đã chuẩn hóa, không phải bản sao 1:1 của SuperFit. Figma MCP xác minh preset dùng `Blue/500 #5B33E6`, `Netral/50 #F8F9FA`, `Netral/100 #F1F3F4` và `Netral/500 #9AA0A6`; sản phẩm cố ý dùng brand/neutral palette bên dưới để có semantic states và consistency riêng. Không đổi token code chỉ để khớp preset nếu chưa có quyết định design-system.
+
 ## Màu
 
 | Token | Giá trị | Mục đích |

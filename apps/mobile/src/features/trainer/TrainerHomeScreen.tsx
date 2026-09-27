@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,20 @@ export function TrainerHomeScreen() {
   const { user, logout } = useAuth();
   const isDark = useColorScheme() === 'dark';
   const themeColors = getSemanticColors(isDark);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const isDualRole =
     Boolean(user?.capabilities?.hasStudentProfile) &&
@@ -43,14 +58,14 @@ export function TrainerHomeScreen() {
       <View style={styles.header}>
         <View style={[styles.roleTag, { backgroundColor: colors.brand[50] }]}>
           <Text style={[styles.roleTagText, { color: colors.brand[700] }]}>
-            TRAINER WORKSPACE
+            KHÔNG GIAN HUẤN LUYỆN VIÊN
           </Text>
         </View>
         <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-          Welcome, {user?.displayName || user?.email}
+          Chào {user?.displayName || user?.email}
         </Text>
         <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-          Trainer capability is active. Manage your coaching profile and details.
+          Quản lý hồ sơ nghề nghiệp và trạng thái quyền huấn luyện của bạn.
         </Text>
       </View>
 
@@ -70,7 +85,7 @@ export function TrainerHomeScreen() {
             styles.cardTitle,
             { color: themeColors.textPrimary },
           ]}>
-          Coaching Authority: {canCoach ? 'Authorized' : 'Disabled (Verification Required)'}
+          Quyền huấn luyện: {canCoach ? 'Đã được cấp' : 'Chờ xác minh'}
         </Text>
         <Text
           style={[
@@ -78,8 +93,8 @@ export function TrainerHomeScreen() {
             { color: themeColors.textSecondary },
           ]}>
           {canCoach
-            ? 'Your coaching authority is active. You may accept and coach students.'
-            : 'In accordance with platform governance, having a Trainer Profile does not grant coaching authority. Formal review and verification by platform administration are required before you can coach students.'}
+            ? 'Bạn có thể nhận và huấn luyện học viên theo quyền hiện tại.'
+            : 'Hồ sơ huấn luyện viên chưa tự động cấp quyền huấn luyện. Quản trị viên cần xác minh trước khi bạn có thể nhận học viên.'}
         </Text>
       </View>
 
@@ -93,18 +108,18 @@ export function TrainerHomeScreen() {
           },
         ]}>
         <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-          Professional Profile
+          Hồ sơ nghề nghiệp
         </Text>
         <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
-          View and update your public handle, bio, coaching experience, and student acceptance status.
+          Xem và cập nhật tên hiển thị, giới thiệu, kinh nghiệm và trạng thái nhận học viên.
         </Text>
         <Pressable
           testID="trainer-view-profile-button"
           accessibilityRole="button"
-          accessibilityLabel="View or edit your trainer profile"
+          accessibilityLabel="Xem hoặc chỉnh sửa hồ sơ huấn luyện viên"
           onPress={() => router.push('/(app)/trainer-profile')}
           style={[styles.primaryButton, { backgroundColor: themeColors.primary }]}>
-          <Text style={styles.primaryButtonText}>View & Edit Trainer Profile</Text>
+          <Text style={styles.primaryButtonText}>Xem và chỉnh sửa hồ sơ</Text>
         </Pressable>
       </View>
 
@@ -120,20 +135,19 @@ export function TrainerHomeScreen() {
             },
           ]}>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            Want to train as a student?
+            Bạn cũng muốn tự tập luyện?
           </Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
-            Activate your Student Profile on the same account to track workouts and set personal
-            fitness goals.
+            Kích hoạt Hồ sơ học viên trên cùng tài khoản để theo dõi tập luyện và mục tiêu cá nhân.
           </Text>
           <Pressable
             testID="trainer-cross-activate-student-button"
             accessibilityRole="button"
-            accessibilityLabel="Activate student profile"
+            accessibilityLabel="Kích hoạt hồ sơ học viên"
             onPress={() => router.push('/(onboarding)/student')}
             style={[styles.secondaryButton, { borderColor: themeColors.primary }]}>
             <Text style={[styles.secondaryButtonText, { color: themeColors.primary }]}>
-              Activate Student Profile
+              Kích hoạt hồ sơ học viên
             </Text>
           </Pressable>
         </View>
@@ -144,12 +158,16 @@ export function TrainerHomeScreen() {
         <Pressable
           testID="trainer-logout-button"
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
-          onPress={logout}
+          accessibilityLabel="Đăng xuất"
+          accessibilityState={{ disabled: isLoggingOut, busy: isLoggingOut }}
+          disabled={isLoggingOut}
+          onPress={handleLogout}
           style={styles.logoutButton}>
-          <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>
-            Sign Out
-          </Text>
+          {isLoggingOut ? (
+            <ActivityIndicator color={themeColors.textSecondary} />
+          ) : (
+            <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>Đăng xuất</Text>
+          )}
         </Pressable>
       </View>
     </ScrollView>

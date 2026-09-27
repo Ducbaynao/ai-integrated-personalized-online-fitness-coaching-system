@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
+import { getAuthErrorMessage, localizeFieldErrors } from '@/features/auth/authMessages';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -21,7 +22,7 @@ import { typography } from '@/design-system/tokens/typography';
 
 export function SignInScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, sessionNotice } = useAuth();
   const isDark = useColorScheme() === 'dark';
 
   const [email, setEmail] = useState('');
@@ -36,10 +37,10 @@ export function SignInScreen() {
     // Client validation
     const errors: Record<string, string> = {};
     if (!email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Vui lòng nhập email.';
     }
     if (!password) {
-      errors.password = 'Password is required';
+      errors.password = 'Vui lòng nhập mật khẩu.';
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -60,15 +61,11 @@ export function SignInScreen() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.errorResponse?.fieldErrors && err.errorResponse.fieldErrors.length > 0) {
-          const map: Record<string, string> = {};
-          err.errorResponse.fieldErrors.forEach((fe) => {
-            map[fe.field] = fe.message;
-          });
-          setFieldErrors(map);
+          setFieldErrors(localizeFieldErrors(err.errorResponse.fieldErrors));
         }
-        setErrorMessage(err.message || 'Login failed. Please check your credentials.');
+        setErrorMessage(getAuthErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.'));
       } else {
-        setErrorMessage('An unexpected error occurred. Please try again.');
+        setErrorMessage('Đã xảy ra lỗi ngoài dự kiến. Vui lòng thử lại.');
       }
     } finally {
       setIsSubmitting(false);
@@ -90,10 +87,22 @@ export function SignInScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.title, { color: textColor }]}>Welcome Back</Text>
+          <Text style={[styles.title, { color: textColor }]}>Chào mừng bạn trở lại</Text>
           <Text style={[styles.subtitle, { color: subtextColor }]}>
-            Sign in to your AI Fitness Coaching account
+            Đăng nhập để tiếp tục hành trình tập luyện của bạn
           </Text>
+
+          {sessionNotice && !errorMessage ? (
+            <View
+              testID="session-notice"
+              style={[styles.infoBanner, { backgroundColor: themeColors.warningSurface }]}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite">
+              <Text style={[styles.infoBannerText, { color: themeColors.warningText }]}>
+                {sessionNotice}
+              </Text>
+            </View>
+          ) : null}
 
           {errorMessage && (
             <View
@@ -109,7 +118,7 @@ export function SignInScreen() {
             <TextInput
               testID="email-input"
               accessibilityLabel="Email"
-              accessibilityHint="Enter your email address"
+              accessibilityHint="Nhập địa chỉ email của bạn"
               aria-invalid={!!fieldErrors.email}
               style={[
                 styles.input,
@@ -135,11 +144,11 @@ export function SignInScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Password</Text>
+            <Text style={[styles.label, { color: textColor }]}>Mật khẩu</Text>
             <TextInput
               testID="password-input"
-              accessibilityLabel="Password"
-              accessibilityHint="Enter your password"
+              accessibilityLabel="Mật khẩu"
+              accessibilityHint="Nhập mật khẩu của bạn"
               aria-invalid={!!fieldErrors.password}
               style={[
                 styles.input,
@@ -165,7 +174,7 @@ export function SignInScreen() {
           <Pressable
             testID="submit-sign-in"
             accessibilityRole="button"
-            accessibilityLabel="Sign In"
+            accessibilityLabel="Đăng nhập"
             accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
             style={({ pressed }) => [
               styles.primaryButton,
@@ -182,7 +191,7 @@ export function SignInScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>Đăng nhập</Text>
             )}
           </Pressable>
 
@@ -190,25 +199,25 @@ export function SignInScreen() {
             <Pressable
               testID="link-to-register"
               accessibilityRole="link"
-              accessibilityLabel="Don't have an account? Register"
+              accessibilityLabel="Chưa có tài khoản? Đăng ký"
               onPress={() => router.push('/(auth)/register')}
               style={styles.linkButton}
               disabled={isSubmitting}>
               <Text style={styles.linkText}>
-                {"Don't have an account? "}
-                <Text style={styles.linkTextBold}>Register</Text>
+                {'Chưa có tài khoản? '}
+                <Text style={styles.linkTextBold}>Đăng ký</Text>
               </Text>
             </Pressable>
 
             <Pressable
               testID="link-to-verify-email"
               accessibilityRole="link"
-              accessibilityLabel="Have a verification token? Verify Email"
+              accessibilityLabel="Đã có mã xác minh? Xác minh email"
               onPress={() => router.push('/(auth)/verify-email')}
               style={styles.linkButton}
               disabled={isSubmitting}>
               <Text style={[styles.linkText, { color: colors.brand[500] }]}>
-                Have a verification token? Verify Email
+                Đã có mã xác minh? Xác minh email
               </Text>
             </Pressable>
           </View>
@@ -268,6 +277,14 @@ const styles = StyleSheet.create({
   errorBannerText: {
     ...typography.bodySmall,
     color: semanticColors.dangerText,
+  },
+  infoBanner: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  infoBannerText: {
+    ...typography.bodySmall,
   },
   primaryButton: {
     minHeight: layout.minimumTouchTarget,
