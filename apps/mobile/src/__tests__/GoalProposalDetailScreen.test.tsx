@@ -874,4 +874,3 @@ describe('GoalProposalDetailScreen', () => {
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
   });
 });
-

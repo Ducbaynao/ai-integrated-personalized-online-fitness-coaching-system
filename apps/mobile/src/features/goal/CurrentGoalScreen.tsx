@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -27,6 +27,13 @@ import { GoalScreenSkeleton } from '@/features/goal/components/GoalScreenSkeleto
 
 type MainTab = 'overview' | 'targets' | 'history' | 'proposals';
 
+const CURRENT_GOAL_IDENTITY = 'current:me';
+
+function getGoalRouteIdentity(goalId?: string): string {
+  const trimmed = goalId?.trim();
+  return trimmed ? `goal-detail:${trimmed}` : CURRENT_GOAL_IDENTITY;
+}
+
 interface CurrentGoalScreenProps {
   goalId?: string;
 }
@@ -36,8 +43,11 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const isDark = useColorScheme() === 'dark';
   const themeColors = getSemanticColors(isDark);
 
+  const currentIdentity = getGoalRouteIdentity(goalId);
+
   const [activeTab, setActiveTab] = useState<MainTab>('overview');
   const [goal, setGoal] = useState<FitnessGoal | null>(null);
+  const [loadedIdentity, setLoadedIdentity] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,59 +57,135 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const [modalAction, setModalAction] = useState<'pause' | 'resume'>('pause');
   const [isModalSubmitting, setIsModalSubmitting] = useState(false);
 
-  const requestSeqRef = useRef(0);
+  // Synchronously invalidate and reset route data whenever identity/goalId changes
+  const [renderedIdentity, setRenderedIdentity] = useState(currentIdentity);
+
+  // Independent sequence references for load and mutation operations
+  const loadRequestSeqRef = useRef(0);
+  const mutationRequestSeqRef = useRef(0);
+  const currentIdentityRef = useRef(currentIdentity);
+
+  const isMountedRef = useRef(true);
+  const isFocusedRef = useRef(true);
+
+  // Modal session key to ensure clean mount and discard previous input state
+  const [modalSessionId, setModalSessionId] = useState(0);
+
+  if (renderedIdentity !== currentIdentity) {
+    setRenderedIdentity(currentIdentity);
+    setGoal(null);
+    setLoadedIdentity(null);
+    setError(null);
+    setIsLoading(true);
+    setIsRefreshing(false);
+    setModalVisible(false);
+    setIsModalSubmitting(false);
+    setModalSessionId((prev) => prev + 1);
+    setActiveTab('overview');
+  }
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    currentIdentityRef.current = currentIdentity;
+    loadRequestSeqRef.current++;
+    mutationRequestSeqRef.current++;
+  }, [currentIdentity]);
+
+  const isGoalMatchingRoute =
+    loadedIdentity === currentIdentity && goal !== null;
 
   const loadGoal = useCallback(
     async (options?: { showLoading?: boolean }) => {
-      const requestId = ++requestSeqRef.current;
+      const targetIdentity = currentIdentity;
+      const requestId = ++loadRequestSeqRef.current;
       await Promise.resolve();
+
       if (options?.showLoading) {
         setIsLoading(true);
+        setError(null);
       }
+
       try {
         let fetchedGoal: FitnessGoal;
         if (goalId) {
-          fetchedGoal = await fitnessGoalApi.getGoal(goalId);
+          fetchedGoal = await fitnessGoalApi.getGoal(goalId.trim());
         } else {
           fetchedGoal = await fitnessGoalApi.getCurrentGoal(true);
         }
-        if (requestId === requestSeqRef.current) {
+
+        if (
+          isMountedRef.current &&
+          isFocusedRef.current &&
+          loadRequestSeqRef.current === requestId &&
+          currentIdentityRef.current === targetIdentity
+        ) {
           setGoal(fetchedGoal);
+          setLoadedIdentity(targetIdentity);
           setError(null);
         }
       } catch (err: any) {
-        if (requestId === requestSeqRef.current) {
+        if (
+          isMountedRef.current &&
+          isFocusedRef.current &&
+          loadRequestSeqRef.current === requestId &&
+          currentIdentityRef.current === targetIdentity
+        ) {
           if (err instanceof ApiError && err.status === 404) {
             if (goalId) {
               setError('Goal not found or inaccessible.');
               setGoal(null);
+              setLoadedIdentity(null);
             } else {
               setGoal(null);
+              setLoadedIdentity(targetIdentity);
               setError(null);
             }
           } else {
             setError(err?.message || 'Failed to load fitness goal.');
+            setGoal(null);
+            setLoadedIdentity(null);
           }
         }
       } finally {
-        if (requestId === requestSeqRef.current) {
+        if (
+          isMountedRef.current &&
+          isFocusedRef.current &&
+          loadRequestSeqRef.current === requestId &&
+          currentIdentityRef.current === targetIdentity
+        ) {
           setIsLoading(false);
           setIsRefreshing(false);
         }
       }
     },
-    [goalId]
+    [currentIdentity, goalId]
   );
 
   useFocusEffect(
     useCallback(() => {
-      const seqRef = requestSeqRef;
+      isFocusedRef.current = true;
+      setModalVisible(false);
+      setIsModalSubmitting(false);
+      setModalSessionId((prev) => prev + 1);
+
       const execute = async () => {
         await loadGoal();
       };
       execute();
+
       return () => {
-        seqRef.current++;
+        isFocusedRef.current = false;
+        loadRequestSeqRef.current++;
+        mutationRequestSeqRef.current++;
+        setModalVisible(false);
+        setIsModalSubmitting(false);
+        setModalSessionId((prev) => prev + 1);
       };
     }, [loadGoal])
   );
@@ -110,28 +196,69 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   };
 
   const handleOpenPause = () => {
+    if (!isGoalMatchingRoute || !goal || goal.status !== 'ACTIVE') return;
+    setModalSessionId((prev) => prev + 1);
     setModalAction('pause');
     setModalVisible(true);
   };
 
   const handleOpenResume = () => {
+    if (!isGoalMatchingRoute || !goal || goal.status !== 'PAUSED') return;
+    setModalSessionId((prev) => prev + 1);
     setModalAction('resume');
     setModalVisible(true);
   };
 
   const handleModalSubmit = async (reason: string) => {
-    if (!goal) return;
+    const mutationIdentity = currentIdentity;
+    const currentGoal = goal;
+
+    if (
+      !currentGoal ||
+      !isGoalMatchingRoute ||
+      loadedIdentity !== mutationIdentity ||
+      isModalSubmitting
+    ) {
+      return;
+    }
+
+    const mutationGoalId = currentGoal.id;
+    const mutationSeq = ++mutationRequestSeqRef.current;
+
     setIsModalSubmitting(true);
     try {
       let updatedGoal: FitnessGoal;
       if (modalAction === 'pause') {
-        updatedGoal = await fitnessGoalApi.pauseGoal(goal.id, reason);
+        updatedGoal = await fitnessGoalApi.pauseGoal(mutationGoalId, reason);
       } else {
-        updatedGoal = await fitnessGoalApi.resumeGoal(goal.id, reason);
+        updatedGoal = await fitnessGoalApi.resumeGoal(mutationGoalId, reason);
       }
-      setGoal(updatedGoal);
-      setModalVisible(false);
+
+      if (
+        isMountedRef.current &&
+        isFocusedRef.current &&
+        currentIdentityRef.current === mutationIdentity &&
+        mutationRequestSeqRef.current === mutationSeq
+      ) {
+        // Invalidate any load/refresh requests started before this mutation completed
+        loadRequestSeqRef.current++;
+        setIsLoading(false);
+        setIsRefreshing(false);
+
+        setGoal(updatedGoal);
+        setLoadedIdentity(mutationIdentity);
+        setModalVisible(false);
+      }
     } catch (err: any) {
+      if (
+        !isMountedRef.current ||
+        !isFocusedRef.current ||
+        currentIdentityRef.current !== mutationIdentity ||
+        mutationRequestSeqRef.current !== mutationSeq
+      ) {
+        return;
+      }
+
       let message = 'An unexpected error occurred while updating goal status.';
       if (err instanceof ApiError) {
         if (err.errorResponse?.errorCode === 'ACTIVE_FITNESS_GOAL_ALREADY_EXISTS') {
@@ -151,12 +278,19 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       Alert.alert('Status Update Failed', message);
       throw err;
     } finally {
-      setIsModalSubmitting(false);
+      if (
+        isMountedRef.current &&
+        isFocusedRef.current &&
+        currentIdentityRef.current === mutationIdentity &&
+        mutationRequestSeqRef.current === mutationSeq
+      ) {
+        setIsModalSubmitting(false);
+      }
     }
   };
 
   const renderTabContent = () => {
-    if (!goal) {
+    if (!isGoalMatchingRoute || !goal) {
       if (activeTab === 'proposals') {
         return <GoalProposalsTab isDark={isDark} />;
       }
@@ -267,7 +401,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         {!isLoading && !error && (
           <>
             {/* Quick Actions (Pause / Resume) if Goal Exists */}
-            {goal && (
+            {isGoalMatchingRoute && goal && (
               <View style={styles.actionRow}>
                 {goal.status === 'ACTIVE' && (
                   <Pressable
@@ -361,8 +495,9 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       </ScrollView>
 
       {/* Pause / Resume Modal */}
-      {goal && (
+      {isGoalMatchingRoute && goal && modalVisible && (
         <PauseResumeGoalModal
+          key={modalSessionId}
           visible={modalVisible}
           action={modalAction}
           goalTitle={goal.title}
