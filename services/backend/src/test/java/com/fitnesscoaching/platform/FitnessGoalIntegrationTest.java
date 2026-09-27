@@ -32,12 +32,16 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -1525,9 +1529,9 @@ class FitnessGoalIntegrationTest {
                 """, adminId);
         jdbcTemplate.update("""
                 INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
-                SELECT ?, r.id, ?, now() FROM fitness.roles r WHERE r.code = 'ADMINISTRATOR'
+                SELECT ?, r.id, ?, now() FROM fitness.roles r WHERE r.code = 'ADMIN'
                 """, adminId, adminId);
-        String adminToken = createAccessToken(adminId, "admin.authority@example.com", List.of("ADMINISTRATOR"));
+        String adminToken = createAccessToken(adminId, "admin.authority@example.com", List.of("ADMIN"));
 
         MvcResult createResult = mockMvc.perform(post("/api/v1/fitness-goals")
                         .header("Authorization", "Bearer " + studentToken)
@@ -2447,5 +2451,644 @@ class FitnessGoalIntegrationTest {
                 .andExpect(jsonPath("$.totalElements", is(1)))
                 .andExpect(jsonPath("$.items", hasSize(1)))
                 .andExpect(jsonPath("$.items[0].title", is("Goal B Other Student")));
+    }
+
+    // ==================== GOAL-07 TEST HARDENING ====================
+
+    @Test
+    @DisplayName("Lifecycle guard: activating an already ACTIVE goal is rejected with 409 INVALID_LIFECYCLE_TRANSITION")
+    void activateGoal_whenAlreadyActive_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.alreadyactive@example.com");
+        String token = createAccessToken(studentId, "student.alreadyactive@example.com", List.of("STUDENT"));
+
+        // Create draft goal
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Initial Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // Activate once -> 200 OK
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"First activation\"}"))
+                .andExpect(status().isOk());
+
+        // Re-activate -> 409 INVALID_LIFECYCLE_TRANSITION
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Second activation attempt\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+        // Status remains ACTIVE, exactly 2 history entries (DRAFT, ACTIVE)
+        String status = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(status).isEqualTo("ACTIVE");
+        Integer historyCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(historyCount).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: activating a PAUSED goal is rejected with 409 INVALID_LIFECYCLE_TRANSITION")
+    void activateGoal_whenPaused_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.actpaused@example.com");
+        String token = createAccessToken(studentId, "student.actpaused@example.com", List.of("STUDENT"));
+
+        // Create active goal
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Active Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": true,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // Pause goal
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Taking a break\"}"))
+                .andExpect(status().isOk());
+
+        // Attempt activate on PAUSED goal -> 409 INVALID_LIFECYCLE_TRANSITION
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Attempting activate instead of resume\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+        // Status remains PAUSED
+        String status = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(status).isEqualTo("PAUSED");
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: activating a goal in terminal states (COMPLETED, ENDED, ABANDONED, REPLACED) is rejected with 409")
+    void activateGoal_whenTerminalState_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.actterminal@example.com");
+        String token = createAccessToken(studentId, "student.actterminal@example.com", List.of("STUDENT"));
+
+        List<String> terminalStates = List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED");
+        for (String terminalState : terminalStates) {
+            MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Goal for %s",
+                                      "startDate": "2026-10-01",
+                                      "activateImmediately": false,
+                                      "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                    }
+                                    """.formatted(terminalState)))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+            // Set to terminal state directly in DB
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?", terminalState, goalId);
+
+            mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\": \"Attempting to activate terminal goal\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+            String persisted = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+            assertThat(persisted).isEqualTo(terminalState);
+        }
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: double pause on already PAUSED goal is rejected with 409 GOAL_LIFECYCLE_CONFLICT")
+    void pauseGoal_whenAlreadyPaused_doublePauseRejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.doublepause@example.com");
+        String token = createAccessToken(studentId, "student.doublepause@example.com", List.of("STUDENT"));
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Pause Test Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": true,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // First pause -> 200 OK
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"First pause\"}"))
+                .andExpect(status().isOk());
+
+        // Second pause -> 409 Conflict
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Second pause attempt\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+        // Persisted state intact
+        String status = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+        assertThat(status).isEqualTo("PAUSED");
+        Integer historyCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
+        assertThat(historyCount).isEqualTo(2); // ACTIVE, PAUSED
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: pause on terminal states is rejected with 409 GOAL_LIFECYCLE_CONFLICT")
+    void pauseGoal_whenTerminalState_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.pauseterminal@example.com");
+        String token = createAccessToken(studentId, "student.pauseterminal@example.com", List.of("STUDENT"));
+
+        for (String terminalState : List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED")) {
+            MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Goal for Pause %s",
+                                      "startDate": "2026-10-01",
+                                      "activateImmediately": false,
+                                      "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                    }
+                                    """.formatted(terminalState)))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?", terminalState, goalId);
+
+            mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\": \"Attempting to pause terminal goal\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+            String persisted = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+            assertThat(persisted).isEqualTo(terminalState);
+        }
+    }
+
+    @Test
+    @DisplayName("Lifecycle guard: resume on DRAFT or terminal states is rejected with 409 GOAL_LIFECYCLE_CONFLICT")
+    void resumeGoal_whenDraftOrTerminalState_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.resumeterminal@example.com");
+        String token = createAccessToken(studentId, "student.resumeterminal@example.com", List.of("STUDENT"));
+
+        // 1. Resume on DRAFT goal
+        MvcResult draftRes = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Draft Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID draftGoalId = UUID.fromString((String) objectMapper.readValue(draftRes.getResponse().getContentAsString(), Map.class).get("id"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + draftGoalId + "/resume")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Attempting to resume draft\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+        // 2. Resume on terminal states
+        for (String terminalState : List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED")) {
+            MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Resume Terminal %s",
+                                      "startDate": "2026-10-01",
+                                      "activateImmediately": false,
+                                      "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                    }
+                                    """.formatted(terminalState)))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?", terminalState, goalId);
+
+            mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\": \"Attempting to resume terminal goal\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+            String persisted = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
+            assertThat(persisted).isEqualTo(terminalState);
+        }
+    }
+
+    @Test
+    @DisplayName("Single-active-goal invariant: activateImmediately=true when active goal already exists fails with 409 and leaves no orphan data")
+    void createGoal_activateImmediately_whenActiveGoalAlreadyExists_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.singlegap@example.com");
+        String token = createAccessToken(studentId, "student.singlegap@example.com", List.of("STUDENT"));
+
+        // Create first active goal
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "First Active Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": true,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        // Snapshot existing rows before second call
+        int initialGoalCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goals WHERE student_id = ?", Integer.class, studentId);
+        int initialVersionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions", Integer.class);
+
+        // Attempt second active goal creation
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Second Active Goal Attempt",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": true,
+                                  "objectives": [{ "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("ACTIVE_FITNESS_GOAL_ALREADY_EXISTS")));
+
+        // Zero partial write verification
+        int finalGoalCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goals WHERE student_id = ?", Integer.class, studentId);
+        int finalVersionCount = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions", Integer.class);
+        assertThat(finalGoalCount).isEqualTo(initialGoalCount).isEqualTo(1);
+        assertThat(finalVersionCount).isEqualTo(initialVersionCount);
+    }
+
+    @Test
+    @DisplayName("Single-active-goal concurrency: concurrent create with activateImmediately=true for same student allows exactly one to succeed")
+    void concurrentCreateGoal_activateImmediately_sameStudent_onlyOneSucceeds() throws Exception {
+        UUID studentId = createActiveStudentUser("student.concurrentcreate@example.com");
+        String token = createAccessToken(studentId, "student.concurrentcreate@example.com", List.of("STUDENT"));
+
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+
+        List<Future<MvcResult>> futures = new ArrayList<>();
+        List<Throwable> executionErrors = new CopyOnWriteArrayList<>();
+
+        try {
+            for (int i = 0; i < threadCount; i++) {
+                final int index = i;
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    try {
+                        if (!startLatch.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Timed out waiting for start latch");
+                        }
+                        return mockMvc.perform(post("/api/v1/fitness-goals")
+                                        .header("Authorization", "Bearer " + token)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("""
+                                                {
+                                                  "title": "Concurrent Goal %d",
+                                                  "startDate": "2026-10-01",
+                                                  "activateImmediately": true,
+                                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                                }
+                                                """.formatted(index)))
+                                .andReturn();
+                    } catch (Throwable t) {
+                        executionErrors.add(t);
+                        throw t;
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                }));
+            }
+
+            boolean ready = readyLatch.await(5, TimeUnit.SECONDS);
+            assertThat(ready).as("All worker threads must be ready within timeout").isTrue();
+
+            startLatch.countDown();
+
+            boolean done = doneLatch.await(10, TimeUnit.SECONDS);
+            assertThat(done).as("All worker threads must complete within timeout").isTrue();
+
+            assertThat(executionErrors).as("Worker threads should not encounter unexpected exceptions").isEmpty();
+
+            int successCount = 0;
+            int conflictCount = 0;
+
+            for (Future<MvcResult> future : futures) {
+                MvcResult res = future.get(1, TimeUnit.SECONDS);
+                int statusCode = res.getResponse().getStatus();
+                if (statusCode == 201) {
+                    successCount++;
+                } else if (statusCode == 409) {
+                    conflictCount++;
+                    Map<String, Object> errorMap = objectMapper.readValue(res.getResponse().getContentAsString(), Map.class);
+                    assertThat(errorMap.get("errorCode")).isEqualTo("ACTIVE_FITNESS_GOAL_ALREADY_EXISTS");
+                } else {
+                    org.junit.jupiter.api.Assertions.fail("Unexpected HTTP status: " + statusCode + ", body: " + res.getResponse().getContentAsString());
+                }
+            }
+
+            assertThat(successCount).as("Exactly one creation request should succeed").isEqualTo(1);
+            assertThat(conflictCount).as("Exactly one creation request should conflict").isEqualTo(1);
+
+            Integer activeGoalsInDb = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM fitness.fitness_goals WHERE student_id = ? AND status = 'ACTIVE'",
+                    Integer.class, studentId);
+            assertThat(activeGoalsInDb).isEqualTo(1);
+        } finally {
+            executor.shutdown();
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Data invariants: nullable/missing target fields are preserved as null and never coerced to 0.0")
+    void createGoal_nullableTargetValues_preservedAsNullAndNeverZero() throws Exception {
+        UUID studentId = createActiveStudentUser("student.nulltargets@example.com");
+        String token = createAccessToken(studentId, "student.nulltargets@example.com", List.of("STUDENT"));
+
+        String payload = """
+                {
+                  "title": "Nullable Target Goal",
+                  "startDate": "2026-10-01",
+                  "activateImmediately": false,
+                  "objectives": [
+                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                  ],
+                  "targets": [
+                    {
+                      "metricCode": "WEIGHT",
+                      "startValue": null,
+                      "targetValue": 75.0,
+                      "targetMinValue": null,
+                      "targetMaxValue": null,
+                      "unitCode": "KG",
+                      "notes": null
+                    }
+                  ]
+                }
+                """;
+
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currentVersion.targets[0].startValue", nullValue()))
+                .andExpect(jsonPath("$.currentVersion.targets[0].targetMinValue", nullValue()))
+                .andExpect(jsonPath("$.currentVersion.targets[0].targetMaxValue", nullValue()))
+                .andExpect(jsonPath("$.currentVersion.targets[0].notes", nullValue()))
+                .andReturn();
+
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        Map<String, Object> targetRow = jdbcTemplate.queryForMap(
+                "SELECT start_value, target_min_value, target_max_value, notes FROM fitness.goal_targets gt " +
+                "JOIN fitness.fitness_goal_versions gv ON gt.goal_version_id = gv.id " +
+                "WHERE gv.fitness_goal_id = ?", goalId);
+
+        assertThat(targetRow.get("start_value")).isNull();
+        assertThat(targetRow.get("target_min_value")).isNull();
+        assertThat(targetRow.get("target_max_value")).isNull();
+        assertThat(targetRow.get("notes")).isNull();
+    }
+
+    @Test
+    @DisplayName("Security check: unauthenticated requests to goal endpoints return 401 UNAUTHORIZED")
+    void unauthenticatedRequests_goalEndpoints_return401() throws Exception {
+        UUID randomGoalId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/fitness-goals/me/current"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/fitness-goals/" + randomGoalId))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + randomGoalId + "/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Authority check: Trainer and Admin cannot activate or directly create student fitness goals (403)")
+    void activateAndCreateGoal_trainerAndAdmin_rejectedWith403() throws Exception {
+        UUID studentId = createActiveStudentUser("student.authguard@example.com");
+        String studentToken = createAccessToken(studentId, "student.authguard@example.com", List.of("STUDENT"));
+
+        // Create draft goal as student
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Draft for Auth Guard",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        UUID trainerId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO fitness.users (id, email, password_hash, display_name, phone_number, status, preferred_locale, timezone, created_at, updated_at) " +
+                "VALUES (?, 'coach.guard@example.com', 'hash', 'Coach Guard', '+84909000111', 'ACTIVE'::fitness.account_status, 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now())", trainerId);
+        jdbcTemplate.update("INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at) SELECT ?, r.id, ?, now() FROM fitness.roles r WHERE r.code = 'TRAINER'", trainerId, trainerId);
+        String trainerToken = createAccessToken(trainerId, "coach.guard@example.com", List.of("TRAINER"));
+
+        UUID adminId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO fitness.users (id, email, password_hash, display_name, phone_number, status, preferred_locale, timezone, created_at, updated_at) " +
+                "VALUES (?, 'admin.guard@example.com', 'hash', 'Admin Guard', '+84909000222', 'ACTIVE'::fitness.account_status, 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now())", adminId);
+        jdbcTemplate.update("INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at) SELECT ?, r.id, ?, now() FROM fitness.roles r WHERE r.code = 'ADMIN'", adminId, adminId);
+        String adminToken = createAccessToken(adminId, "admin.guard@example.com", List.of("ADMIN"));
+
+        // Trainer cannot activate goal
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Trainer trying to activate\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+
+        // Admin cannot activate goal
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Admin trying to activate\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+
+        // Trainer cannot create goal
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Trainer Direct Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+
+        // Admin cannot create goal
+        mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Admin Direct Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("Replay safety: Duplicate lifecycle mutation requests (activate, pause, resume) result in 409 conflict with zero duplicate history or audit entries")
+    void duplicateLifecycleReplaySafety_resultsInConflictAndNoDuplicateHistory() throws Exception {
+        UUID studentId = createActiveStudentUser("student.replay@example.com");
+        String token = createAccessToken(studentId, "student.replay@example.com", List.of("STUDENT"));
+
+        // Create draft goal
+        MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Replay Test Goal",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": false,
+                                  "objectives": [{ "goalTypeCode": "STRENGTH", "priority": "PRIMARY" }]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // 1. Activate
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Activation 1\"}"))
+                .andExpect(status().isOk());
+
+        int historyAfterAct = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
+        int auditAfterAct = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId);
+
+        // Replay Activate -> 409 Conflict, counts unchanged
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/activate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Activation 1 replay\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId)).isEqualTo(historyAfterAct);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId)).isEqualTo(auditAfterAct);
+
+        // 2. Pause
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Pause 1\"}"))
+                .andExpect(status().isOk());
+
+        int historyAfterPause = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
+        int auditAfterPause = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId);
+
+        // Replay Pause -> 409 Conflict, counts unchanged
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Pause 1 replay\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId)).isEqualTo(historyAfterPause);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId)).isEqualTo(auditAfterPause);
+
+        // 3. Resume
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Resume 1\"}"))
+                .andExpect(status().isOk());
+
+        int historyAfterResume = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId);
+        int auditAfterResume = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId);
+
+        // Replay Resume -> 409 Conflict, counts unchanged
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/resume")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Resume 1 replay\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("GOAL_LIFECYCLE_CONFLICT")));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id = ?", Integer.class, goalId)).isEqualTo(historyAfterResume);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ?", Integer.class, goalId)).isEqualTo(auditAfterResume);
     }
 }

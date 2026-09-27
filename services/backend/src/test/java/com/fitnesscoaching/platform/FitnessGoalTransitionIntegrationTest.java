@@ -1187,4 +1187,89 @@ class FitnessGoalTransitionIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode", is("FITNESS_GOAL_NOT_FOUND")));
     }
+
+    private UUID createActiveAdminUser(String email) {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users (id, email, password_hash, display_name, phone_number, status, preferred_locale, timezone, created_at, updated_at)
+                VALUES (?, ?, ?, 'System Admin', '+84900000001', 'ACTIVE'::fitness.account_status, 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now())
+                """,
+                userId, email, passwordEncoder.encode("Password123!"));
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
+                SELECT ?, r.id, ?, now()
+                FROM fitness.roles r
+                WHERE r.code = 'ADMIN'
+                """,
+                userId, userId);
+
+        return userId;
+    }
+
+    @Test
+    @DisplayName("Lifecycle: Transition from terminal goals (COMPLETED, ENDED, ABANDONED, REPLACED) is rejected with 409 INVALID_LIFECYCLE_TRANSITION")
+    void createGoalTransition_terminalGoals_rejectedWith409() throws Exception {
+        UUID studentId = createActiveStudentUser("student.terminaltrans@example.com");
+        String token = createAccessToken(studentId, "student.terminaltrans@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, token, "Active Goal Before Terminal");
+
+        List<String> terminalStatuses = List.of("COMPLETED", "ENDED", "ABANDONED", "REPLACED");
+
+        for (String terminalStatus : terminalStatuses) {
+            jdbcTemplate.update("UPDATE fitness.fitness_goals SET status = ?::fitness.lifecycle_status WHERE id = ?",
+                    terminalStatus, goalId);
+
+            String payload = """
+                    {
+                        "title": "Transition From Terminal",
+                        "startDate": "2027-01-01",
+                        "targetDate": "2027-03-31",
+                        "durationDays": 89,
+                        "transitionReason": "Attempt from terminal state",
+                        "objectives": [
+                            { "goalTypeCode": "FAT_LOSS", "priority": "PRIMARY" }
+                        ]
+                    }
+                    """;
+
+            mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/transitions", goalId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(payload))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+        }
+    }
+
+    @Test
+    @DisplayName("Authorization: Admin cannot directly transition a student's fitness goal -> 403 STUDENT_CAPABILITY_UNAVAILABLE")
+    void authorization_adminCannotDirectlyTransitionStudentGoal() throws Exception {
+        UUID studentId = createActiveStudentUser("student.admintrans@example.com");
+        String studentToken = createAccessToken(studentId, "student.admintrans@example.com", List.of("STUDENT"));
+        UUID goalId = createActiveGoal(studentId, studentToken, "Goal for Admin Transition Attempt");
+
+        UUID adminId = createActiveAdminUser("admin.transcheck@example.com");
+        String adminToken = createAccessToken(adminId, "admin.transcheck@example.com", List.of("ADMIN"));
+
+        String payload = """
+                {
+                    "title": "Admin Transition Attempt",
+                    "startDate": "2027-01-01",
+                    "targetDate": "2027-03-31",
+                    "durationDays": 89,
+                    "transitionReason": "Admin transition attempt",
+                    "objectives": [
+                        { "goalTypeCode": "FAT_LOSS", "priority": "PRIMARY" }
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/transitions", goalId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("STUDENT_CAPABILITY_UNAVAILABLE")));
+    }
 }
