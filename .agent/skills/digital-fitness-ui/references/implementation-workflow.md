@@ -16,7 +16,7 @@
 5. Record missing actors, states, or components as `NOT FOUND IN INSPECTED NODES`; do not infer that they exist elsewhere in the file.
 6. Compare the verified design with `docs/06-ui-ux`. Product rules and project tokens remain authoritative when the preset conflicts with them.
 
-The current SuperFit file/node evidence and known gaps are maintained in `../../../docs/06-ui-ux/references/superfit-reference.md`. Re-inspect the relevant node when implementation depends on visual detail; the reference is an audit trail, not a substitute for MCP context.
+The current SuperFit file/node evidence and known gaps are maintained in `../../../../docs/06-ui-ux/references/superfit-reference.md`. Re-inspect the relevant node when implementation depends on visual detail; the reference is an audit trail, not a substitute for MCP context.
 
 ## Map design to code
 
