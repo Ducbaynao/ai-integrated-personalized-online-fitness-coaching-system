@@ -3,9 +3,9 @@ info:
   title: AI Integrated Personalized Online Fitness Coaching System API
   version: 0.1.0
   description: >-
-    Executable REST contract for Phase 1 Milestone 1 Identity and Common
-    Account. Spring Boot is the business authority. Creating a Trainer Profile
-    or submitting a Trainer Application does not grant coaching authority.
+    Executable REST contract for implemented platform capabilities. Spring Boot
+    is the business authority. Creating a Trainer Profile or submitting a Trainer
+    Application does not grant coaching authority.
   license:
     name: License decision pending
 servers:
@@ -26,8 +26,216 @@ tags:
     description: Verification review, approval, and rejection of trainer applications by platform administrators.
   - name: Fitness Goal
     description: Student-owned fitness goal management, versioning, objectives, and measurable targets.
+  - name: Exercise Catalog
+    description: Authenticated Student and Trainer read access to the active Exercise catalog.
 
 paths:
+  /exercises:
+    get:
+      tags: [Exercise Catalog]
+      operationId: searchExercises
+      summary: Search and filter active Exercises
+      description: >-
+        Returns only ACTIVE, non-deleted Exercises and active variations. Values repeated within
+        one filter dimension are combined with OR; different filter dimensions are combined with
+        AND. Search is a case-insensitive literal substring match over Exercise name, code,
+        description, and active Variation name/code. Results use deterministic ordering by
+        case-insensitive Exercise name ascending, then Exercise ID ascending. DRAFT, INACTIVE,
+        and ARCHIVED content is never returned by this endpoint.
+      parameters:
+        - name: query
+          in: query
+          description: Literal substring to search; `%` and `_` are treated as ordinary characters.
+          schema: { type: string, maxLength: 120 }
+        - name: categoryCodes
+          in: query
+          description: Category codes; multiple values are ORed.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { type: string, minLength: 1, maxLength: 60 }
+        - name: muscleGroupCodes
+          in: query
+          description: Muscle-group codes; multiple values are ORed across active Variations.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { type: string, minLength: 1, maxLength: 60 }
+        - name: equipmentCodes
+          in: query
+          description: Equipment codes; multiple values are ORed across active Variations.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { type: string, minLength: 1, maxLength: 60 }
+        - name: tagCodes
+          in: query
+          description: Exercise tag codes; multiple values are ORed.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { type: string, minLength: 1, maxLength: 80 }
+        - name: difficulties
+          in: query
+          description: Exercise difficulty values; multiple values are ORed.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { $ref: '#/components/schemas/ExerciseDifficulty' }
+        - name: movementPatterns
+          in: query
+          description: Movement-pattern values from filter metadata; multiple values are ORed.
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 20
+            items: { type: string, minLength: 1, maxLength: 60 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paginated active Exercise catalog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExerciseCatalogPageResponse' }
+              example:
+                items:
+                  - id: 10000000-0000-0000-0000-000000000001
+                    code: SYNTH_BODYWEIGHT_SQUAT
+                    name: Synthetic Bodyweight Squat
+                    category: { code: STRENGTH, name: Strength }
+                    description: Synthetic lower-body exercise for development testing.
+                    difficulty: BEGINNER
+                    movementPattern: SQUAT
+                    unilateral: false
+                    primaryMuscles:
+                      - { code: QUADRICEPS, name: Quadriceps }
+                    equipment:
+                      - { code: BODYWEIGHT, name: Bodyweight }
+                    tags:
+                      - { code: BEGINNER_FRIENDLY, name: Beginner Friendly }
+                    variationCount: 1
+                    mediaAvailable: false
+                page: 0
+                size: 20
+                totalItems: 1
+                totalPages: 1
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Authenticated User does not have Student or Trainer capability
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /exercises/filter-metadata:
+    get:
+      tags: [Exercise Catalog]
+      operationId: getExerciseFilterMetadata
+      summary: Get filter metadata for the active Exercise catalog
+      description: >-
+        Returns only categories, muscle groups, equipment, tags, difficulties, and movement
+        patterns currently connected to ACTIVE, non-deleted Exercises through active Variations
+        where applicable.
+      responses:
+        '200':
+          description: Filter metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExerciseFilterMetadataResponse' }
+              example:
+                categories:
+                  - { code: STRENGTH, name: Strength }
+                muscleGroups:
+                  - { code: QUADRICEPS, name: Quadriceps, parentCode: null }
+                equipment:
+                  - { code: BODYWEIGHT, name: Bodyweight }
+                tags:
+                  - { code: BEGINNER_FRIENDLY, name: Beginner Friendly }
+                difficulties: [BEGINNER]
+                movementPatterns: [SQUAT]
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Authenticated User does not have Student or Trainer capability
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /exercises/{exerciseId}:
+    get:
+      tags: [Exercise Catalog]
+      operationId: getExerciseDetail
+      summary: Get an active Exercise detail
+      description: >-
+        Returns an ACTIVE, non-deleted Exercise with active Variations, muscles, equipment,
+        guidance, tags, and media metadata/reference. Storage bucket, object key, download URL,
+        and presigned URL are not exposed. A missing, DRAFT, INACTIVE, or ARCHIVED Exercise
+        returns the same 404 behavior to avoid resource enumeration.
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Active Exercise detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExerciseDetailResponse' }
+              example:
+                id: 10000000-0000-0000-0000-000000000001
+                code: SYNTH_BODYWEIGHT_SQUAT
+                name: Synthetic Bodyweight Squat
+                category: { code: STRENGTH, name: Strength }
+                description: Synthetic lower-body exercise for development testing.
+                instructions: Keep a stable stance and move through a comfortable range.
+                difficulty: BEGINNER
+                movementPattern: SQUAT
+                unilateral: false
+                variations:
+                  - id: 20000000-0000-0000-0000-000000000001
+                    code: SYNTH_BODYWEIGHT_SQUAT_STANDARD
+                    name: Synthetic Bodyweight Squat - Standard
+                    description: Standard synthetic variation.
+                    instructions: Keep a stable stance and controlled tempo.
+                    difficulty: BEGINNER
+                    defaultVariation: true
+                    muscles:
+                      - { code: QUADRICEPS, name: Quadriceps, involvement: PRIMARY }
+                    equipment:
+                      - { code: BODYWEIGHT, name: Bodyweight, requirement: REQUIRED }
+                    media: []
+                tags:
+                  - { code: BEGINNER_FRIENDLY, name: Beginner Friendly }
+                guidance: []
+                mediaAvailable: false
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: Authenticated User does not have Student or Trainer capability
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Exercise does not exist or is not visible in the active catalog (EXERCISE_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /auth/registrations:
     post:
       tags: [Authentication]
@@ -1503,6 +1711,227 @@ components:
         size: { type: integer, minimum: 1 }
         totalItems: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+
+    CatalogOptionResponse:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: { type: string }
+        name: { type: string }
+
+    MuscleGroupOptionResponse:
+      allOf:
+        - $ref: '#/components/schemas/CatalogOptionResponse'
+        - type: object
+          properties:
+            parentCode: { type: [string, 'null'] }
+
+    ExerciseCatalogItemResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - name
+        - unilateral
+        - primaryMuscles
+        - equipment
+        - tags
+        - variationCount
+        - mediaAvailable
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category:
+          anyOf:
+            - $ref: '#/components/schemas/CatalogOptionResponse'
+            - type: 'null'
+        description: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        movementPattern: { type: [string, 'null'] }
+        unilateral: { type: boolean }
+        primaryMuscles:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        equipment:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        variationCount: { type: integer, minimum: 0 }
+        mediaAvailable: { type: boolean }
+
+    ExerciseCatalogPageResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseCatalogItemResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    ExerciseMuscleResponse:
+      type: object
+      additionalProperties: false
+      required: [code, name, involvement]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        involvement:
+          type: string
+          enum: [PRIMARY, SECONDARY, STABILIZER]
+
+    ExerciseEquipmentResponse:
+      type: object
+      additionalProperties: false
+      required: [code, name, requirement]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        requirement:
+          type: string
+          enum: [REQUIRED, OPTIONAL, ALTERNATIVE]
+
+    ExerciseMediaReferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [mediaId, purpose, sortOrder, available]
+      properties:
+        mediaId: { type: string, format: uuid }
+        purpose:
+          type: string
+          enum: [THUMBNAIL, DEMO_IMAGE, DEMO_VIDEO, TECHNIQUE_GUIDE]
+        sortOrder: { type: integer, minimum: 0 }
+        contentType: { type: [string, 'null'] }
+        sizeBytes: { type: [integer, 'null'], format: int64, minimum: 0 }
+        available:
+          type: boolean
+          description: True only when the referenced metadata is not deleted and its scan status is CLEAN.
+
+    ExerciseVariationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - name
+        - defaultVariation
+        - muscles
+        - equipment
+        - media
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        defaultVariation: { type: boolean }
+        muscles:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseMuscleResponse' }
+        equipment:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseEquipmentResponse' }
+        media:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseMediaReferenceResponse' }
+
+    ExerciseGuidanceResponse:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, description, sortOrder]
+      properties:
+        id: { type: string, format: uuid }
+        exerciseVariationId: { type: [string, 'null'], format: uuid }
+        type:
+          type: string
+          enum: [COMMON_MISTAKE, COACHING_CUE, SAFETY_NOTE, REGRESSION, PROGRESSION]
+        title: { type: string }
+        description: { type: string }
+        correction: { type: [string, 'null'] }
+        severity: { type: [string, 'null'] }
+        sortOrder: { type: integer }
+
+    ExerciseDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - name
+        - unilateral
+        - variations
+        - tags
+        - guidance
+        - mediaAvailable
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category:
+          anyOf:
+            - $ref: '#/components/schemas/CatalogOptionResponse'
+            - type: 'null'
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        movementPattern: { type: [string, 'null'] }
+        unilateral: { type: boolean }
+        variations:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseVariationResponse' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        guidance:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseGuidanceResponse' }
+        mediaAvailable: { type: boolean }
+
+    ExerciseFilterMetadataResponse:
+      type: object
+      additionalProperties: false
+      required: [categories, muscleGroups, equipment, tags, difficulties, movementPatterns]
+      properties:
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        muscleGroups:
+          type: array
+          items: { $ref: '#/components/schemas/MuscleGroupOptionResponse' }
+        equipment:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        difficulties:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseDifficulty' }
+        movementPatterns:
+          type: array
+          items: { type: string }
+
+    ExerciseDifficulty:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, ADVANCED]
 
     ErrorResponse:
       type: object

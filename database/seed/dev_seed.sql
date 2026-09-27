@@ -205,6 +205,103 @@ INSERT INTO equipment(code, name) VALUES
 ('PULLUP_BAR', 'Pull-up Bar')
 ON CONFLICT (code) DO NOTHING;
 
+-- Synthetic B02 catalog fixtures. These records are deterministic development data and contain no
+-- copied commercial exercise descriptions or media URLs.
+INSERT INTO exercises(
+    id, code, name, category_id, description, instructions, difficulty,
+    movement_pattern, unilateral, admin_status
+)
+SELECT x.id::uuid, x.code, x.name, c.id, x.description, x.instructions, x.difficulty,
+       x.movement_pattern, x.unilateral, x.admin_status
+FROM (VALUES
+  ('10000000-0000-0000-0000-000000000001','SYNTH_BODYWEIGHT_SQUAT','Synthetic Bodyweight Squat','STRENGTH','Synthetic lower-body exercise for development testing.','Keep a stable stance and move through a comfortable range.','BEGINNER','SQUAT',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000002','SYNTH_ASSISTED_ROW','Synthetic Assisted Row','STRENGTH','Synthetic pulling exercise for development testing.','Pull with control while keeping the torso stable.','BEGINNER','PULL',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000003','SYNTH_CABLE_PRESS','Synthetic Cable Press','STRENGTH','Synthetic pushing exercise for development testing.','Press forward with a controlled return.','INTERMEDIATE','PUSH',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000004','SYNTH_MOBILITY_REACH','Synthetic Mobility Reach','MOBILITY','Synthetic mobility exercise for development testing.','Move slowly within a comfortable range.','BEGINNER','MOBILITY',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000005','SYNTH_STATIONARY_CYCLE','Synthetic Stationary Cycle','CARDIO','Synthetic cardio exercise for development testing.','Use a sustainable cadence and stop if discomfort occurs.','BEGINNER','CARDIO',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000006','SYNTH_UNILATERAL_LUNGE','Synthetic Unilateral Lunge','STRENGTH','Synthetic unilateral lower-body exercise for development testing.','Maintain balance and use a controlled step.','INTERMEDIATE','LUNGE',true,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000007','SYNTH_DRAFT_HINGE','Synthetic Draft Hinge','STRENGTH','Synthetic draft record.','Draft instructions.','BEGINNER','HINGE',false,'DRAFT'),
+  ('10000000-0000-0000-0000-000000000008','SYNTH_ARCHIVED_CARRY','Synthetic Archived Carry','STRENGTH','Synthetic archived record.','Archived instructions.','INTERMEDIATE','CARRY',false,'ARCHIVED'),
+  ('10000000-0000-0000-0000-000000000009','SYNTH_INACTIVE_STEP','Synthetic Inactive Step','STRENGTH','Synthetic inactive legacy record.','Inactive instructions.','BEGINNER','LUNGE',true,'INACTIVE')
+) x(id,code,name,category_code,description,instructions,difficulty,movement_pattern,unilateral,admin_status)
+JOIN exercise_categories c ON c.code=x.category_code
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO exercise_variations(
+    id, exercise_id, code, name, description, instructions, difficulty, is_default, is_active
+)
+SELECT x.id::uuid, e.id, x.code, x.name, x.description, x.instructions, x.difficulty, x.is_default, true
+FROM (VALUES
+  ('20000000-0000-0000-0000-000000000001','SYNTH_BODYWEIGHT_SQUAT','SYNTH_BODYWEIGHT_SQUAT_STANDARD','Synthetic Bodyweight Squat - Standard','Standard synthetic variation.','Keep a stable stance and controlled tempo.','BEGINNER',true),
+  ('20000000-0000-0000-0000-000000000002','SYNTH_BODYWEIGHT_SQUAT','SYNTH_BODYWEIGHT_SQUAT_PAUSE','Synthetic Bodyweight Squat - Pause','Synthetic paused variation.','Pause briefly only within a comfortable range.','INTERMEDIATE',false),
+  ('20000000-0000-0000-0000-000000000003','SYNTH_ASSISTED_ROW','SYNTH_ASSISTED_ROW_BAND','Synthetic Assisted Row - Band','Synthetic band variation.','Keep tension controlled through the full motion.','BEGINNER',true),
+  ('20000000-0000-0000-0000-000000000004','SYNTH_CABLE_PRESS','SYNTH_CABLE_PRESS_STANDARD','Synthetic Cable Press - Standard','Standard synthetic press variation.','Press and return without abrupt movement.','INTERMEDIATE',true),
+  ('20000000-0000-0000-0000-000000000005','SYNTH_MOBILITY_REACH','SYNTH_MOBILITY_REACH_STANDARD','Synthetic Mobility Reach - Standard','Standard synthetic mobility variation.','Use a slow and comfortable motion.','BEGINNER',true),
+  ('20000000-0000-0000-0000-000000000006','SYNTH_STATIONARY_CYCLE','SYNTH_STATIONARY_CYCLE_STEADY','Synthetic Stationary Cycle - Steady','Synthetic steady-state variation.','Maintain a sustainable effort.','BEGINNER',true),
+  ('20000000-0000-0000-0000-000000000007','SYNTH_UNILATERAL_LUNGE','SYNTH_UNILATERAL_LUNGE_DUMBBELL','Synthetic Unilateral Lunge - Dumbbell','Synthetic loaded variation.','Use a stable load and controlled step.','INTERMEDIATE',true),
+  ('20000000-0000-0000-0000-000000000008','SYNTH_DRAFT_HINGE','SYNTH_DRAFT_HINGE_STANDARD','Synthetic Draft Hinge - Standard','Synthetic draft variation.','Draft instructions.','BEGINNER',true),
+  ('20000000-0000-0000-0000-000000000009','SYNTH_ARCHIVED_CARRY','SYNTH_ARCHIVED_CARRY_STANDARD','Synthetic Archived Carry - Standard','Synthetic archived variation.','Archived instructions.','INTERMEDIATE',true),
+  ('20000000-0000-0000-0000-000000000010','SYNTH_INACTIVE_STEP','SYNTH_INACTIVE_STEP_STANDARD','Synthetic Inactive Step - Standard','Synthetic inactive variation.','Inactive instructions.','BEGINNER',true)
+) x(id,exercise_code,code,name,description,instructions,difficulty,is_default)
+JOIN exercises e ON e.code=x.exercise_code
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO exercise_muscles(exercise_variation_id, muscle_group_id, involvement)
+SELECT v.id, mg.id, x.involvement
+FROM (VALUES
+  ('SYNTH_BODYWEIGHT_SQUAT_STANDARD','QUADRICEPS','PRIMARY'),
+  ('SYNTH_BODYWEIGHT_SQUAT_STANDARD','GLUTES','PRIMARY'),
+  ('SYNTH_BODYWEIGHT_SQUAT_STANDARD','CORE','STABILIZER'),
+  ('SYNTH_BODYWEIGHT_SQUAT_PAUSE','QUADRICEPS','PRIMARY'),
+  ('SYNTH_ASSISTED_ROW_BAND','BACK','PRIMARY'),
+  ('SYNTH_ASSISTED_ROW_BAND','BICEPS','SECONDARY'),
+  ('SYNTH_CABLE_PRESS_STANDARD','CHEST','PRIMARY'),
+  ('SYNTH_CABLE_PRESS_STANDARD','TRICEPS','SECONDARY'),
+  ('SYNTH_MOBILITY_REACH_STANDARD','SHOULDERS','PRIMARY'),
+  ('SYNTH_STATIONARY_CYCLE_STEADY','QUADRICEPS','PRIMARY'),
+  ('SYNTH_UNILATERAL_LUNGE_DUMBBELL','QUADRICEPS','PRIMARY'),
+  ('SYNTH_UNILATERAL_LUNGE_DUMBBELL','GLUTES','PRIMARY')
+) x(variation_code,muscle_code,involvement)
+JOIN exercise_variations v ON v.code=x.variation_code
+JOIN muscle_groups mg ON mg.code=x.muscle_code
+ON CONFLICT DO NOTHING;
+
+INSERT INTO exercise_equipment(exercise_variation_id, equipment_id, requirement)
+SELECT v.id, eq.id, x.requirement
+FROM (VALUES
+  ('SYNTH_BODYWEIGHT_SQUAT_STANDARD','BODYWEIGHT','REQUIRED'),
+  ('SYNTH_BODYWEIGHT_SQUAT_PAUSE','BODYWEIGHT','REQUIRED'),
+  ('SYNTH_ASSISTED_ROW_BAND','RESISTANCE_BAND','REQUIRED'),
+  ('SYNTH_ASSISTED_ROW_BAND','PULLUP_BAR','ALTERNATIVE'),
+  ('SYNTH_CABLE_PRESS_STANDARD','CABLE_MACHINE','REQUIRED'),
+  ('SYNTH_CABLE_PRESS_STANDARD','BENCH','OPTIONAL'),
+  ('SYNTH_MOBILITY_REACH_STANDARD','BODYWEIGHT','REQUIRED'),
+  ('SYNTH_STATIONARY_CYCLE_STEADY','STATIONARY_BIKE','REQUIRED'),
+  ('SYNTH_UNILATERAL_LUNGE_DUMBBELL','DUMBBELL','REQUIRED'),
+  ('SYNTH_UNILATERAL_LUNGE_DUMBBELL','BENCH','OPTIONAL')
+) x(variation_code,equipment_code,requirement)
+JOIN exercise_variations v ON v.code=x.variation_code
+JOIN equipment eq ON eq.code=x.equipment_code
+ON CONFLICT DO NOTHING;
+
+INSERT INTO exercise_tag_assignments(exercise_id, exercise_tag_id)
+SELECT e.id, t.id
+FROM (VALUES
+  ('SYNTH_BODYWEIGHT_SQUAT','BEGINNER_FRIENDLY'),
+  ('SYNTH_BODYWEIGHT_SQUAT','BODYWEIGHT'),
+  ('SYNTH_BODYWEIGHT_SQUAT','COMPOUND'),
+  ('SYNTH_ASSISTED_ROW','BEGINNER_FRIENDLY'),
+  ('SYNTH_ASSISTED_ROW','COMPOUND'),
+  ('SYNTH_CABLE_PRESS','COMPOUND'),
+  ('SYNTH_MOBILITY_REACH','MOBILITY'),
+  ('SYNTH_MOBILITY_REACH','LOW_IMPACT'),
+  ('SYNTH_STATIONARY_CYCLE','CARDIO'),
+  ('SYNTH_UNILATERAL_LUNGE','COMPOUND')
+) x(exercise_code,tag_code)
+JOIN exercises e ON e.code=x.exercise_code
+JOIN exercise_tags t ON t.code=x.tag_code
+ON CONFLICT DO NOTHING;
+
 INSERT INTO nutrients(code, name, default_unit_id, is_macro)
 SELECT x.code, x.name, u.id, x.is_macro
 FROM (VALUES
