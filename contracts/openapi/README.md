@@ -4,14 +4,15 @@
 
 ## Current coverage
 
-Version `0.1.0` covers Phase 1 Milestone 1 Identity and Common Account:
+Version `0.1.0` currently covers:
 
 - registration and email confirmation;
 - login, refresh-token rotation, and logout;
 - current User and settings;
 - Student Profile activation;
 - Trainer Profile activation without automatic coaching authority;
-- Trainer Application submission and status.
+- Trainer Application submission and status;
+- read-only active Exercise catalog search, detail, and filter metadata for Student and Trainer capabilities.
 
 Later milestones extend the same `/api/v1` contract. Do not add undocumented endpoints in a client or silently change a request, response, error code, enum, or authority rule.
 

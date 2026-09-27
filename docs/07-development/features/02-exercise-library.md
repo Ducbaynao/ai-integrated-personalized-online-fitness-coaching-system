@@ -14,8 +14,8 @@
 ## 3. Current implementation status
 
 - **EXISTING IMPLEMENTATION:** Flyway V3 contains Exercise catalog, category, equipment, muscle, variation, instruction, and media-reference structures.
-- **EXISTING IMPLEMENTATION:** The backend `exercise` module contains only its package boundary; there are no Exercise application services or REST adapters.
-- **EXISTING IMPLEMENTATION:** OpenAPI has no executable Exercise paths.
+- **EXISTING IMPLEMENTATION:** The backend `exercise` module provides the authenticated Student/Trainer read-only catalog foundation (search/filter/list, detail, and filter metadata); Admin mutations and historical archived access remain unimplemented.
+- **EXISTING IMPLEMENTATION:** OpenAPI defines the three read-only Exercise catalog paths; mutation paths remain unimplemented.
 - **EXISTING IMPLEMENTATION:** Mobile has no Exercise browse/detail/picker feature, and Admin Web has no AD-05 implementation.
 
 ## 4. Feature dependencies
