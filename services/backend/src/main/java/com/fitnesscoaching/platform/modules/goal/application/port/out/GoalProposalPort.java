@@ -18,9 +18,17 @@ public interface GoalProposalPort {
 
     Optional<GoalProposal> findById(UUID proposalId);
 
-    List<GoalProposal> findByStudentId(UUID studentId, ProposalStatus statusFilter, int limit, long offset);
+    List<GoalProposal> findByStudentId(UUID studentId, UUID fitnessGoalId, ProposalStatus statusFilter, int limit, long offset);
 
-    long countByStudentId(UUID studentId, ProposalStatus statusFilter);
+    long countByStudentId(UUID studentId, UUID fitnessGoalId, ProposalStatus statusFilter);
+
+    default List<GoalProposal> findByStudentId(UUID studentId, ProposalStatus statusFilter, int limit, long offset) {
+        return findByStudentId(studentId, null, statusFilter, limit, offset);
+    }
+
+    default long countByStudentId(UUID studentId, ProposalStatus statusFilter) {
+        return countByStudentId(studentId, null, statusFilter);
+    }
 
     boolean rejectProposal(UUID proposalId, UUID studentId, String decisionNote);
 

@@ -8,11 +8,17 @@ Một User có thể có Student Profile, Trainer Profile hoặc cả hai. Role 
 
 Bottom navigation gồm năm destination:
 
-1. `Home`: hôm nay, action required và tóm tắt.
+1. `Home`: hôm nay, action required và tóm tắt. Cung cấp lối vào trực tiếp quản lý mục tiêu (`Manage Fitness Goals →`).
 2. `Plan`: workout plan, schedule và workout execution.
 3. `Progress`: current goal, lifetime, measurement và progress photo.
 4. `Nutrition`: daily target, food log và nutrition progress.
 5. `Profile`: account, coaching, data sharing và preferences.
+
+Stack navigation hỗ trợ các route chuyên biệt cho Student Goal Management:
+
+- `/(app)/goals`: màn hình quản lý Goal hiện tại (`CurrentGoalScreen` - ST-02) với các tab Overview, Targets, History (Versions & Transitions) và Proposals.
+- `/(app)/goals/[goalId]`: màn hình xem chi tiết một Goal cụ thể theo identifier.
+- `/(app)/goal-proposals/[proposalId]`: màn hình xem chi tiết so sánh và quyết định Accept/Reject đề xuất mục tiêu (`GoalProposalDetailScreen` - ST-03).
 
 Chat, notification và AI Assistance mở theo icon hoặc từ context; không biến AI thành tab/coaching mode riêng.
 
@@ -44,7 +50,10 @@ Sidebar theo permission, không hiển thị capability bị cấm:
 
 ## Deep link và context
 
-Notification phải điều hướng đến đúng resource và scope, ví dụ proposal detail, reschedule request, attention signal hoặc AI recommendation. Nếu actor không còn quyền truy cập, hiển thị permission state thay vì fallback sang dữ liệu khác.
+Notification và deep link phải điều hướng đến đúng resource và scope:
+- Mọi route thuộc `/(app)/goals` và `/(app)/goal-proposals/[proposalId]` được bảo vệ bởi guard `canAccessFitnessGoals(user)` (yêu cầu capability `hasStudentProfile`). Nếu User không có Student Profile, hệ thống chuyển hướng về `/(app)`.
+- Proposal notification dẫn trực tiếp đến `/(app)/goal-proposals/[proposalId]`. Nếu proposal không tồn tại hoặc đã xử lý, màn hình hiển thị trạng thái tương ứng kèm nút quay lại an toàn.
+- Nếu actor không còn quyền truy cập, hiển thị permission state thay vì fallback sang dữ liệu khác.
 
 ## Navigation invariants
 

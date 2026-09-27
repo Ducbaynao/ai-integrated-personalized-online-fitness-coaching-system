@@ -27,6 +27,9 @@ export default function AppLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="trainer-profile" />
+      <Stack.Screen name="goals/index" />
+      <Stack.Screen name="goals/[goalId]" />
+      <Stack.Screen name="goal-proposals/[proposalId]" />
     </Stack>
   );
 }

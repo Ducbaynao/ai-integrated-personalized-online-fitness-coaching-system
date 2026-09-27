@@ -748,6 +748,41 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /fitness-goals:
+    get:
+      tags: [Fitness Goal]
+      operationId: getStudentFitnessGoals
+      summary: List fitness goals for the authenticated student
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/GoalLifecycleStatus'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated list of fitness goals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalPageResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
     post:
       tags: [Fitness Goal]
       operationId: createFitnessGoal
@@ -782,10 +817,18 @@ paths:
     get:
       tags: [Fitness Goal]
       operationId: getCurrentFitnessGoal
-      summary: Get current active fitness goal for the authenticated student
+      summary: Get current active or manageable fitness goal for the authenticated student
+      parameters:
+        - name: includePaused
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When true, returns the active goal if present, or the most recent paused goal if no active goal exists.
       responses:
         '200':
-          description: Current active fitness goal
+          description: Current active or paused fitness goal
           content:
             application/json:
               schema:
@@ -1190,6 +1233,12 @@ paths:
       operationId: getMyGoalProposals
       summary: List fitness goal proposals for the authenticated student
       parameters:
+        - name: fitnessGoalId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
         - name: status
           in: query
           required: false
@@ -2220,6 +2269,28 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         currentVersion: { $ref: '#/components/schemas/GoalVersionResponse' }
+
+    FitnessGoalPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FitnessGoalResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
 
     ProposalStatus:
       type: string

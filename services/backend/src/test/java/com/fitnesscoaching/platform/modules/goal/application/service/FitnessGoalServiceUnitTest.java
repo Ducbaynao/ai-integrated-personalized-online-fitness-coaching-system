@@ -1520,6 +1520,43 @@ class FitnessGoalServiceUnitTest {
                 .hasMessageContaining("Audit persistence failed");
     }
 
+    @Test
+    @DisplayName("Get current goal: returns manageable goal when includePaused=true and active is absent")
+    void getCurrentGoal_includePaused_returnsManageableGoal() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal pausedGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.PAUSED, studentId,
+                Instant.now(clock), Instant.now(clock), null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        when(fitnessGoalPersistencePort.findCurrentManageableByStudentId(studentId)).thenReturn(Optional.of(pausedGoal));
+
+        Optional<FitnessGoal> result = fitnessGoalService.getCurrentFitnessGoal(studentId, true);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo(GoalStatus.PAUSED);
+        verify(fitnessGoalPersistencePort).findCurrentManageableByStudentId(studentId);
+    }
+
+    @Test
+    @DisplayName("Get student goals: returns paginated list of student goals")
+    void getStudentGoals_success_returnsPage() {
+        UUID goalId = UUID.randomUUID();
+        FitnessGoal goal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Goal", GoalStatus.ACTIVE, studentId,
+                Instant.now(clock), null, null, null, null, Instant.now(clock), Instant.now(clock), null
+        );
+        when(fitnessGoalPersistencePort.countByStudentId(studentId, null)).thenReturn(1L);
+        when(fitnessGoalPersistencePort.findByStudentId(studentId, null, 20, 0L)).thenReturn(List.of(goal));
+
+        var page = fitnessGoalService.getStudentGoals(new com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsQuery(
+                studentId, null, 0, 20
+        ));
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.totalElements()).isEqualTo(1L);
+        assertThat(page.totalPages()).isEqualTo(1);
+    }
+
     private static <T> T argThat(org.mockito.ArgumentMatcher<T> matcher) {
         return org.mockito.Mockito.argThat(matcher);
     }

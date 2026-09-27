@@ -83,6 +83,13 @@ export function canAccessStudentProfile(user: CurrentUserResponse | null): boole
 }
 
 /**
+ * Deep link guard: check if user can access student fitness goals management.
+ */
+export function canAccessFitnessGoals(user: CurrentUserResponse | null): boolean {
+  return Boolean(user?.capabilities?.hasStudentProfile);
+}
+
+/**
  * Deep link guard: check if user can access trainer profile screen.
  */
 export function canAccessTrainerProfile(user: CurrentUserResponse | null): boolean {

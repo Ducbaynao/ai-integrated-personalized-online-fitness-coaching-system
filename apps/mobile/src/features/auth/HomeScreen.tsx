@@ -131,16 +131,29 @@ export function HomeScreen() {
           </View>
 
           {user?.capabilities?.hasStudentProfile && (
-            <Pressable
-              testID="view-student-profile-button"
-              accessibilityRole="button"
-              accessibilityLabel="Xem và chỉnh sửa hồ sơ học viên"
-              style={[styles.profileButton, { borderColor }]}
-              onPress={() => router.push('/profile')}>
-              <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                Xem và chỉnh sửa hồ sơ →
-              </Text>
-            </Pressable>
+            <>
+              <Pressable
+                testID="view-student-profile-button"
+                accessibilityRole="button"
+                accessibilityLabel="Xem và chỉnh sửa hồ sơ học viên"
+                style={[styles.profileButton, { borderColor }]}
+                onPress={() => router.push('/profile')}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
+                  Xem và chỉnh sửa hồ sơ →
+                </Text>
+              </Pressable>
+
+              <Pressable
+                testID="view-fitness-goals-button"
+                accessibilityRole="button"
+                accessibilityLabel="Quản lý mục tiêu thể chất"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/goals' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
+                  Quản lý mục tiêu thể chất →
+                </Text>
+              </Pressable>
+            </>
           )}
 
           <View style={styles.row}>

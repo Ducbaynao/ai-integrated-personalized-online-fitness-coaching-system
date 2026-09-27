@@ -7,5 +7,9 @@ import java.util.UUID;
 
 public interface GetCurrentFitnessGoalUseCase {
 
-    Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId);
+    default Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId) {
+        return getCurrentFitnessGoal(studentId, false);
+    }
+
+    Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId, boolean includePaused);
 }
