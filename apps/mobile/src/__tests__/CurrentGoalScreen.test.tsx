@@ -1,10 +1,28 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import renderer from 'react-test-renderer';
-import { CurrentGoalScreen } from '@/features/goal/CurrentGoalScreen';
+import { CurrentGoalScreen, isGoalActionAllowed } from '@/features/goal/CurrentGoalScreen';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { ApiError } from '@/types/auth';
 import { FitnessGoal } from '@/types/goal';
+
+let mockActiveFocusCleanup: (() => void) | void = undefined;
+let mockActiveFocusCallback: (() => (() => void) | void) | null = null;
+
+const simulateScreenBlur = () => {
+  if (typeof mockActiveFocusCleanup === 'function') {
+    mockActiveFocusCleanup();
+    mockActiveFocusCleanup = undefined;
+  }
+};
+
+const simulateScreenFocus = async () => {
+  if (mockActiveFocusCallback) {
+    await renderer.act(async () => {
+      mockActiveFocusCleanup = mockActiveFocusCallback!();
+    });
+  }
+};
 
 jest.mock('expo-router', () => {
   const actualReact = jest.requireActual<typeof import('react')>('react');
@@ -15,7 +33,19 @@ jest.mock('expo-router', () => {
       back: jest.fn(),
       canGoBack: () => true,
     }),
-    useFocusEffect: (cb: any) => actualReact.useEffect(cb, [cb]),
+    useFocusEffect: (cb: any) => {
+      actualReact.useEffect(() => {
+        mockActiveFocusCallback = cb;
+        mockActiveFocusCleanup = cb();
+        return () => {
+          if (typeof mockActiveFocusCleanup === 'function') {
+            mockActiveFocusCleanup();
+            mockActiveFocusCleanup = undefined;
+          }
+          mockActiveFocusCallback = null;
+        };
+      }, [cb]);
+    },
   };
 });
 
@@ -103,6 +133,8 @@ describe('CurrentGoalScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockActiveFocusCleanup = undefined;
+    mockActiveFocusCallback = null;
   });
 
   it('renders active goal overview tab with title and Pause button', async () => {
@@ -433,6 +465,1298 @@ describe('CurrentGoalScreen', () => {
 
       // The fast goal MUST remain displayed; the stale response must NOT overwrite it
       expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Newest Fast Goal Title');
+    });
+
+    it('invalidates goal A and shows loading skeleton while request B is pending, then displays only goal B upon completion', async () => {
+      const goalA: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-A',
+        title: 'Goal A Active Title',
+        status: 'ACTIVE',
+      };
+
+      const goalB: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-B',
+        title: 'Goal B Active Title',
+        status: 'ACTIVE',
+      };
+
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalA);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen goalId="goal-A" />);
+      });
+      const root = tree!.root;
+
+      // 1. Load xong goal A
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal A Active Title');
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Update component sang goalId B, trong đó request B đang pending
+      let resolveGoalB!: (val: FitnessGoal) => void;
+      const pendingPromiseB = new Promise<FitnessGoal>((resolve) => {
+        resolveGoalB = resolve;
+      });
+      (fitnessGoalApi.getGoal as jest.Mock).mockReturnValueOnce(pendingPromiseB);
+
+      await renderer.act(async () => {
+        tree.update(<CurrentGoalScreen goalId="goal-B" />);
+      });
+
+      // 3. Trong thời gian B pending:
+      // - Không hiển thị nội dung goal A
+      expect(root.findAllByProps({ testID: 'goal-title' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'overview-goal-card' }).length).toBe(0);
+      // - Không có nút pause/resume của A
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'resume-goal-button' }).length).toBe(0);
+      // - Có loading state phù hợp
+      expect(root.findByProps({ testID: 'goal-screen-skeleton' })).toBeDefined();
+
+      // 4. Khi B hoàn thành, chỉ goal B được hiển thị
+      await renderer.act(async () => {
+        resolveGoalB(goalB);
+      });
+
+      expect(root.findAllByProps({ testID: 'goal-screen-skeleton' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Active Title');
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+    });
+
+    it('discards in-flight pause/resume mutation of goal A when route switches to goal B', async () => {
+      const goalA: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-A',
+        title: 'Goal A Active Title',
+        status: 'ACTIVE',
+      };
+
+      const pausedGoalA: FitnessGoal = {
+        ...goalA,
+        status: 'PAUSED',
+        statusReason: 'Pausing Goal A',
+      };
+
+      const goalB: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-B',
+        title: 'Goal B Active Title',
+        status: 'ACTIVE',
+      };
+
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalA);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen goalId="goal-A" />);
+      });
+      const root = tree!.root;
+
+      // Verify Goal A loaded
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal A Active Title');
+
+      // Open pause modal for Goal A
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+
+      // Enter reason and proceed to confirm
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Pausing Goal A');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      // Set up deferred pause mutation promise for A
+      let resolvePauseA!: (val: FitnessGoal) => void;
+      const pendingPausePromiseA = new Promise<FitnessGoal>((resolve) => {
+        resolvePauseA = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPausePromiseA);
+
+      // Submit pause mutation for A
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+      expect(fitnessGoalApi.pauseGoal).toHaveBeenCalledWith('goal-A', 'Pausing Goal A');
+
+      // Route transitions to Goal B while pause mutation of A is still pending
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalB);
+      await renderer.act(async () => {
+        tree.update(<CurrentGoalScreen goalId="goal-B" />);
+      });
+
+      // Goal B is now displayed
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Active Title');
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // Now resolve the older pause mutation for Goal A
+      await renderer.act(async () => {
+        resolvePauseA(pausedGoalA);
+      });
+
+      // Response mutation của A không được ghi vào màn hình B
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Active Title');
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'resume-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'paused-status-banner' }).length).toBe(0);
+
+      // Không được làm thay đổi modal/state thuộc route B
+      // For instance, opening pause modal on B operates cleanly on Goal B
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      expect(root.findByProps({ testID: 'pause-resume-reason-input' })).toBeDefined();
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('does not display alert or fail route B when an in-flight mutation of goal A rejects after route change', async () => {
+      const goalA: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-A',
+        title: 'Goal A Active Title',
+        status: 'ACTIVE',
+      };
+
+      const goalB: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-B',
+        title: 'Goal B Active Title',
+        status: 'ACTIVE',
+      };
+
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalA);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen goalId="goal-A" />);
+      });
+      const root = tree!.root;
+
+      // Open pause modal for Goal A
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Reason A');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let rejectPauseA!: (err: any) => void;
+      const pendingPausePromiseA = new Promise<FitnessGoal>((_, reject) => {
+        rejectPauseA = reject;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPausePromiseA);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // Switch to Goal B
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalB);
+      await renderer.act(async () => {
+        tree.update(<CurrentGoalScreen goalId="goal-B" />);
+      });
+
+      // Reject Goal A's mutation
+      await renderer.act(async () => {
+        rejectPauseA(new ApiError(500, 'Server failure on Goal A'));
+      });
+
+      // Alert must NOT be shown on Route B, and Route B remains healthy
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Active Title');
+    });
+
+    it('resets state when transitioning from current goal route to detail goal route', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+
+      const detailGoal: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-detail-1',
+        title: 'Detail Goal Title',
+      };
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(detailGoal);
+
+      await renderer.act(async () => {
+        tree.update(<CurrentGoalScreen goalId="goal-detail-1" />);
+      });
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Detail Goal Title');
+    });
+
+    it('does not invalidate in-flight mutation when load/refresh occurs on the same route (Test A)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // 1. Load goal A
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Start pause mutation on A with deferred promise
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Recovering');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolvePause!: (val: FitnessGoal) => void;
+      const pendingPause = new Promise<FitnessGoal>((resolve) => {
+        resolvePause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+      expect(fitnessGoalApi.pauseGoal).toHaveBeenCalledWith('goal-123', 'Recovering');
+
+      // 3. Trigger a load/refresh of goal A while mutation is pending
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      await renderer.act(async () => {
+        const refreshControl = root.findByProps({ refreshing: false });
+        refreshControl.props.onRefresh();
+      });
+
+      // 4. Complete the mutation
+      await renderer.act(async () => {
+        resolvePause(pausedGoal);
+      });
+
+      // 5. Verify mutation is processed and applied, not discarded by load sequence
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+    });
+
+    it('resets modal state when blurred and does not leave modal locked upon refocus (Test B)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // 1. Goal A is loaded
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Open modal and submit mutation
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Recovering');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolvePause!: (val: FitnessGoal) => void;
+      const pendingPause = new Promise<FitnessGoal>((resolve) => {
+        resolvePause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 3. Simulate blur
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      // Modal is closed on blur
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+
+      // 4. Mutation completes after blur
+      await renderer.act(async () => {
+        resolvePause(pausedGoal);
+      });
+
+      // 5. Simulate refocus on same route
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(pausedGoal);
+      await simulateScreenFocus();
+
+      // 6. Verify:
+      // - Modal remains closed
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+      // - No Alert from mutation
+      expect(Alert.alert).not.toHaveBeenCalled();
+      // - Goal is displayed with latest server state (paused)
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(pausedGoal.title);
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      // - Modal is not locked in submitting state: can open freshly
+      renderer.act(() => {
+        root.findByProps({ testID: 'resume-goal-button' }).props.onPress();
+      });
+      const reasonInput = root.findByProps({ testID: 'pause-resume-reason-input' });
+      expect(reasonInput).toBeDefined();
+      expect(reasonInput.props.editable).toBe(true);
+      expect(reasonInput.props.value).toBe('');
+    });
+
+    it('prevents old focus session mutation from affecting new focus session modal and state (Test C)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // 1. Start old mutation on session 1
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Old reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveOldPause!: (val: FitnessGoal) => void;
+      const pendingOldPause = new Promise<FitnessGoal>((resolve) => {
+        resolveOldPause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingOldPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 2. Blur then refocus on same identity
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      await simulateScreenFocus();
+
+      // 3. In new session, open modal and submit a new mutation
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('New reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveNewPause!: (val: FitnessGoal) => void;
+      const pendingNewPause = new Promise<FitnessGoal>((resolve) => {
+        resolveNewPause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingNewPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // New mutation is now pending, new modal is open and submitting
+      const confirmButton = root.findByProps({ testID: 'pause-resume-confirm-button' });
+      expect(confirmButton.props.accessibilityState.busy).toBe(true);
+      expect(confirmButton.props.disabled).toBe(true);
+
+      // 4. Old mutation resolves
+      await renderer.act(async () => {
+        resolveOldPause(pausedGoal);
+      });
+
+      // Verify old mutation did NOT:
+      // - close new modal (confirm button still present in modal)
+      expect(root.findByProps({ testID: 'pause-resume-confirm-button' })).toBeDefined();
+      // - reset submitting state of new mutation (still busy/disabled)
+      const stillConfirmButton = root.findByProps({ testID: 'pause-resume-confirm-button' });
+      expect(stillConfirmButton.props.accessibilityState.busy).toBe(true);
+      expect(stillConfirmButton.props.disabled).toBe(true);
+      // - overwrite goal
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      // - show alert
+      expect(Alert.alert).not.toHaveBeenCalled();
+
+      // 5. Complete new mutation
+      const finalPausedGoal: FitnessGoal = {
+        ...pausedGoal,
+        statusReason: 'New reason',
+      };
+      await renderer.act(async () => {
+        resolveNewPause(finalPausedGoal);
+      });
+
+      // New mutation successfully completes and updates goal
+      expect(root.findAllByProps({ testID: 'pause-resume-confirm-button' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+    });
+
+    it('prevents older refresh response from overwriting newer mutation result when refresh resolves after mutation', async () => {
+      // 1. Load goal A in ACTIVE state
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Start pull-to-refresh with deferred promise (pending)
+      let resolveOldRefresh!: (val: FitnessGoal) => void;
+      const pendingOldRefresh = new Promise<FitnessGoal>((resolve) => {
+        resolveOldRefresh = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pendingOldRefresh);
+
+      renderer.act(() => {
+        const refreshControl = root.findByProps({ refreshing: false });
+        refreshControl.props.onRefresh();
+      });
+
+      // 3. Start pause mutation and leave it pending
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Injury break');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolvePause!: (val: FitnessGoal) => void;
+      const pendingPause = new Promise<FitnessGoal>((resolve) => {
+        resolvePause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 4. Resolve pause mutation FIRST with goal A in PAUSED state
+      await renderer.act(async () => {
+        resolvePause(pausedGoal);
+      });
+
+      // 5. Confirm UI displays paused state, Resume button, no Pause button, modal closed, spinner not stuck
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-resume-confirm-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+      expect(root.findByProps({ refreshing: false })).toBeDefined();
+
+      // 6. Resolve older refresh request with snapshot A in ACTIVE state
+      await renderer.act(async () => {
+        resolveOldRefresh(activeGoal);
+      });
+
+      // 7. Confirm older refresh response did NOT overwrite PAUSED state
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findByProps({ refreshing: false })).toBeDefined();
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('allows a new refresh started after mutation success to update the UI', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // Pause mutation completes
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockResolvedValueOnce(pausedGoal);
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+
+      // New refresh started after mutation success
+      const refreshedPausedGoal: FitnessGoal = {
+        ...pausedGoal,
+        title: 'Refreshed Paused Goal',
+      };
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(refreshedPausedGoal);
+
+      await renderer.act(async () => {
+        root.findByProps({ refreshing: false }).props.onRefresh();
+      });
+
+      // New refresh response is applied
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Refreshed Paused Goal');
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+    });
+
+    it('does not invalidate in-flight load when a mutation fails', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // Start refresh with pending promise
+      let resolveRefresh!: (val: FitnessGoal) => void;
+      const pendingRefresh = new Promise<FitnessGoal>((resolve) => {
+        resolveRefresh = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pendingRefresh);
+
+      renderer.act(() => {
+        root.findByProps({ refreshing: false }).props.onRefresh();
+      });
+
+      // Start pause mutation
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let rejectPause!: (err: any) => void;
+      const pendingPause = new Promise<FitnessGoal>((_, reject) => {
+        rejectPause = reject;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // Mutation fails
+      await renderer.act(async () => {
+        rejectPause(
+          new ApiError(500, 'Server error', {
+            errorCode: 'INTERNAL_ERROR',
+            message: 'Server error',
+            timestamp: '',
+            requestId: '',
+            fieldErrors: [],
+          })
+        );
+      });
+
+      // Alert should be displayed for the failed mutation
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Status Update Failed',
+        'Server error'
+      );
+
+      // Now resolve the ongoing refresh
+      const refreshedActiveGoal: FitnessGoal = {
+        ...activeGoal,
+        title: 'Refreshed Active Goal',
+      };
+      await renderer.act(async () => {
+        resolveRefresh(refreshedActiveGoal);
+      });
+
+      // The refresh was NOT invalidated by mutation failure, so it successfully updates UI
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Refreshed Active Goal');
+      expect(root.findByProps({ refreshing: false })).toBeDefined();
+    });
+
+    it('reconciles latest server state when older mutation resolves after refocus on the same route identity (P1)', async () => {
+      // 1. Mount CurrentGoalScreen with goal A (ACTIVE)
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Open Pause modal, input reason
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Taking a rest');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      // 3. Submit Pause mutation: request backend pending (deferred promise P_mut)
+      let resolveMut!: (val: FitnessGoal) => void;
+      const pMut = new Promise<FitnessGoal>((resolve) => {
+        resolveMut = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pMut);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 4. Blur screen: focus cleanup runs
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      // 5. Refocus screen: triggers refocus GET (deferred promise P_get_refocus)
+      let resolveGetRefocus!: (val: FitnessGoal) => void;
+      const pGetRefocus = new Promise<FitnessGoal>((resolve) => {
+        resolveGetRefocus = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pGetRefocus);
+
+      await simulateScreenFocus();
+
+      // 6. P_get_refocus resolves FIRST: returns snapshot cũ (ACTIVE)
+      await renderer.act(async () => {
+        resolveGetRefocus(activeGoal);
+      });
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'paused-status-banner' }).length).toBe(0);
+
+      // 7. P_mut resolves SAU: mutation succeeds (PAUSED)
+      // This will trigger the silent reconciliation GET (deferred promise P_reconcile)
+      let resolveReconcile!: (val: FitnessGoal) => void;
+      const pReconcile = new Promise<FitnessGoal>((resolve) => {
+        resolveReconcile = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pReconcile);
+
+      await renderer.act(async () => {
+        resolveMut(pausedGoal);
+      });
+
+      // 8. Reconciliation mechanism triggered: getCurrentGoal called
+      expect(fitnessGoalApi.getCurrentGoal).toHaveBeenCalledTimes(3);
+
+      // 9. P_reconcile resolves: returns new server state (PAUSED)
+      await renderer.act(async () => {
+        resolveReconcile(pausedGoal);
+      });
+
+      // 10. Final UI verification:
+      // - Displays PAUSED state and banner
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      // - Button switches to Resume, no Pause button
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      // - No error alert
+      expect(Alert.alert).not.toHaveBeenCalled();
+      // - Modal is not locked in submitting state: can open freshly
+      renderer.act(() => {
+        root.findByProps({ testID: 'resume-goal-button' }).props.onPress();
+      });
+      const reasonInput = root.findByProps({ testID: 'pause-resume-reason-input' });
+      expect(reasonInput).toBeDefined();
+      expect(reasonInput.props.editable).toBe(true);
+      expect(reasonInput.props.value).toBe('');
+    });
+
+    it('does not reconcile or overwrite new route when old mutation completes after route identity changed (Test 4A)', async () => {
+      const goalB: FitnessGoal = {
+        ...activeGoal,
+        id: 'goal-456',
+        title: 'Goal B Title',
+      };
+
+      // 1. Mount CurrentGoalScreen with goalId="goal-123"
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen goalId="goal-123" />);
+      });
+      const root = tree!.root;
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+
+      // 2. Open Pause modal and submit mutation on goal-123
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Reason A');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolvePauseA!: (val: FitnessGoal) => void;
+      const pendingPauseA = new Promise<FitnessGoal>((resolve) => {
+        resolvePauseA = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPauseA);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 3. Route identity changes to goal-456
+      (fitnessGoalApi.getGoal as jest.Mock).mockResolvedValueOnce(goalB);
+
+      await renderer.act(async () => {
+        tree.update(<CurrentGoalScreen goalId="goal-456" />);
+      });
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Title');
+
+      const initialGetGoalCalls = (fitnessGoalApi.getGoal as jest.Mock).mock.calls.length;
+
+      // 4. Old mutation on goal-123 finishes
+      await renderer.act(async () => {
+        resolvePauseA(pausedGoal);
+      });
+
+      // 5. Verify:
+      // - Did NOT call getGoal for reconciliation on new route
+      expect((fitnessGoalApi.getGoal as jest.Mock).mock.calls.length).toBe(initialGetGoalCalls);
+      // - UI still displays Goal B
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe('Goal B Title');
+      // - No Alert
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('loads and displays latest server state when older mutation completes while un-focused and user refocuses later (Test 4C)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Recovering');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolvePause!: (val: FitnessGoal) => void;
+      const pendingPause = new Promise<FitnessGoal>((resolve) => {
+        resolvePause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // Blur screen
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      // Mutation completes while screen is un-focused
+      await renderer.act(async () => {
+        resolvePause(pausedGoal);
+      });
+
+      // Refocus screen later: server now returns paused state
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(pausedGoal);
+      await simulateScreenFocus();
+
+      // UI reflects latest state
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(pausedGoal.title);
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('discards error and does not show alert when old mutation fails after refocus (Test 4D)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let rejectPause!: (err: any) => void;
+      const pendingPause = new Promise<FitnessGoal>((_, reject) => {
+        rejectPause = reject;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // Blur then refocus
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      await simulateScreenFocus();
+
+      // Old mutation fails with error
+      await renderer.act(async () => {
+        rejectPause(
+          new ApiError(500, 'Server error', {
+            errorCode: 'INTERNAL_ERROR',
+            message: 'Server error',
+            timestamp: '',
+            requestId: '',
+            fieldErrors: [],
+          })
+        );
+      });
+
+      // Error is discarded, no Alert is shown for the new focus session
+      expect(Alert.alert).not.toHaveBeenCalled();
+      // UI still displays active goal without interruption
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+    });
+
+    it('disallows actions and shows retry banner when reconciliation fails, and restores state on retry (Test A)', async () => {
+      // 1. Load goal ACTIVE
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(activeGoal.title);
+      expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
+
+      // 2. Start Pause mutation pending
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Break reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveMut!: (val: FitnessGoal) => void;
+      const pMut = new Promise<FitnessGoal>((resolve) => {
+        resolveMut = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pMut);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 3. Blur then refocus on same identity
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      let resolveGetRefocus!: (val: FitnessGoal) => void;
+      const pGetRefocus = new Promise<FitnessGoal>((resolve) => {
+        resolveGetRefocus = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pGetRefocus);
+
+      await simulateScreenFocus();
+
+      // 4. Refocus GET resolves with old snapshot ACTIVE
+      await renderer.act(async () => {
+        resolveGetRefocus(activeGoal);
+      });
+
+      // 5. Old mutation succeeds with PAUSED
+      // Set up silent reconciliation GET which will fail
+      let rejectReconcile!: (err: any) => void;
+      const pReconcile = new Promise<FitnessGoal>((_, reject) => {
+        rejectReconcile = reject;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pReconcile);
+
+      await renderer.act(async () => {
+        resolveMut(pausedGoal);
+      });
+
+      // 6. Silent reconciliation GET fails
+      await renderer.act(async () => {
+        rejectReconcile(new Error('Network error during reconciliation'));
+      });
+
+      // 7. Verify:
+      // - No Alert from old mutation
+      expect(Alert.alert).not.toHaveBeenCalled();
+      // - No infinite loading/refreshing
+      expect(root.findByProps({ refreshing: false })).toBeDefined();
+      // - Cannot open or submit Pause based on stale ACTIVE snapshot (action buttons hidden while reconciling)
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'resume-goal-button' }).length).toBe(0);
+      // - Shows retry reconciliation notice and button
+      expect(root.findByProps({ testID: 'reconciliation-retry-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'retry-reconciliation-button' })).toBeDefined();
+
+      // 8. Retry reconciliation
+      let resolveRetry!: (val: FitnessGoal) => void;
+      const pRetry = new Promise<FitnessGoal>((resolve) => {
+        resolveRetry = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pRetry);
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'retry-reconciliation-button' }).props.onPress();
+      });
+
+      // 9. Retry GET returns PAUSED
+      await renderer.act(async () => {
+        resolveRetry(pausedGoal);
+      });
+
+      // 10. Verify:
+      // - Reconciliation state cleared (banner gone)
+      expect(root.findAllByProps({ testID: 'reconciliation-retry-banner' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'retry-reconciliation-button' }).length).toBe(0);
+      // - UI displays PAUSED
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(pausedGoal.title);
+      // - Resume button appears, Pause button is gone
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+    });
+
+    it('closes open modal immediately when reconciliation starts pending, keeps it closed on failure, and recovers on retry (Test B)', async () => {
+      // 1. Load goal ACTIVE
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // 2. Start mutation and leave pending
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Old reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveMut!: (val: FitnessGoal) => void;
+      const pMut = new Promise<FitnessGoal>((resolve) => {
+        resolveMut = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pMut);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 3. Blur then refocus on same identity
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      let resolveGetRefocus!: (val: FitnessGoal) => void;
+      const pGetRefocus = new Promise<FitnessGoal>((resolve) => {
+        resolveGetRefocus = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pGetRefocus);
+
+      await simulateScreenFocus();
+
+      // 4. Refocus GET returns old snapshot ACTIVE
+      await renderer.act(async () => {
+        resolveGetRefocus(activeGoal);
+      });
+
+      // 5. In new session, user opens Pause modal but does not submit yet
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Thinking about pausing');
+      });
+
+      // Confirm modal is open with the input
+      expect(root.findByProps({ testID: 'pause-resume-reason-input' }).props.value).toBe('Thinking about pausing');
+
+      // 6. Prepare reconciliation GET as deferred promise
+      let rejectReconcile!: (err: any) => void;
+      const pReconcile = new Promise<FitnessGoal>((_, reject) => {
+        rejectReconcile = reject;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pReconcile);
+
+      // 7. Old mutation succeeds with PAUSED, triggering reconciliation pending
+      // 8. Do NOT resolve or reject reconciliation GET immediately
+      await renderer.act(async () => {
+        resolveMut(pausedGoal);
+      });
+
+      // 9. Immediately while reconciliation is still pending, verify:
+      // - Pause modal has disappeared
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-resume-continue-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-resume-confirm-button' }).length).toBe(0);
+      // - No extra call to pauseGoal
+      expect(fitnessGoalApi.pauseGoal).toHaveBeenCalledTimes(1);
+      // - No Pause/Resume button based on old snapshot
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'resume-goal-button' }).length).toBe(0);
+
+      // 10. Now reject reconciliation GET
+      await renderer.act(async () => {
+        rejectReconcile(new Error('Network error during reconciliation'));
+      });
+
+      // 11. Verify:
+      // - Modal does not reappear
+      expect(root.findAllByProps({ testID: 'pause-resume-reason-input' }).length).toBe(0);
+      // - Retry banner displays and Retry Sync is directly accessible
+      expect(root.findByProps({ testID: 'reconciliation-retry-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'retry-reconciliation-button' })).toBeDefined();
+      // - No Alert from mutation
+      expect(Alert.alert).not.toHaveBeenCalled();
+
+      // Retry reconciliation with PAUSED response
+      let resolveRetry!: (val: FitnessGoal) => void;
+      const pRetry = new Promise<FitnessGoal>((resolve) => {
+        resolveRetry = resolve;
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockReturnValueOnce(pRetry);
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'retry-reconciliation-button' }).props.onPress();
+      });
+
+      await renderer.act(async () => {
+        resolveRetry(pausedGoal);
+      });
+
+      // Verify recovery:
+      expect(root.findAllByProps({ testID: 'reconciliation-retry-banner' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'goal-title' }).props.children).toBe(pausedGoal.title);
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+
+      // Open resume modal and verify clean input
+      renderer.act(() => {
+        root.findByProps({ testID: 'resume-goal-button' }).props.onPress();
+      });
+      const reasonInput = root.findByProps({ testID: 'pause-resume-reason-input' });
+      expect(reasonInput).toBeDefined();
+      expect(reasonInput.props.value).toBe('');
+      expect(reasonInput.props.editable).toBe(true);
+    });
+
+    it('guards against submitting modal when action and status mismatch (Test C)', async () => {
+      // 1. Unit verification of isGoalActionAllowed helper
+      expect(isGoalActionAllowed('pause', 'ACTIVE')).toBe(true);
+      expect(isGoalActionAllowed('pause', 'PAUSED')).toBe(false);
+      expect(isGoalActionAllowed('resume', 'PAUSED')).toBe(true);
+      expect(isGoalActionAllowed('resume', 'ACTIVE')).toBe(false);
+
+      // 2. Component-level defense: capture submit callback when ACTIVE, then update to PAUSED
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // Open Pause modal while ACTIVE
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Pause reason');
+      });
+
+      // Capture the onSubmit callback of the rendered modal
+      const modal = root.findByProps({ action: 'pause' });
+      const capturedSubmit = modal.props.onSubmit;
+      expect(typeof capturedSubmit).toBe('function');
+
+      // Update goal to PAUSED via refresh
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(pausedGoal);
+      await renderer.act(async () => {
+        root.findByProps({ refreshing: false }).props.onRefresh();
+      });
+
+      // Verify Pause modal unmounted
+      expect(root.findAllByProps({ action: 'pause' }).length).toBe(0);
+      expect(root.findAllByProps({ testID: 'pause-goal-button' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+
+      // Directly invoke the stale captured submit callback with 'pause' action
+      await renderer.act(async () => {
+        await capturedSubmit('Stale pause submission');
+      });
+
+      // Guard blocks the call: pauseGoal was NEVER called
+      expect(fitnessGoalApi.pauseGoal).not.toHaveBeenCalled();
+    });
+
+    it('does not affect a new pending mutation when older mutation completes (Test D)', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree!.root;
+
+      // 1. Start old mutation on session 1
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('Old reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveOldPause!: (val: FitnessGoal) => void;
+      const pendingOldPause = new Promise<FitnessGoal>((resolve) => {
+        resolveOldPause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingOldPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // 2. Blur then refocus on same identity
+      renderer.act(() => {
+        simulateScreenBlur();
+      });
+
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      await simulateScreenFocus();
+
+      // 3. In new session, open modal and submit a new mutation
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-reason-input' }).props.onChangeText('New reason');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'pause-resume-continue-button' }).props.onPress();
+      });
+
+      let resolveNewPause!: (val: FitnessGoal) => void;
+      const pendingNewPause = new Promise<FitnessGoal>((resolve) => {
+        resolveNewPause = resolve;
+      });
+      (fitnessGoalApi.pauseGoal as jest.Mock).mockReturnValueOnce(pendingNewPause);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'pause-resume-confirm-button' }).props.onPress();
+      });
+
+      // New mutation is now pending, new modal is open and submitting
+      const confirmButton = root.findByProps({ testID: 'pause-resume-confirm-button' });
+      expect(confirmButton.props.accessibilityState.busy).toBe(true);
+      expect(confirmButton.props.disabled).toBe(true);
+
+      const getCurrentGoalCallsBefore = (fitnessGoalApi.getCurrentGoal as jest.Mock).mock.calls.length;
+
+      // 4. Old mutation resolves
+      await renderer.act(async () => {
+        resolveOldPause(pausedGoal);
+      });
+
+      // 5. Verify old mutation did NOT:
+      // - close new modal
+      expect(root.findByProps({ testID: 'pause-resume-confirm-button' })).toBeDefined();
+      // - reset submitting state of new mutation (still busy/disabled)
+      const stillConfirmButton = root.findByProps({ testID: 'pause-resume-confirm-button' });
+      expect(stillConfirmButton.props.accessibilityState.busy).toBe(true);
+      expect(stillConfirmButton.props.disabled).toBe(true);
+      // - trigger reconciliation GET that could overwrite new mutation
+      expect((fitnessGoalApi.getCurrentGoal as jest.Mock).mock.calls.length).toBe(getCurrentGoalCallsBefore);
+      // - show alert
+      expect(Alert.alert).not.toHaveBeenCalled();
+
+      // 6. Complete new mutation
+      const finalPausedGoal: FitnessGoal = {
+        ...pausedGoal,
+        statusReason: 'New reason',
+      };
+      await renderer.act(async () => {
+        resolveNewPause(finalPausedGoal);
+      });
+
+      // New mutation successfully completes and becomes final state
+      expect(root.findAllByProps({ testID: 'pause-resume-confirm-button' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
     });
   });
 });
