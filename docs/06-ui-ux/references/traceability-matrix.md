@@ -7,6 +7,7 @@
 | Coaching Period | Coaching status, history, transition | Student/Trainer | Student và Trainer screens |
 | Data sharing permission | Permission summary và editor | Student/Trainer | Student flows |
 | Fitness Goal | Goal dashboard, detail, proposal, version history | Student/Trainer | Student screens |
+| Exercise Library | Browse/detail/picker; active, archived, unavailable and canonical mapping states | Student/Trainer/Admin | `screen-inventory.md`, `component-specifications.md`, `admin/admin-screens.md` |
 | Workout Plan | Plan list/detail/builder/version summary | Student/Trainer | Student và Trainer screens |
 | Planned vs Actual Workout | Calendar, session detail, execution result | Student/Trainer | Student flows |
 | Schedule change | Request, conflict, accept/reject | Student/Trainer | Student và Trainer flows |

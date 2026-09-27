@@ -34,6 +34,18 @@ Hiển thị primary goal, target chính, progress, timeline, active training ti
 
 Phân biệt Workout Template, Planned Workout và Completed Workout. Hiển thị planned date và performed date riêng nếu khác nhau. Tag supervision requirement khi session yêu cầu PT.
 
+## WorkoutPlanCard
+
+Hiển thị tên plan, source/creator, duration, số session/exercise, media khi có và CTA theo authority. Pattern ảnh phủ và metadata của SuperFit có thể dùng làm visual reference, nhưng card không được mang tên `Recommendation` nếu nó không phải AI output.
+
+## ExerciseListItem
+
+Dùng cho Exercise Library, Exercise picker và playlist trong plan. Hiển thị tên, primary muscle, equipment, variation/canonical relation và media availability khi phù hợp. `Archived` hoặc `Unavailable` phải rõ ràng trong historical view và không được chọn cho plan mới. Đây là component sản phẩm cần cho B02; chưa có frame Exercise Library tương ứng được xác minh trong SuperFit.
+
+## SearchAndFilterBar
+
+Search input có label truy cập, clear action và trạng thái đang tìm; filter action có touch target tối thiểu 44 × 44 và summary filter đang áp dụng. Phân biệt first-use empty với no-result và cung cấp Clear filter cho no-result.
+
 ## NutritionSummaryCard
 
 Hiển thị target và actual tách biệt, day type và logging completeness. Ngày thiếu log phải có nhãn `Dữ liệu chưa đầy đủ` và không tính 0 kcal.
