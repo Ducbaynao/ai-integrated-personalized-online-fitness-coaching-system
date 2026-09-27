@@ -204,8 +204,12 @@ public class FitnessGoalProposalService implements
                     List.of(new FieldErrorDto("page", "Max", "Pagination offset exceeds maximum allowed limit")));
         }
 
-        long total = proposalPort.countByStudentId(query.studentId(), query.statusFilter());
-        List<GoalProposal> items = proposalPort.findByStudentId(query.studentId(), query.statusFilter(), query.size(), offset);
+        long total = query.fitnessGoalId() != null
+                ? proposalPort.countByStudentId(query.studentId(), query.fitnessGoalId(), query.statusFilter())
+                : proposalPort.countByStudentId(query.studentId(), query.statusFilter());
+        List<GoalProposal> items = query.fitnessGoalId() != null
+                ? proposalPort.findByStudentId(query.studentId(), query.fitnessGoalId(), query.statusFilter(), query.size(), offset)
+                : proposalPort.findByStudentId(query.studentId(), query.statusFilter(), query.size(), offset);
         int totalPages = query.size() == 0 ? 0 : (int) Math.ceil((double) total / query.size());
 
         return new GoalProposalPage(items, query.page(), query.size(), total, totalPages);

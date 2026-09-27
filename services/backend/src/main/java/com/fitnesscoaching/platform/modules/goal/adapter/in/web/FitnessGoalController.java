@@ -47,11 +47,16 @@ import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.CreateGoalTr
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.GoalTransitionResponse;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionCommand;
+import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.FitnessGoalPageResponse;
+import com.fitnesscoaching.platform.modules.goal.application.model.FitnessGoalPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalTransitionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsUseCase;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalTransition;
 import java.util.List;
 
@@ -62,6 +67,7 @@ public class FitnessGoalController {
     private final CreateFitnessGoalUseCase createFitnessGoalUseCase;
     private final GetFitnessGoalDetailUseCase getFitnessGoalDetailUseCase;
     private final GetCurrentFitnessGoalUseCase getCurrentFitnessGoalUseCase;
+    private final GetStudentGoalsUseCase getStudentGoalsUseCase;
     private final ActivateFitnessGoalUseCase activateFitnessGoalUseCase;
     private final GetGoalVersionsUseCase getGoalVersionsUseCase;
     private final GetGoalVersionDetailUseCase getGoalVersionDetailUseCase;
@@ -76,6 +82,7 @@ public class FitnessGoalController {
             CreateFitnessGoalUseCase createFitnessGoalUseCase,
             GetFitnessGoalDetailUseCase getFitnessGoalDetailUseCase,
             GetCurrentFitnessGoalUseCase getCurrentFitnessGoalUseCase,
+            GetStudentGoalsUseCase getStudentGoalsUseCase,
             ActivateFitnessGoalUseCase activateFitnessGoalUseCase,
             GetGoalVersionsUseCase getGoalVersionsUseCase,
             GetGoalVersionDetailUseCase getGoalVersionDetailUseCase,
@@ -89,6 +96,7 @@ public class FitnessGoalController {
         this.createFitnessGoalUseCase = createFitnessGoalUseCase;
         this.getFitnessGoalDetailUseCase = getFitnessGoalDetailUseCase;
         this.getCurrentFitnessGoalUseCase = getCurrentFitnessGoalUseCase;
+        this.getStudentGoalsUseCase = getStudentGoalsUseCase;
         this.activateFitnessGoalUseCase = activateFitnessGoalUseCase;
         this.getGoalVersionsUseCase = getGoalVersionsUseCase;
         this.getGoalVersionDetailUseCase = getGoalVersionDetailUseCase;
@@ -113,11 +121,38 @@ public class FitnessGoalController {
         return ResponseEntity.created(location).body(FitnessGoalResponse.fromDomain(created));
     }
 
-    @GetMapping("/me/current")
-    public ResponseEntity<FitnessGoalResponse> getCurrentFitnessGoal(@AuthenticationPrincipal Jwt jwt) {
+    @GetMapping
+    public ResponseEntity<FitnessGoalPageResponse> getFitnessGoals(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) GoalStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
         UUID studentId = UUID.fromString(jwt.getSubject());
-        FitnessGoal current = getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId)
-                .orElseThrow(() -> new FitnessGoalNotFoundException("No active fitness goal found for student."));
+        GetStudentGoalsQuery query = new GetStudentGoalsQuery(studentId, status, page, size);
+        FitnessGoalPage goalPage = getStudentGoalsUseCase.getStudentGoals(query);
+        FitnessGoalPageResponse response = new FitnessGoalPageResponse(
+                goalPage.items().stream().map(FitnessGoalResponse::fromDomain).toList(),
+                goalPage.page(),
+                goalPage.size(),
+                goalPage.totalElements(),
+                goalPage.totalPages()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me/current")
+    public ResponseEntity<FitnessGoalResponse> getCurrentFitnessGoal(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "false") boolean includePaused
+    ) {
+        UUID studentId = UUID.fromString(jwt.getSubject());
+        FitnessGoal current = getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId, includePaused)
+                .orElseThrow(() -> new FitnessGoalNotFoundException(
+                        includePaused
+                                ? "No active or paused fitness goal found for student."
+                                : "No active fitness goal found for student."
+                ));
 
         return ResponseEntity.ok(FitnessGoalResponse.fromDomain(current));
     }

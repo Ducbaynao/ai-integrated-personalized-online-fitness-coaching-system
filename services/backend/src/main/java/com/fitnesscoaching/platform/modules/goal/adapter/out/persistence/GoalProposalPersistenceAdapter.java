@@ -300,6 +300,11 @@ public class GoalProposalPersistenceAdapter implements GoalProposalPort {
 
     @Override
     public List<GoalProposal> findByStudentId(UUID studentId, ProposalStatus statusFilter, int limit, long offset) {
+        return findByStudentId(studentId, null, statusFilter, limit, offset);
+    }
+
+    @Override
+    public List<GoalProposal> findByStudentId(UUID studentId, UUID fitnessGoalId, ProposalStatus statusFilter, int limit, long offset) {
         StringBuilder sql = new StringBuilder("""
                 SELECT id, student_id, fitness_goal_id, base_goal_version_id,
                        source, created_by, proposed_title,
@@ -311,6 +316,11 @@ public class GoalProposalPersistenceAdapter implements GoalProposalPort {
                 """);
         List<Object> params = new ArrayList<>();
         params.add(studentId);
+
+        if (fitnessGoalId != null) {
+            sql.append(" AND fitness_goal_id = ?");
+            params.add(fitnessGoalId);
+        }
 
         if (statusFilter != null) {
             sql.append(" AND status = ?::fitness.proposal_status");
@@ -476,9 +486,19 @@ public class GoalProposalPersistenceAdapter implements GoalProposalPort {
 
     @Override
     public long countByStudentId(UUID studentId, ProposalStatus statusFilter) {
+        return countByStudentId(studentId, null, statusFilter);
+    }
+
+    @Override
+    public long countByStudentId(UUID studentId, UUID fitnessGoalId, ProposalStatus statusFilter) {
         StringBuilder sql = new StringBuilder("SELECT count(*) FROM fitness.goal_proposals WHERE student_id = ?");
         List<Object> params = new ArrayList<>();
         params.add(studentId);
+
+        if (fitnessGoalId != null) {
+            sql.append(" AND fitness_goal_id = ?");
+            params.add(fitnessGoalId);
+        }
 
         if (statusFilter != null) {
             sql.append(" AND status = ?::fitness.proposal_status");

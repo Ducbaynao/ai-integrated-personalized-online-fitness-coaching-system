@@ -3,6 +3,7 @@ import {
   canAccessPurposeSelection,
   canAccessStudentOnboarding,
   canAccessStudentProfile,
+  canAccessFitnessGoals,
   canAccessTrainerOnboarding,
   canAccessTrainerProfile,
   getAuthenticatedHomeRoute,
@@ -126,6 +127,13 @@ describe('Route Guard & Capability Resolution (PROFILE-04)', () => {
     expect(canAccessStudentProfile(studentOnly)).toBe(true);
     expect(canAccessStudentProfile(trainerOnly)).toBe(false);
     expect(canAccessStudentProfile(dualRole)).toBe(true);
+
+    // canAccessFitnessGoals: requires student profile
+    expect(canAccessFitnessGoals(null)).toBe(false);
+    expect(canAccessFitnessGoals(noProfiles)).toBe(false);
+    expect(canAccessFitnessGoals(studentOnly)).toBe(true);
+    expect(canAccessFitnessGoals(trainerOnly)).toBe(false);
+    expect(canAccessFitnessGoals(dualRole)).toBe(true);
 
     // canAccessTrainerProfile: requires trainer profile
     expect(canAccessTrainerProfile(null)).toBe(false);

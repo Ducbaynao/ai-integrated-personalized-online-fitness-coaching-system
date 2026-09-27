@@ -81,7 +81,7 @@ Examples include:
 - `AUTH_TOKEN_EXPIRED`, `AUTH_SESSION_REVOKED`;
 - `TRAINER_NOT_ELIGIBLE`, `COACHING_RELATIONSHIP_NOT_ACTIVE`;
 - `DATA_SCOPE_NOT_GRANTED`, `PRIVILEGED_ACCESS_REQUIRED`;
-- `GOAL_PROPOSAL_NOT_PENDING`, `SOURCE_VERSION_CHANGED`;
+- `GOAL_PROPOSAL_ALREADY_DECIDED`, `STALE_GOAL_PROPOSAL`;
 - `APPOINTMENT_TIME_CONFLICT`, `RESCHEDULE_REQUEST_EXPIRED`;
 - `COACH_REQUIRED`, `WORKOUT_ALREADY_COMPLETED`;
 - `MEASUREMENT_REJECTED`, `UNSUPPORTED_UNIT`;
@@ -156,9 +156,13 @@ Milestone GOAL-01 implements the backend foundation for Student-owned Fitness Go
     - No duplicate target metrics within version targets.
     - Missing measurement values are unknown, never zero.
   - When activating immediately: checks that the student does not already have an active goal.
+- `GET /api/v1/fitness-goals`:
+  - Retrieves paginated list of fitness goals belonging to the authenticated student (`page`, `size`, optional `status` filter).
+  - Returns `200 OK` with `FitnessGoalPageResponse`.
 - `GET /api/v1/fitness-goals/me/current`:
   - Retrieves the authenticated student's current active fitness goal with current version, objectives, and targets.
-  - Returns `404 FITNESS_GOAL_NOT_FOUND` if no active goal exists.
+  - Supports optional query parameter `includePaused=true` (default: `false`): when `true`, returns the active goal if present, or the latest paused goal if no active goal exists.
+  - Returns `404 FITNESS_GOAL_NOT_FOUND` if no matching goal exists.
 - `GET /api/v1/fitness-goals/{goalId}`:
   - Retrieves details of a fitness goal by ID.
   - Strictly verifies ownership (`student_id == authenticatedUserId`). Cross-student access is denied (`403 ACCESS_DENIED`).

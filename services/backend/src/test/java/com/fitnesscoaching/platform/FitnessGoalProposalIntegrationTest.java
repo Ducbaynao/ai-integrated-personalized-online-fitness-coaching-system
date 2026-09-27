@@ -320,6 +320,21 @@ class FitnessGoalProposalIntegrationTest {
                 .andExpect(jsonPath("$.items[0].id", is(proposal1Id.toString())))
                 .andExpect(jsonPath("$.items[0].status", is("PENDING")));
 
+        // 2b. Student lists proposals with matching fitnessGoalId filter
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .param("fitnessGoalId", goalId.toString())
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id", is(proposal1Id.toString())));
+
+        // 2c. Student lists proposals with different fitnessGoalId filter -> returns empty
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .param("fitnessGoalId", UUID.randomUUID().toString())
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(0)));
+
         // 3. Student views proposal detail with baseVersion
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", proposal1Id)
                         .header("Authorization", "Bearer " + studentToken))
@@ -1897,5 +1912,107 @@ class FitnessGoalProposalIntegrationTest {
         String proposalStatus = jdbcTemplate.queryForObject(
                 "SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposalId);
         assertThat(proposalStatus).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    @DisplayName("Proposals Query: student isolation, fitnessGoalId + status filtering, and cross-student goal isolation")
+    void proposalsQuery_filteringAndStudentIsolation_verified() throws Exception {
+        UUID student1Id = createActiveStudentUser("student.iso1@example.com");
+        UUID student2Id = createActiveStudentUser("student.iso2@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.iso@example.com", true, true);
+        createCoachingContext(trainerId, student1Id, true, true);
+        createCoachingContext(trainerId, student2Id, true, true);
+
+        UUID goal1Id = createActiveGoal(student1Id, "Student 1 Goal");
+        UUID goal2Id = createActiveGoal(student2Id, "Student 2 Goal");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.iso@example.com", List.of("TRAINER"));
+        String student1Token = createAccessToken(student1Id, "student.iso1@example.com", List.of("STUDENT"));
+
+        // Create Proposal 1A (PENDING) for Student 1
+        CreateGoalProposalRequest prop1AReq = new CreateGoalProposalRequest(
+                "Proposal 1A", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason 1A",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+        MvcResult res1A = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goal1Id)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(prop1AReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID prop1AId = UUID.fromString((String) objectMapper.readValue(res1A.getResponse().getContentAsString(), Map.class).get("id"));
+
+        // Create Proposal 1B for Student 1 and REJECT it
+        CreateGoalProposalRequest prop1BReq = new CreateGoalProposalRequest(
+                "Proposal 1B", LocalDate.now(), LocalDate.now().plusDays(90), 90, "Reason 1B",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+        MvcResult res1B = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goal1Id)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(prop1BReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID prop1BId = UUID.fromString((String) objectMapper.readValue(res1B.getResponse().getContentAsString(), Map.class).get("id"));
+        mockMvc.perform(post("/api/v1/fitness-goal-proposals/{proposalId}/decisions", prop1BId)
+                        .header("Authorization", "Bearer " + student1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new DecideGoalProposalRequest(ProposalDecision.REJECT, "Reject 1B"))))
+                .andExpect(status().isOk());
+
+        // Create Proposal 2 for Student 2
+        CreateGoalProposalRequest prop2Req = new CreateGoalProposalRequest(
+                "Proposal 2", LocalDate.now(), LocalDate.now().plusDays(45), 45, "Reason 2",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goal2Id)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(prop2Req)))
+                .andExpect(status().isCreated());
+
+        // 1. Student 1 queries all proposals: only receives own proposals (1A and 1B), totalItems = 2
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .header("Authorization", "Bearer " + student1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(2)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(2)));
+
+        // 2. Student 1 queries with fitnessGoalId + status=PENDING: returns only Proposal 1A
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .param("fitnessGoalId", goal1Id.toString())
+                        .param("status", "PENDING")
+                        .header("Authorization", "Bearer " + student1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id", is(prop1AId.toString())))
+                .andExpect(jsonPath("$.items[0].status", is("PENDING")));
+
+        // 3. Student 1 queries with fitnessGoalId + status=REJECTED: returns only Proposal 1B
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .param("fitnessGoalId", goal1Id.toString())
+                        .param("status", "REJECTED")
+                        .header("Authorization", "Bearer " + student1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(1)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id", is(prop1BId.toString())))
+                .andExpect(jsonPath("$.items[0].status", is("REJECTED")));
+
+        // 4. Student 1 queries with Student 2's goal ID: returns empty, no data leakage
+        mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
+                        .param("fitnessGoalId", goal2Id.toString())
+                        .header("Authorization", "Bearer " + student1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(0)))
+                .andExpect(jsonPath("$.totalPages", is(0)))
+                .andExpect(jsonPath("$.items", hasSize(0)));
     }
 }

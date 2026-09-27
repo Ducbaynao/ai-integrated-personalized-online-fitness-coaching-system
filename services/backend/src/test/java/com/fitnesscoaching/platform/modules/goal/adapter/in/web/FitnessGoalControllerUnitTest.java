@@ -36,6 +36,7 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTran
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
@@ -95,6 +96,9 @@ class FitnessGoalControllerUnitTest {
 
     @MockitoBean
     private GetCurrentFitnessGoalUseCase getCurrentFitnessGoalUseCase;
+
+    @MockitoBean
+    private GetStudentGoalsUseCase getStudentGoalsUseCase;
 
     @MockitoBean
     private ActivateFitnessGoalUseCase activateFitnessGoalUseCase;
@@ -235,7 +239,7 @@ class FitnessGoalControllerUnitTest {
     @DisplayName("GET /api/v1/fitness-goals/me/current - returns 200 when active goal exists")
     void getCurrentGoal_success_returns200() throws Exception {
         FitnessGoal dummy = buildDummyGoal(GoalStatus.ACTIVE);
-        when(getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId)).thenReturn(Optional.of(dummy));
+        when(getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId, false)).thenReturn(Optional.of(dummy));
 
         mockMvc.perform(get("/api/v1/fitness-goals/me/current")
                         .with(jwt().jwt(b -> b.subject(studentId.toString()))))
@@ -245,14 +249,44 @@ class FitnessGoalControllerUnitTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/fitness-goals/me/current?includePaused=true - returns paused goal when active absent")
+    void getCurrentGoal_includePaused_returns200() throws Exception {
+        FitnessGoal dummy = buildDummyGoal(GoalStatus.PAUSED);
+        when(getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId, true)).thenReturn(Optional.of(dummy));
+
+        mockMvc.perform(get("/api/v1/fitness-goals/me/current?includePaused=true")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(dummy.id().toString())))
+                .andExpect(jsonPath("$.status", is("PAUSED")));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/fitness-goals/me/current - returns 404 when no active goal")
     void getCurrentGoal_notFound_returns404() throws Exception {
-        when(getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId)).thenReturn(Optional.empty());
+        when(getCurrentFitnessGoalUseCase.getCurrentFitnessGoal(studentId, false)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/fitness-goals/me/current")
                         .with(jwt().jwt(b -> b.subject(studentId.toString()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode", is("FITNESS_GOAL_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/fitness-goals - returns paginated student goals")
+    void getFitnessGoals_success_returns200() throws Exception {
+        FitnessGoal dummy = buildDummyGoal(GoalStatus.ACTIVE);
+        com.fitnesscoaching.platform.modules.goal.application.model.FitnessGoalPage page =
+                new com.fitnesscoaching.platform.modules.goal.application.model.FitnessGoalPage(
+                        List.of(dummy), 0, 20, 1, 1
+                );
+        when(getStudentGoalsUseCase.getStudentGoals(any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/fitness-goals")
+                        .with(jwt().jwt(b -> b.subject(studentId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.items[0].id", is(dummy.id().toString())));
     }
 
     @Test

@@ -53,13 +53,14 @@ public class FitnessGoalProposalController {
     @GetMapping("/api/v1/fitness-goal-proposals/me")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<GoalProposalPageResponse> getMyProposals(
+            @RequestParam(required = false) UUID fitnessGoalId,
             @RequestParam(required = false) ProposalStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal Jwt jwt
     ) {
         UUID studentId = UUID.fromString(jwt.getSubject());
-        GetStudentGoalProposalsQuery query = new GetStudentGoalProposalsQuery(studentId, status, page, size);
+        GetStudentGoalProposalsQuery query = new GetStudentGoalProposalsQuery(studentId, fitnessGoalId, status, page, size);
         GoalProposalPage result = getStudentGoalProposalsUseCase.getStudentProposals(query);
 
         return ResponseEntity.ok(GoalProposalPageResponse.fromDomain(result));

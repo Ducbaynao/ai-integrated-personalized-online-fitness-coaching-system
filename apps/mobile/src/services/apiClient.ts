@@ -12,6 +12,7 @@ import {
   RegistrationResponse,
   TokenPairResponse,
 } from '@/types/auth';
+export { ApiError } from '@/types/auth';
 
 type SessionExpiredHandler = () => void;
 let sessionExpiredHandler: SessionExpiredHandler | null = null;

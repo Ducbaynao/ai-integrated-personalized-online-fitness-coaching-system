@@ -311,6 +311,29 @@ class FitnessGoalProposalServiceUnitTest {
     }
 
     @Test
+    @DisplayName("getStudentProposals: filters by fitnessGoalId when provided")
+    void getStudentProposals_withFitnessGoalId_success() {
+        doNothing().when(studentAuthorityPort).verifyStudentCanManageGoals(studentId);
+        when(proposalPort.countByStudentId(studentId, goalId, ProposalStatus.PENDING)).thenReturn(1L);
+        GoalProposal p = new GoalProposal(
+                UUID.randomUUID(), studentId, goalId, versionId, ProposalSource.TRAINER,
+                trainerId, "Title", LocalDate.now(), LocalDate.now().plusDays(30), 30,
+                "Reason", ProposalStatus.PENDING, null, null, null, null, Instant.now(), Instant.now(),
+                List.of(), List.of(), null
+        );
+        when(proposalPort.findByStudentId(studentId, goalId, ProposalStatus.PENDING, 20, 0L))
+                .thenReturn(List.of(p));
+
+        GetStudentGoalProposalsQuery query = new GetStudentGoalProposalsQuery(studentId, goalId, ProposalStatus.PENDING, 0, 20);
+        GoalProposalPage page = service.getStudentProposals(query);
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.totalItems()).isEqualTo(1L);
+        verify(proposalPort).countByStudentId(studentId, goalId, ProposalStatus.PENDING);
+        verify(proposalPort).findByStudentId(studentId, goalId, ProposalStatus.PENDING, 20, 0L);
+    }
+
+    @Test
     @DisplayName("getStudentProposals: throws ApplicationValidationException for invalid pagination")
     void getStudentProposals_invalidPagination() {
         doNothing().when(studentAuthorityPort).verifyStudentCanManageGoals(studentId);

@@ -27,6 +27,7 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalV
 import com.fitnesscoaching.platform.modules.goal.application.port.in.CreateGoalVersionUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetFitnessGoalDetailUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.model.FitnessGoalPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalTransitionsQuery;
@@ -35,6 +36,8 @@ import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVers
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionDetailUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsQuery;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetGoalVersionsUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetStudentGoalsUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalCommand;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.PauseFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.ResumeFitnessGoalCommand;
@@ -68,6 +71,7 @@ public class FitnessGoalService implements
         CreateFitnessGoalUseCase,
         GetFitnessGoalDetailUseCase,
         GetCurrentFitnessGoalUseCase,
+        GetStudentGoalsUseCase,
         ActivateFitnessGoalUseCase,
         GetGoalVersionsUseCase,
         GetGoalVersionDetailUseCase,
@@ -251,11 +255,54 @@ public class FitnessGoalService implements
     @Override
     @Transactional(readOnly = true)
     public Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId) {
+        return getCurrentFitnessGoal(studentId, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId, boolean includePaused) {
         if (studentId == null) {
             throw new ApplicationValidationException("studentId cannot be null");
         }
         goalStudentAuthorityPort.verifyStudentCanManageGoals(studentId);
+        if (includePaused) {
+            return fitnessGoalPersistencePort.findCurrentManageableByStudentId(studentId);
+        }
         return fitnessGoalPersistencePort.findCurrentActiveByStudentId(studentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FitnessGoalPage getStudentGoals(GetStudentGoalsQuery query) {
+        if (query == null) {
+            throw new ApplicationValidationException("Query cannot be null");
+        }
+        if (query.studentId() == null) {
+            throw new ApplicationValidationException("studentId cannot be null",
+                    List.of(new FieldErrorDto("studentId", "NotNull", "studentId cannot be null")));
+        }
+        if (query.page() < 0) {
+            throw new ApplicationValidationException("Page index must not be negative",
+                    List.of(new FieldErrorDto("page", "Min", "Page index must not be negative")));
+        }
+        if (query.size() < 1 || query.size() > 100) {
+            throw new ApplicationValidationException("Page size must be between 1 and 100",
+                    List.of(new FieldErrorDto("size", "Range", "Page size must be between 1 and 100")));
+        }
+
+        long offset = (long) query.page() * query.size();
+        if (offset > Integer.MAX_VALUE) {
+            throw new ApplicationValidationException("Pagination offset exceeds maximum allowed limit",
+                    List.of(new FieldErrorDto("page", "Max", "Pagination offset exceeds maximum allowed limit")));
+        }
+
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(query.studentId());
+
+        long total = fitnessGoalPersistencePort.countByStudentId(query.studentId(), query.status());
+        List<FitnessGoal> items = fitnessGoalPersistencePort.findByStudentId(query.studentId(), query.status(), query.size(), offset);
+        int totalPages = query.size() == 0 ? 0 : (int) Math.ceil((double) total / query.size());
+
+        return new FitnessGoalPage(items, query.page(), query.size(), total, totalPages);
     }
 
     @Override

@@ -191,6 +191,51 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
         );
     };
 
+    private static final RowMapper<FitnessGoal> GOAL_ROW_MAPPER = (rs, rowNum) -> {
+        UUID id = (UUID) rs.getObject("id");
+        UUID studentId = (UUID) rs.getObject("student_id");
+        String title = rs.getString("title");
+        String statusStr = rs.getString("status");
+        GoalStatus status = statusStr != null ? GoalStatus.valueOf(statusStr) : GoalStatus.DRAFT;
+        UUID createdBy = (UUID) rs.getObject("created_by");
+
+        Timestamp actTs = rs.getTimestamp("activated_at");
+        Instant activatedAt = actTs != null ? actTs.toInstant() : null;
+
+        Timestamp pauseTs = rs.getTimestamp("paused_at");
+        Instant pausedAt = pauseTs != null ? pauseTs.toInstant() : null;
+
+        Timestamp compTs = rs.getTimestamp("completed_at");
+        Instant completedAt = compTs != null ? compTs.toInstant() : null;
+
+        Timestamp endTs = rs.getTimestamp("ended_at");
+        Instant endedAt = endTs != null ? endTs.toInstant() : null;
+
+        String statusReason = rs.getString("status_reason");
+
+        Timestamp crTs = rs.getTimestamp("created_at");
+        Instant createdAt = crTs != null ? crTs.toInstant() : null;
+
+        Timestamp upTs = rs.getTimestamp("updated_at");
+        Instant updatedAt = upTs != null ? upTs.toInstant() : null;
+
+        return new FitnessGoal(
+                id,
+                studentId,
+                title,
+                status,
+                createdBy,
+                activatedAt,
+                pausedAt,
+                completedAt,
+                endedAt,
+                statusReason,
+                createdAt,
+                updatedAt,
+                null
+        );
+    };
+
     @Override
     @Transactional
     public FitnessGoal saveGoalAggregate(
@@ -401,50 +446,7 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
                 FROM fitness.fitness_goals
                 WHERE id = ? AND deleted_at IS NULL
                 """;
-        List<FitnessGoal> goals = jdbcTemplate.query(sql, (rs, rowNum) -> {
-            UUID id = (UUID) rs.getObject("id");
-            UUID studentId = (UUID) rs.getObject("student_id");
-            String title = rs.getString("title");
-            String statusStr = rs.getString("status");
-            GoalStatus status = statusStr != null ? GoalStatus.valueOf(statusStr) : GoalStatus.DRAFT;
-            UUID createdBy = (UUID) rs.getObject("created_by");
-
-            Timestamp actTs = rs.getTimestamp("activated_at");
-            Instant activatedAt = actTs != null ? actTs.toInstant() : null;
-
-            Timestamp pauseTs = rs.getTimestamp("paused_at");
-            Instant pausedAt = pauseTs != null ? pauseTs.toInstant() : null;
-
-            Timestamp compTs = rs.getTimestamp("completed_at");
-            Instant completedAt = compTs != null ? compTs.toInstant() : null;
-
-            Timestamp endTs = rs.getTimestamp("ended_at");
-            Instant endedAt = endTs != null ? endTs.toInstant() : null;
-
-            String statusReason = rs.getString("status_reason");
-
-            Timestamp crTs = rs.getTimestamp("created_at");
-            Instant createdAt = crTs != null ? crTs.toInstant() : null;
-
-            Timestamp upTs = rs.getTimestamp("updated_at");
-            Instant updatedAt = upTs != null ? upTs.toInstant() : null;
-
-            return new FitnessGoal(
-                    id,
-                    studentId,
-                    title,
-                    status,
-                    createdBy,
-                    activatedAt,
-                    pausedAt,
-                    completedAt,
-                    endedAt,
-                    statusReason,
-                    createdAt,
-                    updatedAt,
-                    null
-            );
-        }, goalId);
+        List<FitnessGoal> goals = jdbcTemplate.query(sql, GOAL_ROW_MAPPER, goalId);
 
         if (goals.isEmpty()) {
             return Optional.empty();
@@ -486,6 +488,206 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
             return Optional.empty();
         }
         return findById(ids.get(0));
+    }
+
+    @Override
+    public Optional<FitnessGoal> findCurrentManageableByStudentId(UUID studentId) {
+        String sql = """
+                SELECT id
+                FROM fitness.fitness_goals
+                WHERE student_id = ?
+                  AND status IN ('ACTIVE'::fitness.lifecycle_status, 'PAUSED'::fitness.lifecycle_status)
+                  AND deleted_at IS NULL
+                ORDER BY CASE WHEN status = 'ACTIVE'::fitness.lifecycle_status THEN 1 ELSE 2 END,
+                         updated_at DESC, created_at DESC
+                LIMIT 1
+                """;
+        List<UUID> ids = jdbcTemplate.query(sql, (rs, rowNum) -> (UUID) rs.getObject("id"), studentId);
+        if (ids.isEmpty()) {
+            return Optional.empty();
+        }
+        return findById(ids.get(0));
+    }
+
+    @Override
+    public List<FitnessGoal> findByStudentId(UUID studentId, GoalStatus status, int limit, long offset) {
+        String sql;
+        List<FitnessGoal> goals;
+        if (status != null) {
+            sql = """
+                    SELECT id, student_id, title, status, created_by,
+                           activated_at, paused_at, completed_at, ended_at, status_reason,
+                           created_at, updated_at
+                    FROM fitness.fitness_goals
+                    WHERE student_id = ?
+                      AND status = ?::fitness.lifecycle_status
+                      AND deleted_at IS NULL
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ? OFFSET ?
+                    """;
+            goals = jdbcTemplate.query(sql, GOAL_ROW_MAPPER, studentId, status.name(), limit, offset);
+        } else {
+            sql = """
+                    SELECT id, student_id, title, status, created_by,
+                           activated_at, paused_at, completed_at, ended_at, status_reason,
+                           created_at, updated_at
+                    FROM fitness.fitness_goals
+                    WHERE student_id = ?
+                      AND deleted_at IS NULL
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ? OFFSET ?
+                    """;
+            goals = jdbcTemplate.query(sql, GOAL_ROW_MAPPER, studentId, limit, offset);
+        }
+
+        if (goals.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> goalIds = goals.stream().map(FitnessGoal::id).toList();
+
+        String versionsSql = """
+                SELECT DISTINCT ON (fitness_goal_id)
+                       id, fitness_goal_id, version_number, title, start_date, target_date,
+                       duration_days, effective_from, effective_until, resume_date,
+                       change_reason, change_summary, created_by, source_proposal_id,
+                       created_at, locked_at, locked_by, lock_reason
+                FROM fitness.fitness_goal_versions
+                WHERE fitness_goal_id = ANY (?) AND effective_until IS NULL
+                ORDER BY fitness_goal_id, version_number DESC
+                """;
+
+        List<FitnessGoalVersion> versions = jdbcTemplate.query(
+                con -> {
+                    var ps = con.prepareStatement(versionsSql);
+                    ps.setArray(1, con.createArrayOf("uuid", goalIds.toArray()));
+                    return ps;
+                },
+                VERSION_ROW_MAPPER
+        );
+
+        Map<UUID, List<GoalObjective>> objectivesByVersion = new HashMap<>();
+        Map<UUID, List<GoalTarget>> targetsByVersion = new HashMap<>();
+
+        if (!versions.isEmpty()) {
+            List<UUID> versionIds = versions.stream().map(FitnessGoalVersion::id).toList();
+
+            String objSql = """
+                    SELECT o.id, o.goal_version_id, o.goal_type_id,
+                           gt.code as goal_type_code, gt.name as goal_type_name,
+                           o.priority, o.sort_order, o.notes
+                    FROM fitness.goal_objectives o
+                    JOIN fitness.goal_types gt ON gt.id = o.goal_type_id
+                    WHERE o.goal_version_id = ANY (?)
+                    ORDER BY o.sort_order ASC, o.id ASC
+                    """;
+            jdbcTemplate.query(
+                    con -> {
+                        var ps = con.prepareStatement(objSql);
+                        ps.setArray(1, con.createArrayOf("uuid", versionIds.toArray()));
+                        return ps;
+                    },
+                    rs -> {
+                        UUID vId = (UUID) rs.getObject("goal_version_id");
+                        GoalObjective obj = OBJECTIVE_ROW_MAPPER.mapRow(rs, 0);
+                        objectivesByVersion.computeIfAbsent(vId, k -> new ArrayList<>()).add(obj);
+                    }
+            );
+
+            String tgtSql = """
+                    SELECT t.id, t.goal_version_id, t.metric_definition_id,
+                           md.code as metric_code, md.display_name as metric_display_name,
+                           t.exercise_variation_id, t.start_value, t.target_value,
+                           t.target_min_value, t.target_max_value,
+                           t.unit_id, u.code as unit_code, u.symbol as unit_symbol,
+                           t.target_repetitions, t.target_date, t.notes, t.created_at
+                    FROM fitness.goal_targets t
+                    JOIN fitness.metric_definitions md ON md.id = t.metric_definition_id
+                    JOIN fitness.measurement_units u ON u.id = t.unit_id
+                    WHERE t.goal_version_id = ANY (?)
+                    ORDER BY t.created_at ASC, t.id ASC
+                    """;
+            jdbcTemplate.query(
+                    con -> {
+                        var ps = con.prepareStatement(tgtSql);
+                        ps.setArray(1, con.createArrayOf("uuid", versionIds.toArray()));
+                        return ps;
+                    },
+                    rs -> {
+                        UUID vId = (UUID) rs.getObject("goal_version_id");
+                        GoalTarget tgt = TARGET_ROW_MAPPER.mapRow(rs, 0);
+                        targetsByVersion.computeIfAbsent(vId, k -> new ArrayList<>()).add(tgt);
+                    }
+            );
+        }
+
+        Map<UUID, FitnessGoalVersion> currentVersionByGoalId = new HashMap<>();
+        for (FitnessGoalVersion v : versions) {
+            FitnessGoalVersion fullVersion = new FitnessGoalVersion(
+                    v.id(),
+                    v.fitnessGoalId(),
+                    v.versionNumber(),
+                    v.title(),
+                    v.startDate(),
+                    v.targetDate(),
+                    v.durationDays(),
+                    v.effectiveFrom(),
+                    v.effectiveUntil(),
+                    v.resumeDate(),
+                    v.changeReason(),
+                    v.changeSummary(),
+                    v.createdBy(),
+                    v.sourceProposalId(),
+                    v.createdAt(),
+                    v.lockedAt(),
+                    v.lockedBy(),
+                    v.lockReason(),
+                    objectivesByVersion.getOrDefault(v.id(), List.of()),
+                    targetsByVersion.getOrDefault(v.id(), List.of())
+            );
+            currentVersionByGoalId.put(v.fitnessGoalId(), fullVersion);
+        }
+
+        return goals.stream().map(g -> new FitnessGoal(
+                g.id(),
+                g.studentId(),
+                g.title(),
+                g.status(),
+                g.createdBy(),
+                g.activatedAt(),
+                g.pausedAt(),
+                g.completedAt(),
+                g.endedAt(),
+                g.statusReason(),
+                g.createdAt(),
+                g.updatedAt(),
+                currentVersionByGoalId.get(g.id())
+        )).toList();
+    }
+
+    @Override
+    public long countByStudentId(UUID studentId, GoalStatus status) {
+        String sql;
+        Long count;
+        if (status != null) {
+            sql = """
+                    SELECT COUNT(*)
+                    FROM fitness.fitness_goals
+                    WHERE student_id = ?
+                      AND status = ?::fitness.lifecycle_status
+                      AND deleted_at IS NULL
+                    """;
+            count = jdbcTemplate.queryForObject(sql, Long.class, studentId, status.name());
+        } else {
+            sql = """
+                    SELECT COUNT(*)
+                    FROM fitness.fitness_goals
+                    WHERE student_id = ?
+                      AND deleted_at IS NULL
+                    """;
+            count = jdbcTemplate.queryForObject(sql, Long.class, studentId);
+        }
+        return count != null ? count : 0L;
     }
 
     @Override

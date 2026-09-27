@@ -55,4 +55,10 @@ public interface FitnessGoalPersistencePort {
     FitnessGoal pauseGoal(UUID goalId, UUID studentId, String reason, java.time.Instant pausedAt);
 
     FitnessGoal resumeGoal(UUID goalId, UUID studentId, String reason, java.time.Instant resumedAt);
+
+    Optional<FitnessGoal> findCurrentManageableByStudentId(UUID studentId);
+
+    List<FitnessGoal> findByStudentId(UUID studentId, com.fitnesscoaching.platform.modules.goal.domain.GoalStatus status, int limit, long offset);
+
+    long countByStudentId(UUID studentId, com.fitnesscoaching.platform.modules.goal.domain.GoalStatus status);
 }

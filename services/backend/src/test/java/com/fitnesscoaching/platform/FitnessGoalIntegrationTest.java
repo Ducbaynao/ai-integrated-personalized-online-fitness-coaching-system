@@ -45,6 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fitnesscoaching.platform.common.exception.GoalLifecycleConflictException;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -495,6 +497,72 @@ class FitnessGoalIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title", is("Active Goal Now")))
                 .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("GET /me/current?includePaused=true - returns paused goal after pause and lists in GET /fitness-goals")
+    void getCurrentGoal_includePausedAndListGoals() throws Exception {
+        UUID studentId = createActiveStudentUser("student.paused.read@example.com");
+        String token = createAccessToken(studentId, "student.paused.read@example.com", List.of("STUDENT"));
+
+        // 1. Create and activate goal
+        MvcResult createResult = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Journey To Pause",
+                                  "startDate": "2026-10-01",
+                                  "activateImmediately": true,
+                                  "objectives": [
+                                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY" }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String goalId = com.jayway.jsonpath.JsonPath.read(createResult.getResponse().getContentAsString(), "$.id");
+
+        // 2. Pause goal
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goalId + "/pause")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Temporary rest\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("PAUSED")));
+
+        // 3. /me/current without param returns 404 (strictly active)
+        mockMvc.perform(get("/api/v1/fitness-goals/me/current")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+
+        // 4. /me/current?includePaused=true returns the PAUSED goal!
+        mockMvc.perform(get("/api/v1/fitness-goals/me/current?includePaused=true")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(goalId)))
+                .andExpect(jsonPath("$.status", is("PAUSED")));
+
+        // 5. GET /api/v1/fitness-goals lists the student's goals
+        mockMvc.perform(get("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.items[0].id", is(goalId)))
+                .andExpect(jsonPath("$.items[0].status", is("PAUSED")));
+
+        // 6. GET /api/v1/fitness-goals?status=PAUSED filters properly
+        mockMvc.perform(get("/api/v1/fitness-goals?status=PAUSED")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(1)));
+
+        // 7. GET /api/v1/fitness-goals?status=ACTIVE returns 0 items
+        mockMvc.perform(get("/api/v1/fitness-goals?status=ACTIVE")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(0)));
     }
 
     @Test
@@ -2227,5 +2295,157 @@ class FitnessGoalIntegrationTest {
                 "SELECT count(*) FROM fitness.fitness_goal_status_history WHERE fitness_goal_id IN (?, ?) AND to_status = 'ACTIVE'",
                 Integer.class, goal1Id, goal2Id);
         assertThat(totalActiveHistory).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("List goals: batch hydration, pagination, ordering, and student isolation")
+    void listStudentGoals_batchHydration_paginationOrderingAndIsolation() throws Exception {
+        UUID studentAId = createActiveStudentUser("student.batch.a@example.com");
+        String tokenA = createAccessToken(studentAId, "student.batch.a@example.com", List.of("STUDENT"));
+
+        UUID studentBId = createActiveStudentUser("student.batch.b@example.com");
+        String tokenB = createAccessToken(studentBId, "student.batch.b@example.com", List.of("STUDENT"));
+
+        String createPayloadTemplate = """
+                {
+                  "title": "%s",
+                  "startDate": "2026-10-01",
+                  "targetDate": "2026-12-31",
+                  "activateImmediately": %s,
+                  "objectives": [
+                    { "goalTypeCode": "MUSCLE_GAIN", "priority": "PRIMARY", "sortOrder": 0, "notes": "Objective notes" }
+                  ],
+                  "targets": [
+                    { "metricCode": "WEIGHT", "startValue": 70.0, "targetValue": 75.0, "unitCode": "KG", "notes": "Target notes" }
+                  ]
+                }
+                """;
+
+        // Student A - Goal 1 (oldest, DRAFT)
+        MvcResult res1 = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(createPayloadTemplate, "Goal 1 Oldest", "false")))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goal1Id = UUID.fromString((String) objectMapper.readValue(res1.getResponse().getContentAsString(), Map.class).get("id"));
+        jdbcTemplate.update("UPDATE fitness.fitness_goals SET created_at = now() - interval '3 days' WHERE id = ?", goal1Id);
+
+        // Student A - Goal 2 (middle, ACTIVE then PAUSED via API)
+        MvcResult res2 = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(createPayloadTemplate, "Goal 2 Paused", "true")))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goal2Id = UUID.fromString((String) objectMapper.readValue(res2.getResponse().getContentAsString(), Map.class).get("id"));
+
+        mockMvc.perform(post("/api/v1/fitness-goals/" + goal2Id + "/pause")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "reason": "Pausing for scheduled recovery" }
+                                """))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE fitness.fitness_goals SET created_at = now() - interval '2 days' WHERE id = ?", goal2Id);
+
+        // Student A - Goal 3 (newest active)
+        MvcResult res3 = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(createPayloadTemplate, "Goal 3 Active", "true")))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goal3Id = UUID.fromString((String) objectMapper.readValue(res3.getResponse().getContentAsString(), Map.class).get("id"));
+        jdbcTemplate.update("UPDATE fitness.fitness_goals SET created_at = now() - interval '1 day' WHERE id = ?", goal3Id);
+
+        // Student A - Goal 4 (soft-deleted, should never appear)
+        MvcResult res4 = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(createPayloadTemplate, "Goal 4 Deleted", "false")))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID goal4Id = UUID.fromString((String) objectMapper.readValue(res4.getResponse().getContentAsString(), Map.class).get("id"));
+        jdbcTemplate.update("UPDATE fitness.fitness_goals SET deleted_at = now() WHERE id = ?", goal4Id);
+
+        // Student B - Goal B (other student, should never appear for Student A)
+        MvcResult resB = mockMvc.perform(post("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(createPayloadTemplate, "Goal B Other Student", "true")))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        // 1. Direct persistence adapter test (verifying batch hydration and ordering)
+        List<FitnessGoal> goalsA = fitnessGoalPersistencePort.findByStudentId(studentAId, null, 10, 0);
+        assertThat(goalsA).hasSize(3);
+        assertThat(goalsA.get(0).id()).isEqualTo(goal3Id);
+        assertThat(goalsA.get(0).title()).isEqualTo("Goal 3 Active");
+        assertThat(goalsA.get(1).id()).isEqualTo(goal2Id);
+        assertThat(goalsA.get(1).title()).isEqualTo("Goal 2 Paused");
+        assertThat(goalsA.get(2).id()).isEqualTo(goal1Id);
+        assertThat(goalsA.get(2).title()).isEqualTo("Goal 1 Oldest");
+
+        // Verify batch hydration of currentVersion, objectives, and targets
+        for (FitnessGoal g : goalsA) {
+            assertThat(g.currentVersion()).isNotNull();
+            assertThat(g.currentVersion().objectives()).isNotEmpty();
+            assertThat(g.currentVersion().targets()).isNotEmpty();
+            assertThat(g.currentVersion().objectives().get(0).goalTypeCode()).isEqualTo("MUSCLE_GAIN");
+            assertThat(g.currentVersion().targets().get(0).metricCode()).isEqualTo("WEIGHT");
+        }
+
+        // 2. Status filtering via adapter
+        List<FitnessGoal> activeGoalsA = fitnessGoalPersistencePort.findByStudentId(studentAId, GoalStatus.ACTIVE, 10, 0);
+        assertThat(activeGoalsA).hasSize(1);
+        assertThat(activeGoalsA.get(0).id()).isEqualTo(goal3Id);
+
+        // 3. Pagination via adapter
+        List<FitnessGoal> paged1 = fitnessGoalPersistencePort.findByStudentId(studentAId, null, 1, 0);
+        assertThat(paged1).hasSize(1);
+        assertThat(paged1.get(0).id()).isEqualTo(goal3Id);
+
+        List<FitnessGoal> paged2 = fitnessGoalPersistencePort.findByStudentId(studentAId, null, 1, 1);
+        assertThat(paged2).hasSize(1);
+        assertThat(paged2.get(0).id()).isEqualTo(goal2Id);
+
+        // 4. Web endpoint test for student A - unfiltered pagination
+        mockMvc.perform(get("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page", is(0)))
+                .andExpect(jsonPath("$.size", is(10)))
+                .andExpect(jsonPath("$.totalElements", is(3)))
+                .andExpect(jsonPath("$.totalPages", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(3)))
+                .andExpect(jsonPath("$.items[0].id", is(goal3Id.toString())))
+                .andExpect(jsonPath("$.items[0].title", is("Goal 3 Active")))
+                .andExpect(jsonPath("$.items[0].status", is("ACTIVE")))
+                .andExpect(jsonPath("$.items[0].currentVersion.objectives", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].currentVersion.targets", hasSize(1)))
+                .andExpect(jsonPath("$.items[1].id", is(goal2Id.toString())))
+                .andExpect(jsonPath("$.items[1].title", is("Goal 2 Paused")))
+                .andExpect(jsonPath("$.items[2].id", is(goal1Id.toString())))
+                .andExpect(jsonPath("$.items[2].title", is("Goal 1 Oldest")));
+
+        // 5. Web endpoint test for student A - status filter
+        mockMvc.perform(get("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .param("status", "ACTIVE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id", is(goal3Id.toString())));
+
+        // 6. Web endpoint test for student B - isolation
+        mockMvc.perform(get("/api/v1/fitness-goals")
+                        .header("Authorization", "Bearer " + tokenB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].title", is("Goal B Other Student")));
     }
 }
