@@ -1,9 +1,10 @@
 import React from 'react';
-import { FlatList, TextInput } from 'react-native';
+import { FlatList, Text, TextInput } from 'react-native';
 import renderer from 'react-test-renderer';
 import { ExerciseCatalogScreen } from '@/features/exercise/ExerciseCatalogScreen';
 import { useExerciseCatalog, useExerciseFilterMetadata } from '@/features/exercise/exerciseQueries';
 import { ExerciseCatalogItem, ExerciseFilterMetadata } from '@/types/exercise';
+import { ApiError } from '@/types/auth';
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 jest.mock('@/hooks/use-debounced-value', () => ({ useDebouncedValue: (value: string) => value }));
@@ -94,8 +95,28 @@ describe('ExerciseCatalogScreen', () => {
 
   it('renders catalog content and the unavailable-media placeholder', () => {
     const root = renderScreen().root;
-    expect(root.findByProps({ testID: 'exercise-row-exercise-1' })).toBeDefined();
-    expect(root.findByProps({ testID: 'exercise-media-exercise-1' }).props.accessibilityLabel).toBe('Bài tập chưa có media');
+    const row = root.findByProps({ testID: 'exercise-row-exercise-1' });
+    expect(row.findAllByType(Text).some((node) => node.props.children === 'Back Squat')).toBe(true);
+    expect(root.findByProps({ testID: 'exercise-media-exercise-1' }).props.accessibilityLabel).toBe('Bài tập chưa có nội dung hướng dẫn');
+  });
+
+  it('renders the main static copy and accessibility text in Vietnamese', () => {
+    const root = renderScreen().root;
+    expect(root.findAllByType(Text).some((node) => node.props.children === 'Thư viện bài tập')).toBe(true);
+    expect(root.findByProps({ testID: 'exercise-search-input' }).props).toEqual(
+      expect.objectContaining({
+        placeholder: 'Tìm bài tập',
+        accessibilityLabel: 'Tìm kiếm bài tập',
+        accessibilityHint: 'Nhập tên hoặc từ khóa bài tập',
+      })
+    );
+    expect(root.findByProps({ testID: 'exercise-filter-button' }).props).toEqual(
+      expect.objectContaining({
+        accessibilityLabel: 'Lọc bài tập',
+        accessibilityHint: 'Mở các lựa chọn lọc danh mục bài tập',
+        accessibilityState: { expanded: false },
+      })
+    );
   });
 
   it('distinguishes an empty catalog from no search results', () => {
@@ -118,6 +139,22 @@ describe('ExerciseCatalogScreen', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it('maps a stable permission error code to Vietnamese and hides stale catalog data', () => {
+    const error = new ApiError(403, 'Access is denied.', {
+      errorCode: 'ACCESS_DENIED',
+      message: 'Access is denied.',
+      timestamp: '2026-09-28T00:00:00Z',
+      requestId: 'request-1',
+      fieldErrors: [],
+    });
+    (useExerciseCatalog as jest.Mock).mockReturnValue(catalogState({ isError: true, error }));
+    const root = renderScreen().root;
+
+    expect(root.findAllByType(Text).some((node) => node.props.children === 'Bạn chưa có quyền xem thư viện')).toBe(true);
+    expect(root.findAllByProps({ testID: 'exercise-row-exercise-1' })).toHaveLength(0);
+    expect(root.findAllByProps({ testID: 'retry-exercise-catalog' })).toHaveLength(0);
+  });
+
   it('keeps stale content visible when a background refetch fails', () => {
     (useExerciseCatalog as jest.Mock).mockReturnValue(catalogState({ isRefetchError: true, error: new Error('offline') }));
     const root = renderScreen().root;
@@ -131,6 +168,13 @@ describe('ExerciseCatalogScreen', () => {
     const root = renderScreen().root;
     renderer.act(() => root.findByType(FlatList).props.onEndReached());
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces load-more progress in Vietnamese', () => {
+    (useExerciseCatalog as jest.Mock).mockReturnValue(catalogState({ isFetchingNextPage: true }));
+    const indicator = renderScreen().root.findByProps({ testID: 'exercise-load-more-indicator' });
+    expect(indicator.props.accessibilityRole).toBe('progressbar');
+    expect(indicator.props.accessibilityLabel).toBe('Đang tải thêm bài tập');
   });
 
   it('renders and retries a load-more error', () => {
@@ -151,7 +195,10 @@ describe('ExerciseCatalogScreen', () => {
   it('applies and removes filter chips with accessible controls', () => {
     const tree = renderScreen();
     renderer.act(() => tree.root.findByProps({ testID: 'exercise-filter-button' }).props.onPress());
+    expect(tree.root.findByProps({ testID: 'exercise-filter-button' }).props.accessibilityState).toEqual({ expanded: true });
+    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: false });
     renderer.act(() => tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.onPress());
+    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: true });
     renderer.act(() => tree.root.findByProps({ testID: 'apply-exercise-filters' }).props.onPress());
     expect(useExerciseCatalog).toHaveBeenLastCalledWith(expect.objectContaining({ categoryCodes: ['STRENGTH'] }));
     const chip = tree.root.findByProps({ testID: 'remove-filter-categoryCodes:STRENGTH' });

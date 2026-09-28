@@ -5,12 +5,7 @@ import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 import { ExerciseCatalogItem } from '@/types/exercise';
-
-const DIFFICULTY_LABELS = {
-  BEGINNER: 'Cơ bản',
-  INTERMEDIATE: 'Trung cấp',
-  ADVANCED: 'Nâng cao',
-} as const;
+import { EXERCISE_DIFFICULTY_LABELS } from '../exerciseMessages';
 
 interface ExerciseListItemProps {
   exercise: ExerciseCatalogItem;
@@ -28,15 +23,15 @@ export function ExerciseListItem({ exercise, isDark = false }: ExerciseListItemP
       testID={`exercise-row-${exercise.id}`}
       accessible
       accessibilityRole="summary"
-      accessibilityLabel={`${exercise.name}. Nhóm cơ chính: ${muscles || 'chưa xác định'}. Thiết bị: ${equipment || 'không yêu cầu'}.`}
+      accessibilityLabel={`${exercise.name}. Nhóm cơ chính: ${muscles || 'chưa xác định'}. Thiết bị: ${equipment || 'không yêu cầu'}. ${exercise.mediaAvailable ? 'Có nội dung hướng dẫn.' : 'Chưa có nội dung hướng dẫn.'}`}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View
         testID={`exercise-media-${exercise.id}`}
-        accessibilityLabel={exercise.mediaAvailable ? 'Bài tập có media hướng dẫn' : 'Bài tập chưa có media'}
+        accessibilityLabel={exercise.mediaAvailable ? 'Bài tập có nội dung hướng dẫn' : 'Bài tập chưa có nội dung hướng dẫn'}
         style={[styles.media, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }]}>
         <Text style={[styles.mediaGlyph, { color: colors.textSecondary }]}>▶</Text>
         <Text style={[styles.mediaText, { color: colors.textSecondary }]}>
-          {exercise.mediaAvailable ? 'Media có sẵn' : 'Chưa có media'}
+          {exercise.mediaAvailable ? 'Có nội dung hướng dẫn' : 'Chưa có nội dung hướng dẫn'}
         </Text>
       </View>
       <View style={styles.content}>
@@ -50,7 +45,7 @@ export function ExerciseListItem({ exercise, isDark = false }: ExerciseListItemP
         <View style={styles.badges}>
           {exercise.difficulty && (
             <Text style={[styles.badge, { backgroundColor: colors.brandSoft, color: colors.primary }]}>
-              {DIFFICULTY_LABELS[exercise.difficulty]}
+              {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}
             </Text>
           )}
           {exercise.category && (

@@ -20,8 +20,12 @@ import { useExerciseCatalog, useExerciseFilterMetadata } from './exerciseQueries
 import { ExerciseListItem } from './components/ExerciseListItem';
 import { SearchAndFilterBar } from './components/SearchAndFilterBar';
 import { ExerciseFilterModal } from './components/ExerciseFilterModal';
-import { ApiError } from '@/types/auth';
 import { ExerciseCatalogFilters, ExerciseFilterMetadata } from '@/types/exercise';
+import {
+  EXERCISE_DIFFICULTY_LABELS,
+  getExerciseCatalogErrorCopy,
+  isExerciseAccessError,
+} from './exerciseMessages';
 
 type ArrayFilterKey = Exclude<keyof ExerciseCatalogFilters, 'query'>;
 
@@ -34,14 +38,10 @@ const FILTER_LABELS: Record<ArrayFilterKey, string> = {
   movementPatterns: 'Kiểu chuyển động',
 };
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  BEGINNER: 'Cơ bản',
-  INTERMEDIATE: 'Trung cấp',
-  ADVANCED: 'Nâng cao',
-};
-
 function optionName(metadata: ExerciseFilterMetadata | undefined, key: ArrayFilterKey, code: string) {
-  if (key === 'difficulties') return DIFFICULTY_LABELS[code] ?? code;
+  if (key === 'difficulties') {
+    return EXERCISE_DIFFICULTY_LABELS[code as keyof typeof EXERCISE_DIFFICULTY_LABELS] ?? code;
+  }
   if (key === 'movementPatterns') return code;
   const metadataKey = {
     categoryCodes: 'categories',
@@ -122,7 +122,8 @@ export function ExerciseCatalogScreen() {
   };
 
   const isNoResult = Boolean(debouncedSearch.trim()) || hasFilters(filters);
-  const permissionDenied = catalog.error instanceof ApiError && catalog.error.status === 403;
+  const errorCopy = getExerciseCatalogErrorCopy(catalog.error);
+  const accessError = isExerciseAccessError(catalog.error);
 
   const header = (
     <View style={styles.headerContent}>
@@ -141,14 +142,15 @@ export function ExerciseCatalogScreen() {
         value={search}
         onChangeText={setSearch}
         onOpenFilters={() => setFilterModalVisible(true)}
+        filtersExpanded={filterModalVisible}
         chips={chips}
         onRemoveChip={removeChip}
         colors={colors}
       />
-      {catalog.isRefetchError && exercises.length > 0 && !catalog.isFetchNextPageError && (
+      {catalog.isRefetchError && exercises.length > 0 && !catalog.isFetchNextPageError && !accessError && (
         <View testID="exercise-background-error" accessibilityRole="alert" style={[styles.warning, { backgroundColor: colors.warningSurface }]}>
           <Text style={[styles.warningText, { color: colors.warningText }]}>Không thể cập nhật dữ liệu mới. Danh sách gần nhất vẫn được giữ lại.</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Thử cập nhật lại danh sách" onPress={() => catalog.refetch()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Thử cập nhật lại danh sách" accessibilityHint="Tải lại dữ liệu mới nhất" onPress={() => catalog.refetch()}>
             <Text style={[styles.warningAction, { color: colors.warningText }]}>Thử lại</Text>
           </Pressable>
         </View>
@@ -176,21 +178,24 @@ export function ExerciseCatalogScreen() {
     );
   }
 
-  if (catalog.isError && exercises.length === 0) {
+  if (catalog.isError && (exercises.length === 0 || accessError)) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]}>
         {header}
         <View testID="exercise-catalog-error" accessibilityRole="alert" style={styles.centerState}>
-          <Text style={[styles.stateTitle, { color: colors.textPrimary }]}>{permissionDenied ? 'Bạn chưa có quyền xem thư viện' : 'Không thể tải thư viện bài tập'}</Text>
-          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>{permissionDenied ? 'Hãy kiểm tra quyền tài khoản hoặc đăng nhập lại.' : 'Kiểm tra kết nối mạng rồi thử lại.'}</Text>
-          <Pressable
-            testID="retry-exercise-catalog"
-            accessibilityRole="button"
-            accessibilityLabel="Thử tải lại thư viện bài tập"
-            onPress={() => catalog.refetch()}
-            style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Thử lại</Text>
-          </Pressable>
+          <Text style={[styles.stateTitle, { color: colors.textPrimary }]}>{errorCopy.title}</Text>
+          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>{errorCopy.message}</Text>
+          {!accessError && (
+            <Pressable
+              testID="retry-exercise-catalog"
+              accessibilityRole="button"
+              accessibilityLabel="Thử tải lại thư viện bài tập"
+              accessibilityHint="Gửi lại yêu cầu tải danh sách bài tập"
+              onPress={() => catalog.refetch()}
+              style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Thử lại</Text>
+            </Pressable>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -222,11 +227,11 @@ export function ExerciseCatalogScreen() {
         }
         ListFooterComponent={
           <View style={styles.footer}>
-            {catalog.isFetchingNextPage && <ActivityIndicator testID="exercise-load-more-indicator" accessibilityLabel="Đang tải thêm bài tập" color={colors.primary} />}
+            {catalog.isFetchingNextPage && <ActivityIndicator testID="exercise-load-more-indicator" accessibilityRole="progressbar" accessibilityLabel="Đang tải thêm bài tập" color={colors.primary} />}
             {catalog.isFetchNextPageError && (
               <View testID="exercise-load-more-error" accessibilityRole="alert" style={styles.loadMoreError}>
                 <Text style={[styles.stateBody, { color: colors.dangerText }]}>Không thể tải thêm bài tập.</Text>
-                <Pressable testID="retry-load-more" accessibilityRole="button" accessibilityLabel="Thử tải thêm bài tập" onPress={loadMore} style={[styles.secondaryButton, { borderColor: colors.primary }]}>
+                <Pressable testID="retry-load-more" accessibilityRole="button" accessibilityLabel="Thử tải thêm bài tập" accessibilityHint="Gửi lại yêu cầu tải trang bài tập tiếp theo" onPress={loadMore} style={[styles.secondaryButton, { borderColor: colors.primary }]}>
                   <Text style={[styles.buttonText, { color: colors.primary }]}>Thử lại</Text>
                 </Pressable>
               </View>

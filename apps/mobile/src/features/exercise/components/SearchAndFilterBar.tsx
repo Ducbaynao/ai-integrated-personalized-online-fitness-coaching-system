@@ -14,6 +14,7 @@ interface SearchAndFilterBarProps {
   value: string;
   onChangeText: (value: string) => void;
   onOpenFilters: () => void;
+  filtersExpanded: boolean;
   chips: ActiveFilterChip[];
   onRemoveChip: (key: string) => void;
   colors: SemanticColorScheme;
@@ -23,6 +24,7 @@ export function SearchAndFilterBar({
   value,
   onChangeText,
   onOpenFilters,
+  filtersExpanded,
   chips,
   onRemoveChip,
   colors,
@@ -51,6 +53,7 @@ export function SearchAndFilterBar({
             testID="clear-exercise-search"
             accessibilityRole="button"
             accessibilityLabel="Xóa từ khóa tìm kiếm"
+            accessibilityHint="Xóa nội dung trong ô tìm kiếm"
             onPress={() => onChangeText('')}
             style={[styles.clearButton, { borderColor: colors.border, backgroundColor: colors.surface }]}>
             <Text style={[styles.clearText, { color: colors.textPrimary }]}>×</Text>
@@ -61,7 +64,7 @@ export function SearchAndFilterBar({
           accessibilityRole="button"
           accessibilityLabel="Lọc bài tập"
           accessibilityHint="Mở các lựa chọn lọc danh mục bài tập"
-          accessibilityState={{ expanded: false }}
+          accessibilityState={{ expanded: filtersExpanded }}
           onPress={onOpenFilters}
           style={({ pressed }) => [
             styles.filterButton,
@@ -84,6 +87,7 @@ export function SearchAndFilterBar({
               testID={`remove-filter-${chip.key}`}
               accessibilityRole="button"
               accessibilityLabel={`Xóa bộ lọc ${chip.label}`}
+              accessibilityHint="Loại bỏ lựa chọn này khỏi bộ lọc"
               onPress={() => onRemoveChip(chip.key)}
               style={[styles.chip, { backgroundColor: colors.brandSoft, borderColor: colors.primary }]}>
               <Text style={[styles.chipText, { color: colors.primary }]}>{chip.label} ×</Text>

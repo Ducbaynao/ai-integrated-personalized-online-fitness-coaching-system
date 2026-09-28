@@ -4,7 +4,8 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
-import { ExerciseCatalogFilters, ExerciseDifficulty, ExerciseFilterMetadata } from '@/types/exercise';
+import { ExerciseCatalogFilters, ExerciseFilterMetadata } from '@/types/exercise';
+import { EXERCISE_DIFFICULTY_LABELS } from '../exerciseMessages';
 
 type FilterArrayKey = Exclude<keyof ExerciseCatalogFilters, 'query'>;
 
@@ -19,12 +20,6 @@ interface ExerciseFilterModalProps {
   onClose: () => void;
   isDark?: boolean;
 }
-
-const DIFFICULTY_LABELS: Record<ExerciseDifficulty, string> = {
-  BEGINNER: 'Cơ bản',
-  INTERMEDIATE: 'Trung cấp',
-  ADVANCED: 'Nâng cao',
-};
 
 export function ExerciseFilterModal({
   visible,
@@ -92,6 +87,7 @@ export function ExerciseFilterModal({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Đóng bộ lọc"
+              accessibilityHint="Đóng mà không áp dụng các thay đổi"
               onPress={onClose}
               style={styles.closeButton}>
               <Text style={[styles.closeText, { color: colors.textPrimary }]}>Đóng</Text>
@@ -102,7 +98,7 @@ export function ExerciseFilterModal({
           {isError && !metadata && (
             <View style={styles.messageBlock}>
               <Text style={[styles.message, { color: colors.dangerText }]}>Không thể tải lựa chọn bộ lọc.</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Thử tải lại bộ lọc" onPress={onRetryMetadata}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Thử tải lại bộ lọc" accessibilityHint="Tải lại các lựa chọn bộ lọc" onPress={onRetryMetadata}>
                 <Text style={[styles.link, { color: colors.primary }]}>Thử lại</Text>
               </Pressable>
             </View>
@@ -117,7 +113,7 @@ export function ExerciseFilterModal({
               {renderSection(
                 'Độ khó',
                 'difficulties',
-                metadata.difficulties.map((code) => ({ code, name: DIFFICULTY_LABELS[code] }))
+                metadata.difficulties.map((code) => ({ code, name: EXERCISE_DIFFICULTY_LABELS[code] }))
               )}
               {renderSection(
                 'Kiểu chuyển động',
@@ -132,6 +128,7 @@ export function ExerciseFilterModal({
               testID="clear-exercise-filters"
               accessibilityRole="button"
               accessibilityLabel="Xóa toàn bộ bộ lọc"
+              accessibilityHint="Bỏ toàn bộ lựa chọn đang đánh dấu"
               onPress={() => setDraft({})}
               style={[styles.secondaryButton, { borderColor: colors.primary }]}>
               <Text style={[styles.buttonText, { color: colors.primary }]}>Xóa lọc</Text>
@@ -140,6 +137,7 @@ export function ExerciseFilterModal({
               testID="apply-exercise-filters"
               accessibilityRole="button"
               accessibilityLabel="Áp dụng bộ lọc"
+              accessibilityHint="Áp dụng các lựa chọn và đóng bộ lọc"
               onPress={() => onApply(draft)}
               style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
               <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Áp dụng</Text>
