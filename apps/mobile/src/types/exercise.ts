@@ -1,5 +1,7 @@
 export type ExerciseDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 
+export const EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION = 20;
+
 export interface CatalogOption {
   code: string;
   name: string;

@@ -4,8 +4,15 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
-import { ExerciseCatalogFilters, ExerciseFilterMetadata } from '@/types/exercise';
-import { EXERCISE_DIFFICULTY_LABELS } from '../exerciseMessages';
+import {
+  EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION,
+  ExerciseCatalogFilters,
+  ExerciseFilterMetadata,
+} from '@/types/exercise';
+import {
+  EXERCISE_DIFFICULTY_LABELS,
+  EXERCISE_FILTER_LIMIT_MESSAGE,
+} from '../exerciseMessages';
 
 type FilterArrayKey = Exclude<keyof ExerciseCatalogFilters, 'query'>;
 
@@ -36,47 +43,87 @@ export function ExerciseFilterModal({
   const [draft, setDraft] = useState<ExerciseCatalogFilters>(filters);
 
   const toggle = (key: FilterArrayKey, value: string) => {
-    const current = (draft[key] ?? []) as readonly string[];
-    const next = current.includes(value)
-      ? current.filter((item) => item !== value)
-      : [...current, value];
-    setDraft((previous) => ({ ...previous, [key]: next }));
+    setDraft((previous) => {
+      const current = (previous[key] ?? []) as readonly string[];
+      if (current.includes(value)) {
+        return { ...previous, [key]: current.filter((item) => item !== value) };
+      }
+      if (current.length >= EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION) {
+        return previous;
+      }
+      return { ...previous, [key]: [...current, value] };
+    });
   };
 
   const renderSection = (
     title: string,
     key: FilterArrayKey,
     options: { code: string; name: string }[]
-  ) => (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
-      <View style={styles.options}>
-        {options.map((option) => {
-          const selected = ((draft[key] ?? []) as readonly string[]).includes(option.code);
-          return (
-            <Pressable
-              key={option.code}
-              testID={`filter-option-${key}-${option.code}`}
-              accessibilityRole="checkbox"
-              accessibilityLabel={`${title}: ${option.name}`}
-              accessibilityState={{ checked: selected }}
-              onPress={() => toggle(key, option.code)}
-              style={[
-                styles.option,
-                {
-                  backgroundColor: selected ? colors.brandSoft : colors.surface,
-                  borderColor: selected ? colors.primary : colors.border,
-                },
-              ]}>
-              <Text style={[styles.optionText, { color: selected ? colors.primary : colors.textPrimary }]}>
-                {option.name}
-              </Text>
-            </Pressable>
-          );
-        })}
+  ) => {
+    const selectedValues = (draft[key] ?? []) as readonly string[];
+    const atLimit = selectedValues.length >= EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION;
+
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        {atLimit && (
+          <Text
+            testID={`filter-limit-message-${key}`}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={[styles.limitMessage, { color: colors.warningText }]}>
+            {EXERCISE_FILTER_LIMIT_MESSAGE}
+          </Text>
+        )}
+        <View style={styles.options}>
+          {options.map((option) => {
+            const selected = selectedValues.includes(option.code);
+            const disabled = atLimit && !selected;
+            return (
+              <Pressable
+                key={option.code}
+                testID={`filter-option-${key}-${option.code}`}
+                accessibilityRole="checkbox"
+                accessibilityLabel={`${title}: ${option.name}`}
+                accessibilityState={{ checked: selected, disabled }}
+                disabled={disabled}
+                onPress={() => toggle(key, option.code)}
+                style={[
+                  styles.option,
+                  {
+                    backgroundColor: selected
+                      ? colors.brandSoft
+                      : disabled
+                        ? colors.surfaceSubtle
+                        : colors.surface,
+                    borderColor: selected ? colors.primary : colors.border,
+                  },
+                ]}>
+                <Text
+                  style={[
+                    styles.optionText,
+                    {
+                      color: selected
+                        ? colors.primary
+                        : disabled
+                          ? colors.textSecondary
+                          : colors.textPrimary,
+                    },
+                  ]}>
+                  {option.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+  const hasOverLimit = (Object.keys(draft) as FilterArrayKey[]).some((key) => {
+    const value = draft[key];
+    return Array.isArray(value) && value.length > EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION;
+  });
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -138,9 +185,22 @@ export function ExerciseFilterModal({
               accessibilityRole="button"
               accessibilityLabel="Áp dụng bộ lọc"
               accessibilityHint="Áp dụng các lựa chọn và đóng bộ lọc"
-              onPress={() => onApply(draft)}
-              style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Áp dụng</Text>
+              accessibilityState={{ disabled: hasOverLimit }}
+              disabled={hasOverLimit}
+              onPress={() => {
+                if (!hasOverLimit) onApply(draft);
+              }}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: hasOverLimit ? colors.surfaceSubtle : colors.primary },
+              ]}>
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: hasOverLimit ? colors.textSecondary : colors.textOnPrimary },
+                ]}>
+                Áp dụng
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -162,6 +222,7 @@ const styles = StyleSheet.create({
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   option: { minHeight: layout.minimumTouchTarget, borderWidth: 1, borderRadius: radius.full, justifyContent: 'center', paddingHorizontal: spacing.md },
   optionText: { ...typography.bodySmall, fontWeight: '600' },
+  limitMessage: { ...typography.bodySmall },
   messageBlock: { padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
   message: { ...typography.bodySmall, textAlign: 'center', padding: spacing.lg },
   link: { ...typography.label, textDecorationLine: 'underline' },

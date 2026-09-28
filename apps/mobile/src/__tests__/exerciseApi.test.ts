@@ -1,6 +1,7 @@
 import { exerciseApi, serializeExerciseCatalogParams } from '@/services/exerciseApi';
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
+import { EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION } from '@/types/exercise';
 
 jest.mock('@/services/apiClient', () => ({ request: jest.fn() }));
 
@@ -52,6 +53,33 @@ describe('exerciseApi', () => {
       method: 'GET',
       requiresAuth: true,
     });
+  });
+
+  it.each([
+    'categoryCodes',
+    'muscleGroupCodes',
+    'equipmentCodes',
+    'tagCodes',
+    'difficulties',
+    'movementPatterns',
+  ] as const)('rejects %s above the OpenAPI maxItems before creating a request', (dimension) => {
+    const values = Array.from(
+      { length: EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION + 1 },
+      (_, index) => `VALUE_${index}`
+    );
+
+    expect(() => serializeExerciseCatalogParams({ [dimension]: values })).toThrow(RangeError);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('does not call the request client when a filter dimension exceeds maxItems', async () => {
+    const categoryCodes = Array.from(
+      { length: EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION + 1 },
+      (_, index) => `CATEGORY_${index}`
+    );
+
+    await expect(exerciseApi.getCatalog({ categoryCodes })).rejects.toThrow(RangeError);
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('propagates stable authentication errors from request()', async () => {

@@ -6,6 +6,7 @@ import {
   ExerciseDetail,
   ExerciseDifficulty,
   ExerciseFilterMetadata,
+  EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION,
 } from '@/types/exercise';
 
 export const EXERCISE_CATALOG_PAGE_SIZE = 20;
@@ -20,7 +21,13 @@ export interface NormalizedExerciseCatalogFilters {
   movementPatterns: string[];
 }
 
-function normalizeCodes(values: readonly string[] | undefined): string[] {
+function normalizeCodes(values: readonly string[] | undefined, dimension: string): string[] {
+  if ((values?.length ?? 0) > EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION) {
+    throw new RangeError(
+      `${dimension} must not contain more than ${EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION} values`
+    );
+  }
+
   return [...new Set((values ?? []).map((value) => value.trim().toUpperCase()).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'en'));
 }
@@ -31,12 +38,12 @@ export function normalizeExerciseCatalogFilters(
   const query = filters.query?.trim().toLocaleLowerCase('vi-VN') || undefined;
   return {
     ...(query ? { query } : {}),
-    categoryCodes: normalizeCodes(filters.categoryCodes),
-    muscleGroupCodes: normalizeCodes(filters.muscleGroupCodes),
-    equipmentCodes: normalizeCodes(filters.equipmentCodes),
-    tagCodes: normalizeCodes(filters.tagCodes),
-    difficulties: normalizeCodes(filters.difficulties) as ExerciseDifficulty[],
-    movementPatterns: normalizeCodes(filters.movementPatterns),
+    categoryCodes: normalizeCodes(filters.categoryCodes, 'categoryCodes'),
+    muscleGroupCodes: normalizeCodes(filters.muscleGroupCodes, 'muscleGroupCodes'),
+    equipmentCodes: normalizeCodes(filters.equipmentCodes, 'equipmentCodes'),
+    tagCodes: normalizeCodes(filters.tagCodes, 'tagCodes'),
+    difficulties: normalizeCodes(filters.difficulties, 'difficulties') as ExerciseDifficulty[],
+    movementPatterns: normalizeCodes(filters.movementPatterns, 'movementPatterns'),
   };
 }
 
