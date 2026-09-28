@@ -42,6 +42,12 @@ const user = (id: string): CurrentUserResponse => ({
   },
 });
 
+const exerciseDetailKey = [
+  'exercise-catalog',
+  'detail',
+  '10000000-0000-0000-0000-000000000001',
+] as const;
+
 function Consumer() {
   const { user: currentUser, logout, refreshUser } = useAuth();
   return (
@@ -69,9 +75,11 @@ describe('authenticated query cache lifecycle', () => {
       tree = renderer.create(<AuthProvider><Consumer /></AuthProvider>);
     });
     queryClient.setQueryData(['exercise-catalog'], { private: true });
+    queryClient.setQueryData(exerciseDetailKey, { privateDetail: true });
 
     await renderer.act(async () => tree!.root.findByProps({ testID: 'logout' }).props.onPress());
     expect(queryClient.getQueryData(['exercise-catalog'])).toBeUndefined();
+    expect(queryClient.getQueryData(exerciseDetailKey)).toBeUndefined();
   });
 
   it('clears server state when the authenticated identity changes', async () => {
@@ -83,10 +91,12 @@ describe('authenticated query cache lifecycle', () => {
       tree = renderer.create(<AuthProvider><Consumer /></AuthProvider>);
     });
     queryClient.setQueryData(['exercise-catalog'], { private: true });
+    queryClient.setQueryData(exerciseDetailKey, { privateDetail: true });
 
     await renderer.act(async () => tree!.root.findByProps({ testID: 'refresh' }).props.onPress());
     expect(tree!.root.findByProps({ testID: 'user-id' }).props.children).toBe('user-2');
     expect(queryClient.getQueryData(['exercise-catalog'])).toBeUndefined();
+    expect(queryClient.getQueryData(exerciseDetailKey)).toBeUndefined();
   });
 
   it('clears server state on forced logout', async () => {
@@ -95,10 +105,12 @@ describe('authenticated query cache lifecycle', () => {
       renderer.create(<AuthProvider><Consumer /></AuthProvider>);
     });
     queryClient.setQueryData(['exercise-catalog'], { private: true });
+    queryClient.setQueryData(exerciseDetailKey, { privateDetail: true });
 
     expect(registerSessionExpiredHandler).toHaveBeenCalled();
     renderer.act(() => sessionExpiredHandler?.());
     expect(queryClient.getQueryData(['exercise-catalog'])).toBeUndefined();
+    expect(queryClient.getQueryData(exerciseDetailKey)).toBeUndefined();
   });
 });
 

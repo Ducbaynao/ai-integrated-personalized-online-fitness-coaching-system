@@ -31,6 +31,7 @@ export default function AppLayout() {
       <Stack.Screen name="goals/[goalId]" />
       <Stack.Screen name="goal-proposals/[proposalId]" />
       <Stack.Screen name="exercises/index" />
+      <Stack.Screen name="exercises/[exerciseId]" />
     </Stack>
   );
 }

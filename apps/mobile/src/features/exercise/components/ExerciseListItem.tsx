@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -13,17 +13,18 @@ interface ExerciseListItemProps {
   onPress?: () => void;
 }
 
-export function ExerciseListItem({ exercise, isDark = false }: ExerciseListItemProps) {
+export function ExerciseListItem({ exercise, isDark = false, onPress }: ExerciseListItemProps) {
   const colors = getSemanticColors(isDark);
   const muscles = exercise.primaryMuscles.map((item) => item.name).join(', ');
   const equipment = exercise.equipment.map((item) => item.name).join(', ');
 
   return (
-    <View
+    <Pressable
       testID={`exercise-row-${exercise.id}`}
-      accessible
-      accessibilityRole="summary"
+      accessibilityRole="button"
       accessibilityLabel={`${exercise.name}. Nhóm cơ chính: ${muscles || 'chưa xác định'}. Thiết bị: ${equipment || 'không yêu cầu'}. ${exercise.mediaAvailable ? 'Có nội dung hướng dẫn.' : 'Chưa có nội dung hướng dẫn.'}`}
+      accessibilityHint="Mở chi tiết bài tập"
+      onPress={onPress}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View
         testID={`exercise-media-${exercise.id}`}
@@ -55,7 +56,7 @@ export function ExerciseListItem({ exercise, isDark = false }: ExerciseListItemP
           )}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

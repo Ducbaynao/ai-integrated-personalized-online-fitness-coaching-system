@@ -7,7 +7,11 @@ import { ExerciseCatalogItem, ExerciseFilterMetadata } from '@/types/exercise';
 import { ApiError } from '@/types/auth';
 import { layout } from '@/design-system/tokens/spacing';
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
+const mockBack = jest.fn();
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: mockBack, push: mockPush }),
+}));
 jest.mock('@/hooks/use-debounced-value', () => ({ useDebouncedValue: (value: string) => value }));
 jest.mock('@/features/exercise/exerciseQueries', () => ({
   useExerciseCatalog: jest.fn(),
@@ -99,6 +103,20 @@ describe('ExerciseCatalogScreen', () => {
     const row = root.findByProps({ testID: 'exercise-row-exercise-1' });
     expect(row.findAllByType(Text).some((node) => node.props.children === 'Back Squat')).toBe(true);
     expect(root.findByProps({ testID: 'exercise-media-exercise-1' }).props.accessibilityLabel).toBe('Bài tập chưa có nội dung hướng dẫn');
+  });
+
+  it('opens the typed detail route with the exercise ID from the API', () => {
+    const row = renderScreen().root.findByProps({ testID: 'exercise-row-exercise-1' });
+
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityLabel).toContain('Back Squat');
+    expect(row.props.accessibilityHint).toBe('Mở chi tiết bài tập');
+    renderer.act(() => row.props.onPress());
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/exercises/[exerciseId]',
+      params: { exerciseId: 'exercise-1' },
+    });
   });
 
   it('uses one horizontal gutter for the list header and exercise rows', () => {

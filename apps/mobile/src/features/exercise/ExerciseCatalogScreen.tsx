@@ -10,7 +10,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -207,7 +207,20 @@ export function ExerciseCatalogScreen() {
         testID="exercise-catalog-list"
         data={exercises}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ExerciseListItem exercise={item} isDark={isDark} />}
+        renderItem={({ item }) => (
+          <ExerciseListItem
+            exercise={item}
+            isDark={isDark}
+            onPress={() =>
+              router.push(
+                {
+                  pathname: '/(app)/exercises/[exerciseId]',
+                  params: { exerciseId: item.id },
+                } as unknown as Href
+              )
+            }
+          />
+        )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={header}
         contentContainerStyle={styles.listContent}

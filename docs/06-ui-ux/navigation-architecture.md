@@ -23,7 +23,7 @@ Stack navigation hỗ trợ các route chuyên biệt cho Student Goal Managemen
 Exercise catalog dùng route authenticated chung cho Student và Trainer:
 
 - `/(app)/exercises`: màn hình duyệt, tìm kiếm và lọc Exercise Library (`ExerciseCatalogScreen` - ST-21). Trong khi Plan stack chưa được triển khai, route được mở từ một entry nhỏ trên landing screen của từng capability và không tạo thêm bottom tab.
-- Row bài tập chưa điều hướng tới detail cho đến khi ST-22 có route hoàn chỉnh.
+- `/(app)/exercises/[exerciseId]`: màn hình chi tiết Exercise (`ExerciseDetailScreen` - ST-22), mở từ row ST-21 bằng Exercise UUID. Route dùng chung cho Student và Trainer, xử lý tham số không hợp lệ trước khi gửi request và không tạo thêm bottom tab.
 
 Chat, notification và AI Assistance mở theo icon hoặc từ context; không biến AI thành tab/coaching mode riêng.
 
