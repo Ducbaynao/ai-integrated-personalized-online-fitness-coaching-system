@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { authApi, registerSessionExpiredHandler } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
+import { clearQueryCache } from '@/services/queryClient';
 import {
   ApiError,
   CurrentUserResponse,
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const handleSessionExpired = useCallback(() => {
+    clearQueryCache();
     safeClearActiveCapability().catch(() => {});
     userRef.current = null;
     setUser(null);
@@ -96,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const tokens = await tokenStorage.getTokens();
       if (!tokens) {
+        clearQueryCache();
         userRef.current = null;
         setUser(null);
         setActiveCapabilityState(null);
@@ -115,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       await tokenStorage.clearTokens().catch(() => {});
+      clearQueryCache();
       await safeClearActiveCapability();
       userRef.current = null;
       setUser(null);
@@ -153,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (data: LoginRequest): Promise<TokenPairResponse> => {
     const tokenPair = await authApi.login(data);
+    clearQueryCache();
     setSessionNotice(null);
     setRestoreError(null);
     userRef.current = tokenPair.user;
@@ -186,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authApi.logout();
     } finally {
+      clearQueryCache();
       await safeClearActiveCapability();
       userRef.current = null;
       setUser(null);
@@ -199,6 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(
     async (preferredCapability?: ActiveCapability | null): Promise<CurrentUserResponse> => {
       const currentUser = await authApi.getCurrentUser();
+      if (userRef.current?.id && userRef.current.id !== currentUser.id) {
+        clearQueryCache();
+      }
       userRef.current = currentUser;
 
       const targetCapability =

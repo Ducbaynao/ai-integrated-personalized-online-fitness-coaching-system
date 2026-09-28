@@ -123,6 +123,23 @@ export function TrainerHomeScreen() {
         </Pressable>
       </View>
 
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+        ]}>
+        <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Thư viện bài tập</Text>
+        <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>Tra cứu danh mục bài tập theo nhóm cơ, thiết bị và độ khó.</Text>
+        <Pressable
+          testID="trainer-view-exercise-library-button"
+          accessibilityRole="button"
+          accessibilityLabel="Mở thư viện bài tập"
+          onPress={() => router.push('/exercises' as any)}
+          style={[styles.secondaryButton, { borderColor: themeColors.primary }]}>
+          <Text style={[styles.secondaryButtonText, { color: themeColors.primary }]}>Mở thư viện bài tập</Text>
+        </Pressable>
+      </View>
+
       {/* Cross-activation Card (Trainer -> Student) */}
       {canCrossActivateStudent && (
         <View

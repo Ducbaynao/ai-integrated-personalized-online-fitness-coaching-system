@@ -153,6 +153,15 @@ export function HomeScreen() {
                   Quản lý mục tiêu thể chất →
                 </Text>
               </Pressable>
+
+              <Pressable
+                testID="view-exercise-library-button"
+                accessibilityRole="button"
+                accessibilityLabel="Mở thư viện bài tập"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/exercises' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Thư viện bài tập →</Text>
+              </Pressable>
             </>
           )}
 
