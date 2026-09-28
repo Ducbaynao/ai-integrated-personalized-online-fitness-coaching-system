@@ -84,7 +84,7 @@ export interface ExerciseCatalogContentProps {
   onBack: () => void;
   renderExercise: (exercise: ExerciseCatalogItem, isDark: boolean) => ReactElement | null;
   listExtraData?: unknown;
-  bottomContent?: ReactNode;
+  bottomContent?: ReactNode | ((state: { interactionDisabled: boolean }) => ReactNode);
 }
 
 export function ExerciseCatalogContent({
@@ -206,6 +206,8 @@ export function ExerciseCatalogContent({
       isDark={isDark}
     />
   ) : null;
+  const renderBottomContent = (interactionDisabled: boolean) =>
+    typeof bottomContent === 'function' ? bottomContent({ interactionDisabled }) : bottomContent;
 
   if (catalog.isPending) {
     return (
@@ -214,7 +216,7 @@ export function ExerciseCatalogContent({
           {header}
         </View>
         <CatalogSkeleton colors={colors} />
-        {bottomContent}
+        {renderBottomContent(true)}
         {filterModal}
       </SafeAreaView>
     );
@@ -244,7 +246,7 @@ export function ExerciseCatalogContent({
             </Pressable>
           )}
         </View>
-        {bottomContent}
+        {renderBottomContent(true)}
         {filterModal}
       </SafeAreaView>
     );
@@ -319,7 +321,7 @@ export function ExerciseCatalogContent({
           </View>
         }
       />
-      {bottomContent}
+      {renderBottomContent(false)}
       {filterModal}
     </SafeAreaView>
   );
