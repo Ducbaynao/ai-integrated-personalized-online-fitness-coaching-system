@@ -1,10 +1,11 @@
 import React from 'react';
-import { FlatList, Text, TextInput } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput } from 'react-native';
 import renderer from 'react-test-renderer';
 import { ExerciseCatalogScreen } from '@/features/exercise/ExerciseCatalogScreen';
 import { useExerciseCatalog, useExerciseFilterMetadata } from '@/features/exercise/exerciseQueries';
 import { ExerciseCatalogItem, ExerciseFilterMetadata } from '@/types/exercise';
 import { ApiError } from '@/types/auth';
+import { layout } from '@/design-system/tokens/spacing';
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 jest.mock('@/hooks/use-debounced-value', () => ({ useDebouncedValue: (value: string) => value }));
@@ -98,6 +99,33 @@ describe('ExerciseCatalogScreen', () => {
     const row = root.findByProps({ testID: 'exercise-row-exercise-1' });
     expect(row.findAllByType(Text).some((node) => node.props.children === 'Back Squat')).toBe(true);
     expect(root.findByProps({ testID: 'exercise-media-exercise-1' }).props.accessibilityLabel).toBe('Bài tập chưa có nội dung hướng dẫn');
+  });
+
+  it('uses one horizontal gutter for the list header and exercise rows', () => {
+    const root = renderScreen().root;
+    const listStyle = StyleSheet.flatten(root.findByType(FlatList).props.contentContainerStyle);
+    const headerStyle = StyleSheet.flatten(
+      root.findByProps({ testID: 'exercise-catalog-header' }).props.style
+    );
+
+    expect(listStyle.paddingHorizontal).toBe(layout.mobileScreenPadding);
+    expect(headerStyle.paddingHorizontal).toBeUndefined();
+  });
+
+  it('keeps the standalone loading header at the mobile screen gutter', () => {
+    (useExerciseCatalog as jest.Mock).mockReturnValue(
+      catalogState({ data: undefined, isPending: true })
+    );
+    const root = renderScreen().root;
+    const wrapperStyle = StyleSheet.flatten(
+      root.findByProps({ testID: 'exercise-catalog-standalone-header' }).props.style
+    );
+    const headerStyle = StyleSheet.flatten(
+      root.findByProps({ testID: 'exercise-catalog-header' }).props.style
+    );
+
+    expect(wrapperStyle.paddingHorizontal).toBe(layout.mobileScreenPadding);
+    expect(headerStyle.paddingHorizontal).toBeUndefined();
   });
 
   it('renders the main static copy and accessibility text in Vietnamese', () => {
@@ -196,9 +224,9 @@ describe('ExerciseCatalogScreen', () => {
     const tree = renderScreen();
     renderer.act(() => tree.root.findByProps({ testID: 'exercise-filter-button' }).props.onPress());
     expect(tree.root.findByProps({ testID: 'exercise-filter-button' }).props.accessibilityState).toEqual({ expanded: true });
-    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: false });
+    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: false, disabled: false });
     renderer.act(() => tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.onPress());
-    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: true });
+    expect(tree.root.findByProps({ testID: 'filter-option-categoryCodes-STRENGTH' }).props.accessibilityState).toEqual({ checked: true, disabled: false });
     renderer.act(() => tree.root.findByProps({ testID: 'apply-exercise-filters' }).props.onPress());
     expect(useExerciseCatalog).toHaveBeenLastCalledWith(expect.objectContaining({ categoryCodes: ['STRENGTH'] }));
     const chip = tree.root.findByProps({ testID: 'remove-filter-categoryCodes:STRENGTH' });

@@ -126,7 +126,7 @@ export function ExerciseCatalogScreen() {
   const accessError = isExerciseAccessError(catalog.error);
 
   const header = (
-    <View style={styles.headerContent}>
+    <View testID="exercise-catalog-header" style={styles.headerContent}>
       <View style={styles.titleRow}>
         <Pressable
           accessibilityRole="button"
@@ -161,7 +161,7 @@ export function ExerciseCatalogScreen() {
   if (catalog.isPending) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]}>
-        {header}
+        <View testID="exercise-catalog-standalone-header" style={styles.standaloneHeader}>{header}</View>
         <CatalogSkeleton colors={colors} />
         {filterModalVisible && <ExerciseFilterModal
           visible={filterModalVisible}
@@ -181,8 +181,8 @@ export function ExerciseCatalogScreen() {
   if (catalog.isError && (exercises.length === 0 || accessError)) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]}>
-        {header}
-        <View testID="exercise-catalog-error" accessibilityRole="alert" style={styles.centerState}>
+        <View testID="exercise-catalog-standalone-header" style={styles.standaloneHeader}>{header}</View>
+        <View testID="exercise-catalog-error" accessibilityRole="alert" style={[styles.centerState, styles.standaloneCenterState]}>
           <Text style={[styles.stateTitle, { color: colors.textPrimary }]}>{errorCopy.title}</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>{errorCopy.message}</Text>
           {!accessError && (
@@ -257,7 +257,8 @@ export function ExerciseCatalogScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: layout.mobileScreenPadding, paddingBottom: spacing.xxl },
-  headerContent: { paddingHorizontal: layout.mobileScreenPadding, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.lg },
+  headerContent: { paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.lg },
+  standaloneHeader: { paddingHorizontal: layout.mobileScreenPadding },
   titleRow: { gap: spacing.xs },
   backButton: { minHeight: layout.minimumTouchTarget, alignSelf: 'flex-start', justifyContent: 'center' },
   backText: { ...typography.label },
@@ -267,7 +268,8 @@ const styles = StyleSheet.create({
   warning: { borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   warningText: { ...typography.bodySmall },
   warningAction: { ...typography.label, textDecorationLine: 'underline' },
-  centerState: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.xxl, gap: spacing.md },
+  centerState: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
+  standaloneCenterState: { paddingHorizontal: spacing.xl },
   stateTitle: { ...typography.h3, textAlign: 'center' },
   stateBody: { ...typography.bodySmall, textAlign: 'center' },
   primaryButton: { minHeight: layout.minimumTouchTarget, borderRadius: radius.md, paddingHorizontal: spacing.xl, alignItems: 'center', justifyContent: 'center' },

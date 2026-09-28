@@ -1,11 +1,17 @@
 import { ApiError } from '@/types/auth';
-import { ExerciseDifficulty } from '@/types/exercise';
+import {
+  EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION,
+  ExerciseDifficulty,
+} from '@/types/exercise';
 
 export const EXERCISE_DIFFICULTY_LABELS: Record<ExerciseDifficulty, string> = {
   BEGINNER: 'Cơ bản',
   INTERMEDIATE: 'Trung cấp',
   ADVANCED: 'Nâng cao',
 };
+
+export const EXERCISE_FILTER_LIMIT_MESSAGE =
+  `Tối đa ${EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION} lựa chọn cho mỗi nhóm bộ lọc.`;
 
 export interface ExerciseErrorCopy {
   title: string;
