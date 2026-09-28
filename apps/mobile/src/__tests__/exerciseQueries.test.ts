@@ -1,6 +1,7 @@
 import { exerciseApi } from '@/services/exerciseApi';
 import {
   exerciseCatalogInfiniteQueryOptions,
+  exerciseDetailQueryOptions,
   exerciseQueryKeys,
 } from '@/features/exercise/exerciseQueries';
 import { shouldRetryQuery } from '@/services/queryClient';
@@ -14,6 +15,7 @@ jest.mock('@/services/exerciseApi', () => {
     exerciseApi: {
       ...actual.exerciseApi,
       getCatalog: jest.fn(),
+      getDetail: jest.fn(),
     },
   };
 });
@@ -70,6 +72,31 @@ describe('exercise catalog query policy', () => {
     expect(shouldRetryQuery(0, new ApiError(0, 'Offline'))).toBe(true);
     expect(shouldRetryQuery(1, new ApiError(503, 'Unavailable'))).toBe(true);
     expect(shouldRetryQuery(2, new ApiError(503, 'Unavailable'))).toBe(false);
+  });
+
+  it('builds a stable detail key and calls the endpoint with the normalized ID', async () => {
+    const id = '10000000-0000-4000-8000-00000000000A';
+    const options = exerciseDetailQueryOptions(` ${id} `);
+    (exerciseApi.getDetail as jest.Mock).mockResolvedValueOnce({ id: id.toLowerCase() });
+
+    await (options.queryFn as Function)({ queryKey: options.queryKey });
+
+    expect(options.queryKey).toEqual([
+      'exercise-catalog',
+      'detail',
+      '10000000-0000-4000-8000-00000000000a',
+    ]);
+    expect(exerciseApi.getDetail).toHaveBeenCalledWith(
+      '10000000-0000-4000-8000-00000000000a'
+    );
+  });
+
+  it('disables the detail query for an invalid identifier', () => {
+    const options = exerciseDetailQueryOptions('not-a-uuid');
+
+    expect(options.enabled).toBe(false);
+    expect(options.queryKey).toEqual(['exercise-catalog', 'detail', 'invalid']);
+    expect(exerciseApi.getDetail).not.toHaveBeenCalled();
   });
 });
 

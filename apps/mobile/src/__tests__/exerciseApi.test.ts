@@ -1,4 +1,8 @@
-import { exerciseApi, serializeExerciseCatalogParams } from '@/services/exerciseApi';
+import {
+  exerciseApi,
+  normalizeExerciseId,
+  serializeExerciseCatalogParams,
+} from '@/services/exerciseApi';
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
 import { EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION } from '@/types/exercise';
@@ -34,21 +38,25 @@ describe('exerciseApi', () => {
   it('uses the B01 request client for list, detail, and filter metadata', async () => {
     (request as jest.Mock)
       .mockResolvedValueOnce({ items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 })
-      .mockResolvedValueOnce({ id: 'exercise/one' })
+      .mockResolvedValueOnce({ id: '10000000-0000-4000-8000-000000000001' })
       .mockResolvedValueOnce({ categories: [] });
 
     await exerciseApi.getCatalog();
-    await exerciseApi.getDetail('exercise/one');
+    await exerciseApi.getDetail('10000000-0000-4000-8000-000000000001');
     await exerciseApi.getFilterMetadata();
 
     expect(request).toHaveBeenNthCalledWith(1, '/exercises?page=0&size=20', {
       method: 'GET',
       requiresAuth: true,
     });
-    expect(request).toHaveBeenNthCalledWith(2, '/exercises/exercise%2Fone', {
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      '/exercises/10000000-0000-4000-8000-000000000001',
+      {
       method: 'GET',
       requiresAuth: true,
-    });
+      }
+    );
     expect(request).toHaveBeenNthCalledWith(3, '/exercises/filter-metadata', {
       method: 'GET',
       requiresAuth: true,
@@ -80,6 +88,33 @@ describe('exerciseApi', () => {
 
     await expect(exerciseApi.getCatalog({ categoryCodes })).rejects.toThrow(RangeError);
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '', 'exercise-one', ['10000000-0000-4000-8000-000000000001']])(
+    'rejects an invalid detail identifier without sending a request: %p',
+    async (exerciseId) => {
+      expect(normalizeExerciseId(exerciseId)).toBeNull();
+      await expect(exerciseApi.getDetail(exerciseId as string)).rejects.toThrow(RangeError);
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
+
+  it('normalizes a valid UUID before requesting detail', async () => {
+    (request as jest.Mock).mockResolvedValueOnce({});
+    const id = '10000000-0000-4000-8000-00000000000A';
+
+    await exerciseApi.getDetail(` ${id} `);
+
+    expect(request).toHaveBeenCalledWith(
+      '/exercises/10000000-0000-4000-8000-00000000000a',
+      { method: 'GET', requiresAuth: true }
+    );
+  });
+
+  it('accepts the UUID-shaped synthetic identifier documented by OpenAPI', () => {
+    expect(normalizeExerciseId('10000000-0000-0000-0000-000000000001')).toBe(
+      '10000000-0000-0000-0000-000000000001'
+    );
   });
 
   it('propagates stable authentication errors from request()', async () => {

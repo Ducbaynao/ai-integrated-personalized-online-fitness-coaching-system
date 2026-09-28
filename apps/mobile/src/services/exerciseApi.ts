@@ -11,6 +11,15 @@ import {
 
 export const EXERCISE_CATALOG_PAGE_SIZE = 20;
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function normalizeExerciseId(exerciseId: unknown): string | null {
+  if (typeof exerciseId !== 'string') return null;
+  const normalized = exerciseId.trim().toLowerCase();
+  return UUID_PATTERN.test(normalized) ? normalized : null;
+}
+
 export interface NormalizedExerciseCatalogFilters {
   query?: string;
   categoryCodes: string[];
@@ -81,7 +90,12 @@ export const exerciseApi = {
   },
 
   async getDetail(exerciseId: string): Promise<ExerciseDetail> {
-    return request<ExerciseDetail>(`/exercises/${encodeURIComponent(exerciseId)}`, {
+    const normalizedExerciseId = normalizeExerciseId(exerciseId);
+    if (!normalizedExerciseId) {
+      throw new RangeError('exerciseId must be a valid UUID');
+    }
+
+    return request<ExerciseDetail>(`/exercises/${normalizedExerciseId}`, {
       method: 'GET',
       requiresAuth: true,
     });
