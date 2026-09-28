@@ -9,8 +9,10 @@ import {
   DMSans_700Bold,
 } from '@expo-google-fonts/dm-sans';
 import * as SplashScreen from 'expo-splash-screen';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { SessionGateScreen } from '@/features/auth/SessionGateScreen';
+import { queryClient } from '@/services/queryClient';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -61,8 +63,10 @@ export default function RootLayout() {
   });
 
   return (
-    <AuthProvider>
-      <RootNavigator fontsReady={fontsLoaded || Boolean(fontError)} />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RootNavigator fontsReady={fontsLoaded || Boolean(fontError)} />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
