@@ -17,7 +17,8 @@
 - **EXISTING IMPLEMENTATION:** The backend `exercise` module provides the authenticated Student/Trainer read-only catalog foundation (search/filter/list, detail, and filter metadata); Admin mutations and historical archived access remain unimplemented.
 - **EXISTING IMPLEMENTATION:** OpenAPI defines the three read-only Exercise catalog paths; mutation paths remain unimplemented.
 - **EXISTING IMPLEMENTATION:** Mobile ST-21 provides authenticated Student/Trainer catalog browse, debounced search, metadata-driven filters, session query cache, pagination, pull-to-refresh, and explicit loading/empty/error/stale states.
-- **EXISTING IMPLEMENTATION:** Mobile ST-22 detail and picker flows remain unimplemented, and Admin Web has no AD-05 implementation.
+- **EXISTING IMPLEMENTATION:** Mobile ST-22 provides an authenticated Student/Trainer detail route, typed detail query, Vietnamese loading/error/unavailable/stale states, optional metadata sections, variation/guidance content, and media availability placeholders without exposing storage references.
+- **EXISTING IMPLEMENTATION:** The Mobile Exercise picker remains unimplemented, and Admin Web has no AD-05 implementation.
 
 ## 4. Feature dependencies
 
@@ -48,7 +49,8 @@
 ## 8. Mobile scope
 
 - **EXISTING IMPLEMENTATION:** ST-21 Exercise Library browse/search/filter uses the B01 API/auth client and a non-persisted TanStack Query cache that is cleared on logout or authenticated identity change.
-- **PROPOSED SOLUTION:** Add ST-22 detail and reusable Exercise picker flows for plan building.
+- **EXISTING IMPLEMENTATION:** ST-22 detail is available from ST-21 at `/(app)/exercises/[exerciseId]` and reuses B01 authentication/query-cache lifecycle behavior.
+- **PROPOSED SOLUTION:** Add the reusable Exercise picker flow for plan building.
 - **PROPOSED SOLUTION:** Display instructions, muscles, equipment, variation relationships, media availability, and archived/unavailable states without breaking historical plan views.
 - **PROPOSED SOLUTION:** Map pagination, query, filter, empty results, retryable errors, permission errors, and stale catalog state explicitly.
 

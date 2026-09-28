@@ -2,6 +2,9 @@ import { ApiError } from '@/types/auth';
 import {
   EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION,
   ExerciseDifficulty,
+  ExerciseEquipmentRequirement,
+  ExerciseGuidanceType,
+  ExerciseMuscleInvolvement,
 } from '@/types/exercise';
 
 export const EXERCISE_DIFFICULTY_LABELS: Record<ExerciseDifficulty, string> = {
@@ -12,6 +15,29 @@ export const EXERCISE_DIFFICULTY_LABELS: Record<ExerciseDifficulty, string> = {
 
 export const EXERCISE_FILTER_LIMIT_MESSAGE =
   `Tối đa ${EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION} lựa chọn cho mỗi nhóm bộ lọc.`;
+
+export const EXERCISE_MUSCLE_INVOLVEMENT_LABELS: Record<ExerciseMuscleInvolvement, string> = {
+  PRIMARY: 'Nhóm cơ chính',
+  SECONDARY: 'Nhóm cơ phụ',
+  STABILIZER: 'Nhóm cơ ổn định',
+};
+
+export const EXERCISE_EQUIPMENT_REQUIREMENT_LABELS: Record<
+  ExerciseEquipmentRequirement,
+  string
+> = {
+  REQUIRED: 'Bắt buộc',
+  OPTIONAL: 'Tùy chọn',
+  ALTERNATIVE: 'Thay thế',
+};
+
+export const EXERCISE_GUIDANCE_TYPE_LABELS: Record<ExerciseGuidanceType, string> = {
+  COMMON_MISTAKE: 'Lỗi thường gặp',
+  COACHING_CUE: 'Gợi ý kỹ thuật',
+  SAFETY_NOTE: 'Lưu ý an toàn',
+  REGRESSION: 'Biến thể đơn giản hơn',
+  PROGRESSION: 'Biến thể nâng cao hơn',
+};
 
 export interface ExerciseErrorCopy {
   title: string;
@@ -99,4 +125,57 @@ export function getExerciseCatalogErrorCopy(error: unknown): ExerciseErrorCopy {
 export function isExerciseAccessError(error: unknown): boolean {
   const kind = getExerciseCatalogErrorCopy(error).kind;
   return kind === 'permission' || kind === 'session';
+}
+
+export interface ExerciseDetailErrorCopy {
+  title: string;
+  message: string;
+  kind: 'unavailable' | 'permission' | 'session' | 'network' | 'server' | 'generic';
+}
+
+export function getExerciseDetailErrorCopy(error: unknown): ExerciseDetailErrorCopy {
+  if (error instanceof ApiError) {
+    const errorCode = error.errorResponse?.errorCode;
+    if (error.status === 404 || errorCode === 'EXERCISE_NOT_FOUND') {
+      return {
+        title: 'Bài tập không khả dụng',
+        message: 'Bài tập này không tồn tại hoặc hiện không khả dụng.',
+        kind: 'unavailable',
+      };
+    }
+    if (error.status === 403 || errorCode === 'ACCESS_DENIED') {
+      return {
+        title: 'Bạn chưa có quyền xem bài tập',
+        message: 'Tài khoản cần có hồ sơ học viên hoặc huấn luyện viên để xem nội dung này.',
+        kind: 'permission',
+      };
+    }
+    if (error.status === 401 || ['UNAUTHORIZED', 'AUTH_TOKEN_EXPIRED', 'AUTH_SESSION_REVOKED', 'INVALID_REFRESH_TOKEN'].includes(errorCode ?? '')) {
+      return {
+        title: 'Phiên đăng nhập không còn hiệu lực',
+        message: 'Vui lòng đăng nhập lại để tiếp tục.',
+        kind: 'session',
+      };
+    }
+    if (error.status === 0) {
+      return {
+        title: 'Không thể kết nối đến máy chủ',
+        message: 'Hãy kiểm tra kết nối mạng rồi thử lại.',
+        kind: 'network',
+      };
+    }
+    if (error.status >= 500) {
+      return {
+        title: 'Máy chủ đang gặp sự cố',
+        message: 'Vui lòng thử lại sau ít phút.',
+        kind: 'server',
+      };
+    }
+  }
+
+  return {
+    title: 'Không thể tải chi tiết bài tập',
+    message: 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    kind: 'generic',
+  };
 }

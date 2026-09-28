@@ -36,7 +36,7 @@
 | ST-19 | Chat | Relationship-scoped messages |
 | ST-20 | Notification Center | Deep links and preferences |
 | ST-21 | Exercise Library | Browse, search/filter active Exercise catalog |
-| ST-22 | Exercise Detail | Instructions, muscle, equipment, variation and media state |
+| ST-22 | Exercise Detail | Route `/(app)/exercises/[exerciseId]`; instructions, muscle, equipment, variation and media state |
 
 Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, không phải một Exercise Library khác. Historical plan có thể mở Exercise archived/unavailable ở read-only state.
 

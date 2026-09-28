@@ -1,4 +1,8 @@
-import { getExerciseCatalogErrorCopy, isExerciseAccessError } from '@/features/exercise/exerciseMessages';
+import {
+  getExerciseCatalogErrorCopy,
+  getExerciseDetailErrorCopy,
+  isExerciseAccessError,
+} from '@/features/exercise/exerciseMessages';
 import { ApiError, ErrorResponse } from '@/types/auth';
 
 function apiError(status: number, errorCode: string, backendMessage: string): ApiError {
@@ -44,5 +48,20 @@ describe('exercise catalog error copy', () => {
     expect(isExerciseAccessError(apiError(403, 'ACCESS_DENIED', 'Forbidden'))).toBe(true);
     expect(isExerciseAccessError(apiError(401, 'UNAUTHORIZED', 'Unauthorized'))).toBe(true);
     expect(isExerciseAccessError(new ApiError(0, 'Offline'))).toBe(false);
+  });
+});
+
+describe('exercise detail error copy', () => {
+  it.each([
+    ['EXERCISE_NOT_FOUND', 404, 'Bài tập không khả dụng', 'unavailable'],
+    ['ACCESS_DENIED', 403, 'Bạn chưa có quyền xem bài tập', 'permission'],
+    ['AUTH_SESSION_REVOKED', 401, 'Phiên đăng nhập không còn hiệu lực', 'session'],
+  ])('maps stable code %s without exposing backend messages', (code, status, title, kind) => {
+    const rawMessage = 'Sensitive backend detail';
+    const copy = getExerciseDetailErrorCopy(apiError(status as number, code, rawMessage));
+
+    expect(copy).toEqual(expect.objectContaining({ title, kind }));
+    expect(copy.title).not.toContain(rawMessage);
+    expect(copy.message).not.toContain(rawMessage);
   });
 });
