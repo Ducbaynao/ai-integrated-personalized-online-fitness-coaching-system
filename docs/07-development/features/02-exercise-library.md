@@ -18,7 +18,7 @@
 - **EXISTING IMPLEMENTATION:** OpenAPI defines the three read-only Exercise catalog paths; mutation paths remain unimplemented.
 - **EXISTING IMPLEMENTATION:** Mobile ST-21 provides authenticated Student/Trainer catalog browse, debounced search, metadata-driven filters, session query cache, pagination, pull-to-refresh, and explicit loading/empty/error/stale states.
 - **EXISTING IMPLEMENTATION:** Mobile ST-22 provides an authenticated Student/Trainer detail route, typed detail query, Vietnamese loading/error/unavailable/stale states, optional metadata sections, variation/guidance content, and media availability placeholders without exposing storage references.
-- **EXISTING IMPLEMENTATION:** The Mobile Exercise picker remains unimplemented, and Admin Web has no AD-05 implementation.
+- **EXISTING IMPLEMENTATION:** Mobile provides a reusable controlled single-selection Exercise picker component for future B04 Plan Builder integration. It reuses ST-21 query/search/filter/pagination states, returns a typed Exercise summary only after explicit confirmation, supports excluded Exercise identifiers, and intentionally has no standalone production route. Admin Web still has no AD-05 implementation.
 
 ## 4. Feature dependencies
 
@@ -50,7 +50,7 @@
 
 - **EXISTING IMPLEMENTATION:** ST-21 Exercise Library browse/search/filter uses the B01 API/auth client and a non-persisted TanStack Query cache that is cleared on logout or authenticated identity change.
 - **EXISTING IMPLEMENTATION:** ST-22 detail is available from ST-21 at `/(app)/exercises/[exerciseId]` and reuses B01 authentication/query-cache lifecycle behavior.
-- **PROPOSED SOLUTION:** Add the reusable Exercise picker flow for plan building.
+- **EXISTING IMPLEMENTATION:** The reusable Exercise picker is available for plan-building consumers without a standalone route; B04 remains responsible for integrating it and persisting the selected Exercise identifier through its own plan commands.
 - **PROPOSED SOLUTION:** Display instructions, muscles, equipment, variation relationships, media availability, and archived/unavailable states without breaking historical plan views.
 - **PROPOSED SOLUTION:** Map pagination, query, filter, empty results, retryable errors, permission errors, and stale catalog state explicitly.
 

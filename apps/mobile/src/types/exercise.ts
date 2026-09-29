@@ -27,6 +27,8 @@ export interface ExerciseCatalogItem {
   mediaAvailable: boolean;
 }
 
+export type ExerciseSummary = ExerciseCatalogItem;
+
 export interface ExerciseCatalogPage {
   items: ExerciseCatalogItem[];
   page: number;

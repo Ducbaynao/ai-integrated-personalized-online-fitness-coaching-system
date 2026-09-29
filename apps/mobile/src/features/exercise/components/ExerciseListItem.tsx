@@ -11,21 +11,42 @@ interface ExerciseListItemProps {
   exercise: ExerciseCatalogItem;
   isDark?: boolean;
   onPress?: () => void;
+  mode?: 'browse' | 'single-select';
+  selected?: boolean;
+  disabled?: boolean;
 }
 
-export function ExerciseListItem({ exercise, isDark = false, onPress }: ExerciseListItemProps) {
+export function ExerciseListItem({
+  exercise,
+  isDark = false,
+  onPress,
+  mode = 'browse',
+  selected = false,
+  disabled = false,
+}: ExerciseListItemProps) {
   const colors = getSemanticColors(isDark);
   const muscles = exercise.primaryMuscles.map((item) => item.name).join(', ');
   const equipment = exercise.equipment.map((item) => item.name).join(', ');
+  const isSelectionMode = mode === 'single-select';
+  const selectionCopy = disabled ? 'Bài tập này đã được thêm.' : selected ? 'Đã chọn.' : '';
 
   return (
     <Pressable
       testID={`exercise-row-${exercise.id}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${exercise.name}. Nhóm cơ chính: ${muscles || 'chưa xác định'}. Thiết bị: ${equipment || 'không yêu cầu'}. ${exercise.mediaAvailable ? 'Có nội dung hướng dẫn.' : 'Chưa có nội dung hướng dẫn.'}`}
-      accessibilityHint="Mở chi tiết bài tập"
+      accessibilityRole={isSelectionMode ? 'radio' : 'button'}
+      accessibilityLabel={`${exercise.name}. Nhóm cơ chính: ${muscles || 'chưa xác định'}. Thiết bị: ${equipment || 'không yêu cầu'}. ${exercise.mediaAvailable ? 'Có nội dung hướng dẫn.' : 'Chưa có nội dung hướng dẫn.'} ${selectionCopy}`.trim()}
+      accessibilityHint={isSelectionMode ? 'Chọn bài tập này' : 'Mở chi tiết bài tập'}
+      accessibilityState={isSelectionMode ? { checked: selected, disabled } : undefined}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      style={[
+        styles.card,
+        {
+          backgroundColor: selected ? colors.brandSoft : colors.surface,
+          borderColor: selected ? colors.primary : colors.border,
+          opacity: disabled ? 0.6 : 1,
+        },
+      ]}>
       <View
         testID={`exercise-media-${exercise.id}`}
         accessibilityLabel={exercise.mediaAvailable ? 'Bài tập có nội dung hướng dẫn' : 'Bài tập chưa có nội dung hướng dẫn'}
@@ -44,6 +65,12 @@ export function ExerciseListItem({ exercise, isDark = false, onPress }: Exercise
           {equipment || 'Không yêu cầu thiết bị'}
         </Text>
         <View style={styles.badges}>
+          {isSelectionMode && selected && !disabled && (
+            <Text style={[styles.badge, { backgroundColor: colors.primary, color: colors.textOnPrimary }]}>Đã chọn</Text>
+          )}
+          {isSelectionMode && disabled && (
+            <Text style={[styles.badge, { backgroundColor: colors.surfaceSubtle, color: colors.textSecondary }]}>Đã được thêm</Text>
+          )}
           {exercise.difficulty && (
             <Text style={[styles.badge, { backgroundColor: colors.brandSoft, color: colors.primary }]}>
               {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}

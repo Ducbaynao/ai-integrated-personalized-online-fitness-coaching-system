@@ -42,6 +42,10 @@ Hiển thị tên plan, source/creator, duration, số session/exercise, media k
 
 Dùng cho Exercise Library, Exercise picker và playlist trong plan. Hiển thị tên, primary muscle, equipment, variation/canonical relation và media availability khi phù hợp. `Archived` hoặc `Unavailable` phải rõ ràng trong historical view và không được chọn cho plan mới. Đây là component sản phẩm cần cho B02; chưa có frame Exercise Library tương ứng được xác minh trong SuperFit.
 
+## ExercisePicker
+
+Component contextual dùng lại catalog query, search, metadata-driven filters, pagination và `ExerciseListItem`; không có production route riêng. Picker dùng single-selection radio semantics, nhận controlled `selectedExercise`, trả typed `ExerciseSummary` khi người dùng xác nhận và hỗ trợ `excludedExerciseIds`. Selection hợp lệ được giữ khi search/filter làm row tạm thời không còn visible; confirm bị khóa khi chưa chọn, khi selection bị exclude hoặc khi catalog chưa sẵn sàng. Static copy và accessibility text dùng tiếng Việt, còn tên Exercise giữ nguyên từ API.
+
 ## SearchAndFilterBar
 
 Search input có label truy cập, clear action và trạng thái đang tìm; filter action có touch target tối thiểu 44 × 44 và summary filter đang áp dụng. Phân biệt first-use empty với no-result và cung cấp Clear filter cho no-result.
