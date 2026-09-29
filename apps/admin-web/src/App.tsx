@@ -4,7 +4,8 @@ import { DashboardPage } from './features/dashboard/DashboardPage.tsx'
 import { AuthProvider } from './features/auth/AuthContext.tsx'
 import { LoginPage } from './features/auth/LoginPage.tsx'
 import { ProtectedRoute } from './features/auth/ProtectedRoute.tsx'
-import { ExerciseCatalogPlaceholder } from './features/exercise/ExerciseCatalogPlaceholder.tsx'
+import { ExerciseDetailPage } from './features/exercise/ExerciseDetailPage.tsx'
+import { ExerciseListPage } from './features/exercise/ExerciseListPage.tsx'
 
 function App() {
   return (
@@ -23,7 +24,15 @@ function App() {
             path="exercises"
             element={
               <ProtectedRoute permission="CATALOG_MANAGE">
-                <ExerciseCatalogPlaceholder />
+                <ExerciseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="exercises/:exerciseId"
+            element={
+              <ProtectedRoute permission="CATALOG_MANAGE">
+                <ExerciseDetailPage />
               </ProtectedRoute>
             }
           />

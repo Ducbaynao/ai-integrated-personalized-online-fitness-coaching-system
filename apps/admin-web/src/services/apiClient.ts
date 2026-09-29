@@ -132,7 +132,11 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    throw await readError(response)
+    const error = await readError(response)
+    if (response.status === 401 && authenticated) {
+      expireSession()
+    }
+    throw error
   }
 
   if (response.status === 204) {

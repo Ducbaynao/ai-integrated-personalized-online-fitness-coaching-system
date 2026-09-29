@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { StatePanel } from '../../components/StatePanel.tsx'
 import { ApiError } from '../../services/apiClient.ts'
 import { useAuth } from './authContextValue.ts'
 
@@ -16,6 +17,21 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  if (auth.status === 'loading') {
+    return <StatePanel title="Đang kiểm tra phiên đăng nhập…" />
+  }
+
+  if (auth.status === 'error') {
+    return (
+      <StatePanel
+        title="Không thể kiểm tra phiên đăng nhập"
+        description="Vui lòng kiểm tra kết nối mạng rồi thử lại."
+        action={<button onClick={auth.retryBootstrap}>Thử lại</button>}
+        tone="danger"
+      />
+    )
+  }
 
   if (auth.status === 'authenticated') {
     return <Navigate to="/" replace />
