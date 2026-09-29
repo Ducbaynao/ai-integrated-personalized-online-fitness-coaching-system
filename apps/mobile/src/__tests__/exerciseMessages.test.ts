@@ -55,7 +55,10 @@ describe('exercise detail error copy', () => {
   it.each([
     ['EXERCISE_NOT_FOUND', 404, 'Bài tập không khả dụng', 'unavailable'],
     ['ACCESS_DENIED', 403, 'Bạn chưa có quyền xem bài tập', 'permission'],
+    ['ACCOUNT_UNAVAILABLE', 403, 'Tài khoản hiện không khả dụng', 'permission'],
+    ['STUDENT_CAPABILITY_UNAVAILABLE', 409, 'Bạn chưa có quyền xem bài tập', 'permission'],
     ['AUTH_SESSION_REVOKED', 401, 'Phiên đăng nhập không còn hiệu lực', 'session'],
+    ['VALIDATION_FAILED', 400, 'Yêu cầu bài tập chưa hợp lệ', 'validation'],
   ])('maps stable code %s without exposing backend messages', (code, status, title, kind) => {
     const rawMessage = 'Sensitive backend detail';
     const copy = getExerciseDetailErrorCopy(apiError(status as number, code, rawMessage));

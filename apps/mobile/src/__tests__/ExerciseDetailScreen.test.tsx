@@ -7,7 +7,11 @@ import { ApiError, ErrorResponse } from '@/types/auth';
 import { ExerciseDetail } from '@/types/exercise';
 
 const mockBack = jest.fn();
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: mockBack }) }));
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: mockBack, replace: mockReplace, canGoBack: mockCanGoBack }),
+}));
 jest.mock('@/features/exercise/exerciseQueries', () => ({ useExerciseDetail: jest.fn() }));
 
 const exerciseId = '10000000-0000-0000-0000-000000000001';
@@ -92,6 +96,7 @@ function renderScreen(id: unknown = exerciseId) {
 describe('ExerciseDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
     (useExerciseDetail as jest.Mock).mockReturnValue(queryState());
   });
 
@@ -162,12 +167,95 @@ describe('ExerciseDetailScreen', () => {
     expect(root.findAllByProps({ testID: 'exercise-detail-variations' })).toHaveLength(0);
   });
 
-  it('announces variation names without translating them', () => {
+  it('exposes a variation with only its API-provided name as a heading', () => {
+    (useExerciseDetail as jest.Mock).mockReturnValue(
+      queryState({
+        data: {
+          ...detail,
+          variations: [
+            {
+              ...detail.variations[0],
+              description: null,
+              instructions: null,
+              difficulty: null,
+              defaultVariation: false,
+            },
+          ],
+        },
+      })
+    );
+    const variation = renderScreen().root.findByProps({
+      testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
+    });
+    const text = variation.findAllByType(Text);
+
+    expect(variation.props.accessible).toBeUndefined();
+    expect(variation.props.accessibilityLabel).toBeUndefined();
+    expect(text).toHaveLength(1);
+    expect(text[0].props.children).toBe('High Bar Squat');
+    expect(text[0].props.accessibilityRole).toBe('header');
+  });
+
+  it('keeps the default-variation marker accessible as visible text', () => {
     const variation = renderScreen().root.findByProps({
       testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
     });
 
-    expect(variation.props.accessibilityLabel).toBe('High Bar Squat. Biến thể mặc định');
+    expect(variation.findAllByType(Text).some((node) => node.props.children === 'Mặc định')).toBe(true);
+  });
+
+  it('keeps variation difficulty accessible as visible text', () => {
+    const variation = renderScreen().root.findByProps({
+      testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
+    });
+
+    expect(
+      variation.findAllByType(Text).some((node) =>
+        JSON.stringify(node.props.children).includes('Độ khó')
+      )
+    ).toBe(true);
+  });
+
+  it('keeps variation description accessible as visible text', () => {
+    const variation = renderScreen().root.findByProps({
+      testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
+    });
+
+    expect(
+      variation.findAllByType(Text).some((node) => node.props.children === 'Bar rests high on the upper back.')
+    ).toBe(true);
+  });
+
+  it('keeps variation instructions accessible as visible text', () => {
+    const variation = renderScreen().root.findByProps({
+      testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
+    });
+
+    expect(
+      variation.findAllByType(Text).some((node) =>
+        JSON.stringify(node.props.children).includes('Keep the chest tall.')
+      )
+    ).toBe(true);
+  });
+
+  it('does not aggregate or omit full variation content from the accessibility tree', () => {
+    const variation = renderScreen().root.findByProps({
+      testID: 'exercise-variation-20000000-0000-0000-0000-000000000001',
+    });
+    const readableContent = variation
+      .findAllByType(Text)
+      .map((node) => JSON.stringify(node.props.children))
+      .join(' ');
+
+    expect(variation.props.accessible).toBeUndefined();
+    expect(variation.props.accessibilityLabel).toBeUndefined();
+    expect(readableContent).toContain('High Bar Squat');
+    expect(readableContent).toContain('Mặc định');
+    expect(readableContent).toContain('Độ khó');
+    expect(readableContent).toContain('Bar rests high on the upper back.');
+    expect(readableContent).toContain('Keep the chest tall.');
+    expect(readableContent).not.toContain('undefined');
+    expect(readableContent).not.toContain('""');
   });
 
   it('does not request a missing or invalid route parameter', () => {
@@ -210,6 +298,50 @@ describe('ExerciseDetailScreen', () => {
   });
 
   it.each([
+    [404, 'EXERCISE_NOT_FOUND', 'exercise-detail-unavailable'],
+    [403, 'ACCESS_DENIED', 'exercise-detail-permission'],
+    [403, 'ACCOUNT_UNAVAILABLE', 'exercise-detail-permission'],
+    [409, 'STUDENT_CAPABILITY_UNAVAILABLE', 'exercise-detail-permission'],
+    [401, 'AUTH_SESSION_REVOKED', 'exercise-detail-session'],
+  ])(
+    'hides cached detail when a terminal HTTP %s refetch fails',
+    (status, code, expectedState) => {
+      const rawMessage = `Sensitive backend detail for ${code}`;
+      (useExerciseDetail as jest.Mock).mockReturnValue(
+        queryState({
+          isError: true,
+          isRefetchError: true,
+          error: apiError(status, code, rawMessage),
+        })
+      );
+      const root = renderScreen().root;
+      const renderedText = root.findAllByType(Text).map((node) => node.props.children).join(' ');
+
+      expect(root.findByProps({ testID: expectedState })).toBeDefined();
+      expect(root.findAllByProps({ testID: 'exercise-detail-name' })).toHaveLength(0);
+      expect(root.findAllByProps({ testID: 'exercise-detail-description' })).toHaveLength(0);
+      expect(root.findAllByProps({ testID: 'exercise-detail-instructions' })).toHaveLength(0);
+      expect(root.findAllByProps({ testID: 'exercise-detail-variations' })).toHaveLength(0);
+      expect(root.findAllByProps({ testID: 'exercise-detail-media' })).toHaveLength(0);
+      expect(renderedText).not.toContain(rawMessage);
+    }
+  );
+
+  it.each([
+    [400, 'VALIDATION_FAILED', 'exercise-detail-validation'],
+    [409, 'UNEXPECTED_CONFLICT', 'exercise-detail-generic'],
+  ])('fails closed for cached non-transient HTTP %s errors', (status, code, expectedState) => {
+    (useExerciseDetail as jest.Mock).mockReturnValue(
+      queryState({ isError: true, isRefetchError: true, error: apiError(status, code, 'Raw backend message') })
+    );
+    const root = renderScreen().root;
+
+    expect(root.findByProps({ testID: expectedState })).toBeDefined();
+    expect(root.findAllByProps({ testID: 'exercise-detail-name' })).toHaveLength(0);
+    expect(root.findAllByProps({ testID: 'retry-exercise-detail' })).toHaveLength(0);
+  });
+
+  it.each([
     [0, 'exercise-detail-network'],
     [503, 'exercise-detail-server'],
   ])('offers retry for HTTP %s failures', (status, testID) => {
@@ -220,11 +352,13 @@ describe('ExerciseDetailScreen', () => {
     const root = renderScreen().root;
 
     expect(root.findByProps({ testID })).toBeDefined();
-    renderer.act(() => root.findByProps({ testID: 'retry-exercise-detail' }).props.onPress());
+    renderer.act(() => {
+      root.findByProps({ testID: 'retry-exercise-detail' }).props.onPress();
+    });
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('keeps stale detail visible when a background refetch fails', () => {
+  it('keeps stale detail visible when a network refetch fails', () => {
     (useExerciseDetail as jest.Mock).mockReturnValue(
       queryState({ isError: true, isRefetchError: true, error: new ApiError(0, 'Offline') })
     );
@@ -234,7 +368,29 @@ describe('ExerciseDetailScreen', () => {
     expect(root.findByProps({ testID: 'exercise-detail-name' }).props.children).toBe('Barbell Squat');
   });
 
-  it('provides an accessible back action', () => {
+  it('keeps stale detail visible and retries when a server refetch fails', () => {
+    const refetch = jest.fn().mockResolvedValue(undefined);
+    (useExerciseDetail as jest.Mock).mockReturnValue(
+      queryState({
+        isError: true,
+        isRefetchError: true,
+        error: new ApiError(503, 'Internal database detail'),
+        refetch,
+      })
+    );
+    const root = renderScreen().root;
+    const renderedText = root.findAllByType(Text).map((node) => node.props.children).join(' ');
+
+    expect(root.findByProps({ testID: 'exercise-detail-background-error' })).toBeDefined();
+    expect(root.findByProps({ testID: 'exercise-detail-name' }).props.children).toBe('Barbell Squat');
+    expect(renderedText).not.toContain('Internal database detail');
+    renderer.act(() => {
+      root.findByProps({ testID: 'retry-exercise-detail-background' }).props.onPress();
+    });
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses navigation history for the accessible back action', () => {
     const back = renderScreen().root.findByProps({ testID: 'exercise-detail-back' });
 
     expect(back.props.accessibilityRole).toBe('button');
@@ -242,5 +398,36 @@ describe('ExerciseDetailScreen', () => {
     expect(back.props.accessibilityHint).toBe('Trở về màn hình trước');
     renderer.act(() => back.props.onPress());
     expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('replaces a direct deep link with the catalog when no history exists', () => {
+    mockCanGoBack.mockReturnValue(false);
+    const back = renderScreen().root.findByProps({ testID: 'exercise-detail-back' });
+
+    renderer.act(() => back.props.onPress());
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/exercises');
+  });
+
+  it('uses the same catalog fallback from a deep-linked unavailable state without looping', () => {
+    mockCanGoBack.mockReturnValue(false);
+    (useExerciseDetail as jest.Mock).mockReturnValue(
+      queryState({
+        data: undefined,
+        isError: true,
+        error: apiError(404, 'EXERCISE_NOT_FOUND', 'Raw backend message'),
+      })
+    );
+    const root = renderScreen().root;
+
+    expect(root.findByProps({ testID: 'exercise-detail-unavailable' })).toBeDefined();
+    renderer.act(() => root.findByProps({ testID: 'exercise-detail-back' }).props.onPress());
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/exercises');
   });
 });

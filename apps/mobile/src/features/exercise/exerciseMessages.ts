@@ -130,7 +130,7 @@ export function isExerciseAccessError(error: unknown): boolean {
 export interface ExerciseDetailErrorCopy {
   title: string;
   message: string;
-  kind: 'unavailable' | 'permission' | 'session' | 'network' | 'server' | 'generic';
+  kind: 'unavailable' | 'permission' | 'session' | 'validation' | 'network' | 'server' | 'generic';
 }
 
 export function getExerciseDetailErrorCopy(error: unknown): ExerciseDetailErrorCopy {
@@ -143,7 +143,23 @@ export function getExerciseDetailErrorCopy(error: unknown): ExerciseDetailErrorC
         kind: 'unavailable',
       };
     }
-    if (error.status === 403 || errorCode === 'ACCESS_DENIED') {
+    if (errorCode === 'ACCOUNT_UNAVAILABLE') {
+      return {
+        title: 'Tài khoản hiện không khả dụng',
+        message: 'Vui lòng kiểm tra trạng thái tài khoản hoặc liên hệ bộ phận hỗ trợ.',
+        kind: 'permission',
+      };
+    }
+    if (
+      error.status === 403 ||
+      [
+        'ACCESS_DENIED',
+        'STUDENT_CAPABILITY_REVOKED',
+        'STUDENT_CAPABILITY_UNAVAILABLE',
+        'TRAINER_CAPABILITY_REVOKED',
+        'TRAINER_CAPABILITY_UNAVAILABLE',
+      ].includes(errorCode ?? '')
+    ) {
       return {
         title: 'Bạn chưa có quyền xem bài tập',
         message: 'Tài khoản cần có hồ sơ học viên hoặc huấn luyện viên để xem nội dung này.',
@@ -155,6 +171,13 @@ export function getExerciseDetailErrorCopy(error: unknown): ExerciseDetailErrorC
         title: 'Phiên đăng nhập không còn hiệu lực',
         message: 'Vui lòng đăng nhập lại để tiếp tục.',
         kind: 'session',
+      };
+    }
+    if (error.status === 400 || errorCode === 'VALIDATION_FAILED') {
+      return {
+        title: 'Yêu cầu bài tập chưa hợp lệ',
+        message: 'Không thể tải bài tập từ yêu cầu này. Vui lòng quay lại thư viện và thử lại.',
+        kind: 'validation',
       };
     }
     if (error.status === 0) {
