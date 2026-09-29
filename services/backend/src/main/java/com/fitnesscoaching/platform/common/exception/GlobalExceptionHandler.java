@@ -522,10 +522,49 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(AdminExerciseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAdminExerciseNotFound(AdminExerciseNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "ADMIN_EXERCISE_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(ExerciseLifecycleConflictException.class)
+    public ResponseEntity<ErrorResponse> handleExerciseLifecycleConflict(ExerciseLifecycleConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "EXERCISE_LIFECYCLE_CONFLICT", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(ExerciseVersionConflictException.class)
+    public ResponseEntity<ErrorResponse> handleExerciseVersionConflict(ExerciseVersionConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "EXERCISE_VERSION_CONFLICT", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(ExerciseCanonicalConflictException.class)
+    public ResponseEntity<ErrorResponse> handleExerciseCanonicalConflict(ExerciseCanonicalConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "EXERCISE_CANONICAL_CONFLICT", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String constraintName = extractConstraintName(ex);
         String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+
+        if (matchesConstraint(constraintName, msg, "exercises_code_key")) {
+            ErrorResponse response = ErrorResponse.of(
+                    "EXERCISE_CODE_CONFLICT",
+                    "Exercise code is already in use.",
+                    Instant.now(clock),
+                    RequestIdHolder.get(),
+                    Collections.emptyList()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
 
         if (matchesConstraint(constraintName, msg, "uq_trainer_pending_application")) {
             ErrorResponse response = ErrorResponse.of(
