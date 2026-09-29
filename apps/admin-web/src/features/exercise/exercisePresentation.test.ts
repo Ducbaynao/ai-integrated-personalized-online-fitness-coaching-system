@@ -23,4 +23,14 @@ describe('exercise error mapping', () => {
       expect(JSON.stringify(content)).not.toContain(error.errorCode)
     },
   )
+
+  it('uses a stable error code before the HTTP fallback', () => {
+    const content = getExerciseErrorContent(
+      new ApiError(400, 'ADMIN_EXERCISE_NOT_FOUND'),
+      'detail',
+    )
+
+    expect(content.title).toBe('Không tìm thấy bài tập')
+    expect(content.description).toBe('Bài tập này không tồn tại hoặc hiện không khả dụng.')
+  })
 })

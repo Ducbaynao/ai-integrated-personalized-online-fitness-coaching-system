@@ -31,6 +31,42 @@ export function getExerciseErrorContent(
   context: 'list' | 'detail',
 ): ExerciseErrorContent {
   if (error instanceof ApiError) {
+    if (
+      ['SESSION_EXPIRED', 'UNAUTHENTICATED', 'UNAUTHORIZED', 'INVALID_REFRESH_TOKEN'].includes(
+        error.errorCode,
+      )
+    ) {
+      return {
+        title: 'Phiên đăng nhập đã hết hạn',
+        description: 'Vui lòng đăng nhập lại để tiếp tục.',
+        retryable: false,
+      }
+    }
+    if (
+      ['ACCESS_DENIED', 'ACCOUNT_UNAVAILABLE', 'CATALOG_MANAGE_REQUIRED'].includes(
+        error.errorCode,
+      )
+    ) {
+      return {
+        title: 'Bạn không có quyền truy cập',
+        description: 'Quyền quản lý danh mục hiện không khả dụng.',
+        retryable: false,
+      }
+    }
+    if (error.errorCode === 'ADMIN_EXERCISE_NOT_FOUND' && context === 'detail') {
+      return {
+        title: 'Không tìm thấy bài tập',
+        description: 'Bài tập này không tồn tại hoặc hiện không khả dụng.',
+        retryable: false,
+      }
+    }
+    if (error.errorCode === 'VALIDATION_FAILED') {
+      return {
+        title: 'Không thể tải dữ liệu',
+        description: 'Yêu cầu không hợp lệ hoặc dữ liệu hiện không khả dụng.',
+        retryable: false,
+      }
+    }
     if (error.status === 0) {
       return {
         title: 'Không thể kết nối đến hệ thống',
