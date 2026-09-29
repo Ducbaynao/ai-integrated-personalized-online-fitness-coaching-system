@@ -20,9 +20,12 @@ The Admin Web calls only the Spring Boot API. It does not access PostgreSQL or t
 - React 19
 - TypeScript
 - Vite 8
+- React Router
+- TanStack Query
+- Vitest and Testing Library
 - Oxlint
 
-Add routing, server-state, form, validation, component, and test dependencies deliberately as the first Admin milestone is implemented. Keep the README aligned with actually installed packages.
+Add form, validation, and component dependencies only when a concrete workflow needs them. Keep the README aligned with actually installed packages.
 
 ## Run locally
 
@@ -44,6 +47,8 @@ Quality commands:
 
 ```bash
 npm run lint
+npm run typecheck
+npm run test
 npm run build
 npm run preview
 ```
@@ -64,6 +69,9 @@ Keep route/layout composition thin. Business decisions, authority checks, and li
 
 - The reviewed REST contract is `../../contracts/openapi/openapi.yaml`.
 - Use versioned `/api/v1` endpoints through a shared API client.
+- Read effective permissions from `GET /users/me`; never infer UI authority from a role or JWT claim.
+- Access and refresh tokens are kept in `sessionStorage`, cleared on logout/session failure, and never persisted across browser sessions. This limits persistence but does not remove XSS risk, so avoid unsafe HTML and keep the dependency surface reviewed.
+- A failed access token refresh is shared across concurrent requests and transitions the application to the signed-out state.
 - Do not expose persistence entities in view models.
 - Do not log access tokens, secrets, raw sensitive records, or unnecessary personal data.
 - Privileged actions require backend permission checks, reason/context, step-up authentication when applicable, and immutable audit.
