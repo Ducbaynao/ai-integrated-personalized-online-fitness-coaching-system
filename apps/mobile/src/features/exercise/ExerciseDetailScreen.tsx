@@ -149,10 +149,27 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
   const detailQuery = useExerciseDetail(validExerciseId);
   const detail = detailQuery.data;
   const refetch = detailQuery.refetch;
+  const detailErrorCopy = detailQuery.isError
+    ? getExerciseDetailErrorCopy(detailQuery.error)
+    : null;
+  const isTransientDetailError =
+    detailErrorCopy?.kind === 'network' || detailErrorCopy?.kind === 'server';
+  const isTerminalDetailError = detailQuery.isError && !isTransientDetailError;
+  const canRenderStaleDetail = Boolean(
+    detail && (!detailQuery.isError || isTransientDetailError)
+  );
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(app)/exercises');
+  };
 
   const shell = (content: React.ReactNode) => (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]}>
-      <DetailHeader colors={colors} onBack={() => router.back()} />
+      <DetailHeader colors={colors} onBack={handleBack} />
       {content}
     </SafeAreaView>
   );
@@ -168,25 +185,34 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
     );
   }
 
-  if (detailQuery.isPending) {
-    return shell(<ExerciseDetailSkeleton colors={colors} />);
-  }
-
-  if (detailQuery.isError && !detail) {
-    const copy = getExerciseDetailErrorCopy(detailQuery.error);
-    const retryable = ['network', 'server', 'generic'].includes(copy.kind);
+  if (isTerminalDetailError && detailErrorCopy) {
     return shell(
       <DetailState
         colors={colors}
-        testID={`exercise-detail-${copy.kind}`}
-        title={copy.title}
-        message={copy.message}
-        onRetry={retryable ? () => refetch() : undefined}
+        testID={`exercise-detail-${detailErrorCopy.kind}`}
+        title={detailErrorCopy.title}
+        message={detailErrorCopy.message}
       />
     );
   }
 
-  if (!detail) {
+  if (detailQuery.isPending) {
+    return shell(<ExerciseDetailSkeleton colors={colors} />);
+  }
+
+  if (detailQuery.isError && !canRenderStaleDetail && detailErrorCopy) {
+    return shell(
+      <DetailState
+        colors={colors}
+        testID={`exercise-detail-${detailErrorCopy.kind}`}
+        title={detailErrorCopy.title}
+        message={detailErrorCopy.message}
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  if (!detail || !canRenderStaleDetail) {
     return shell(
       <DetailState
         colors={colors}
@@ -203,7 +229,7 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]}>
-      <DetailHeader colors={colors} onBack={() => router.back()} />
+      <DetailHeader colors={colors} onBack={handleBack} />
       <ScrollView
         testID="exercise-detail-scroll"
         contentContainerStyle={styles.content}
@@ -214,7 +240,7 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
             tintColor={colors.primary}
           />
         }>
-        {detailQuery.isRefetchError && (
+        {detailQuery.isRefetchError && isTransientDetailError && (
           <View
             testID="exercise-detail-background-error"
             accessibilityRole="alert"
@@ -223,6 +249,7 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
               Không thể cập nhật dữ liệu mới. Chi tiết gần nhất vẫn được giữ lại.
             </Text>
             <Pressable
+              testID="retry-exercise-detail-background"
               accessibilityRole="button"
               accessibilityLabel="Thử cập nhật lại chi tiết bài tập"
               accessibilityHint="Tải lại dữ liệu mới nhất"
@@ -367,8 +394,6 @@ export function ExerciseDetailScreen({ exerciseId }: ExerciseDetailScreenProps) 
                 <View
                   key={variation.id}
                   testID={`exercise-variation-${variation.id}`}
-                  accessible
-                  accessibilityLabel={`${variation.name}${variation.defaultVariation ? '. Biến thể mặc định' : ''}`}
                   style={[styles.variationCard, { borderColor: colors.border }]}>
                   <View style={styles.variationTitleRow}>
                     <Text accessibilityRole="header" style={[styles.itemName, { color: colors.textPrimary }]}>
