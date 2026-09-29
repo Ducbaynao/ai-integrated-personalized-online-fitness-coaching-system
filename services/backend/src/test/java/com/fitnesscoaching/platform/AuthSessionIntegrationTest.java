@@ -1064,6 +1064,34 @@ class AuthSessionIntegrationTest {
         );
     }
 
+    @Test
+    @DisplayName("Login and refreshed sessions expose current server-side effective permissions without JWT permission claims")
+    void loginAndRefreshExposeEffectivePermissionsThroughCurrentUserProjection() throws Exception {
+        String email = "admin.session.permissions@example.com";
+        String password = "StrongPassword123!";
+        UUID userId = registerAndConfirm(email, password);
+        assignRole(userId, "ADMIN");
+
+        Map<String, Object> session = login(email, password, "Admin Browser");
+        Map<String, Object> loginUser = (Map<String, Object>) session.get("user");
+        assertThat(loginUser.get("permissions")).isEqualTo(List.of("CATALOG_MANAGE"));
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new RefreshTokenRequest((String) session.get("refreshToken"), "Admin Browser"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.permissions", is(List.of("CATALOG_MANAGE"))))
+                .andReturn();
+
+        Map<String, Object> refreshed = objectMapper.readValue(
+                refreshResult.getResponse().getContentAsString(), Map.class);
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + refreshed.get("accessToken")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE"))));
+    }
+
     @TestConfiguration
     static class TestAdminEndpointConfig {
         @RestController

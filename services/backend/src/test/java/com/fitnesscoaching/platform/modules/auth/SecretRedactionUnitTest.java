@@ -260,6 +260,7 @@ class SecretRedactionUnitTest {
     void currentUserToStringRedactsSensitiveData() {
         String phoneSentinel = "+84999999999-secret-phone";
         String privacySentinel = "secret-privacy-value";
+        String permissionSentinel = "SECRET_PERMISSION_CODE";
         Instant now = Instant.parse("2026-09-20T08:00:00Z");
         UUID userId = UUID.randomUUID();
 
@@ -280,12 +281,13 @@ class SecretRedactionUnitTest {
         // 2. CurrentUserResponse
         var userResp = new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.CurrentUserResponse(
                 userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE, "en-US", "UTC", now, now,
-                phoneSentinel, List.of("STUDENT"),
+                phoneSentinel, List.of("STUDENT"), List.of(permissionSentinel),
                 new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UserCapabilitiesDto(true, false, false),
                 new com.fitnesscoaching.platform.modules.user.adapter.in.web.dto.UserSettingsDto(1, "METRIC", Map.of(), Map.of("secretKey", privacySentinel))
         );
         assertThat(userResp.toString())
                 .doesNotContain(phoneSentinel)
+                .doesNotContain(permissionSentinel)
                 .contains("phoneNumber=[REDACTED]");
         assertThat(userResp.settings().toString())
                 .doesNotContain(privacySentinel)
@@ -294,12 +296,13 @@ class SecretRedactionUnitTest {
         // 3. CurrentUserView & UserSettingsView
         var userView = new com.fitnesscoaching.platform.modules.user.application.model.CurrentUserView(
                 userId, "athlete@example.com", "Alex", AccountStatus.ACTIVE, "en-US", "UTC", now, now,
-                phoneSentinel, List.of("STUDENT"),
+                phoneSentinel, List.of("STUDENT"), List.of(permissionSentinel),
                 new com.fitnesscoaching.platform.modules.user.application.model.UserCapabilitiesView(true, false, false),
                 new com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView(1, "METRIC", Map.of(), Map.of("secretKey", privacySentinel))
         );
         assertThat(userView.toString())
                 .doesNotContain(phoneSentinel)
+                .doesNotContain(permissionSentinel)
                 .contains("phoneNumber=[REDACTED]");
         assertThat(userView.settings().toString())
                 .doesNotContain(privacySentinel)

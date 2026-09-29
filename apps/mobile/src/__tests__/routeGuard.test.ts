@@ -35,6 +35,7 @@ describe('Route Guard & Capability Resolution (PROFILE-04)', () => {
       createdAt: '2026-09-20T08:00:00Z',
       phoneNumber: null,
       roles,
+      permissions: [],
     capabilities: {
       hasStudentProfile,
       hasTrainerProfile,

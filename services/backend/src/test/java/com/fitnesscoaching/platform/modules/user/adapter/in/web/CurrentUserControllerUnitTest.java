@@ -84,6 +84,7 @@ class CurrentUserControllerUnitTest {
                 Instant.parse("2026-09-01T12:00:00Z"),
                 "+84901234567",
                 List.of("STUDENT"),
+                List.of("CATALOG_MANAGE"),
                 new UserCapabilitiesView(true, false, false),
                 new UserSettingsView(1, "METRIC", Map.of("theme", "dark"), Map.of("shareProgress", false))
         );
@@ -106,6 +107,7 @@ class CurrentUserControllerUnitTest {
                 .andExpect(jsonPath("$.timezone", is("Asia/Ho_Chi_Minh")))
                 .andExpect(jsonPath("$.phoneNumber", is("+84901234567")))
                 .andExpect(jsonPath("$.roles[0]", is("STUDENT")))
+                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE"))))
                 .andExpect(jsonPath("$.capabilities.hasStudentProfile", is(true)))
                 .andExpect(jsonPath("$.capabilities.hasTrainerProfile", is(false)))
                 .andExpect(jsonPath("$.capabilities.canCoach", is(false)))
@@ -115,6 +117,33 @@ class CurrentUserControllerUnitTest {
                 .andExpect(jsonPath("$.settings.privacyPreferences.shareProgress", is(false)));
 
         verify(getCurrentUserUseCase).getCurrentUser(userId);
+    }
+
+    @Test
+    @DisplayName("GET /users/me always returns a non-null permissions array")
+    void getCurrentUser_nullPermissionsAreNormalizedToEmptyArray() throws Exception {
+        UUID userId = UUID.randomUUID();
+        CurrentUserView view = new CurrentUserView(
+                userId,
+                "student@example.com",
+                "Student",
+                AccountStatus.ACTIVE,
+                "vi-VN",
+                "Asia/Ho_Chi_Minh",
+                Instant.parse("2026-09-01T12:00:00Z"),
+                Instant.parse("2026-09-01T12:00:00Z"),
+                null,
+                List.of("STUDENT"),
+                null,
+                new UserCapabilitiesView(true, false, false),
+                UserSettingsView.defaults()
+        );
+        when(getCurrentUserUseCase.getCurrentUser(userId)).thenReturn(view);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of())));
     }
 
     @Test

@@ -45,6 +45,7 @@ export interface UserSummary {
 export interface CurrentUserResponse extends UserSummary {
   phoneNumber: string | null;
   roles: RoleCode[];
+  permissions: string[];
   capabilities: UserCapabilities;
   settings: UserSettings;
 }

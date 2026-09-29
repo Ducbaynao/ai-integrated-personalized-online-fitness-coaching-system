@@ -124,6 +124,7 @@ public class CurrentUserController {
                 view.createdAt(),
                 view.phoneNumber(),
                 view.roles(),
+                view.permissions(),
                 new UserCapabilitiesDto(
                         view.capabilities().hasStudentProfile(),
                         view.capabilities().hasTrainerProfile(),

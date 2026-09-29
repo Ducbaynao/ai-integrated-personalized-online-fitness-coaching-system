@@ -130,6 +130,7 @@ public class AuthController {
                 user.createdAt(),
                 user.phoneNumber(),
                 user.roles(),
+                user.permissions(),
                 new UserCapabilitiesDto(
                         user.capabilities().hasStudentProfile(),
                         user.capabilities().hasTrainerProfile(),
