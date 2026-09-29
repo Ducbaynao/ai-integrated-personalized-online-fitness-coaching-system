@@ -73,6 +73,7 @@ describe('apiClient and authApi', () => {
         createdAt: '2026-09-20T08:00:00Z',
         phoneNumber: null,
         roles: ['STUDENT'],
+        permissions: [],
         capabilities: { hasStudentProfile: true, hasTrainerProfile: false, canCoach: false },
         settings: {
           weekStartsOn: 1,

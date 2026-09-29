@@ -33,6 +33,7 @@ const user = (id: string): CurrentUserResponse => ({
   createdAt: '2026-09-28T00:00:00Z',
   phoneNumber: null,
   roles: ['STUDENT'],
+  permissions: [],
   capabilities: { hasStudentProfile: true, hasTrainerProfile: false, canCoach: false },
   settings: {
     weekStartsOn: 1,

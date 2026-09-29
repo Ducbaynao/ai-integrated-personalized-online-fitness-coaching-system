@@ -17,6 +17,7 @@ import org.mockito.quality.Strictness;
 import org.mockito.junit.jupiter.MockitoSettings;
 
 import com.fitnesscoaching.platform.modules.user.application.port.out.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -41,13 +42,17 @@ class CurrentUserReadAdapterUnitTest {
     @Mock
     private CoachingAuthorityQuery coachingAuthorityQuery;
 
+    @Mock
+    private UserPermissionQuery permissionQuery;
+
     private ObjectMapper objectMapper;
     private CurrentUserReadAdapter adapter;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        adapter = new CurrentUserReadAdapter(jdbcTemplate, objectMapper, coachingAuthorityQuery);
+        adapter = new CurrentUserReadAdapter(jdbcTemplate, objectMapper, coachingAuthorityQuery, permissionQuery);
+        when(permissionQuery.getEffectivePermissions(any())).thenReturn(List.of());
     }
 
     @Test

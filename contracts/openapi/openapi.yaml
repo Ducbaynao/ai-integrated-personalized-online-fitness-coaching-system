@@ -1714,13 +1714,24 @@ components:
       allOf:
         - $ref: '#/components/schemas/UserSummary'
         - type: object
-          required: [roles, capabilities, settings]
+          required: [roles, permissions, capabilities, settings]
           properties:
             phoneNumber: { type: [string, 'null'], maxLength: 32 }
             roles:
               type: array
               uniqueItems: true
               items: { $ref: '#/components/schemas/RoleCode' }
+            permissions:
+              type: array
+              description: Effective permission codes granted by active role assignments for an active account. Empty for users without effective permissions.
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 1
+                maxLength: 100
+              examples:
+                - [CATALOG_MANAGE]
+                - []
             capabilities:
               type: object
               required: [hasStudentProfile, hasTrainerProfile, canCoach]

@@ -65,24 +65,22 @@ public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAcco
 
     @Override
     @Transactional(readOnly = true)
-    public boolean hasActivePermission(UUID userId, String permissionCode) {
-        Boolean granted = jdbcTemplate.queryForObject(
+    public List<String> getEffectivePermissions(UUID userId) {
+        return jdbcTemplate.query(
                 """
-                SELECT EXISTS(
-                    SELECT 1
-                    FROM fitness.user_roles ur
-                    JOIN fitness.role_permissions rp ON rp.role_id = ur.role_id
-                    JOIN fitness.permissions p ON p.id = rp.permission_id
-                    WHERE ur.user_id = ?
-                      AND ur.revoked_at IS NULL
-                      AND p.code = ?
-                )
+                SELECT DISTINCT p.code
+                FROM fitness.users u
+                JOIN fitness.user_roles ur ON ur.user_id = u.id
+                JOIN fitness.role_permissions rp ON rp.role_id = ur.role_id
+                JOIN fitness.permissions p ON p.id = rp.permission_id
+                WHERE u.id = ?
+                  AND u.status = 'ACTIVE'::fitness.account_status
+                  AND ur.revoked_at IS NULL
+                ORDER BY p.code ASC
                 """,
-                Boolean.class,
-                userId,
-                permissionCode
+                (rs, rowNum) -> rs.getString("code"),
+                userId
         );
-        return Boolean.TRUE.equals(granted);
     }
 
     @Override

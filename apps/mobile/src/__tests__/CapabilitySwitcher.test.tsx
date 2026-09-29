@@ -20,6 +20,7 @@ describe('CapabilitySwitcher Component', () => {
     createdAt: '2026-09-20T08:00:00Z',
     phoneNumber: null,
     roles: ['STUDENT', 'TRAINER'],
+    permissions: [],
     capabilities: {
       hasStudentProfile,
       hasTrainerProfile,

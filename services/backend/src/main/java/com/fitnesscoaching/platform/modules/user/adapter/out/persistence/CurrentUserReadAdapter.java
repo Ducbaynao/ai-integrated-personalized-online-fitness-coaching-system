@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.modules.user.application.model.CurrentUserVi
 import com.fitnesscoaching.platform.modules.user.application.model.UserCapabilitiesView;
 import com.fitnesscoaching.platform.modules.user.application.model.UserSettingsView;
 import com.fitnesscoaching.platform.modules.user.application.port.in.CurrentUserQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.out.CoachingAuthorityQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -24,15 +25,18 @@ public class CurrentUserReadAdapter implements CurrentUserQuery {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final CoachingAuthorityQuery coachingAuthorityQuery;
+    private final UserPermissionQuery permissionQuery;
 
     public CurrentUserReadAdapter(
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
-            CoachingAuthorityQuery coachingAuthorityQuery
+            CoachingAuthorityQuery coachingAuthorityQuery,
+            UserPermissionQuery permissionQuery
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.coachingAuthorityQuery = coachingAuthorityQuery;
+        this.permissionQuery = permissionQuery;
     }
 
     @Override
@@ -92,6 +96,7 @@ public class CurrentUserReadAdapter implements CurrentUserQuery {
                 (rs, rowNum) -> rs.getString("code"),
                 userId
         );
+        List<String> permissions = permissionQuery.getEffectivePermissions(userId);
 
         UserSettingsView settings = jdbcTemplate.query(
                 """
@@ -158,6 +163,7 @@ public class CurrentUserReadAdapter implements CurrentUserQuery {
                 user.createdAt(),
                 user.phoneNumber(),
                 roles,
+                permissions,
                 capabilities,
                 settings
         ));

@@ -36,6 +36,7 @@ describe('Session Restoration Navigation Resolution in Index', () => {
       createdAt: '2026-09-20T08:00:00Z',
       phoneNumber: null,
       roles,
+      permissions: [],
     capabilities: {
       hasStudentProfile,
       hasTrainerProfile,

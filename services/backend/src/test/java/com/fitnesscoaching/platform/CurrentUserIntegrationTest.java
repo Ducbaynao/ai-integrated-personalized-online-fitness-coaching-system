@@ -151,6 +151,26 @@ class CurrentUserIntegrationTest {
                 userId, roleId);
     }
 
+    private void ensurePermission(String permissionCode) {
+        jdbcTemplate.update(
+                "INSERT INTO fitness.permissions(code, description) VALUES (?, ?) ON CONFLICT (code) DO NOTHING",
+                permissionCode, "Test permission: " + permissionCode
+        );
+    }
+
+    private void grantPermission(String roleCode, String permissionCode) {
+        ensureRole(roleCode);
+        ensurePermission(permissionCode);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.role_permissions(role_id, permission_id)
+                SELECT r.id, p.id
+                FROM fitness.roles r
+                CROSS JOIN fitness.permissions p
+                WHERE r.code = ? AND p.code = ?
+                ON CONFLICT DO NOTHING
+                """, roleCode, permissionCode);
+    }
+
     private void insertStudentProfile(UUID userId) {
         jdbcTemplate.update("""
                 INSERT INTO fitness.student_profiles (user_id, date_of_birth, gender, training_experience_level, created_at, updated_at)
@@ -204,6 +224,7 @@ class CurrentUserIntegrationTest {
                 .andExpect(jsonPath("$.displayName", is("Alice Athlete")))
                 .andExpect(jsonPath("$.phoneNumber", is("+84901234567")))
                 .andExpect(jsonPath("$.roles", is(List.of("STUDENT"))))
+                .andExpect(jsonPath("$.permissions", is(List.of())))
                 .andExpect(jsonPath("$.capabilities.hasStudentProfile", is(true)))
                 .andExpect(jsonPath("$.capabilities.hasTrainerProfile", is(false)))
                 .andExpect(jsonPath("$.capabilities.canCoach", is(false)))
@@ -213,6 +234,109 @@ class CurrentUserIntegrationTest {
                 .andExpect(jsonPath("$.settings.privacyPreferences.shareActivity", is(false)))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.token").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns sorted, de-duplicated effective permissions for an active account")
+    void getCurrentUser_returnsSortedDistinctEffectivePermissions() throws Exception {
+        UUID userId = insertUser("admin.permissions@example.com", "Catalog Admin", null, AccountStatus.ACTIVE);
+        assignRole(userId, "ADMIN");
+        assignRole(userId, "TEST_CATALOG_ADMIN");
+        grantPermission("TEST_CATALOG_ADMIN", "CATALOG_MANAGE");
+        grantPermission("TEST_CATALOG_ADMIN", "AUDIT_VIEW_TEST");
+
+        String token = createAccessToken(userId, "admin.permissions@example.com", List.of("ADMIN"));
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of("AUDIT_VIEW_TEST", "CATALOG_MANAGE"))));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns no permission when the active ADMIN role lacks the assignment")
+    void getCurrentUser_adminWithoutPermissionAssignmentReturnsEmpty() throws Exception {
+        UUID userId = insertUser("admin.no.permission@example.com", "Limited Admin", null, AccountStatus.ACTIVE);
+        assignRole(userId, "ADMIN");
+        jdbcTemplate.update("""
+                DELETE FROM fitness.role_permissions rp
+                USING fitness.roles r, fitness.permissions p
+                WHERE rp.role_id = r.id AND rp.permission_id = p.id
+                  AND r.code = 'ADMIN' AND p.code = 'CATALOG_MANAGE'
+                """);
+
+        try {
+            String token = createAccessToken(userId, "admin.no.permission@example.com", List.of("ADMIN"));
+            mockMvc.perform(get("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.permissions", is(List.of())));
+        } finally {
+            grantPermission("ADMIN", "CATALOG_MANAGE");
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me excludes permissions from a revoked role assignment")
+    void getCurrentUser_revokedRoleReturnsEmptyPermissions() throws Exception {
+        UUID userId = insertUser("admin.revoked@example.com", "Former Admin", null, AccountStatus.ACTIVE);
+        assignRole(userId, "ADMIN");
+        revokeRole(userId, "ADMIN");
+
+        String token = createAccessToken(userId, "admin.revoked@example.com", List.of("ADMIN"));
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of())));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/me returns empty permissions for inactive accounts")
+    void getCurrentUser_inactiveAccountReturnsEmptyPermissions() throws Exception {
+        UUID userId = insertUser("admin.suspended@example.com", "Suspended Admin", null, AccountStatus.SUSPENDED);
+        assignRole(userId, "ADMIN");
+
+        String token = createAccessToken(userId, "admin.suspended@example.com", List.of("ADMIN"));
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of())));
+    }
+
+    @Test
+    @DisplayName("Student and Trainer accounts without grants receive a non-null empty permission array")
+    void getCurrentUser_studentAndTrainerWithoutGrantsReturnEmptyPermissions() throws Exception {
+        for (String role : List.of("STUDENT", "TRAINER")) {
+            String email = role.toLowerCase() + ".permissions@example.com";
+            UUID userId = insertUser(email, role + " User", null, AccountStatus.ACTIVE);
+            assignRole(userId, role);
+            String token = createAccessToken(userId, email, List.of(role));
+
+            mockMvc.perform(get("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.permissions", is(List.of())));
+        }
+    }
+
+    @Test
+    @DisplayName("Revoking ADMIN removes effective permissions immediately and keeps the Admin API denied")
+    void revokedAdminPermissionDisappearsAndAdminApiRemainsDenied() throws Exception {
+        UUID userId = insertUser("admin.revoke.live@example.com", "Revoked Admin", null, AccountStatus.ACTIVE);
+        assignRole(userId, "ADMIN");
+        String token = createAccessToken(userId, "admin.revoke.live@example.com", List.of("ADMIN"));
+
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE"))));
+
+        revokeRole(userId, "ADMIN");
+
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions", is(List.of())));
+        mockMvc.perform(get("/api/v1/admin/exercises").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -332,7 +456,7 @@ class CurrentUserIntegrationTest {
         com.fitnesscoaching.platform.modules.user.application.service.UserService userService =
                 new com.fitnesscoaching.platform.modules.user.application.service.UserService(
                         new com.fitnesscoaching.platform.modules.user.adapter.out.persistence.CurrentUserReadAdapter(
-                                jdbcTemplate, objectMapper, uid -> false),
+                                jdbcTemplate, objectMapper, uid -> false, uid -> List.of()),
                         new com.fitnesscoaching.platform.modules.user.adapter.out.persistence.UserPersistenceAdapter(
                                 jdbcTemplate, objectMapper) {
                             @Override

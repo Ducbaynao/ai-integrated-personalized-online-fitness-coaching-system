@@ -69,6 +69,7 @@ describe('AuthProvider Capabilities Integration Tests (Finding 1 & 2)', () => {
       ...(hasStudentProfile ? ['STUDENT' as const] : []),
       ...(hasTrainerProfile ? ['TRAINER' as const] : []),
     ],
+    permissions: [],
     capabilities: {
       hasStudentProfile,
       hasTrainerProfile,
