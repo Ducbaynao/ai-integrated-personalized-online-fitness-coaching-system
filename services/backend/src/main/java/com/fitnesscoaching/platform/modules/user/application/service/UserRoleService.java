@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.user.application.service;
 import com.fitnesscoaching.platform.common.exception.SystemRoleNotFoundException;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleUseCase;
 import com.fitnesscoaching.platform.modules.user.domain.RoleActivationResult;
@@ -17,7 +18,7 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAccountStatusQuery {
+public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAccountStatusQuery, UserPermissionQuery {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -60,6 +61,28 @@ public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAcco
         }
 
         return results.get(0) == null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasActivePermission(UUID userId, String permissionCode) {
+        Boolean granted = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS(
+                    SELECT 1
+                    FROM fitness.user_roles ur
+                    JOIN fitness.role_permissions rp ON rp.role_id = ur.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE ur.user_id = ?
+                      AND ur.revoked_at IS NULL
+                      AND p.code = ?
+                )
+                """,
+                Boolean.class,
+                userId,
+                permissionCode
+        );
+        return Boolean.TRUE.equals(granted);
     }
 
     @Override

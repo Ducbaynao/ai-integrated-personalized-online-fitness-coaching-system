@@ -15,7 +15,7 @@
 
 - **EXISTING IMPLEMENTATION:** Flyway V3 contains Exercise catalog, category, equipment, muscle, variation, instruction, and media-reference structures.
 - **EXISTING IMPLEMENTATION:** The backend `exercise` module provides the authenticated Student/Trainer read-only catalog foundation (search/filter/list, detail, and filter metadata); Admin mutations and historical archived access remain unimplemented.
-- **EXISTING IMPLEMENTATION:** OpenAPI defines the three read-only Exercise catalog paths; mutation paths remain unimplemented.
+- **EXISTING IMPLEMENTATION:** OpenAPI defines the three public read-only Exercise catalog paths and the permission-protected Admin list/detail, draft create/edit, activate, archive, and canonical-replacement paths.
 - **EXISTING IMPLEMENTATION:** Mobile ST-21 provides authenticated Student/Trainer catalog browse, debounced search, metadata-driven filters, session query cache, pagination, pull-to-refresh, and explicit loading/empty/error/stale states.
 - **EXISTING IMPLEMENTATION:** Mobile ST-22 provides an authenticated Student/Trainer detail route, typed detail query, Vietnamese loading/error/unavailable/stale states, optional metadata sections, variation/guidance content, and media availability placeholders without exposing storage references.
 - **EXISTING IMPLEMENTATION:** Mobile provides a reusable controlled single-selection Exercise picker component for future B04 Plan Builder integration. It reuses ST-21 query/search/filter/pagination states, returns a typed Exercise summary only after explicit confirmation, supports excluded Exercise identifiers, and intentionally has no standalone production route. Admin Web still has no AD-05 implementation.
@@ -36,13 +36,13 @@
 
 - **EXISTING IMPLEMENTATION:** V3 already models the core Exercise catalog and V12 adds integrity/index support.
 - **CONFIRMED REQUIREMENT:** Historical workout/template rows must continue resolving an Exercise after it is archived or superseded.
-- **UNRESOLVED DECISION:** Domain documentation defines `DRAFT`, `ACTIVE`, and `ARCHIVED`, while V3 also permits `INACTIVE`; Database Review must approve the canonical lifecycle or mapping before backend status rules are finalized.
-- **PROPOSED SOLUTION:** Raise a Schema Change Request only if the reviewed lifecycle, search indexes, or canonical mapping cannot be represented by the current schema.
+- **CONFIRMED DECISION:** V22 standardizes the Exercise lifecycle as `DRAFT`, `ACTIVE`, and `ARCHIVED`, migrates legacy `INACTIVE` rows to `ARCHIVED`, and adds optimistic versioning plus Admin query indexes.
+- **EXISTING IMPLEMENTATION:** Canonical replacement maps an archived source directly to one active, non-deleted target. Self-reference, cycles, chains, and archiving a current canonical target are rejected.
 
 ## 7. Backend and API scope
 
-- **PROPOSED SOLUTION:** Add module-owned domain/application services, persistence adapters, DTOs, and controllers; do not expose persistence entities or another module's repository.
-- **PROPOSED SOLUTION:** Define OpenAPI resources for paginated Exercise search, Exercise detail, filter metadata, and permission-protected Admin create/update/archive/canonical-map actions.
+- **EXISTING IMPLEMENTATION:** Module-owned domain/application services, persistence adapters, DTOs, and controllers implement Admin catalog lifecycle without exposing persistence entities or another module's repository.
+- **EXISTING IMPLEMENTATION:** Admin APIs require an active `ADMIN` role and the database-backed `CATALOG_MANAGE` permission; mutations use optimistic version checks and immutable audit records.
 - **PROPOSED SOLUTION:** Support stable filtering by text, status, muscle group, equipment, category, and variation/canonical relationship with deterministic sorting.
 - **CONFIRMED REQUIREMENT:** Archive and merge/mapping actions require validation and audit; hard delete is not exposed.
 
@@ -102,7 +102,7 @@
 - **CONFIRMED REQUIREMENT:** B02 includes basic Admin Exercise management; other Admin governance remains outside this feature.
 - **CONFIRMED REQUIREMENT:** PostgreSQL catalog data is authoritative; AI output is not an Exercise source of truth.
 - **PROPOSED SOLUTION:** Treat B02 as the reusable catalog/picker foundation for B04.
-- **UNRESOLVED DECISION:** Canonical handling of V3 `INACTIVE` versus the documented lifecycle requires team/Database Review.
+- **CONFIRMED DECISION:** Legacy `INACTIVE` Exercise data is mapped forward to `ARCHIVED`; `INACTIVE` is no longer accepted by the Exercise contract or current schema constraint.
 
 ## 16. Delivery workflow
 

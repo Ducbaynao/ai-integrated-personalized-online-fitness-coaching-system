@@ -28,6 +28,8 @@ tags:
     description: Student-owned fitness goal management, versioning, objectives, and measurable targets.
   - name: Exercise Catalog
     description: Authenticated Student and Trainer read access to the active Exercise catalog.
+  - name: Admin Exercise Catalog
+    description: Permission-protected Exercise draft, lifecycle, and canonical replacement management.
 
 paths:
   /exercises:
@@ -40,8 +42,8 @@ paths:
         one filter dimension are combined with OR; different filter dimensions are combined with
         AND. Search is a case-insensitive literal substring match over Exercise name, code,
         description, and active Variation name/code. Results use deterministic ordering by
-        case-insensitive Exercise name ascending, then Exercise ID ascending. DRAFT, INACTIVE,
-        and ARCHIVED content is never returned by this endpoint.
+        case-insensitive Exercise name ascending, then Exercise ID ascending. DRAFT and ARCHIVED
+        content is never returned by this endpoint.
       parameters:
         - name: query
           in: query
@@ -184,7 +186,7 @@ paths:
       description: >-
         Returns an ACTIVE, non-deleted Exercise with active Variations, muscles, equipment,
         guidance, tags, and media metadata/reference. Storage bucket, object key, download URL,
-        and presigned URL are not exposed. A missing, DRAFT, INACTIVE, or ARCHIVED Exercise
+        and presigned URL are not exposed. A missing, DRAFT, or ARCHIVED Exercise
         returns the same 404 behavior to avoid resource enumeration.
       parameters:
         - name: exerciseId
@@ -235,6 +237,189 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/exercises:
+    get:
+      tags: [Admin Exercise Catalog]
+      operationId: searchAdminExercises
+      summary: Search Exercises across every lifecycle state
+      description: Requires an active ADMIN role and CATALOG_MANAGE permission. Results are ordered by case-insensitive name, then ID.
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paginated governed Exercise catalog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExercisePageResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403':
+          description: CATALOG_MANAGE permission is missing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    post:
+      tags: [Admin Exercise Catalog]
+      operationId: createAdminExerciseDraft
+      summary: Create a DRAFT Exercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminExerciseDraftRequest' }
+      responses:
+        '201':
+          description: Exercise draft created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExerciseResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '409':
+          description: Exercise code conflict (EXERCISE_CODE_CONFLICT)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/exercises/{exerciseId}:
+    parameters:
+      - name: exerciseId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Admin Exercise Catalog]
+      operationId: getAdminExerciseDetail
+      summary: Get governed Exercise detail in any lifecycle state
+      responses:
+        '200':
+          description: Exercise detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExerciseResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404':
+          description: Exercise not found (ADMIN_EXERCISE_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [Admin Exercise Catalog]
+      operationId: updateAdminExerciseDraft
+      summary: Replace editable content of a DRAFT Exercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAdminExerciseRequest' }
+      responses:
+        '200':
+          description: Updated Exercise draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExerciseResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404':
+          description: Exercise not found (ADMIN_EXERCISE_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Lifecycle, version, or code conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/exercises/{exerciseId}/activate:
+    post:
+      tags: [Admin Exercise Catalog]
+      operationId: activateAdminExercise
+      summary: Activate a complete DRAFT Exercise
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExerciseVersionRequest' }
+      responses:
+        '200':
+          description: Activated Exercise
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExerciseResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { description: Exercise not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Lifecycle or version conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/exercises/{exerciseId}/archive:
+    post:
+      tags: [Admin Exercise Catalog]
+      operationId: archiveAdminExercise
+      summary: Archive an ACTIVE Exercise
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArchiveExerciseRequest' }
+      responses:
+        '200': { description: Archived Exercise, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExerciseResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { description: Exercise not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Lifecycle, canonical-target, or version conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/exercises/{exerciseId}/canonical-replacement:
+    put:
+      tags: [Admin Exercise Catalog]
+      operationId: setAdminExerciseCanonicalReplacement
+      summary: Set, change, or clear an archived Exercise canonical replacement
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CanonicalReplacementRequest' }
+      responses:
+        '200': { description: Updated canonical replacement metadata, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExerciseResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { description: Source or target Exercise not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Canonical, lifecycle, or version conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
   /auth/registrations:
     post:
@@ -1981,6 +2166,193 @@ components:
     ExerciseDifficulty:
       type: string
       enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+
+    ExerciseLifecycleStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, ARCHIVED]
+
+    AdminExerciseMuscleInput:
+      type: object
+      additionalProperties: false
+      required: [muscleGroupCode, involvement]
+      properties:
+        muscleGroupCode: { type: string, minLength: 1, maxLength: 60 }
+        involvement: { type: string, enum: [PRIMARY, SECONDARY, STABILIZER] }
+
+    AdminExerciseEquipmentInput:
+      type: object
+      additionalProperties: false
+      required: [equipmentCode, requirement]
+      properties:
+        equipmentCode: { type: string, minLength: 1, maxLength: 60 }
+        requirement: { type: string, enum: [REQUIRED, OPTIONAL, ALTERNATIVE] }
+
+    AdminExerciseVariationInput:
+      type: object
+      additionalProperties: false
+      required: [code, name, defaultVariation, active]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 120 }
+        name: { type: string, minLength: 1, maxLength: 180 }
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        defaultVariation: { type: boolean }
+        active: { type: boolean }
+        muscles:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AdminExerciseMuscleInput' }
+        equipment:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AdminExerciseEquipmentInput' }
+
+    AdminExerciseDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name, unilateral]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 180 }
+        categoryCode: { type: [string, 'null'], maxLength: 60 }
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        movementPattern: { type: [string, 'null'], maxLength: 60 }
+        unilateral: { type: boolean }
+        tagCodes:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 80 }
+        variations:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AdminExerciseVariationInput' }
+
+    UpdateAdminExerciseRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, exercise]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        exercise: { $ref: '#/components/schemas/AdminExerciseDraftRequest' }
+
+    ExerciseVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+
+    ArchiveExerciseRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+
+    CanonicalReplacementRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        targetExerciseId:
+          type: [string, 'null']
+          format: uuid
+          description: Null clears the current canonical replacement.
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+
+    AdminExerciseVariationResponse:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, defaultVariation, active, muscles, equipment]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 120 }
+        name: { type: string, minLength: 1, maxLength: 180 }
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        defaultVariation: { type: boolean }
+        active: { type: boolean }
+        muscles:
+          type: array
+          items: { $ref: '#/components/schemas/AdminExerciseMuscleInput' }
+        equipment:
+          type: array
+          items: { $ref: '#/components/schemas/AdminExerciseEquipmentInput' }
+
+    AdminExerciseResponse:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, unilateral, status, version, tagCodes, variations, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        categoryCode: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        movementPattern: { type: [string, 'null'] }
+        unilateral: { type: boolean }
+        status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
+        version: { type: integer, format: int64, minimum: 0 }
+        canonicalReplacementId: { type: [string, 'null'], format: uuid }
+        tagCodes: { type: array, items: { type: string } }
+        variations:
+          type: array
+          items: { $ref: '#/components/schemas/AdminExerciseVariationResponse' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminExerciseSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, status, version, variationCount, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        categoryCode: { type: [string, 'null'] }
+        difficulty:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseDifficulty'
+            - type: 'null'
+        movementPattern: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
+        version: { type: integer, format: int64, minimum: 0 }
+        canonicalReplacementId: { type: [string, 'null'], format: uuid }
+        variationCount: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+
+    AdminExercisePageResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminExerciseSummaryResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     ErrorResponse:
       type: object
