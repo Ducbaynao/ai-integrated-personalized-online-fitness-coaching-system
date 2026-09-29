@@ -48,7 +48,7 @@ class ExerciseCatalogIntegrationTest {
     private static final UUID ACTIVE_SQUAT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID DRAFT_ID = UUID.fromString("10000000-0000-0000-0000-000000000007");
     private static final UUID ARCHIVED_ID = UUID.fromString("10000000-0000-0000-0000-000000000008");
-    private static final UUID INACTIVE_ID = UUID.fromString("10000000-0000-0000-0000-000000000009");
+    private static final UUID SECOND_ARCHIVED_ID = UUID.fromString("10000000-0000-0000-0000-000000000009");
 
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres")
@@ -111,7 +111,7 @@ class ExerciseCatalogIntegrationTest {
                     .andExpect(jsonPath("$.items", hasSize(6)))
                     .andExpect(jsonPath("$.items[*].code", everyItem(not("SYNTH_DRAFT_HINGE"))))
                     .andExpect(jsonPath("$.items[*].code", everyItem(not("SYNTH_ARCHIVED_CARRY"))))
-                    .andExpect(jsonPath("$.items[*].code", everyItem(not("SYNTH_INACTIVE_STEP"))));
+                    .andExpect(jsonPath("$.items[*].code", everyItem(not("SYNTH_ARCHIVED_STEP"))));
         }
     }
 
@@ -147,7 +147,7 @@ class ExerciseCatalogIntegrationTest {
 
     @Test
     void nonVisibleAndMissingDetailUseSameNotFoundBehavior() throws Exception {
-        for (UUID id : List.of(DRAFT_ID, ARCHIVED_ID, INACTIVE_ID, UUID.randomUUID())) {
+        for (UUID id : List.of(DRAFT_ID, ARCHIVED_ID, SECOND_ARCHIVED_ID, UUID.randomUUID())) {
             mockMvc.perform(get("/api/v1/exercises/{id}", id)
                             .header("Authorization", bearer("TRAINER")))
                     .andExpect(status().isNotFound())
@@ -301,7 +301,7 @@ class ExerciseCatalogIntegrationTest {
                 ('10000000-0000-0000-0000-000000000006','SYNTH_UNILATERAL_LUNGE','Synthetic Unilateral Lunge','STRENGTH','Synthetic lunge description','Synthetic lunge instructions','INTERMEDIATE','LUNGE',true,'ACTIVE'),
                 ('10000000-0000-0000-0000-000000000007','SYNTH_DRAFT_HINGE','Synthetic Draft Hinge','STRENGTH','Draft','Draft','BEGINNER','HINGE',false,'DRAFT'),
                 ('10000000-0000-0000-0000-000000000008','SYNTH_ARCHIVED_CARRY','Synthetic Archived Carry','STRENGTH','Archived','Archived','INTERMEDIATE','CARRY',false,'ARCHIVED'),
-                ('10000000-0000-0000-0000-000000000009','SYNTH_INACTIVE_STEP','Synthetic Inactive Step','STRENGTH','Inactive','Inactive','BEGINNER','LUNGE',true,'INACTIVE')
+                ('10000000-0000-0000-0000-000000000009','SYNTH_ARCHIVED_STEP','Synthetic Archived Step','STRENGTH','Archived','Archived','BEGINNER','LUNGE',true,'ARCHIVED')
                 ) x(id,code,name,category_code,description,instructions,difficulty,pattern,unilateral,status)
                 JOIN fitness.exercise_categories c ON c.code=x.category_code;
                 """);
@@ -319,7 +319,7 @@ class ExerciseCatalogIntegrationTest {
                 ('20000000-0000-0000-0000-000000000007','SYNTH_UNILATERAL_LUNGE','SYNTH_UNILATERAL_LUNGE_DUMBBELL','Synthetic Unilateral Lunge - Dumbbell','Lunge instructions','INTERMEDIATE',true),
                 ('20000000-0000-0000-0000-000000000008','SYNTH_DRAFT_HINGE','SYNTH_DRAFT_HINGE_STANDARD','Synthetic Draft Hinge - Standard','Draft instructions','BEGINNER',true),
                 ('20000000-0000-0000-0000-000000000009','SYNTH_ARCHIVED_CARRY','SYNTH_ARCHIVED_CARRY_STANDARD','Synthetic Archived Carry - Standard','Archived instructions','INTERMEDIATE',true),
-                ('20000000-0000-0000-0000-000000000010','SYNTH_INACTIVE_STEP','SYNTH_INACTIVE_STEP_STANDARD','Synthetic Inactive Step - Standard','Inactive instructions','BEGINNER',true)
+                ('20000000-0000-0000-0000-000000000010','SYNTH_ARCHIVED_STEP','SYNTH_ARCHIVED_STEP_STANDARD','Synthetic Archived Step - Standard','Archived instructions','BEGINNER',true)
                 ) x(id,exercise_code,code,name,instructions,difficulty,is_default)
                 JOIN fitness.exercises e ON e.code=x.exercise_code;
                 """);

@@ -222,7 +222,7 @@ FROM (VALUES
   ('10000000-0000-0000-0000-000000000006','SYNTH_UNILATERAL_LUNGE','Synthetic Unilateral Lunge','STRENGTH','Synthetic unilateral lower-body exercise for development testing.','Maintain balance and use a controlled step.','INTERMEDIATE','LUNGE',true,'ACTIVE'),
   ('10000000-0000-0000-0000-000000000007','SYNTH_DRAFT_HINGE','Synthetic Draft Hinge','STRENGTH','Synthetic draft record.','Draft instructions.','BEGINNER','HINGE',false,'DRAFT'),
   ('10000000-0000-0000-0000-000000000008','SYNTH_ARCHIVED_CARRY','Synthetic Archived Carry','STRENGTH','Synthetic archived record.','Archived instructions.','INTERMEDIATE','CARRY',false,'ARCHIVED'),
-  ('10000000-0000-0000-0000-000000000009','SYNTH_INACTIVE_STEP','Synthetic Inactive Step','STRENGTH','Synthetic inactive legacy record.','Inactive instructions.','BEGINNER','LUNGE',true,'INACTIVE')
+  ('10000000-0000-0000-0000-000000000009','SYNTH_ARCHIVED_STEP','Synthetic Archived Step','STRENGTH','Synthetic archived record without a replacement.','Archived instructions.','BEGINNER','LUNGE',true,'ARCHIVED')
 ) x(id,code,name,category_code,description,instructions,difficulty,movement_pattern,unilateral,admin_status)
 JOIN exercise_categories c ON c.code=x.category_code
 ON CONFLICT (code) DO NOTHING;
@@ -241,7 +241,7 @@ FROM (VALUES
   ('20000000-0000-0000-0000-000000000007','SYNTH_UNILATERAL_LUNGE','SYNTH_UNILATERAL_LUNGE_DUMBBELL','Synthetic Unilateral Lunge - Dumbbell','Synthetic loaded variation.','Use a stable load and controlled step.','INTERMEDIATE',true),
   ('20000000-0000-0000-0000-000000000008','SYNTH_DRAFT_HINGE','SYNTH_DRAFT_HINGE_STANDARD','Synthetic Draft Hinge - Standard','Synthetic draft variation.','Draft instructions.','BEGINNER',true),
   ('20000000-0000-0000-0000-000000000009','SYNTH_ARCHIVED_CARRY','SYNTH_ARCHIVED_CARRY_STANDARD','Synthetic Archived Carry - Standard','Synthetic archived variation.','Archived instructions.','INTERMEDIATE',true),
-  ('20000000-0000-0000-0000-000000000010','SYNTH_INACTIVE_STEP','SYNTH_INACTIVE_STEP_STANDARD','Synthetic Inactive Step - Standard','Synthetic inactive variation.','Inactive instructions.','BEGINNER',true)
+  ('20000000-0000-0000-0000-000000000010','SYNTH_ARCHIVED_STEP','SYNTH_ARCHIVED_STEP_STANDARD','Synthetic Archived Step - Standard','Synthetic archived variation.','Archived instructions.','BEGINNER',true)
 ) x(id,exercise_code,code,name,description,instructions,difficulty,is_default)
 JOIN exercises e ON e.code=x.exercise_code
 ON CONFLICT (code) DO NOTHING;
@@ -265,6 +265,17 @@ FROM (VALUES
 JOIN exercise_variations v ON v.code=x.variation_code
 JOIN muscle_groups mg ON mg.code=x.muscle_code
 ON CONFLICT DO NOTHING;
+
+INSERT INTO exercise_canonical_mappings(
+    duplicate_exercise_id, canonical_exercise_id, reason
+)
+SELECT archived.id, replacement.id, 'Synthetic canonical replacement fixture'
+FROM exercises archived
+JOIN exercises replacement ON replacement.code = 'SYNTH_BODYWEIGHT_SQUAT'
+WHERE archived.code = 'SYNTH_ARCHIVED_CARRY'
+ON CONFLICT (duplicate_exercise_id) DO UPDATE SET
+    canonical_exercise_id = EXCLUDED.canonical_exercise_id,
+    reason = EXCLUDED.reason;
 
 INSERT INTO exercise_equipment(exercise_variation_id, equipment_id, requirement)
 SELECT v.id, eq.id, x.requirement
