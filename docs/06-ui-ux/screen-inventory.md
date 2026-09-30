@@ -65,7 +65,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | AD-02 | Users and Roles | Lifecycle, permission, security, audit |
 | AD-03 | Trainer Applications | Review queue and decisions |
 | AD-04 | Trainer Verification Detail | Verification/activity/certification separated |
-| AD-05 | Exercise Library | Draft/active/archived, duplicate/merge |
+| AD-05 | Exercise Library | List/detail và route create/edit Draft; active/archived read-only; duplicate/merge |
 | AD-06 | Knowledge Publishing | Draft-review-publish-version/archive |
 | AD-07 | AI Operations | Runs, errors, latency, validation, outcomes |
 | AD-08 | AI Run Detail and Evaluation | Replay/evaluation without business action |

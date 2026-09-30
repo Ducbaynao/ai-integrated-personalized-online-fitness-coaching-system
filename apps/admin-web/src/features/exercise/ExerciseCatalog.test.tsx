@@ -38,6 +38,28 @@ describe('exercise catalog list', () => {
       'placeholder',
       'Tìm theo tên hoặc mã bài tập',
     )
+    expect(screen.getByRole('link', { name: 'Tạo bài tập' })).toHaveAttribute('href', '/exercises/new')
+    expect(screen.queryByRole('link', { name: 'Chỉnh sửa' })).not.toBeInTheDocument()
+  })
+
+  it('shows edit only for DRAFT rows', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(createExercisePage({
+      items: [createExercisePage().items[0], {
+        ...createExercisePage().items[0],
+        id: '10000000-0000-0000-0000-000000000001',
+        code: 'DRAFT_SQUAT',
+        name: 'Draft Squat',
+        status: 'DRAFT',
+      }],
+      totalItems: 2,
+    }))))
+    renderList()
+
+    expect(await screen.findByRole('link', { name: 'Chỉnh sửa' })).toHaveAttribute(
+      'href',
+      '/exercises/10000000-0000-0000-0000-000000000001/edit',
+    )
+    expect(screen.getAllByText('Chỉ xem')).toHaveLength(1)
   })
 
   it('announces the initial loading state accessibly', () => {

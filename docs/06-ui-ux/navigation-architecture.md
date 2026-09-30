@@ -53,6 +53,13 @@ Sidebar theo permission, không hiển thị capability bị cấm:
 - Security and Audit
 - Configuration and Feature Flags
 
+Exercise governance dùng các route được bảo vệ bằng effective permission `CATALOG_MANAGE`:
+
+- `/exercises`: danh sách Exercise ở mọi trạng thái.
+- `/exercises/new`: tạo Exercise `DRAFT`.
+- `/exercises/:exerciseId`: chi tiết read-only.
+- `/exercises/:exerciseId/edit`: chỉnh sửa chỉ khi Exercise còn là `DRAFT`; route trực tiếp của `ACTIVE`/`ARCHIVED` hiển thị trạng thái bị chặn.
+
 ## Deep link và context
 
 Notification và deep link phải điều hướng đến đúng resource và scope:

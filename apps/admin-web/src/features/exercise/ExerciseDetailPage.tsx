@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StatePanel } from '../../components/StatePanel.tsx'
 import { isRetryableApiError } from '../../services/apiClient.ts'
 import { exerciseQueryKeys, getAdminExerciseDetail } from '../../services/exerciseApi.ts'
@@ -85,9 +85,14 @@ export function ExerciseDetailPage() {
           <h1>{exercise.name}</h1>
           <p className="muted">{exercise.code}</p>
         </div>
-        <span className={`status-badge status-badge--${exercise.status.toLowerCase()}`}>
-          {lifecycleLabels[exercise.status]}
-        </span>
+        <div className="detail-actions">
+          <span className={`status-badge status-badge--${exercise.status.toLowerCase()}`}>
+            {lifecycleLabels[exercise.status]}
+          </span>
+          {exercise.status === 'DRAFT' ? (
+            <Link className="button-link" to={`/exercises/${exercise.id}/edit`}>Chỉnh sửa</Link>
+          ) : null}
+        </div>
       </header>
 
       <section className="surface" aria-labelledby="general-heading">

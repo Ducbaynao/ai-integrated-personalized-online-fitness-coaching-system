@@ -146,6 +146,7 @@ function ExerciseListContent() {
                   <th scope="col">Độ khó</th>
                   <th scope="col">Biến thể</th>
                   <th scope="col">Cập nhật</th>
+                  <th scope="col">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,6 +166,11 @@ function ExerciseListContent() {
                     <td>{exercise.difficulty ? difficultyLabels[exercise.difficulty] : '—'}</td>
                     <td>{exercise.variationCount.toLocaleString('vi-VN')}</td>
                     <td>{formatDateTime(exercise.updatedAt)}</td>
+                    <td>
+                      {exercise.status === 'DRAFT' ? (
+                        <Link to={`/exercises/${exercise.id}/edit`}>Chỉnh sửa</Link>
+                      ) : <span className="muted">Chỉ xem</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -204,10 +210,13 @@ function ExerciseListContent() {
 
 function PageHeading() {
   return (
-    <div>
-      <p className="eyebrow">Quản lý danh mục</p>
-      <h1>Bài tập</h1>
-      <p className="muted">Theo dõi bài tập ở mọi trạng thái vòng đời.</p>
+    <div className="page-heading-row">
+      <div>
+        <p className="eyebrow">Quản lý danh mục</p>
+        <h1>Bài tập</h1>
+        <p className="muted">Theo dõi bài tập ở mọi trạng thái vòng đời.</p>
+      </div>
+      <Link className="button-link" to="/exercises/new">Tạo bài tập</Link>
     </div>
   )
 }
