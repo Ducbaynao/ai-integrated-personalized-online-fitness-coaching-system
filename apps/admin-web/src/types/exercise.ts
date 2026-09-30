@@ -1,5 +1,38 @@
 export type ExerciseLifecycleStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 export type ExerciseDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
+export type ExerciseMovementPattern =
+  | 'SQUAT'
+  | 'HINGE'
+  | 'LUNGE'
+  | 'PUSH'
+  | 'PULL'
+  | 'CARRY'
+  | 'ROTATION'
+  | 'CORE_STABILITY'
+  | 'LOCOMOTION'
+  | 'ISOLATION'
+  | 'MOBILITY'
+  | 'BALANCE'
+export type MuscleInvolvement = 'PRIMARY' | 'SECONDARY' | 'STABILIZER'
+export type EquipmentRequirement = 'REQUIRED' | 'OPTIONAL' | 'ALTERNATIVE'
+
+export interface CatalogOption {
+  code: string
+  name: string
+}
+
+export interface MuscleGroupOption extends CatalogOption {
+  parentCode: string | null
+}
+
+export interface AdminExerciseFormMetadata {
+  categories: CatalogOption[]
+  muscleGroups: MuscleGroupOption[]
+  equipment: CatalogOption[]
+  tags: CatalogOption[]
+  difficulties: ExerciseDifficulty[]
+  movementPatterns: CatalogOption[]
+}
 
 export interface AdminExerciseSummary {
   id: string
@@ -7,7 +40,7 @@ export interface AdminExerciseSummary {
   name: string
   categoryCode: string | null
   difficulty: ExerciseDifficulty | null
-  movementPattern: string | null
+  movementPattern: ExerciseMovementPattern | null
   status: ExerciseLifecycleStatus
   version: number
   canonicalReplacementId: string | null
@@ -34,11 +67,11 @@ export interface AdminExerciseVariation {
   active: boolean
   muscles: Array<{
     muscleGroupCode: string
-    involvement: 'PRIMARY' | 'SECONDARY' | 'STABILIZER'
+    involvement: MuscleInvolvement
   }>
   equipment: Array<{
     equipmentCode: string
-    requirement: 'REQUIRED' | 'OPTIONAL' | 'ALTERNATIVE'
+    requirement: EquipmentRequirement
   }>
 }
 
@@ -66,4 +99,44 @@ export interface ExerciseSearchParams {
   status?: ExerciseLifecycleStatus
   page: number
   size: number
+}
+
+export interface AdminExerciseMuscleInput {
+  muscleGroupCode: string
+  involvement: MuscleInvolvement
+}
+
+export interface AdminExerciseEquipmentInput {
+  equipmentCode: string
+  requirement: EquipmentRequirement
+}
+
+export interface AdminExerciseVariationInput {
+  code: string
+  name: string
+  description: string | null
+  instructions: string | null
+  difficulty: ExerciseDifficulty | null
+  defaultVariation: boolean
+  active: boolean
+  muscles: AdminExerciseMuscleInput[]
+  equipment: AdminExerciseEquipmentInput[]
+}
+
+export interface AdminExerciseDraftRequest {
+  code: string
+  name: string
+  categoryCode: string | null
+  description: string | null
+  instructions: string | null
+  difficulty: ExerciseDifficulty | null
+  movementPattern: ExerciseMovementPattern | null
+  unilateral: boolean
+  tagCodes: string[]
+  variations: AdminExerciseVariationInput[]
+}
+
+export interface UpdateAdminExerciseRequest {
+  expectedVersion: number
+  exercise: AdminExerciseDraftRequest
 }

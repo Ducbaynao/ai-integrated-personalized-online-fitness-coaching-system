@@ -1,5 +1,6 @@
 import type {
   AdminExerciseDetail,
+  AdminExerciseFormMetadata,
   AdminExercisePage,
   AdminExerciseSummary,
 } from '../types/exercise.ts'
@@ -19,6 +20,20 @@ export function createExerciseSummary(
     canonicalReplacementId: null,
     variationCount: 1,
     updatedAt: '2026-09-29T08:30:00Z',
+    ...overrides,
+  }
+}
+
+export function createExerciseMetadata(
+  overrides: Partial<AdminExerciseFormMetadata> = {},
+): AdminExerciseFormMetadata {
+  return {
+    categories: [{ code: 'STRENGTH', name: 'Strength' }],
+    muscleGroups: [{ code: 'QUADRICEPS', name: 'Quadriceps', parentCode: null }],
+    equipment: [{ code: 'BARBELL', name: 'Barbell' }],
+    tags: [{ code: 'COMPOUND', name: 'Compound' }],
+    difficulties: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
+    movementPatterns: [{ code: 'SQUAT', name: 'Squat' }],
     ...overrides,
   }
 }

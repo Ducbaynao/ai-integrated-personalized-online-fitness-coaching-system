@@ -30,6 +30,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select { font: inherit; }
+textarea { font: inherit; resize: vertical; }
 
 button, .button-link {
   min-height: 44px;
@@ -43,8 +44,11 @@ button, .button-link {
 }
 
 button:hover, .button-link:hover { background: var(--color-primary-strong); }
+.button-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 button:disabled { cursor: not-allowed; opacity: .6; }
 .button-secondary { color: var(--color-primary); background: var(--color-surface); }
+.button-danger-text { min-height: 36px; padding: 0; border: 0; color: var(--color-danger); background: transparent; }
+.button-danger-text:hover { color: #8f1b13; background: transparent; text-decoration: underline; }
 a { color: var(--color-primary-strong); }
 :focus-visible { outline: 3px solid #79b8ff; outline-offset: 2px; }
 h1, h2, p { margin-top: 0; }
@@ -142,6 +146,7 @@ td a { font-weight: 700; }
 .back-button { width: fit-content; min-height: 36px; padding: 0; border: 0; color: var(--color-primary-strong); background: transparent; }
 .back-button:hover { background: transparent; text-decoration: underline; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.detail-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 .detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); margin: 0; }
 .detail-grid dt { margin-bottom: var(--space-1); color: var(--color-text-muted); font-size: .82rem; font-weight: 700; }
 .detail-grid dd { margin: 0; overflow-wrap: anywhere; }
@@ -156,6 +161,47 @@ td a { font-weight: 700; }
 .variation-card header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); }
 .variation-card h3 { margin: 0; }
 .variation-markers { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.page-heading-row, .section-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.page-heading-row .button-link { flex: 0 0 auto; }
+.form-section { display: grid; gap: var(--space-4); min-width: 0; margin: 0; }
+.form-section > legend, .variation-editor > legend, .nested-editor > legend { padding: 0 var(--space-2); font-size: 1.2rem; font-weight: 750; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.form-field { display: grid; gap: var(--space-2); min-width: 0; color: var(--color-text-muted); font-size: .875rem; font-weight: 650; }
+.form-field input, .form-field select, .form-field textarea, .nested-editor-row select {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+.form-field textarea { min-height: 96px; }
+.form-field [aria-invalid="true"], .nested-editor-row [aria-invalid="true"] { border-color: var(--color-danger); }
+.field-error { color: var(--color-danger); font-size: .85rem; font-weight: 600; }
+.form-help { margin-bottom: 0; color: var(--color-text-muted); }
+.checkbox-options { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
+.checkbox-field { display: inline-flex; min-height: 44px; align-items: center; gap: var(--space-2); color: var(--color-text); font-weight: 600; }
+.checkbox-field input { width: 18px; height: 18px; }
+.checkbox-field--standalone { align-self: end; }
+.checkbox-field--unavailable { color: var(--color-text-muted); }
+.checkbox-stack { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.variation-editor-list { display: grid; gap: var(--space-4); }
+.variation-editor { display: grid; gap: var(--space-4); min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.section-heading-row--compact { align-items: center; }
+.nested-editor { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.nested-editor-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px) auto; align-items: start; gap: var(--space-3); }
+.nested-editor-row label { display: grid; gap: var(--space-1); }
+.button-compact { width: fit-content; min-height: 40px; }
+.form-actions, .inline-actions, .dialog-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+.inline-actions--center { justify-content: center; }
+.form-actions { position: sticky; z-index: 5; bottom: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: rgba(255, 255, 255, .96); box-shadow: var(--shadow-surface); }
+.form-error-summary, .conflict-panel { padding: var(--space-4); border: 1px solid #f4c7c3; border-radius: var(--radius-md); color: #7a271a; background: var(--color-danger-soft); }
+.form-error-summary h2, .conflict-panel h2 { margin-bottom: var(--space-2); }
+.form-error-summary ul { margin-bottom: 0; }
+.dialog-backdrop { display: grid; position: fixed; z-index: 100; inset: 0; padding: var(--space-4); background: rgba(23, 32, 42, .52); place-items: center; }
+.confirmation-dialog { width: min(100%, 520px); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-surface); }
+.confirmation-dialog h2 { margin-top: 0; }
 
 @media (max-width: 720px) {
   .app-header, .account-menu { align-items: flex-start; }
@@ -164,7 +210,9 @@ td a { font-weight: 700; }
   .sidebar { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--color-border); }
   .main-content { padding: var(--space-4); }
   .login-card { padding: var(--space-5); }
-  .filter-bar, .detail-grid { grid-template-columns: 1fr; }
-  .table-summary, .detail-heading { align-items: flex-start; flex-direction: column; }
+  .filter-bar, .detail-grid, .form-grid, .nested-editor-row { grid-template-columns: 1fr; }
+  .table-summary, .detail-heading, .page-heading-row, .section-heading-row { align-items: flex-start; flex-direction: column; }
+  .detail-actions { justify-content: flex-start; }
   .pagination { justify-content: flex-start; }
+  .form-actions { position: static; }
 }

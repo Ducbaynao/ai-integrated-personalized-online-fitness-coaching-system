@@ -1,16 +1,21 @@
 import type {
   AdminExerciseDetail,
+  AdminExerciseDraftRequest,
+  AdminExerciseFormMetadata,
   AdminExercisePage,
   ExerciseSearchParams,
+  UpdateAdminExerciseRequest,
 } from '../types/exercise.ts'
 import { apiRequest } from './apiClient.ts'
 
 export const exerciseQueryKeys = {
   all: ['admin-exercises'] as const,
+  lists: () => [...exerciseQueryKeys.all, 'list'] as const,
   list: (params: ExerciseSearchParams) =>
-    [...exerciseQueryKeys.all, 'list', params] as const,
+    [...exerciseQueryKeys.lists(), params] as const,
   detail: (exerciseId: string) =>
     [...exerciseQueryKeys.all, 'detail', exerciseId] as const,
+  metadata: () => [...exerciseQueryKeys.all, 'metadata'] as const,
 }
 
 export function getAdminExercises(params: ExerciseSearchParams): Promise<AdminExercisePage> {
@@ -26,4 +31,27 @@ export function getAdminExercises(params: ExerciseSearchParams): Promise<AdminEx
 
 export function getAdminExerciseDetail(exerciseId: string): Promise<AdminExerciseDetail> {
   return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}`)
+}
+
+export function getAdminExerciseFormMetadata(): Promise<AdminExerciseFormMetadata> {
+  return apiRequest('/admin/exercises/metadata')
+}
+
+export function createAdminExerciseDraft(
+  exercise: AdminExerciseDraftRequest,
+): Promise<AdminExerciseDetail> {
+  return apiRequest('/admin/exercises', {
+    method: 'POST',
+    body: JSON.stringify(exercise),
+  })
+}
+
+export function updateAdminExerciseDraft(
+  exerciseId: string,
+  request: UpdateAdminExerciseRequest,
+): Promise<AdminExerciseDetail> {
+  return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
 }
