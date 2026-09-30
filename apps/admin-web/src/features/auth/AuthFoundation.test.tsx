@@ -35,6 +35,20 @@ describe('authenticated admin foundation', () => {
     expect(screen.queryByRole('link', { name: 'Bài tập' })).not.toBeInTheDocument()
   })
 
+  it.each(['/exercises/new', '/exercises/2c5f9430-c360-4b32-b70a-d6f92b76bfd4/edit'])(
+    'guards the direct draft route %s by effective permission',
+    async (path) => {
+      const user = createCurrentUser({ roles: ['ADMIN'], permissions: [] })
+      writeSession(createTokenPair(user))
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(user)))
+
+      renderApp(path)
+
+      expect(await screen.findByRole('heading', { name: 'Bạn không có quyền truy cập' })).toBeInTheDocument()
+      expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    },
+  )
+
   it('shows catalog navigation only with the effective CATALOG_MANAGE permission', async () => {
     const user = createCurrentUser({ permissions: ['CATALOG_MANAGE'] })
     writeSession(createTokenPair(user))

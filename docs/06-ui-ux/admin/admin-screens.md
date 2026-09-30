@@ -16,6 +16,8 @@ Queue theo status/age/risk. Detail có application data, certificates, document 
 
 Table/list có status Draft/Active/Archived, muscle, equipment, media, duplicate signal và usage. Archived thay hard-delete khi đã có historical reference. Merge flow hiển thị canonical mapping và impact.
 
+Create/Edit dùng Admin form metadata và stable code từ API. Create luôn tạo `DRAFT`; chỉ `DRAFT` có action Edit. Form hỗ trợ variations, muscles và equipment theo contract, cảnh báo thay đổi chưa lưu và xử lý optimistic version conflict mà không ghi đè âm thầm. `ACTIVE` và `ARCHIVED` giữ read-only trong checkpoint Draft Create/Edit.
+
 ## AD-06 Knowledge Publishing
 
 Version list và pipeline state. Editor metadata tách processing/review/publish. Active version read-only; Create New Version là CTA thay cho Edit Active.

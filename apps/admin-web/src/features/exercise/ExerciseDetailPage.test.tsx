@@ -43,6 +43,27 @@ describe('exercise detail', () => {
     expect(screen.getByRole('heading', { name: 'Bài tập thay thế chuẩn' })).toBeInTheDocument()
   })
 
+  it('shows edit only for a DRAFT detail', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(createExerciseDetail({ status: 'DRAFT' }))))
+    const { unmount } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[`/exercises/${EXERCISE_ID}`]}>
+          <Routes><Route path="/exercises/:exerciseId" element={<ExerciseDetailPage />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByRole('link', { name: 'Chỉnh sửa' })).toHaveAttribute(
+      'href',
+      `/exercises/${EXERCISE_ID}/edit`,
+    )
+    unmount()
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(createExerciseDetail({ status: 'ACTIVE' }))))
+    renderDetail()
+    await screen.findByRole('heading', { name: 'Barbell Squat' })
+    expect(screen.queryByRole('link', { name: 'Chỉnh sửa' })).not.toBeInTheDocument()
+  })
+
   it.each([
     [401, 'SESSION_REVOKED', 'Phiên đăng nhập đã hết hạn'],
     [403, 'CATALOG_MANAGE_REQUIRED', 'Bạn không có quyền truy cập'],

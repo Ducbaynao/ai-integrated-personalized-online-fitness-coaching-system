@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiRequest } from './apiClient.ts'
+import { ApiError, apiRequest } from './apiClient.ts'
 import { writeSession } from './sessionStorage.ts'
 import { createTokenPair } from '../test/testData.ts'
 
@@ -38,5 +38,20 @@ describe('apiRequest', () => {
       Promise.all([apiRequest('/protected/one'), apiRequest('/protected/two')]),
     ).resolves.toEqual([{ ok: true }, { ok: true }])
     expect(refreshRequests).toBe(1)
+  })
+
+  it('keeps stable field/code metadata but discards raw backend field messages', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({
+      errorCode: 'VALIDATION_FAILED',
+      message: 'raw form message',
+      fieldErrors: [{ field: 'code', code: 'NotBlank', message: 'raw field message' }],
+    }, { status: 400 })))
+
+    const error = await apiRequest('/invalid').catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).fieldErrors).toEqual([{ field: 'code', code: 'NotBlank' }])
+    expect(JSON.stringify(error)).not.toContain('raw field message')
+    expect(JSON.stringify(error)).not.toContain('raw form message')
   })
 })

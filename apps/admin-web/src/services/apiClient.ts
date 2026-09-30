@@ -4,20 +4,29 @@ import { clearSession, readSession, writeSession } from './sessionStorage.ts'
 
 interface ErrorEnvelope {
   errorCode?: unknown
+  fieldErrors?: unknown
+}
+
+export interface ApiFieldError {
+  field: string
+  code: string
 }
 
 export class ApiError extends Error {
   readonly status: number
   readonly errorCode: string
+  readonly fieldErrors: ApiFieldError[]
 
   constructor(
     status: number,
     errorCode: string,
+    fieldErrors: ApiFieldError[] = [],
   ) {
     super(errorCode)
     this.name = 'ApiError'
     this.status = status
     this.errorCode = errorCode
+    this.fieldErrors = fieldErrors
   }
 }
 
@@ -38,17 +47,33 @@ function expireSession(): void {
 
 async function readError(response: Response): Promise<ApiError> {
   let errorCode = response.status === 401 ? 'UNAUTHENTICATED' : 'REQUEST_FAILED'
+  let fieldErrors: ApiFieldError[] = []
 
   try {
     const body = (await response.json()) as ErrorEnvelope
     if (typeof body.errorCode === 'string') {
       errorCode = body.errorCode
     }
+    if (Array.isArray(body.fieldErrors)) {
+      fieldErrors = body.fieldErrors.flatMap((item) => {
+        if (
+          typeof item === 'object' && item !== null &&
+          typeof Reflect.get(item, 'field') === 'string' &&
+          typeof Reflect.get(item, 'code') === 'string'
+        ) {
+          return [{
+            field: Reflect.get(item, 'field') as string,
+            code: Reflect.get(item, 'code') as string,
+          }]
+        }
+        return []
+      })
+    }
   } catch {
     // The technical fallback is stable and intentionally ignores raw response text.
   }
 
-  return new ApiError(response.status, errorCode)
+  return new ApiError(response.status, errorCode, fieldErrors)
 }
 
 async function refreshAccessToken(): Promise<string> {
