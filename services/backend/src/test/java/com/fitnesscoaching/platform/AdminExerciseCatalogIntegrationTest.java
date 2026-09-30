@@ -29,12 +29,15 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,6 +51,9 @@ class AdminExerciseCatalogIntegrationTest {
     private static final UUID ACTIVE_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
     private static final UUID ARCHIVED_ID = UUID.fromString("10000000-0000-0000-0000-000000000003");
     private static final UUID ARCHIVED_TWO_ID = UUID.fromString("10000000-0000-0000-0000-000000000004");
+    private static final List<String> MOVEMENT_PATTERNS = List.of(
+            "SQUAT", "HINGE", "LUNGE", "PUSH", "PULL", "CARRY", "ROTATION",
+            "CORE_STABILITY", "LOCOMOTION", "ISOLATION", "MOBILITY", "BALANCE");
 
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
@@ -87,6 +93,7 @@ class AdminExerciseCatalogIntegrationTest {
                 fitness.exercises, fitness.equipment, fitness.muscle_groups, fitness.exercise_categories,
                 fitness.users CASCADE
                 """);
+        jdbcTemplate.update("UPDATE fitness.exercise_movement_patterns SET is_active=true");
         jdbcTemplate.update("""
                 INSERT INTO fitness.users(id,email,password_hash,display_name,status)
                 VALUES (?, 'admin@example.com', 'hash', 'Admin', 'ACTIVE'::fitness.account_status)
@@ -125,6 +132,182 @@ class AdminExerciseCatalogIntegrationTest {
                     ON CONFLICT DO NOTHING
                     """);
         }
+    }
+
+    @Test
+    void metadataRequiresAuthorizationAndReturnsOnlyEligibleDeterministicallyOrderedOptions() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata"))
+                .andExpect(status().isUnauthorized());
+        for (String role : List.of("STUDENT", "TRAINER")) {
+            mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                            .header("Authorization", bearer(UUID.randomUUID(), role)))
+                    .andExpect(status().isForbidden());
+        }
+
+        jdbcTemplate.update("""
+                DELETE FROM fitness.role_permissions rp
+                USING fitness.roles r, fitness.permissions p
+                WHERE rp.role_id=r.id AND rp.permission_id=p.id
+                  AND r.code='ADMIN' AND p.code='CATALOG_MANAGE'
+                """);
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+        jdbcTemplate.update("""
+                INSERT INTO fitness.role_permissions(role_id,permission_id)
+                SELECT r.id,p.id FROM fitness.roles r CROSS JOIN fitness.permissions p
+                WHERE r.code='ADMIN' AND p.code='CATALOG_MANAGE'
+                ON CONFLICT DO NOTHING
+                """);
+
+        jdbcTemplate.update("INSERT INTO fitness.exercise_categories(code,name) VALUES ('ALPHA_CATEGORY','alpha')");
+        jdbcTemplate.update("INSERT INTO fitness.muscle_groups(code,name) VALUES ('ALPHA_MUSCLE','alpha')");
+        jdbcTemplate.update("INSERT INTO fitness.equipment(code,name,is_active) VALUES ('HIDDEN_EQUIPMENT','Hidden',false)");
+        jdbcTemplate.update("INSERT INTO fitness.exercise_tags(code,name,is_active) VALUES ('HIDDEN_TAG','Hidden',false)");
+
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movementPatterns[*].code", hasSize(12)))
+                .andExpect(jsonPath("$.movementPatterns[?(@.code == 'BALANCE')]", hasSize(1)))
+                .andExpect(jsonPath("$.movementPatterns[?(@.code == 'HINGE')].name", contains("Hip Hinge")))
+                .andExpect(jsonPath("$.movementPatterns[?(@.code == 'CARRY')].name", contains("Loaded Carry")));
+
+        jdbcTemplate.update("UPDATE fitness.exercise_movement_patterns SET is_active=false WHERE code='BALANCE'");
+
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[*].code", contains("ALPHA_CATEGORY", "STRENGTH")))
+                .andExpect(jsonPath("$.muscleGroups[*].code", contains("ALPHA_MUSCLE", "CORE")))
+                .andExpect(jsonPath("$.equipment[*].code", contains("BODYWEIGHT")))
+                .andExpect(jsonPath("$.tags[*].code", contains("COMPOUND")))
+                .andExpect(jsonPath("$.difficulties", contains("BEGINNER", "INTERMEDIATE", "ADVANCED")))
+                .andExpect(jsonPath("$.movementPatterns[*].code", org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem("BALANCE"))))
+                .andExpect(jsonPath("$.movementPatterns[*].code", hasSize(11)));
+
+        jdbcTemplate.update("UPDATE fitness.user_roles SET revoked_at=now() WHERE user_id=?", ADMIN_ID);
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+        jdbcTemplate.update("UPDATE fitness.user_roles SET revoked_at=null WHERE user_id=?", ADMIN_ID);
+
+        jdbcTemplate.update("UPDATE fitness.users SET status='SUSPENDED'::fitness.account_status WHERE id=?", ADMIN_ID);
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+    }
+
+    @Test
+    void metadataReturnsEmptyArraysWhenReferenceGroupsHaveNoEligibleValues() throws Exception {
+        jdbcTemplate.execute("""
+                TRUNCATE TABLE fitness.exercises, fitness.equipment, fitness.muscle_groups,
+                fitness.exercise_categories, fitness.exercise_tags CASCADE
+                """);
+        jdbcTemplate.update("UPDATE fitness.exercise_movement_patterns SET is_active=false");
+
+        mockMvc.perform(get("/api/v1/admin/exercises/metadata")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories", hasSize(0)))
+                .andExpect(jsonPath("$.muscleGroups", hasSize(0)))
+                .andExpect(jsonPath("$.equipment", hasSize(0)))
+                .andExpect(jsonPath("$.tags", hasSize(0)))
+                .andExpect(jsonPath("$.movementPatterns", hasSize(0)))
+                .andExpect(jsonPath("$.difficulties", contains("BEGINNER", "INTERMEDIATE", "ADVANCED")));
+    }
+
+    @Test
+    void draftCreateAndUpdateAcceptEveryActiveMovementPatternNullAndNormalizedCasing() throws Exception {
+        for (String movementPattern : MOVEMENT_PATTERNS) {
+            mockMvc.perform(post("/api/v1/admin/exercises")
+                            .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(completeDraftBody("CREATE_" + movementPattern,
+                                    "Create " + movementPattern, movementPattern)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.movementPattern", is(movementPattern)));
+        }
+
+        int expectedVersion = 0;
+        for (String movementPattern : MOVEMENT_PATTERNS) {
+            mockMvc.perform(put("/api/v1/admin/exercises/{id}", DRAFT_ID)
+                            .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"expectedVersion\":" + expectedVersion + ",\"exercise\":" +
+                                    completeDraftBody("DRAFT_EXERCISE", "Draft Exercise", movementPattern) + "}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.movementPattern", is(movementPattern)));
+            expectedVersion++;
+        }
+
+        mockMvc.perform(put("/api/v1/admin/exercises/{id}", DRAFT_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":" + expectedVersion + ",\"exercise\":" +
+                                completeDraftBody("DRAFT_EXERCISE", "Draft Exercise", "squat") + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movementPattern", is("SQUAT")));
+        expectedVersion++;
+
+        String nullableMovementBody = completeDraftBody("DRAFT_EXERCISE", "Draft Exercise", "SQUAT")
+                .replace("\"movementPattern\":\"SQUAT\"", "\"movementPattern\":null");
+        mockMvc.perform(put("/api/v1/admin/exercises/{id}", DRAFT_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":" + expectedVersion + ",\"exercise\":" +
+                                nullableMovementBody + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movementPattern").value(org.hamcrest.Matchers.nullValue()));
+
+        String nullableCreateBody = completeDraftBody("CREATE_NULL_PATTERN", "Create Null Pattern", "SQUAT")
+                .replace("\"movementPattern\":\"SQUAT\"", "\"movementPattern\":null");
+        mockMvc.perform(post("/api/v1/admin/exercises")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nullableCreateBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.movementPattern").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void draftMutationRejectsUnknownAndInactiveMovementPatternsButHistoricalDetailRemainsReadable() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/exercises")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completeDraftBody("UNKNOWN_PATTERN", "Unknown Pattern", "NOT_A_PATTERN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")))
+                .andExpect(jsonPath("$.fieldErrors[0].field", is("movementPattern")))
+                .andExpect(content().string(not(containsString("foreign key"))))
+                .andExpect(content().string(not(containsString("constraint"))));
+
+        jdbcTemplate.update("UPDATE fitness.exercise_movement_patterns SET is_active=false WHERE code='SQUAT'");
+        mockMvc.perform(post("/api/v1/admin/exercises")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(completeDraftBody("INACTIVE_PATTERN", "Inactive Pattern", "SQUAT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")))
+                .andExpect(jsonPath("$.fieldErrors[0].field", is("movementPattern")));
+
+        mockMvc.perform(put("/api/v1/admin/exercises/{id}", DRAFT_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedVersion\":0,\"exercise\":" +
+                                completeDraftBody("DRAFT_EXERCISE", "Draft Exercise", "SQUAT") + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")))
+                .andExpect(jsonPath("$.fieldErrors[0].field", is("movementPattern")));
+
+        mockMvc.perform(get("/api/v1/admin/exercises/{id}", ACTIVE_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movementPattern", is("SQUAT")));
     }
 
     @Test

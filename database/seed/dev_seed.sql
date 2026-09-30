@@ -205,6 +205,13 @@ INSERT INTO equipment(code, name) VALUES
 ('PULLUP_BAR', 'Pull-up Bar')
 ON CONFLICT (code) DO NOTHING;
 
+INSERT INTO exercise_movement_patterns(code, display_name) VALUES
+('SQUAT', 'Squat'), ('HINGE', 'Hip Hinge'), ('LUNGE', 'Lunge'), ('PUSH', 'Push'),
+('PULL', 'Pull'), ('CARRY', 'Loaded Carry'), ('ROTATION', 'Rotation'),
+('CORE_STABILITY', 'Core Stability'), ('LOCOMOTION', 'Locomotion'),
+('ISOLATION', 'Isolation'), ('MOBILITY', 'Mobility'), ('BALANCE', 'Balance')
+ON CONFLICT (code) DO UPDATE SET display_name = EXCLUDED.display_name;
+
 -- Synthetic B02 catalog fixtures. These records are deterministic development data and contain no
 -- copied commercial exercise descriptions or media URLs.
 INSERT INTO exercises(
@@ -218,7 +225,7 @@ FROM (VALUES
   ('10000000-0000-0000-0000-000000000002','SYNTH_ASSISTED_ROW','Synthetic Assisted Row','STRENGTH','Synthetic pulling exercise for development testing.','Pull with control while keeping the torso stable.','BEGINNER','PULL',false,'ACTIVE'),
   ('10000000-0000-0000-0000-000000000003','SYNTH_CABLE_PRESS','Synthetic Cable Press','STRENGTH','Synthetic pushing exercise for development testing.','Press forward with a controlled return.','INTERMEDIATE','PUSH',false,'ACTIVE'),
   ('10000000-0000-0000-0000-000000000004','SYNTH_MOBILITY_REACH','Synthetic Mobility Reach','MOBILITY','Synthetic mobility exercise for development testing.','Move slowly within a comfortable range.','BEGINNER','MOBILITY',false,'ACTIVE'),
-  ('10000000-0000-0000-0000-000000000005','SYNTH_STATIONARY_CYCLE','Synthetic Stationary Cycle','CARDIO','Synthetic cardio exercise for development testing.','Use a sustainable cadence and stop if discomfort occurs.','BEGINNER','CARDIO',false,'ACTIVE'),
+  ('10000000-0000-0000-0000-000000000005','SYNTH_STATIONARY_CYCLE','Synthetic Stationary Cycle','CARDIO','Synthetic cardio exercise for development testing.','Use a sustainable cadence and stop if discomfort occurs.','BEGINNER','LOCOMOTION',false,'ACTIVE'),
   ('10000000-0000-0000-0000-000000000006','SYNTH_UNILATERAL_LUNGE','Synthetic Unilateral Lunge','STRENGTH','Synthetic unilateral lower-body exercise for development testing.','Maintain balance and use a controlled step.','INTERMEDIATE','LUNGE',true,'ACTIVE'),
   ('10000000-0000-0000-0000-000000000007','SYNTH_DRAFT_HINGE','Synthetic Draft Hinge','STRENGTH','Synthetic draft record.','Draft instructions.','BEGINNER','HINGE',false,'DRAFT'),
   ('10000000-0000-0000-0000-000000000008','SYNTH_ARCHIVED_CARRY','Synthetic Archived Carry','STRENGTH','Synthetic archived record.','Archived instructions.','INTERMEDIATE','CARRY',false,'ARCHIVED'),

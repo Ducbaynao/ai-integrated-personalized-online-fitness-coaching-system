@@ -11,6 +11,7 @@ import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseCatalogUseCase;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
@@ -20,6 +21,7 @@ import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseEquipment;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseMuscle;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseVariation;
+import com.fitnesscoaching.platform.modules.exercise.domain.ExerciseDifficulty;
 import com.fitnesscoaching.platform.modules.exercise.domain.ExerciseLifecycleStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
@@ -32,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,7 +48,8 @@ import java.util.UUID;
 public class AdminExerciseCatalogService implements AdminExerciseCatalogUseCase {
 
     private static final int MAX_PAGE_SIZE = 100;
-    private static final Set<String> DIFFICULTIES = Set.of("BEGINNER", "INTERMEDIATE", "ADVANCED");
+    private static final List<String> DIFFICULTIES = Arrays.stream(ExerciseDifficulty.values())
+            .map(Enum::name).toList();
     private static final Set<String> INVOLVEMENTS = Set.of("PRIMARY", "SECONDARY", "STABILIZER");
     private static final Set<String> REQUIREMENTS = Set.of("REQUIRED", "OPTIONAL", "ALTERNATIVE");
 
@@ -93,6 +97,16 @@ public class AdminExerciseCatalogService implements AdminExerciseCatalogUseCase 
         }
         return repository.search(new AdminExerciseQuery(
                 query.adminUserId(), search, query.status(), query.page(), query.size()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminExerciseFormMetadata getFormMetadata(UUID adminUserId) {
+        verifyCatalogManager(adminUserId);
+        AdminExerciseFormMetadata metadata = repository.findFormMetadata();
+        return new AdminExerciseFormMetadata(
+                metadata.categories(), metadata.muscleGroups(), metadata.equipment(), metadata.tags(),
+                DIFFICULTIES, metadata.movementPatterns());
     }
 
     @Override

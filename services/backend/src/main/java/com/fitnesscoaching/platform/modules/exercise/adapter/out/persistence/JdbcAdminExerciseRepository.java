@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.exercise.adapter.out.persistence;
 
+import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
@@ -9,7 +10,9 @@ import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseEquipme
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseMuscle;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseSummary;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseVariation;
+import com.fitnesscoaching.platform.modules.exercise.domain.CatalogOption;
 import com.fitnesscoaching.platform.modules.exercise.domain.ExerciseLifecycleStatus;
+import com.fitnesscoaching.platform.modules.exercise.domain.MuscleGroupOption;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -92,6 +95,40 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
         long count = total == null ? 0 : total;
         int totalPages = count == 0 ? 0 : (int) ((count + query.size() - 1) / query.size());
         return new AdminExercisePage(items, query.page(), query.size(), count, totalPages);
+    }
+
+    @Override
+    public AdminExerciseFormMetadata findFormMetadata() {
+        List<CatalogOption> categories = catalogOptions(
+                "SELECT code, name FROM fitness.exercise_categories ORDER BY lower(name), code");
+        List<MuscleGroupOption> muscleGroups = jdbcTemplate.query(
+                """
+                SELECT child.code, child.name, parent.code AS parent_code
+                FROM fitness.muscle_groups child
+                LEFT JOIN fitness.muscle_groups parent ON parent.id = child.parent_id
+                ORDER BY lower(child.name), child.code
+                """,
+                (rs, rowNum) -> new MuscleGroupOption(
+                        rs.getString("code"), rs.getString("name"), rs.getString("parent_code")));
+        List<CatalogOption> equipment = catalogOptions(
+                "SELECT code, name FROM fitness.equipment WHERE is_active = true ORDER BY lower(name), code");
+        List<CatalogOption> tags = catalogOptions(
+                "SELECT code, name FROM fitness.exercise_tags WHERE is_active = true ORDER BY lower(name), code");
+        List<CatalogOption> movementPatterns = jdbcTemplate.query(
+                """
+                SELECT code, display_name
+                FROM fitness.exercise_movement_patterns
+                WHERE is_active = true
+                ORDER BY lower(display_name), code
+                """,
+                (rs, rowNum) -> new CatalogOption(rs.getString("code"), rs.getString("display_name")));
+        return new AdminExerciseFormMetadata(
+                categories, muscleGroups, equipment, tags, List.of(), movementPatterns);
+    }
+
+    private List<CatalogOption> catalogOptions(String sql) {
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> new CatalogOption(rs.getString("code"), rs.getString("name")));
     }
 
     @Override
@@ -267,6 +304,10 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
         if (data.categoryCode() != null && !exists("exercise_categories", data.categoryCode(), false)) {
             problems.add("categoryCode");
         }
+        if (data.movementPattern() != null
+                && !exists("exercise_movement_patterns", data.movementPattern(), true)) {
+            problems.add("movementPattern");
+        }
         for (String tag : new LinkedHashSet<>(data.tagCodes())) {
             if (!exists("exercise_tags", tag, true)) problems.add("tagCodes:" + tag);
         }
@@ -311,8 +352,18 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
                     WHERE eta.exercise_id = ? AND t.is_active = false
                 )
                 """, Boolean.class, exerciseId);
+        Boolean inactiveMovementPattern = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS(
+                    SELECT 1 FROM fitness.exercises exercise
+                    JOIN fitness.exercise_movement_patterns pattern
+                      ON pattern.code = exercise.movement_pattern
+                    WHERE exercise.id = ? AND pattern.is_active = false
+                )
+                """, Boolean.class, exerciseId);
         if (Boolean.TRUE.equals(inactiveEquipment)) problems.add("equipmentCodes");
         if (Boolean.TRUE.equals(inactiveTags)) problems.add("tagCodes");
+        if (Boolean.TRUE.equals(inactiveMovementPattern)) problems.add("movementPattern");
         return problems;
     }
 

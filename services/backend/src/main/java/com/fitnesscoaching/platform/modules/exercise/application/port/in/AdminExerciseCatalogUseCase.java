@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.exercise.application.port.in;
 
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
+import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
 
 import java.util.UUID;
@@ -8,6 +9,8 @@ import java.util.UUID;
 public interface AdminExerciseCatalogUseCase {
 
     AdminExercisePage search(AdminExerciseQuery query);
+
+    AdminExerciseFormMetadata getFormMetadata(UUID adminUserId);
 
     AdminExercise getDetail(UUID adminUserId, UUID exerciseId);
 

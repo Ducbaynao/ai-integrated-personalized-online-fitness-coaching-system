@@ -296,6 +296,38 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /admin/exercises/metadata:
+    get:
+      tags: [Admin Exercise Catalog]
+      operationId: getAdminExerciseFormMetadata
+      summary: Get selectable metadata for Admin Exercise create and edit forms
+      description: Requires an active ADMIN role and CATALOG_MANAGE permission. Inactive equipment, tags, and movement patterns are omitted.
+      responses:
+        '200':
+          description: Deterministically ordered form metadata; every collection is present even when empty
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExerciseFormMetadataResponse' }
+              examples:
+                populated:
+                  value:
+                    categories: [{ code: STRENGTH, name: Strength }]
+                    muscleGroups: [{ code: CORE, name: Core, parentCode: null }]
+                    equipment: [{ code: BODYWEIGHT, name: Bodyweight }]
+                    tags: [{ code: COMPOUND, name: Compound }]
+                    difficulties: [BEGINNER, INTERMEDIATE, ADVANCED]
+                    movementPatterns: [{ code: SQUAT, name: Squat }]
+                emptyCatalogs:
+                  value:
+                    categories: []
+                    muscleGroups: []
+                    equipment: []
+                    tags: []
+                    difficulties: [BEGINNER, INTERMEDIATE, ADVANCED]
+                    movementPatterns: []
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
   /admin/exercises/{exerciseId}:
     parameters:
       - name: exerciseId
@@ -1998,7 +2030,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ExerciseDifficulty'
             - type: 'null'
-        movementPattern: { type: [string, 'null'] }
+        movementPattern:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseMovementPattern'
+            - type: 'null'
         unilateral: { type: boolean }
         primaryMuscles:
           type: array
@@ -2137,7 +2172,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ExerciseDifficulty'
             - type: 'null'
-        movementPattern: { type: [string, 'null'] }
+        movementPattern:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseMovementPattern'
+            - type: 'null'
         unilateral: { type: boolean }
         variations:
           type: array
@@ -2177,6 +2215,10 @@ components:
     ExerciseDifficulty:
       type: string
       enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+
+    ExerciseMovementPattern:
+      type: string
+      enum: [SQUAT, HINGE, LUNGE, PUSH, PULL, CARRY, ROTATION, CORE_STABILITY, LOCOMOTION, ISOLATION, MOBILITY, BALANCE]
 
     ExerciseLifecycleStatus:
       type: string
@@ -2236,7 +2278,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ExerciseDifficulty'
             - type: 'null'
-        movementPattern: { type: [string, 'null'], maxLength: 60 }
+        movementPattern:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseMovementPattern'
+            - type: 'null'
         unilateral: { type: boolean }
         tagCodes:
           type: array
@@ -2320,7 +2365,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ExerciseDifficulty'
             - type: 'null'
-        movementPattern: { type: [string, 'null'] }
+        movementPattern:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseMovementPattern'
+            - type: 'null'
         unilateral: { type: boolean }
         status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
         version: { type: integer, format: int64, minimum: 0 }
@@ -2345,7 +2393,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ExerciseDifficulty'
             - type: 'null'
-        movementPattern: { type: [string, 'null'] }
+        movementPattern:
+          anyOf:
+            - $ref: '#/components/schemas/ExerciseMovementPattern'
+            - type: 'null'
         status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
         version: { type: integer, format: int64, minimum: 0 }
         canonicalReplacementId: { type: [string, 'null'], format: uuid }
@@ -2364,6 +2415,30 @@ components:
         size: { type: integer, minimum: 1, maximum: 100 }
         totalItems: { type: integer, format: int64, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+
+    AdminExerciseFormMetadataResponse:
+      type: object
+      additionalProperties: false
+      required: [categories, muscleGroups, equipment, tags, difficulties, movementPatterns]
+      properties:
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        muscleGroups:
+          type: array
+          items: { $ref: '#/components/schemas/MuscleGroupOptionResponse' }
+        equipment:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
+        difficulties:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseDifficulty' }
+        movementPatterns:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogOptionResponse' }
 
     ErrorResponse:
       type: object
