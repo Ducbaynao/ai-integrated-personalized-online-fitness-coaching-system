@@ -89,6 +89,9 @@ class V22ExerciseLifecycleMigrationIntegrationTest {
                     "UPDATE fitness.exercises SET admin_status='ARCHIVED' WHERE id=?", activeId))
                     .isInstanceOf(DataIntegrityViolationException.class);
 
+            Flyway.configure().dataSource(dataSource).schemas("fitness").defaultSchema("fitness")
+                    .target("23").load().migrate();
+
             String developmentSeed = Files.readString(
                     Path.of("..", "..", "database", "seed", "dev_seed.sql"));
             jdbc.execute(developmentSeed);

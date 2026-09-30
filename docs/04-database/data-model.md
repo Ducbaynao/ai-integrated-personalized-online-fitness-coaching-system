@@ -39,6 +39,8 @@ erDiagram
 
 Historical sessions reference the source plan version. Significant changes append versions. Actual facts are not rewritten to match a plan.
 
+The Exercise catalog uses a nullable, governed movement-pattern reference. Active reference values are selectable for new Admin draft mutations; an inactive value remains attached to historical Exercise content until that draft is deliberately changed.
+
 ## Schedule
 
 Appointment identifies Trainer, Student, start/end, timezone, location/type, status, and optional related Planned Workout. Recurrence/series metadata is separate from occurrence state. Change Request stores initiator, original/proposed times, recurrence scope, reason, status, creation/response time, and final change reference. Change History retains each accepted transition.

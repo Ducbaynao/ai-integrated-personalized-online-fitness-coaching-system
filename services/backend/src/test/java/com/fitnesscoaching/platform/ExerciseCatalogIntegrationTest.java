@@ -297,7 +297,7 @@ class ExerciseCatalogIntegrationTest {
                 ('10000000-0000-0000-0000-000000000002','SYNTH_ASSISTED_ROW','Synthetic Assisted Row','STRENGTH','Synthetic row description','Synthetic row instructions','BEGINNER','PULL',false,'ACTIVE'),
                 ('10000000-0000-0000-0000-000000000003','SYNTH_CABLE_PRESS','Synthetic Cable Press','STRENGTH','Synthetic press description','Synthetic press instructions','INTERMEDIATE','PUSH',false,'ACTIVE'),
                 ('10000000-0000-0000-0000-000000000004','SYNTH_MOBILITY_REACH','Synthetic Mobility Reach','MOBILITY','Synthetic mobility description','Synthetic mobility instructions','BEGINNER','MOBILITY',false,'ACTIVE'),
-                ('10000000-0000-0000-0000-000000000005','SYNTH_STATIONARY_CYCLE','Synthetic Stationary Cycle','CARDIO','Synthetic cycle description','Synthetic cycle instructions','BEGINNER','CARDIO',false,'ACTIVE'),
+                ('10000000-0000-0000-0000-000000000005','SYNTH_STATIONARY_CYCLE','Synthetic Stationary Cycle','CARDIO','Synthetic cycle description','Synthetic cycle instructions','BEGINNER','LOCOMOTION',false,'ACTIVE'),
                 ('10000000-0000-0000-0000-000000000006','SYNTH_UNILATERAL_LUNGE','Synthetic Unilateral Lunge','STRENGTH','Synthetic lunge description','Synthetic lunge instructions','INTERMEDIATE','LUNGE',true,'ACTIVE'),
                 ('10000000-0000-0000-0000-000000000007','SYNTH_DRAFT_HINGE','Synthetic Draft Hinge','STRENGTH','Draft','Draft','BEGINNER','HINGE',false,'DRAFT'),
                 ('10000000-0000-0000-0000-000000000008','SYNTH_ARCHIVED_CARRY','Synthetic Archived Carry','STRENGTH','Archived','Archived','INTERMEDIATE','CARRY',false,'ARCHIVED'),
