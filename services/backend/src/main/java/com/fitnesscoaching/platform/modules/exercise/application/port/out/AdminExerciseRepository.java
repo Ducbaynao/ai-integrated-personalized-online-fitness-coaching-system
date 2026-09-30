@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.exercise.application.port.out;
 
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
+import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
@@ -14,6 +15,8 @@ import java.util.UUID;
 public interface AdminExerciseRepository {
 
     AdminExercisePage search(AdminExerciseQuery query);
+
+    AdminExerciseFormMetadata findFormMetadata();
 
     Optional<AdminExercise> findById(UUID exerciseId);
 

@@ -7,9 +7,11 @@ import com.fitnesscoaching.platform.common.exception.ExerciseVersionConflictExce
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
+import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.port.out.AdminExerciseRepository;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseVariation;
+import com.fitnesscoaching.platform.modules.exercise.domain.CatalogOption;
 import com.fitnesscoaching.platform.modules.exercise.domain.ExerciseLifecycleStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
@@ -229,6 +231,30 @@ class AdminExerciseCatalogServiceUnitTest {
 
         assertThatThrownBy(() -> service.getDetail(ADMIN, EXERCISE)).isInstanceOf(AccessDeniedException.class);
         verify(repository, never()).findById(any());
+    }
+
+    @Test
+    void metadataRequiresEffectivePermissionBeforeRepositoryAccess() {
+        when(accountStatusQuery.getAccountStatus(ADMIN)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(roleQuery.hasActiveRole(ADMIN, "ADMIN")).thenReturn(true);
+        when(permissionQuery.hasActivePermission(ADMIN, "CATALOG_MANAGE")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getFormMetadata(ADMIN)).isInstanceOf(AccessDeniedException.class);
+
+        verify(repository, never()).findFormMetadata();
+    }
+
+    @Test
+    void metadataUsesDomainDifficultyOrderAndRepositoryCatalogs() {
+        authorize();
+        CatalogOption squat = new CatalogOption("SQUAT", "Squat");
+        when(repository.findFormMetadata()).thenReturn(new AdminExerciseFormMetadata(
+                List.of(), List.of(), List.of(), List.of(), List.of("WRONG"), List.of(squat)));
+
+        AdminExerciseFormMetadata metadata = service.getFormMetadata(ADMIN);
+
+        assertThat(metadata.difficulties()).containsExactly("BEGINNER", "INTERMEDIATE", "ADVANCED");
+        assertThat(metadata.movementPatterns()).containsExactly(squat);
     }
 
     private void authorize() {

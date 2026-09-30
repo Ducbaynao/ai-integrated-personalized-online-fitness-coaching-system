@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.exercise.adapter.in.web;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.FieldErrorDto;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExerciseDraftRequest;
+import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExerciseFormMetadataResponse;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExercisePageResponse;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExerciseResponse;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.ArchiveExerciseRequest;
@@ -55,6 +56,12 @@ public class AdminExerciseController {
         AdminExerciseQuery request = new AdminExerciseQuery(
                 UUID.fromString(jwt.getSubject()), query, lifecycleStatus, page, size);
         return ResponseEntity.ok(AdminExercisePageResponse.fromDomain(useCase.search(request)));
+    }
+
+    @GetMapping("/metadata")
+    public ResponseEntity<AdminExerciseFormMetadataResponse> metadata(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(AdminExerciseFormMetadataResponse.fromDomain(
+                useCase.getFormMetadata(UUID.fromString(jwt.getSubject()))));
     }
 
     @GetMapping("/{exerciseId}")
