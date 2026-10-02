@@ -4,6 +4,8 @@ import type {
   AdminExerciseFormMetadata,
   AdminExercisePage,
   ArchiveExerciseRequest,
+  CanonicalReplacementPreview,
+  CanonicalReplacementRequest,
   ExerciseSearchParams,
   ExerciseVersionRequest,
   UpdateAdminExerciseRequest,
@@ -18,6 +20,8 @@ export const exerciseQueryKeys = {
   detail: (exerciseId: string) =>
     [...exerciseQueryKeys.all, 'detail', exerciseId] as const,
   metadata: () => [...exerciseQueryKeys.all, 'metadata'] as const,
+  canonicalReplacementPreview: (exerciseId: string) =>
+    [...exerciseQueryKeys.all, 'canonical-replacement-preview', exerciseId] as const,
 }
 
 export function getAdminExercises(params: ExerciseSearchParams): Promise<AdminExercisePage> {
@@ -74,6 +78,24 @@ export function archiveAdminExercise(
 ): Promise<AdminExerciseDetail> {
   return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}/archive`, {
     method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+export function getCanonicalReplacementPreview(
+  exerciseId: string,
+): Promise<CanonicalReplacementPreview> {
+  return apiRequest(
+    `/admin/exercises/${encodeURIComponent(exerciseId)}/canonical-replacement/preview`,
+  )
+}
+
+export function setAdminExerciseCanonicalReplacement(
+  exerciseId: string,
+  request: CanonicalReplacementRequest,
+): Promise<AdminExerciseDetail> {
+  return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}/canonical-replacement`, {
+    method: 'PUT',
     body: JSON.stringify(request),
   })
 }

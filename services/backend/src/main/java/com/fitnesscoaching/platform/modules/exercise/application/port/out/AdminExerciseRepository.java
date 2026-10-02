@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.exercise.application.port.out;
 
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementExercise;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
@@ -21,6 +22,8 @@ public interface AdminExerciseRepository {
     Optional<AdminExercise> findById(UUID exerciseId);
 
     Optional<AdminExercise> findByIdForUpdate(UUID exerciseId);
+
+    Optional<CanonicalReplacementExercise> findCanonicalReplacementExerciseById(UUID exerciseId);
 
     AdminExercise createDraft(UUID exerciseId, UUID actorId, ExerciseDraftData data, Instant now);
 

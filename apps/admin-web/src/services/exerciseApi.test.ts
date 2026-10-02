@@ -6,8 +6,10 @@ import {
   createAdminExerciseDraft,
   exerciseQueryKeys,
   getAdminExerciseFormMetadata,
+  getCanonicalReplacementPreview,
   getAdminExercises,
   updateAdminExerciseDraft,
+  setAdminExerciseCanonicalReplacement,
 } from './exerciseApi.ts'
 
 describe('exercise API contract', () => {
@@ -96,6 +98,51 @@ describe('exercise API contract', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ expectedVersion: 8, reason: 'Nội dung đã lỗi thời' }),
+      }),
+    )
+  })
+
+  it('uses the read-only preview and exact canonical replacement mutation contracts', async () => {
+    const exerciseId = '2c5f9430-c360-4b32-b70a-d6f92b76bfd4'
+    const targetExerciseId = 'cf2961f5-8392-4d55-b48a-257c48a99ca7'
+    const preview = {
+      sourceExercise: { id: exerciseId, code: 'OLD_SQUAT', name: 'Old Squat', status: 'ARCHIVED' },
+      expectedVersion: 4,
+      currentTarget: null,
+      usageImpact: { availability: 'NOT_AVAILABLE', count: null },
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(preview))
+      .mockResolvedValueOnce(Response.json(createExerciseDetail({ status: 'ARCHIVED' })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getCanonicalReplacementPreview(exerciseId)
+    await setAdminExerciseCanonicalReplacement(exerciseId, {
+      expectedVersion: 4,
+      targetExerciseId,
+      reason: 'Nội dung trùng lặp',
+    })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `/api/v1/admin/exercises/${exerciseId}/canonical-replacement/preview`,
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    )
+    expect(exerciseQueryKeys.canonicalReplacementPreview(exerciseId)).toEqual([
+      'admin-exercises',
+      'canonical-replacement-preview',
+      exerciseId,
+    ])
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/admin/exercises/${exerciseId}/canonical-replacement`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          expectedVersion: 4,
+          targetExerciseId,
+          reason: 'Nội dung trùng lặp',
+        }),
       }),
     )
   })

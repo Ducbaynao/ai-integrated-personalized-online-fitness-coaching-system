@@ -148,3 +148,25 @@ export interface ExerciseVersionRequest {
 export interface ArchiveExerciseRequest extends ExerciseVersionRequest {
   reason: string
 }
+
+export interface CanonicalReplacementRequest extends ExerciseVersionRequest {
+  targetExerciseId: string | null
+  reason: string
+}
+
+export interface CanonicalReplacementExerciseReference {
+  id: string
+  code: string
+  name: string
+  status: ExerciseLifecycleStatus
+}
+
+export interface CanonicalReplacementPreview {
+  sourceExercise: CanonicalReplacementExerciseReference
+  expectedVersion: number
+  currentTarget: CanonicalReplacementExerciseReference | null
+  usageImpact: {
+    availability: 'NOT_AVAILABLE'
+    count: number | null
+  }
+}

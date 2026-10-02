@@ -4,7 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { exerciseQueryKeys } from '../../services/exerciseApi.ts'
-import { createExerciseDetail } from '../../test/exerciseTestData.ts'
+import {
+  createCanonicalReplacementPreview,
+  createExerciseDetail,
+  createExercisePage,
+  createExerciseSummary,
+} from '../../test/exerciseTestData.ts'
 import { ExerciseDetailPage } from './ExerciseDetailPage.tsx'
 
 const EXERCISE_ID = '2c5f9430-c360-4b32-b70a-d6f92b76bfd4'
@@ -178,6 +183,125 @@ describe('exercise detail', () => {
       method: 'POST',
       body: JSON.stringify({ expectedVersion: 9, reason: 'Nội dung cũ' }),
     }))
+  })
+
+  it('previews and sets an archived Exercise canonical replacement with the preview version', async () => {
+    const targetId = 'cf2961f5-8392-4d55-b48a-257c48a99ca7'
+    const archived = createExerciseDetail({ status: 'ARCHIVED', version: 10 })
+    const updated = createExerciseDetail({
+      status: 'ARCHIVED',
+      version: 11,
+      canonicalReplacementId: targetId,
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(archived))
+      .mockResolvedValueOnce(Response.json(createCanonicalReplacementPreview()))
+      .mockResolvedValueOnce(Response.json(createExercisePage({
+        items: [createExerciseSummary({ id: targetId, name: 'Goblet Squat', code: 'GOBLET_SQUAT' })],
+      })))
+      .mockResolvedValueOnce(Response.json(updated))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: 'Quản lý bài tập thay thế' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Quản lý bài tập thay thế chuẩn' })
+    expect(dialog).toHaveAccessibleDescription(/không viết lại dữ liệu lịch sử/)
+    expect(screen.getByText(/không hiển thị giá trị 0/)).toBeInTheDocument()
+    const confirm = screen.getByRole('button', { name: 'Xóa bài tập thay thế' })
+    expect(confirm).toBeDisabled()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bài tập thay thế' }), targetId)
+    expect(screen.getByRole('button', { name: 'Lưu bài tập thay thế' })).toBeDisabled()
+    await user.type(screen.getByRole('textbox', { name: 'Lý do thay đổi' }), '  Nội dung trùng lặp  ')
+    await user.click(screen.getByRole('button', { name: 'Lưu bài tập thay thế' }))
+
+    expect(await screen.findByText('Đã cập nhật bài tập thay thế chuẩn cho Barbell Squat.')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      `/api/v1/admin/exercises/${EXERCISE_ID}/canonical-replacement`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          expectedVersion: 10,
+          targetExerciseId: targetId,
+          reason: 'Nội dung trùng lặp',
+        }),
+      }),
+    )
+  })
+
+  it('disables same-target set and clear-empty canonical no-op submissions', async () => {
+    const targetId = 'cf2961f5-8392-4d55-b48a-257c48a99ca7'
+    const currentTarget = {
+      id: targetId,
+      code: 'GOBLET_SQUAT',
+      name: 'Goblet Squat',
+      status: 'ACTIVE' as const,
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(createExerciseDetail({
+        status: 'ARCHIVED',
+        canonicalReplacementId: targetId,
+      })))
+      .mockResolvedValueOnce(Response.json(createCanonicalReplacementPreview({ currentTarget })))
+      .mockResolvedValueOnce(Response.json(createExercisePage({
+        items: [createExerciseSummary({ id: targetId, name: 'Goblet Squat', code: 'GOBLET_SQUAT' })],
+      })))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: 'Quản lý bài tập thay thế' }))
+    expect(await screen.findAllByText('Goblet Squat (GOBLET_SQUAT)')).not.toHaveLength(0)
+    await user.type(screen.getByRole('textbox', { name: 'Lý do thay đổi' }), 'Giữ nguyên')
+    expect(screen.getByRole('button', { name: 'Lưu bài tập thay thế' })).toBeDisabled()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bài tập thay thế' }), '')
+    expect(screen.getByRole('button', { name: 'Xóa bài tập thay thế' })).toBeEnabled()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('disables clear when an archived Exercise has no current canonical target', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json(createExerciseDetail({ status: 'ARCHIVED' })))
+      .mockResolvedValueOnce(Response.json(createCanonicalReplacementPreview()))
+      .mockResolvedValueOnce(Response.json(createExercisePage({ items: [] })))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: 'Quản lý bài tập thay thế' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Lý do thay đổi' }), 'Không cần thay thế')
+    expect(screen.getByRole('button', { name: 'Xóa bài tập thay thế' })).toBeDisabled()
+  })
+
+  it('hides the detail and clears Exercise caches when preview authority is revoked', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 0 }, mutations: { retry: false } },
+    })
+    const archived = createExerciseDetail({ status: 'ARCHIVED' })
+    const fetchMock = vi.fn().mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/canonical-replacement/preview')) {
+        return Response.json({
+          errorCode: 'CATALOG_MANAGE_REQUIRED',
+          message: 'raw private preview detail',
+        }, { status: 403 })
+      }
+      if (url.includes('?')) return Response.json(createExercisePage())
+      return Response.json(archived)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderDetail(queryClient)
+
+    await user.click(await screen.findByRole('button', { name: 'Quản lý bài tập thay thế' }))
+
+    expect(await screen.findByRole('heading', { name: 'Bạn không có quyền thực hiện thao tác' })).toBeInTheDocument()
+    expect(screen.queryByText('Barbell Squat')).not.toBeInTheDocument()
+    expect(screen.queryByText('raw private preview detail')).not.toBeInTheDocument()
+    await waitFor(() => expect(queryClient.getQueriesData({ queryKey: exerciseQueryKeys.all })).toHaveLength(0))
   })
 
   it('prevents duplicate lifecycle submissions while the first request is pending', async () => {

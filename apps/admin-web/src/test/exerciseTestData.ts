@@ -3,6 +3,7 @@ import type {
   AdminExerciseFormMetadata,
   AdminExercisePage,
   AdminExerciseSummary,
+  CanonicalReplacementPreview,
 } from '../types/exercise.ts'
 
 export function createExerciseSummary(
@@ -20,6 +21,23 @@ export function createExerciseSummary(
     canonicalReplacementId: null,
     variationCount: 1,
     updatedAt: '2026-09-29T08:30:00Z',
+    ...overrides,
+  }
+}
+
+export function createCanonicalReplacementPreview(
+  overrides: Partial<CanonicalReplacementPreview> = {},
+): CanonicalReplacementPreview {
+  return {
+    sourceExercise: {
+      id: '2c5f9430-c360-4b32-b70a-d6f92b76bfd4',
+      code: 'BARBELL_SQUAT',
+      name: 'Barbell Squat',
+      status: 'ARCHIVED',
+    },
+    expectedVersion: 10,
+    currentTarget: null,
+    usageImpact: { availability: 'NOT_AVAILABLE', count: null },
     ...overrides,
   }
 }

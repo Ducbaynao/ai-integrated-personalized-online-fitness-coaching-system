@@ -443,6 +443,41 @@ class AdminExerciseCatalogIntegrationTest {
     }
 
     @Test
+    void canonicalReplacementPreviewIsAuthorizedReadOnlyAndUsesNullForUnavailableUsage() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO fitness.exercise_canonical_mappings(
+                    duplicate_exercise_id, canonical_exercise_id, mapped_by, reason)
+                VALUES (?, ?, ?, 'Duplicate')
+                """, ARCHIVED_ID, ACTIVE_ID, ADMIN_ID);
+        Long versionBefore = jdbcTemplate.queryForObject(
+                "SELECT version FROM fitness.exercises WHERE id = ?", Long.class, ARCHIVED_ID);
+        Integer auditsBefore = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs", Integer.class);
+
+        mockMvc.perform(get("/api/v1/admin/exercises/{id}/canonical-replacement/preview", ARCHIVED_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceExercise.id", is(ARCHIVED_ID.toString())))
+                .andExpect(jsonPath("$.sourceExercise.status", is("ARCHIVED")))
+                .andExpect(jsonPath("$.expectedVersion", is(versionBefore.intValue())))
+                .andExpect(jsonPath("$.currentTarget.id", is(ACTIVE_ID.toString())))
+                .andExpect(jsonPath("$.currentTarget.status", is("ACTIVE")))
+                .andExpect(jsonPath("$.usageImpact.availability", is("NOT_AVAILABLE")))
+                .andExpect(jsonPath("$.usageImpact.count").value(org.hamcrest.Matchers.nullValue()));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT version FROM fitness.exercises WHERE id = ?", Long.class, ARCHIVED_ID))
+                .isEqualTo(versionBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.audit_logs", Integer.class))
+                .isEqualTo(auditsBefore);
+
+        mockMvc.perform(get("/api/v1/admin/exercises/{id}/canonical-replacement/preview", ACTIVE_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode", is("EXERCISE_LIFECYCLE_CONFLICT")));
+    }
+
+    @Test
     void publicCatalogStillReturnsOnlyActiveExercise() throws Exception {
         mockMvc.perform(get("/api/v1/exercises").header("Authorization", bearer(UUID.randomUUID(), "STUDENT")))
                 .andExpect(status().isOk())

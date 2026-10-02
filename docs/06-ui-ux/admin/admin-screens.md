@@ -16,6 +16,8 @@ Queue theo status/age/risk. Detail có application data, certificates, document 
 
 Table/list có status Draft/Active/Archived, muscle, equipment, media, duplicate signal và usage. Archived thay hard-delete khi đã có historical reference. Merge flow hiển thị canonical mapping và impact.
 
+Canonical replacement trong B02 chỉ cập nhật ánh xạ từ Exercise đã lưu trữ đến một Exercise đang hoạt động; không viết lại tham chiếu lịch sử. Dialog hiển thị target hiện tại, tìm/chọn target mới, lý do và optimistic version. Khi B04/B05 usage consumer chưa có, impact phải ghi `Chưa khả dụng`, không hiển thị `0`; thao tác đặt lại cùng target hoặc xóa khi chưa có target bị khóa.
+
 Create/Edit dùng Admin form metadata và stable code từ API. Create luôn tạo `DRAFT`; chỉ `DRAFT` có action Edit. Form hỗ trợ variations, muscles và equipment theo contract, cảnh báo thay đổi chưa lưu và xử lý optimistic version conflict mà không ghi đè âm thầm. `ACTIVE` và `ARCHIVED` giữ read-only trong checkpoint Draft Create/Edit.
 
 ## AD-06 Knowledge Publishing

@@ -21,7 +21,8 @@
 - **EXISTING IMPLEMENTATION:** Mobile ST-21 provides authenticated Student/Trainer catalog browse, debounced search, metadata-driven filters, session query cache, pagination, pull-to-refresh, and explicit loading/empty/error/stale states.
 - **EXISTING IMPLEMENTATION:** Mobile ST-22 provides an authenticated Student/Trainer detail route, typed detail query, Vietnamese loading/error/unavailable/stale states, optional metadata sections, variation/guidance content, and media availability placeholders without exposing storage references.
 - **EXISTING IMPLEMENTATION:** Mobile provides a reusable controlled single-selection Exercise picker component for future B04 Plan Builder integration. It reuses ST-21 query/search/filter/pagination states, returns a typed Exercise summary only after explicit confirmation, supports excluded Exercise identifiers, and intentionally has no standalone production route.
-- **EXISTING IMPLEMENTATION:** Admin Web provides the authenticated, `CATALOG_MANAGE`-guarded AD-05 read-only foundation: Vietnamese list/search/lifecycle filter/pagination, stable backend ordering, detail, session refresh, sanitized error mapping, and explicit loading/empty/no-result/permission/stale states. Create/edit/activate/archive/canonical-mapping UI remains unimplemented.
+- **EXISTING IMPLEMENTATION:** Admin Web provides the authenticated, `CATALOG_MANAGE`-guarded AD-05 catalog workflow: Vietnamese list/search/lifecycle filter/pagination, stable backend ordering, detail, draft create/edit, activate/archive, and canonical replacement management with explicit loading/empty/no-result/permission/stale/conflict states.
+- **CONFIRMED DECISION:** Canonical replacement is mapping-only in B02. It does not rewrite historical workout/template foreign keys or implement B04/B05 consumers. The read-only preview therefore reports usage impact as `NOT_AVAILABLE` with a `null` count, never a synthetic zero.
 
 ## 4. Feature dependencies
 
@@ -61,7 +62,7 @@
 
 - **CONFIRMED REQUIREMENT:** Implement the basic Exercise management portion of AD-05 only.
 - **EXISTING IMPLEMENTATION:** The permission-aware table and read-only detail use effective permissions from `GET /users/me`; role or JWT inference is not used for UI access.
-- **PROPOSED SOLUTION:** Extend the foundation with draft create/edit, activation, archive confirmation, duplicate indication, and canonical mapping impact summary.
+- **EXISTING IMPLEMENTATION:** Archived Exercise detail supports setting, changing, and clearing a direct active canonical target with reason, displayed-version guard, audited backend mutation, no-op controls disabled in the client, and a read-only impact preview that marks deferred usage data unavailable.
 - **CONFIRMED REQUIREMENT:** Admin manages platform content and does not obtain coaching authority through this feature.
 
 ## 10. UI/UX and Figma deliverables

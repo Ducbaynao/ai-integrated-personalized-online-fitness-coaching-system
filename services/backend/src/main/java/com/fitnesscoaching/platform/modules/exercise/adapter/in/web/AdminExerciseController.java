@@ -8,6 +8,7 @@ import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExe
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.AdminExerciseResponse;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.ArchiveExerciseRequest;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.CanonicalReplacementRequest;
+import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.CanonicalReplacementPreviewResponse;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.ExerciseVersionRequest;
 import com.fitnesscoaching.platform.modules.exercise.adapter.in.web.dto.UpdateAdminExerciseRequest;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseCatalogUseCase;
@@ -123,6 +124,15 @@ public class AdminExerciseController {
         return ResponseEntity.ok(AdminExerciseResponse.fromDomain(useCase.setCanonicalReplacement(
                 UUID.fromString(jwt.getSubject()), exerciseId, request.expectedVersion(),
                 request.targetExerciseId(), request.reason())));
+    }
+
+    @GetMapping("/{exerciseId}/canonical-replacement/preview")
+    public ResponseEntity<CanonicalReplacementPreviewResponse> canonicalReplacementPreview(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID exerciseId
+    ) {
+        return ResponseEntity.ok(CanonicalReplacementPreviewResponse.fromDomain(
+                useCase.getCanonicalReplacementPreview(UUID.fromString(jwt.getSubject()), exerciseId)));
     }
 
     private ExerciseLifecycleStatus parseStatus(String status) {

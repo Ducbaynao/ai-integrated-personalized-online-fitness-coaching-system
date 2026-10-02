@@ -203,7 +203,7 @@ td a { font-weight: 700; }
 .form-error-summary h2, .conflict-panel h2 { margin-bottom: var(--space-2); }
 .form-error-summary ul { margin-bottom: 0; }
 .dialog-backdrop { display: grid; position: fixed; z-index: 100; inset: 0; padding: var(--space-4); background: rgba(23, 32, 42, .52); place-items: center; }
-.confirmation-dialog { width: min(100%, 520px); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-surface); }
+.confirmation-dialog { width: min(100%, 520px); max-height: calc(100vh - (2 * var(--space-4))); overflow-y: auto; padding: var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-surface); }
 .confirmation-dialog h2 { margin-top: 0; }
 .confirmation-dialog .form-field { margin: var(--space-4) 0 var(--space-2); }
 .confirmation-dialog .form-help { text-align: right; }
