@@ -453,6 +453,28 @@ paths:
         '404': { description: Source or target Exercise not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '409': { description: Canonical, lifecycle, or version conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
+  /admin/exercises/{exerciseId}/canonical-replacement/preview:
+    get:
+      tags: [Admin Exercise Catalog]
+      operationId: previewAdminExerciseCanonicalReplacement
+      summary: Preview canonical replacement metadata for an archived Exercise
+      description: Usage impact is explicitly unavailable until historical B04/B05 consumers are implemented; unavailable counts are null, never zero.
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Read-only canonical replacement preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CanonicalReplacementPreviewResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { description: Source Exercise not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Source lifecycle or canonical mapping conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
   /auth/registrations:
     post:
       tags: [Authentication]
@@ -2326,6 +2348,43 @@ components:
           format: uuid
           description: Null clears the current canonical replacement.
         reason: { type: string, minLength: 1, maxLength: 1000 }
+
+    CanonicalReplacementExerciseReference:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, status]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
+
+    CanonicalReplacementUsageImpact:
+      type: object
+      additionalProperties: false
+      required: [availability, count]
+      properties:
+        availability:
+          type: string
+          enum: [NOT_AVAILABLE]
+        count:
+          type: ['integer', 'null']
+          format: int64
+          minimum: 0
+          description: Null while usage impact is unavailable; absence is never represented as zero.
+
+    CanonicalReplacementPreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [sourceExercise, expectedVersion, currentTarget, usageImpact]
+      properties:
+        sourceExercise: { $ref: '#/components/schemas/CanonicalReplacementExerciseReference' }
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        currentTarget:
+          anyOf:
+            - $ref: '#/components/schemas/CanonicalReplacementExerciseReference'
+            - type: 'null'
+        usageImpact: { $ref: '#/components/schemas/CanonicalReplacementUsageImpact' }
 
     AdminExerciseVariationResponse:
       type: object

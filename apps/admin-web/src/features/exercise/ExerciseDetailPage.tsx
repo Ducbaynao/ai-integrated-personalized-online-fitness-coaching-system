@@ -9,8 +9,16 @@ import {
   archiveAdminExercise,
   exerciseQueryKeys,
   getAdminExerciseDetail,
+  getAdminExercises,
+  getCanonicalReplacementPreview,
+  setAdminExerciseCanonicalReplacement,
 } from '../../services/exerciseApi.ts'
-import type { AdminExerciseVariation } from '../../types/exercise.ts'
+import type {
+  AdminExerciseSummary,
+  AdminExerciseVariation,
+  CanonicalReplacementExerciseReference,
+} from '../../types/exercise.ts'
+import { useDebouncedValue } from './useDebouncedValue.ts'
 import {
   difficultyLabels,
   formatDateTime,
@@ -60,6 +68,14 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
   const [actionError, setActionError] = useState<ActionErrorContent>()
   const [terminalActionError, setTerminalActionError] = useState<TerminalActionError>()
   const [successMessage, setSuccessMessage] = useState<string>()
+  const [replacementDialogOpen, setReplacementDialogOpen] = useState(false)
+  const [replacementSearch, setReplacementSearch] = useState('')
+  const debouncedReplacementSearch = useDebouncedValue(replacementSearch, 300)
+  const [selectedReplacement, setSelectedReplacement] = useState<
+    AdminExerciseSummary | CanonicalReplacementExerciseReference | null | undefined
+  >()
+  const [replacementReason, setReplacementReason] = useState('')
+  const [replacementReasonError, setReplacementReasonError] = useState<string>()
   const detailQuery = useQuery({
     queryKey: exerciseQueryKeys.detail(exerciseId),
     queryFn: () => getAdminExerciseDetail(exerciseId),
@@ -96,14 +112,102 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
       }
     },
   })
+  const replacementPreviewQuery = useQuery({
+    queryKey: exerciseQueryKeys.canonicalReplacementPreview(exerciseId),
+    queryFn: () => getCanonicalReplacementPreview(exerciseId),
+    enabled: replacementDialogOpen && isValidExerciseId && !terminalActionError,
+    staleTime: 0,
+  })
+  const replacementCandidatesQuery = useQuery({
+    queryKey: exerciseQueryKeys.list({
+      query: debouncedReplacementSearch || undefined,
+      status: 'ACTIVE',
+      page: 0,
+      size: 20,
+    }),
+    queryFn: () => getAdminExercises({
+      query: debouncedReplacementSearch || undefined,
+      status: 'ACTIVE',
+      page: 0,
+      size: 20,
+    }),
+    enabled: replacementDialogOpen && !terminalActionError,
+  })
+  const effectiveSelectedReplacement = selectedReplacement === undefined
+    ? replacementPreviewQuery.data?.currentTarget
+    : selectedReplacement
+  const replacementMutation = useMutation({
+    mutationFn: ({
+      expectedVersion,
+      targetExerciseId,
+      reason,
+    }: {
+      expectedVersion: number
+      targetExerciseId: string | null
+      reason: string
+    }) => setAdminExerciseCanonicalReplacement(exerciseId, {
+      expectedVersion,
+      targetExerciseId,
+      reason,
+    }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(exerciseQueryKeys.detail(updated.id), updated)
+      queryClient.removeQueries({
+        queryKey: exerciseQueryKeys.canonicalReplacementPreview(updated.id),
+        exact: true,
+      })
+      await queryClient.invalidateQueries({ queryKey: exerciseQueryKeys.lists() })
+      setReplacementDialogOpen(false)
+      setSelectedReplacement(undefined)
+      setReplacementReason('')
+      setReplacementReasonError(undefined)
+      setActionError(undefined)
+      setSuccessMessage(updated.canonicalReplacementId
+        ? `Đã cập nhật bài tập thay thế chuẩn cho ${updated.name}.`
+        : `Đã xóa bài tập thay thế chuẩn khỏi ${updated.name}.`)
+    },
+    onError: (error) => {
+      const mapped = mapCanonicalReplacementError(error)
+      if (mapped.terminal) {
+        setReplacementDialogOpen(false)
+        setTerminalActionError(mapped.terminal)
+      } else {
+        setReplacementDialogOpen(false)
+        setActionError(mapped.content)
+      }
+    },
+  })
   const state = location.state as DetailLocationState | null
   const goBack = () => navigate(state?.from?.startsWith('/exercises') ? state.from : '/exercises')
 
   useEffect(() => {
     if (terminalActionError) {
-      queryClient.removeQueries({ queryKey: exerciseQueryKeys.detail(exerciseId), exact: true })
+      queryClient.removeQueries({ queryKey: exerciseQueryKeys.all })
     }
   }, [exerciseId, queryClient, terminalActionError])
+
+  useEffect(() => {
+    if (!replacementDialogOpen || !replacementPreviewQuery.isError) return
+    const mapped = mapCanonicalReplacementError(replacementPreviewQuery.error)
+    if (mapped.terminal) {
+      const timer = window.setTimeout(() => setTerminalActionError(mapped.terminal), 0)
+      return () => window.clearTimeout(timer)
+    }
+  }, [replacementDialogOpen, replacementPreviewQuery.error, replacementPreviewQuery.isError])
+
+  useEffect(() => {
+    if (!replacementDialogOpen || !replacementCandidatesQuery.isError) return
+    const mapped = mapCanonicalReplacementError(replacementCandidatesQuery.error)
+    if (mapped.terminal) {
+      const timer = window.setTimeout(() => setTerminalActionError(mapped.terminal), 0)
+      return () => window.clearTimeout(timer)
+    }
+  }, [replacementCandidatesQuery.error, replacementCandidatesQuery.isError, replacementDialogOpen])
+
+  const replacementQueryTerminalError = replacementDialogOpen
+    ? getTerminalCanonicalReplacementError(replacementPreviewQuery.error)
+      ?? getTerminalCanonicalReplacementError(replacementCandidatesQuery.error)
+    : undefined
 
   if (!isValidExerciseId) {
     return (
@@ -116,11 +220,12 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
   }
 
 
-  if (terminalActionError) {
+  if (terminalActionError || replacementQueryTerminalError) {
+    const terminal = terminalActionError ?? replacementQueryTerminalError!
     return (
       <DetailState
-        title={terminalActionError.title}
-        description={terminalActionError.description}
+        title={terminal.title}
+        description={terminal.description}
         onBack={goBack}
       />
     )
@@ -183,6 +288,35 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
     }
     actionMutation.mutate({ snapshot: actionSnapshot })
   }
+  const openReplacementDialog = () => {
+    setActionError(undefined)
+    setSuccessMessage(undefined)
+    setReplacementSearch('')
+    setSelectedReplacement(undefined)
+    setReplacementReason('')
+    setReplacementReasonError(undefined)
+    setReplacementDialogOpen(true)
+  }
+  const closeReplacementDialog = () => {
+    if (!replacementMutation.isPending) {
+      setReplacementDialogOpen(false)
+      setSelectedReplacement(undefined)
+    }
+  }
+  const confirmReplacement = () => {
+    const preview = replacementPreviewQuery.data
+    if (!preview || replacementMutation.isPending) return
+    const reason = replacementReason.trim()
+    if (reason.length < 1 || reason.length > 1000) {
+      setReplacementReasonError('Lý do thay đổi phải có từ 1 đến 1000 ký tự.')
+      return
+    }
+    replacementMutation.mutate({
+      expectedVersion: preview.expectedVersion,
+      targetExerciseId: effectiveSelectedReplacement?.id ?? null,
+      reason,
+    })
+  }
 
   return (
     <section className="page-stack">
@@ -235,6 +369,15 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
               onClick={() => openAction('archive')}
             >
               Lưu trữ
+            </button>
+          ) : null}
+          {exercise.status === 'ARCHIVED' ? (
+            <button
+              type="button"
+              disabled={replacementMutation.isPending}
+              onClick={openReplacementDialog}
+            >
+              Quản lý bài tập thay thế
             </button>
           ) : null}
         </div>
@@ -330,8 +473,169 @@ function ExerciseDetailPageContent({ exerciseId }: { exerciseId: string }) {
         {archiveReasonError ? <p id="archive-reason-error" className="field-error">{archiveReasonError}</p> : null}
         <p id="archive-reason-count" className="form-help">{archiveReason.length.toLocaleString('vi-VN')} / 1.000 ký tự</p>
       </ConfirmationDialog>
+      <ConfirmationDialog
+        open={replacementDialogOpen}
+        title="Quản lý bài tập thay thế chuẩn"
+        description={`Chọn một bài tập đang hoạt động để thay thế “${exercise.name}”, hoặc xóa ánh xạ hiện tại. Thao tác chỉ cập nhật ánh xạ và không viết lại dữ liệu lịch sử.`}
+        confirmLabel={effectiveSelectedReplacement ? 'Lưu bài tập thay thế' : 'Xóa bài tập thay thế'}
+        cancelLabel="Hủy"
+        busy={replacementMutation.isPending}
+        confirmDisabled={isReplacementConfirmationDisabled(
+          replacementPreviewQuery.data?.currentTarget?.id ?? null,
+          effectiveSelectedReplacement?.id ?? null,
+          replacementReason,
+          replacementPreviewQuery.isPending || replacementCandidatesQuery.isPending,
+        )}
+        onCancel={closeReplacementDialog}
+        onConfirm={confirmReplacement}
+      >
+        {replacementPreviewQuery.isPending ? (
+          <p role="status">Đang tải thông tin ánh xạ…</p>
+        ) : replacementPreviewQuery.isError ? (
+          <div className="inline-alert" role="alert">
+            Không thể tải thông tin ánh xạ. Vui lòng thử lại.
+            <button className="button-link-inline" onClick={() => void replacementPreviewQuery.refetch()}>
+              Thử lại
+            </button>
+          </div>
+        ) : replacementPreviewQuery.data ? (
+          <>
+            <dl className="detail-grid canonical-preview-grid">
+              <DetailField
+                label="Bài tập thay thế hiện tại"
+                value={replacementPreviewQuery.data.currentTarget
+                  ? `${replacementPreviewQuery.data.currentTarget.name} (${replacementPreviewQuery.data.currentTarget.code})`
+                  : 'Chưa đặt'}
+              />
+              <DetailField label="Ảnh hưởng sử dụng" value="Chưa khả dụng" />
+            </dl>
+            <p className="form-help">
+              Số lượng bản ghi bị ảnh hưởng chưa khả dụng; hệ thống không hiển thị giá trị 0 thay cho dữ liệu chưa biết.
+            </p>
+            <label className="form-field" htmlFor="replacement-search">
+              Tìm bài tập đang hoạt động
+              <input
+                id="replacement-search"
+                type="search"
+                value={replacementSearch}
+                disabled={replacementMutation.isPending}
+                onChange={(event) => setReplacementSearch(event.target.value)}
+              />
+            </label>
+            <label className="form-field" htmlFor="replacement-target">
+              Bài tập thay thế
+              <select
+                id="replacement-target"
+                value={effectiveSelectedReplacement?.id ?? ''}
+                disabled={replacementMutation.isPending || replacementCandidatesQuery.isPending}
+                onChange={(event) => {
+                  const selectedId = event.target.value
+                  if (!selectedId) {
+                    setSelectedReplacement(null)
+                    return
+                  }
+                  const options = replacementCandidatesQuery.data?.items ?? []
+                  setSelectedReplacement(
+                    options.find((candidate) => candidate.id === selectedId)
+                    ?? (replacementPreviewQuery.data.currentTarget?.id === selectedId
+                      ? replacementPreviewQuery.data.currentTarget
+                      : undefined),
+                  )
+                }}
+              >
+                <option value="">Không đặt bài tập thay thế</option>
+                {mergeReplacementOptions(
+                  effectiveSelectedReplacement,
+                  replacementCandidatesQuery.data?.items ?? [],
+                ).map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name} ({candidate.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {replacementCandidatesQuery.isError ? (
+              <div className="inline-alert" role="alert">
+                Không thể tải danh sách bài tập đang hoạt động.
+                <button className="button-link-inline" onClick={() => void replacementCandidatesQuery.refetch()}>
+                  Thử lại
+                </button>
+              </div>
+            ) : replacementCandidatesQuery.data?.items.length === 0 ? (
+              <p className="form-help">Không tìm thấy bài tập đang hoạt động phù hợp.</p>
+            ) : null}
+            <label className="form-field" htmlFor="replacement-reason">
+              Lý do thay đổi
+              <textarea
+                id="replacement-reason"
+                value={replacementReason}
+                maxLength={1000}
+                aria-required="true"
+                aria-invalid={Boolean(replacementReasonError)}
+                aria-describedby={replacementReasonError
+                  ? 'replacement-reason-error replacement-reason-count'
+                  : 'replacement-reason-count'}
+                disabled={replacementMutation.isPending}
+                onChange={(event) => {
+                  setReplacementReason(event.target.value)
+                  setReplacementReasonError(undefined)
+                }}
+              />
+            </label>
+            {replacementReasonError ? (
+              <p id="replacement-reason-error" className="field-error">{replacementReasonError}</p>
+            ) : null}
+            <p id="replacement-reason-count" className="form-help">
+              {replacementReason.length.toLocaleString('vi-VN')} / 1.000 ký tự
+            </p>
+          </>
+        ) : null}
+      </ConfirmationDialog>
     </section>
   )
+}
+
+function mapCanonicalReplacementError(error: unknown): {
+  content?: ActionErrorContent
+  terminal?: TerminalActionError
+} {
+  const mapped = mapLifecycleActionError(error)
+  if (error instanceof ApiError && error.errorCode === 'EXERCISE_CANONICAL_CONFLICT') {
+    return {
+      content: {
+        title: 'Không thể cập nhật bài tập thay thế',
+        description: 'Ánh xạ không còn hợp lệ do quan hệ thay thế đã thay đổi. Hãy tải lại chi tiết và kiểm tra lại.',
+        refreshRecommended: true,
+      },
+    }
+  }
+  return mapped
+}
+
+function getTerminalCanonicalReplacementError(error: unknown) {
+  if (!error) return undefined
+  return mapCanonicalReplacementError(error).terminal
+}
+
+function isReplacementConfirmationDisabled(
+  currentTargetId: string | null,
+  selectedTargetId: string | null,
+  reason: string,
+  loading: boolean,
+) {
+  const normalizedReason = reason.trim()
+  return loading
+    || currentTargetId === selectedTargetId
+    || normalizedReason.length < 1
+    || normalizedReason.length > 1000
+}
+
+function mergeReplacementOptions(
+  selected: AdminExerciseSummary | CanonicalReplacementExerciseReference | null | undefined,
+  candidates: AdminExerciseSummary[],
+) {
+  if (!selected || candidates.some((candidate) => candidate.id === selected.id)) return candidates
+  return [selected, ...candidates]
 }
 
 function mapLifecycleActionError(error: unknown): {

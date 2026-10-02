@@ -13,6 +13,8 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementExercise;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementPreview;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseCatalogUseCase;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
@@ -114,6 +116,25 @@ public class AdminExerciseCatalogService implements AdminExerciseCatalogUseCase 
     public AdminExercise getDetail(UUID adminUserId, UUID exerciseId) {
         verifyCatalogManager(adminUserId);
         return find(exerciseId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CanonicalReplacementPreview getCanonicalReplacementPreview(UUID adminUserId, UUID exerciseId) {
+        verifyCatalogManager(adminUserId);
+        AdminExercise source = find(exerciseId);
+        requireStatus(source, ExerciseLifecycleStatus.ARCHIVED,
+                "Canonical replacement can only be managed for an ARCHIVED Exercise");
+        CanonicalReplacementExercise sourceReference = new CanonicalReplacementExercise(
+                source.id(), source.code(), source.name(), source.status());
+        CanonicalReplacementExercise currentTarget = source.canonicalReplacementId() == null
+                ? null
+                : repository.findCanonicalReplacementExerciseById(source.canonicalReplacementId())
+                .orElseThrow(() -> new ExerciseCanonicalConflictException(
+                        "Current canonical replacement target is unavailable"));
+        return new CanonicalReplacementPreview(
+                sourceReference, source.version(), currentTarget,
+                CanonicalReplacementPreview.UsageImpact.notAvailable());
     }
 
     @Override

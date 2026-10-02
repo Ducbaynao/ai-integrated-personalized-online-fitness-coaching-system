@@ -8,6 +8,8 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementExercise;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementPreview;
 import com.fitnesscoaching.platform.modules.exercise.application.port.out.AdminExerciseRepository;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExercise;
 import com.fitnesscoaching.platform.modules.exercise.domain.AdminExerciseVariation;
@@ -179,6 +181,38 @@ class AdminExerciseCatalogServiceUnitTest {
         when(repository.findById(EXERCISE)).thenReturn(Optional.of(exercise(EXERCISE, ExerciseLifecycleStatus.ARCHIVED, 4, null)));
         assertThat(service.setCanonicalReplacement(ADMIN, EXERCISE, 3, null, "No longer needed")
                 .canonicalReplacementId()).isNull();
+    }
+
+    @Test
+    void canonicalReplacementPreviewIsReadOnlyAndKeepsUnavailableUsageUnknown() {
+        authorize();
+        AdminExercise source = exercise(EXERCISE, ExerciseLifecycleStatus.ARCHIVED, 7, TARGET);
+        when(repository.findById(EXERCISE)).thenReturn(Optional.of(source));
+        when(repository.findCanonicalReplacementExerciseById(TARGET)).thenReturn(Optional.of(
+                new CanonicalReplacementExercise(
+                        TARGET, "ACTIVE_TARGET", "Active Target", ExerciseLifecycleStatus.ACTIVE)));
+
+        CanonicalReplacementPreview preview = service.getCanonicalReplacementPreview(ADMIN, EXERCISE);
+
+        assertThat(preview.sourceExercise().id()).isEqualTo(EXERCISE);
+        assertThat(preview.expectedVersion()).isEqualTo(7);
+        assertThat(preview.currentTarget().id()).isEqualTo(TARGET);
+        assertThat(preview.usageImpact().availability()).isEqualTo("NOT_AVAILABLE");
+        assertThat(preview.usageImpact().count()).isNull();
+        verify(repository, never()).setCanonicalReplacement(any(), anyLong(), any(), any(), any(), any());
+        verify(repository, never()).clearCanonicalReplacement(any(), anyLong(), any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    void canonicalReplacementPreviewRejectsNonArchivedSource() {
+        authorize();
+        when(repository.findById(EXERCISE)).thenReturn(Optional.of(
+                exercise(EXERCISE, ExerciseLifecycleStatus.ACTIVE, 1, null)));
+
+        assertThatThrownBy(() -> service.getCanonicalReplacementPreview(ADMIN, EXERCISE))
+                .isInstanceOf(ExerciseLifecycleConflictException.class);
+        verify(repository, never()).findCanonicalReplacementExerciseById(any());
     }
 
     @Test

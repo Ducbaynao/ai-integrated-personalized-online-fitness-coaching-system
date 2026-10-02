@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.exercise.adapter.out.persistence;
 
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExerciseFormMetadata;
 import com.fitnesscoaching.platform.modules.exercise.application.model.AdminExercisePage;
+import com.fitnesscoaching.platform.modules.exercise.application.model.CanonicalReplacementExercise;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.AdminExerciseQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseDraftData;
 import com.fitnesscoaching.platform.modules.exercise.application.port.out.AdminExerciseRepository;
@@ -139,6 +140,21 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
     @Override
     public Optional<AdminExercise> findByIdForUpdate(UUID exerciseId) {
         return findExercise(exerciseId, true);
+    }
+
+    @Override
+    public Optional<CanonicalReplacementExercise> findCanonicalReplacementExerciseById(UUID exerciseId) {
+        return jdbcTemplate.query(
+                """
+                SELECT id, code, name, admin_status
+                FROM fitness.exercises
+                WHERE id = ? AND deleted_at IS NULL
+                """,
+                (rs, rowNum) -> new CanonicalReplacementExercise(
+                        rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name"),
+                        ExerciseLifecycleStatus.valueOf(rs.getString("admin_status"))),
+                exerciseId
+        ).stream().findFirst();
     }
 
     private Optional<AdminExercise> findExercise(UUID exerciseId, boolean lock) {
