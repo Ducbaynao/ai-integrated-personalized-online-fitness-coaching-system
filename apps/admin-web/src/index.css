@@ -47,6 +47,8 @@ button:hover, .button-link:hover { background: var(--color-primary-strong); }
 .button-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 button:disabled { cursor: not-allowed; opacity: .6; }
 .button-secondary { color: var(--color-primary); background: var(--color-surface); }
+.button-danger { border-color: var(--color-danger); background: var(--color-danger); }
+.button-danger:hover { background: #8f1b13; }
 .button-danger-text { min-height: 36px; padding: 0; border: 0; color: var(--color-danger); background: transparent; }
 .button-danger-text:hover { color: #8f1b13; background: transparent; text-decoration: underline; }
 a { color: var(--color-primary-strong); }
@@ -137,6 +139,7 @@ td a { font-weight: 700; }
 .pagination { display: flex; flex-wrap: wrap; align-items: end; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 .pagination label { grid-template-columns: auto 80px; align-items: center; }
 .inline-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid #f2c94c; border-radius: var(--radius-sm); color: #644c00; background: #fff9df; }
+.success-alert { padding: var(--space-3) var(--space-4); border: 1px solid #9ed7ba; border-radius: var(--radius-sm); color: #0b5e36; background: #e9f8f0; }
 .button-link-inline { min-height: 36px; padding: 0; border: 0; color: var(--color-primary-strong); background: transparent; text-decoration: underline; }
 .button-link-inline:hover { background: transparent; }
 .skeleton-stack { display: grid; gap: var(--space-4); }
@@ -202,6 +205,8 @@ td a { font-weight: 700; }
 .dialog-backdrop { display: grid; position: fixed; z-index: 100; inset: 0; padding: var(--space-4); background: rgba(23, 32, 42, .52); place-items: center; }
 .confirmation-dialog { width: min(100%, 520px); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-surface); }
 .confirmation-dialog h2 { margin-top: 0; }
+.confirmation-dialog .form-field { margin: var(--space-4) 0 var(--space-2); }
+.confirmation-dialog .form-help { text-align: right; }
 
 @media (max-width: 720px) {
   .app-header, .account-menu { align-items: flex-start; }

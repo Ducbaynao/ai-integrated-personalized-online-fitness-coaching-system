@@ -3,7 +3,9 @@ import type {
   AdminExerciseDraftRequest,
   AdminExerciseFormMetadata,
   AdminExercisePage,
+  ArchiveExerciseRequest,
   ExerciseSearchParams,
+  ExerciseVersionRequest,
   UpdateAdminExerciseRequest,
 } from '../types/exercise.ts'
 import { apiRequest } from './apiClient.ts'
@@ -52,6 +54,26 @@ export function updateAdminExerciseDraft(
 ): Promise<AdminExerciseDetail> {
   return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}`, {
     method: 'PUT',
+    body: JSON.stringify(request),
+  })
+}
+
+export function activateAdminExercise(
+  exerciseId: string,
+  request: ExerciseVersionRequest,
+): Promise<AdminExerciseDetail> {
+  return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}/activate`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+export function archiveAdminExercise(
+  exerciseId: string,
+  request: ArchiveExerciseRequest,
+): Promise<AdminExerciseDetail> {
+  return apiRequest(`/admin/exercises/${encodeURIComponent(exerciseId)}/archive`, {
+    method: 'POST',
     body: JSON.stringify(request),
   })
 }
