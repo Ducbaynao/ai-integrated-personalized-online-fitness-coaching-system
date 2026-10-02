@@ -1,28 +1,40 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { exerciseQueryKeys } from '../../services/exerciseApi.ts'
 import { createExerciseDetail, createExerciseMetadata } from '../../test/exerciseTestData.ts'
+import { ExerciseDetailPage } from './ExerciseDetailPage.tsx'
 import { ExerciseCreatePage, ExerciseEditPage } from './ExerciseDraftPages.tsx'
 
 const EXERCISE_ID = '2c5f9430-c360-4b32-b70a-d6f92b76bfd4'
 
-function renderDraftPage(path: string, queryClient = createQueryClient()) {
+function renderDraftPage(
+  path: string,
+  queryClient = createQueryClient(),
+  options: {
+    initialEntries?: string[]
+    initialIndex?: number
+    detailElement?: ReactNode
+  } = {},
+) {
+  const router = createMemoryRouter([
+    { path: '/exercises/new', element: <ExerciseCreatePage /> },
+    { path: '/exercises/:exerciseId/edit', element: <ExerciseEditPage /> },
+    { path: '/exercises/:exerciseId', element: options.detailElement ?? <h1>Chi tiết kiểm thử</h1> },
+    { path: '/exercises', element: <h1>Danh sách kiểm thử</h1> },
+  ], {
+    initialEntries: options.initialEntries ?? [path],
+    initialIndex: options.initialIndex,
+  })
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/exercises/new" element={<ExerciseCreatePage />} />
-          <Route path="/exercises/:exerciseId/edit" element={<ExerciseEditPage />} />
-          <Route path="/exercises/:exerciseId" element={<h1>Chi tiết kiểm thử</h1>} />
-          <Route path="/exercises" element={<h1>Danh sách kiểm thử</h1>} />
-        </Routes>
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { ...result, queryClient }
+  return { ...result, queryClient, router }
 }
 
 function createQueryClient() {
@@ -93,7 +105,9 @@ describe('exercise draft create and edit flows', () => {
     const fetchMock = successfulFetch()
     vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
-    renderDraftPage(`/exercises/${EXERCISE_ID}/edit`)
+    const queryClient = createQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderDraftPage(`/exercises/${EXERCISE_ID}/edit`, queryClient)
 
     const nameInput = await screen.findByLabelText(/Tên bài tập/)
     expect(nameInput).toHaveValue('Barbell Squat')
@@ -106,6 +120,11 @@ describe('exercise draft create and edit flows', () => {
     const payload = JSON.parse(putCall?.[1]?.body as string)
     expect(payload.expectedVersion).toBe(7)
     expect(payload.exercise.name).toBe('Updated Squat')
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: exerciseQueryKeys.lists() })
+    expect(queryClient.getQueryData(exerciseQueryKeys.detail(EXERCISE_ID))).toMatchObject({
+      name: 'Updated Squat',
+      version: 8,
+    })
   })
 
   it.each(['ACTIVE', 'ARCHIVED'] as const)('blocks direct editing of a %s exercise', async (status) => {
@@ -227,21 +246,70 @@ describe('exercise draft create and edit flows', () => {
     expect(screen.getByRole('alertdialog', { name: 'Tải bản mới nhất?' })).toBeInTheDocument()
   })
 
-  it('removes the editable form after a lifecycle conflict', async () => {
+  it.each([
+    ['permission revoked', 'CATALOG_MANAGE_REQUIRED', 403, 'Bạn không có quyền chỉnh sửa'],
+    ['account unavailable', 'ACCOUNT_UNAVAILABLE', 403, 'Tài khoản không khả dụng'],
+    ['not found', 'ADMIN_EXERCISE_NOT_FOUND', 404, 'Không tìm thấy bài tập'],
+  ])('removes cached detail and unsafe actions after a terminal %s mutation', async (
+    _scenario,
+    errorCode,
+    status,
+    title,
+  ) => {
     const fetchMock = vi.fn().mockImplementation(async (input: string, init?: RequestInit) => {
       if (input.endsWith('/metadata')) return Response.json(createExerciseMetadata())
-      if (!init?.method) return Response.json(createExerciseDetail({ status: 'DRAFT' }))
+      if (!init?.method) return Response.json(createExerciseDetail({ status: 'DRAFT', version: 7 }))
+      return Response.json({ errorCode, message: 'raw terminal detail', fieldErrors: [] }, { status })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    const { queryClient } = renderDraftPage(`/exercises/${EXERCISE_ID}/edit`)
+
+    await screen.findByRole('form')
+    expect(queryClient.getQueryData(exerciseQueryKeys.detail(EXERCISE_ID))).toBeDefined()
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /chi tiết/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Barbell Squat')).not.toBeInTheDocument()
+    expect(screen.queryByText('raw terminal detail')).not.toBeInTheDocument()
+    expect(queryClient.getQueryData(exerciseQueryKeys.detail(EXERCISE_ID))).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: 'Quay lại danh sách' }))
+    expect(await screen.findByRole('heading', { name: 'Danh sách kiểm thử' })).toBeInTheDocument()
+  })
+
+  it('clears stale detail after a lifecycle conflict and only opens freshly loaded detail', async () => {
+    let detailRequests = 0
+    const fetchMock = vi.fn().mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input.endsWith('/metadata')) return Response.json(createExerciseMetadata())
+      if (!init?.method) {
+        detailRequests += 1
+        return Response.json(createExerciseDetail(detailRequests === 1
+          ? { status: 'DRAFT', version: 7, name: 'Stale Draft Name' }
+          : { status: 'ACTIVE', version: 8, name: 'Fresh Active Name' }))
+      }
       return Response.json({ errorCode: 'EXERCISE_LIFECYCLE_CONFLICT', message: 'raw', fieldErrors: [] }, { status: 409 })
     })
     vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
-    renderDraftPage(`/exercises/${EXERCISE_ID}/edit`)
+    const { queryClient } = renderDraftPage(`/exercises/${EXERCISE_ID}/edit`, createQueryClient(), {
+      detailElement: <ExerciseDetailPage />,
+    })
 
     await screen.findByRole('form')
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
 
     expect(await screen.findByRole('heading', { name: 'Bài tập không còn có thể chỉnh sửa' })).toBeInTheDocument()
     expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(screen.queryByText('Stale Draft Name')).not.toBeInTheDocument()
+    expect(queryClient.getQueryData(exerciseQueryKeys.detail(EXERCISE_ID))).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: 'Tải chi tiết mới nhất' }))
+    expect(await screen.findByRole('heading', { name: 'Fresh Active Name' })).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(screen.queryByText('Stale Draft Name')).not.toBeInTheDocument()
   })
 
   it('handles empty metadata and terminal permission errors with safe Vietnamese states', async () => {
@@ -310,6 +378,89 @@ describe('exercise draft create and edit flows', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/Tên bài tập/)).toHaveValue('Unsaved name')
     unmount()
+  })
+
+  it('blocks browser Back and proceeds without changing the history destination', async () => {
+    vi.stubGlobal('fetch', successfulFetch())
+    const user = userEvent.setup()
+    const { router } = renderDraftPage('/exercises/new', createQueryClient(), {
+      initialEntries: ['/exercises', '/exercises/new'],
+      initialIndex: 1,
+    })
+
+    await user.type(await screen.findByLabelText(/Tên bài tập/), 'Dirty back navigation')
+    await act(async () => { await router.navigate(-1) })
+    expect(screen.getByRole('alertdialog', { name: 'Bạn có thay đổi chưa lưu' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/exercises/new')
+
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục chỉnh sửa' }))
+    expect(router.state.location.pathname).toBe('/exercises/new')
+    expect(screen.getByLabelText(/Tên bài tập/)).toHaveValue('Dirty back navigation')
+
+    await act(async () => { await router.navigate(-1) })
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Rời trang' }))
+    expect(await screen.findByRole('heading', { name: 'Danh sách kiểm thử' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/exercises')
+  })
+
+  it('blocks browser Forward while dirty and keeps the form when staying', async () => {
+    vi.stubGlobal('fetch', successfulFetch())
+    const user = userEvent.setup()
+    const { router } = renderDraftPage('/exercises/new', createQueryClient(), {
+      initialEntries: ['/exercises/new', '/exercises'],
+      initialIndex: 0,
+    })
+
+    await user.type(await screen.findByLabelText(/Tên bài tập/), 'Dirty forward navigation')
+    await act(async () => { await router.navigate(1) })
+    expect(screen.getByRole('alertdialog', { name: 'Bạn có thay đổi chưa lưu' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/exercises/new')
+
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục chỉnh sửa' }))
+    expect(screen.getByLabelText(/Tên bài tập/)).toHaveValue('Dirty forward navigation')
+    expect(router.state.location.pathname).toBe('/exercises/new')
+  })
+
+  it('keeps the editable snapshot stable when a background refetch finds a newer version', async () => {
+    let detailRequests = 0
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (input.endsWith('/metadata')) return Response.json(createExerciseMetadata())
+      if (input.endsWith(EXERCISE_ID)) {
+        detailRequests += 1
+        return Response.json(createExerciseDetail(detailRequests === 1
+          ? { status: 'DRAFT', version: 7, name: 'Loaded Snapshot' }
+          : { status: 'DRAFT', version: 8, name: 'Latest Server Snapshot' }))
+      }
+      throw new Error(`Unexpected request: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    const queryClient = createQueryClient()
+    renderDraftPage(`/exercises/${EXERCISE_ID}/edit`, queryClient)
+
+    const nameInput = await screen.findByLabelText(/Tên bài tập/)
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Local unsaved snapshot')
+    act(() => {
+      queryClient.setQueryData(
+        exerciseQueryKeys.detail(EXERCISE_ID),
+        createExerciseDetail({ status: 'DRAFT', version: 8, name: 'Latest Server Snapshot' }),
+      )
+    })
+
+    expect(nameInput).toHaveValue('Local unsaved snapshot')
+    expect(screen.getByText('Phiên bản 7')).toBeInTheDocument()
+    expect(screen.queryByText('Phiên bản 8')).not.toBeInTheDocument()
+    expect(await screen.findByText(/Máy chủ có phiên bản mới hơn/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Tải bản mới nhất' }))
+    expect(screen.getByRole('alertdialog', { name: 'Tải bản mới nhất?' })).toBeInTheDocument()
+    expect(nameInput).toHaveValue('Local unsaved snapshot')
+    await user.click(screen.getByRole('button', { name: 'Tải và bỏ thay đổi' }))
+
+    expect(await screen.findByDisplayValue('Latest Server Snapshot')).toBeInTheDocument()
+    expect(screen.getByText('Phiên bản 8')).toBeInTheDocument()
   })
 
   it('registers refresh protection only after the form becomes dirty', async () => {

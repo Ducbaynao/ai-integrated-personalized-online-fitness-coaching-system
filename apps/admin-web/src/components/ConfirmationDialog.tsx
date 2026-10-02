@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -21,6 +21,14 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
+  const onCancelRef = useRef(onCancel)
+  const generatedId = useId()
+  const titleId = `confirmation-title-${generatedId}`
+  const descriptionId = `confirmation-description-${generatedId}`
+
+  useEffect(() => {
+    onCancelRef.current = onCancel
+  }, [onCancel])
 
   useEffect(() => {
     if (!open) return
@@ -29,7 +37,7 @@ export function ConfirmationDialog({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onCancel()
+        onCancelRef.current()
         return
       }
       if (event.key !== 'Tab' || !dialogRef.current) return
@@ -38,7 +46,11 @@ export function ConfirmationDialog({
       if (focusable.length === 0) return
       const first = focusable[0]
       const last = focusable.at(-1)!
-      if (event.shiftKey && document.activeElement === first) {
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        const recoveryTarget = event.shiftKey ? last : first
+        recoveryTarget.focus()
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault()
         last.focus()
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -49,9 +61,9 @@ export function ConfirmationDialog({
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
-      previousFocus?.focus()
+      if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [onCancel, open])
+  }, [open])
 
   if (!open) return null
 
@@ -63,12 +75,12 @@ export function ConfirmationDialog({
         className="confirmation-dialog"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirmation-title"
-        aria-describedby="confirmation-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         ref={dialogRef}
       >
-        <h2 id="confirmation-title">{title}</h2>
-        <p id="confirmation-description">{description}</p>
+        <h2 id={titleId}>{title}</h2>
+        <p id={descriptionId}>{description}</p>
         <div className="dialog-actions">
           <button ref={cancelRef} type="button" className="button-secondary" onClick={onCancel}>
             {cancelLabel}

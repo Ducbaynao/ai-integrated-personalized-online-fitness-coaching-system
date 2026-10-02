@@ -517,7 +517,11 @@ function CheckboxOptions({
       ))}
       {unavailableCodes.map((code) => (
         <label className="checkbox-field checkbox-field--unavailable" key={code}>
-          <input type="checkbox" checked disabled />
+          <input
+            type="checkbox"
+            checked
+            onChange={() => onChange(selectedCodes.filter((selectedCode) => selectedCode !== code))}
+          />
           {code} — Không còn khả dụng
         </label>
       ))}

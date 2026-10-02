@@ -66,14 +66,19 @@ describe('exercise draft form foundation', () => {
     variation.equipment = [{ ...createEmptyEquipment(), equipmentCode: 'BARBELL' }]
     value.code = 'BARBELL_SQUAT'
     value.name = 'Barbell Squat'
+    value.tagCodes = ['COMPOUND']
     value.variations = [variation]
 
     const payload = toAdminExerciseDraftRequest(value)
 
     expect(JSON.stringify(payload)).not.toContain('clientKey')
+    expect(payload.tagCodes).toEqual(['COMPOUND'])
     expect(payload.variations[0].name).toBe('High-bar Squat')
     expect(payload.variations[0].muscles).toEqual([
       { muscleGroupCode: 'QUADRICEPS', involvement: 'PRIMARY' },
+    ])
+    expect(payload.variations[0].equipment).toEqual([
+      { equipmentCode: 'BARBELL', requirement: 'REQUIRED' },
     ])
   })
 
@@ -96,29 +101,51 @@ describe('exercise draft form foundation', () => {
     expect(toAdminExerciseDraftRequest(value).tagCodes).toHaveLength(101)
   })
 
-  it('shows current unavailable metadata without silently deleting it', () => {
-    const value = createEmptyExerciseDraft()
-    value.code = 'LEGACY_DRAFT'
-    value.name = 'Legacy Draft'
-    value.movementPattern = 'RETIRED_PATTERN'
-    value.tagCodes = ['RETIRED_TAG']
-
-    render(
-      <ExerciseDraftForm
-        mode="edit"
-        value={value}
-        metadata={createExerciseMetadata()}
-        busy={false}
-        onChange={vi.fn()}
-        onSubmit={vi.fn()}
-        onCancel={vi.fn()}
-      />,
-    )
+  it('retains an unavailable tag until the user removes it and never makes it selectable again', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    function Harness() {
+      const [value, setValue] = useState(() => ({
+        ...createEmptyExerciseDraft(),
+        code: 'LEGACY_DRAFT',
+        name: 'Legacy Draft',
+        movementPattern: 'RETIRED_PATTERN',
+        tagCodes: ['RETIRED_TAG'],
+      }))
+      return (
+        <ExerciseDraftForm
+          mode="edit"
+          value={value}
+          metadata={createExerciseMetadata()}
+          busy={false}
+          onChange={setValue}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
+    }
+    render(<Harness />)
 
     expect(screen.getByRole('option', { name: 'RETIRED_PATTERN — Không còn khả dụng' })).toBeDisabled()
-    expect(screen.getByText('RETIRED_TAG — Không còn khả dụng')).toBeInTheDocument()
-    expect(toAdminExerciseDraftRequest(value).movementPattern).toBe('RETIRED_PATTERN')
-    expect(toAdminExerciseDraftRequest(value).tagCodes).toEqual(['RETIRED_TAG'])
+    const unavailableTag = screen.getByRole('checkbox', { name: 'RETIRED_TAG — Không còn khả dụng' })
+    expect(unavailableTag).toBeChecked()
+    expect(unavailableTag).toBeEnabled()
+
+    unavailableTag.focus()
+    await user.keyboard(' ')
+    expect(screen.queryByRole('checkbox', { name: 'RETIRED_TAG — Không còn khả dụng' })).not.toBeInTheDocument()
+    expect(screen.queryByText('RETIRED_TAG')).not.toBeInTheDocument()
+
+    const activeTag = screen.getByRole('checkbox', { name: 'Compound' })
+    await user.click(activeTag)
+    expect(activeTag).toBeChecked()
+    await user.click(activeTag)
+    expect(activeTag).not.toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit.mock.calls[0][0].movementPattern).toBe('RETIRED_PATTERN')
+    expect(onSubmit.mock.calls[0][0].tagCodes).toEqual([])
   })
 
   it('disables submit while a mutation is running', () => {

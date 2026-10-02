@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ConfirmationDialog } from '../../components/ConfirmationDialog.tsx'
@@ -33,6 +33,7 @@ export function ExerciseCreatePage() {
   const [serverErrors, setServerErrors] = useState<ExerciseDraftFormErrors>({})
   const [formError, setFormError] = useState<string>()
   const [terminalError, setTerminalError] = useState<TerminalFormError>()
+  const [createdExerciseId, setCreatedExerciseId] = useState<string>()
   const dirty = serializeDraft(value) !== baseline
   const { requestNavigation, unsavedChangesDialog } = useUnsavedChanges(dirty)
   const metadataQuery = useQuery({
@@ -45,10 +46,16 @@ export function ExerciseCreatePage() {
       setBaseline(serializeDraft(value))
       queryClient.setQueryData(exerciseQueryKeys.detail(created.id), created)
       await queryClient.invalidateQueries({ queryKey: exerciseQueryKeys.lists() })
-      navigate(`/exercises/${created.id}`, { replace: true })
+      setCreatedExerciseId(created.id)
     },
     onError: (error) => applyMutationError(error, setServerErrors, setFormError, setTerminalError),
   })
+
+  useEffect(() => {
+    if (createdExerciseId && !dirty) {
+      navigate(`/exercises/${createdExerciseId}`, { replace: true })
+    }
+  }, [createdExerciseId, dirty, navigate])
 
   if (terminalError) {
     return <TerminalFormState error={terminalError} onCatalog={() => navigate('/exercises')} />
@@ -100,6 +107,7 @@ export function ExerciseEditPage() {
   const [terminalError, setTerminalError] = useState<TerminalFormError>()
   const [versionConflict, setVersionConflict] = useState(false)
   const [confirmReload, setConfirmReload] = useState(false)
+  const [updatedExerciseId, setUpdatedExerciseId] = useState<string>()
   const dirty = Boolean(value && baseline && serializeDraft(value) !== baseline)
   const { requestNavigation, unsavedChangesDialog } = useUnsavedChanges(dirty)
   const metadataQuery = useQuery({
@@ -109,8 +117,14 @@ export function ExerciseEditPage() {
   const detailQuery = useQuery({
     queryKey: exerciseQueryKeys.detail(exerciseId),
     queryFn: () => getAdminExerciseDetail(exerciseId),
-    enabled: validId,
+    enabled: validId && !terminalError,
   })
+
+  useEffect(() => {
+    if (terminalError) {
+      queryClient.removeQueries({ queryKey: exerciseQueryKeys.detail(exerciseId), exact: true })
+    }
+  }, [exerciseId, queryClient, terminalError])
 
   if (!value && detailQuery.data?.status === 'DRAFT') {
     const initialValue = exerciseDetailToFormValue(detailQuery.data)
@@ -128,7 +142,7 @@ export function ExerciseEditPage() {
       setBaseline(serializeDraft(updatedValue))
       queryClient.setQueryData(exerciseQueryKeys.detail(updated.id), updated)
       await queryClient.invalidateQueries({ queryKey: exerciseQueryKeys.lists() })
-      navigate(`/exercises/${updated.id}`, { replace: true })
+      setUpdatedExerciseId(updated.id)
     },
     onError: (error) => {
       if (error instanceof ApiError && error.errorCode === 'EXERCISE_VERSION_CONFLICT') {
@@ -139,6 +153,12 @@ export function ExerciseEditPage() {
       applyMutationError(error, setServerErrors, setFormError, setTerminalError)
     },
   })
+
+  useEffect(() => {
+    if (updatedExerciseId && !dirty) {
+      navigate(`/exercises/${updatedExerciseId}`, { replace: true })
+    }
+  }, [dirty, navigate, updatedExerciseId])
 
   if (!validId) {
     return (
@@ -151,7 +171,16 @@ export function ExerciseEditPage() {
     )
   }
   if (terminalError) {
-    return <TerminalFormState error={terminalError} onCatalog={() => navigate('/exercises')} exerciseId={exerciseId} />
+    return (
+      <TerminalFormState
+        error={terminalError}
+        onCatalog={() => navigate('/exercises')}
+        onDetail={terminalError.allowFreshDetail ? () => {
+          queryClient.removeQueries({ queryKey: exerciseQueryKeys.detail(exerciseId), exact: true })
+          navigate(`/exercises/${exerciseId}`)
+        } : undefined}
+      />
+    )
   }
   if (metadataQuery.isPending || detailQuery.isPending) return <FormLoading title="Chỉnh sửa bài tập" />
   if (metadataQuery.isError || !metadataQuery.data) {
@@ -184,6 +213,7 @@ export function ExerciseEditPage() {
     )
   }
   if (!value || loadedVersion === undefined) return <FormLoading title="Chỉnh sửa bài tập" />
+  const newerServerVersionAvailable = detail.version > loadedVersion
 
   const reloadLatest = async () => {
     const latest = await queryClient.fetchQuery({
@@ -209,17 +239,19 @@ export function ExerciseEditPage() {
 
   return (
     <section className="page-stack">
-      <FormHeading eyebrow="Chỉnh sửa bản nháp" title={detail.name} description={`Phiên bản ${detail.version.toLocaleString('vi-VN')}`} />
+      <FormHeading eyebrow="Chỉnh sửa bản nháp" title={value.name} description={`Phiên bản ${loadedVersion.toLocaleString('vi-VN')}`} />
       {canRenderStaleDetail ? (
         <div className="inline-alert" role="status">
           Không thể tải dữ liệu mới nhất. Bạn nên thử lại trước khi chỉnh sửa.
           <button className="button-link-inline" onClick={() => void detailQuery.refetch()}>Thử lại</button>
         </div>
       ) : null}
-      {versionConflict ? (
+      {versionConflict || newerServerVersionAvailable ? (
         <div className="conflict-panel" role="alert">
           <h2>Có phiên bản mới hơn trên hệ thống</h2>
-          <p>Dữ liệu bạn nhập chưa bị mất. Bạn có thể tải bản mới nhất hoặc quay lại trang chi tiết.</p>
+          <p>{newerServerVersionAvailable
+            ? 'Máy chủ có phiên bản mới hơn. Dữ liệu bạn đang nhập vẫn được giữ nguyên.'
+            : 'Dữ liệu bạn nhập chưa bị mất. Bạn có thể tải bản mới nhất hoặc quay lại trang chi tiết.'}</p>
           <div className="inline-actions">
             <button type="button" onClick={() => setConfirmReload(true)}>Tải bản mới nhất</button>
             <button type="button" className="button-secondary" onClick={() => requestNavigation(`/exercises/${exerciseId}`)}>Quay lại chi tiết</button>
@@ -271,6 +303,7 @@ function serializeDraft(value: ExerciseDraftFormValue): string {
 interface TerminalFormError {
   title: string
   description: string
+  allowFreshDetail?: boolean
 }
 
 function applyMutationError(
@@ -278,40 +311,45 @@ function applyMutationError(
   setServerErrors: (errors: ExerciseDraftFormErrors) => void,
   setFormError: (message: string | undefined) => void,
   setTerminalError: (error: TerminalFormError | undefined) => void,
-) {
+): TerminalFormError | undefined {
   if (error instanceof ApiError) {
     if (error.errorCode === 'EXERCISE_CODE_CONFLICT') {
       setServerErrors({ code: 'Mã bài tập đã được sử dụng. Vui lòng chọn mã khác.' })
       setFormError('Mã bài tập bị trùng với dữ liệu hiện có.')
-      return
+      return undefined
     }
     if (error.errorCode === 'EXERCISE_LIFECYCLE_CONFLICT') {
-      setTerminalError({
+      const terminal = {
         title: 'Bài tập không còn có thể chỉnh sửa',
         description: 'Trạng thái bài tập đã thay đổi. Hãy quay lại trang chi tiết hoặc danh sách.',
-      })
-      return
+        allowFreshDetail: true,
+      }
+      setTerminalError(terminal)
+      return terminal
     }
     if (error.status === 401 || ['SESSION_EXPIRED', 'UNAUTHENTICATED', 'INVALID_REFRESH_TOKEN'].includes(error.errorCode)) {
-      setTerminalError({
+      const terminal = {
         title: 'Phiên đăng nhập đã hết hạn',
         description: 'Vui lòng đăng nhập lại để tiếp tục.',
-      })
-      return
+      }
+      setTerminalError(terminal)
+      return terminal
     }
     if (error.status === 403 || ['ACCESS_DENIED', 'ACCOUNT_UNAVAILABLE', 'CATALOG_MANAGE_REQUIRED'].includes(error.errorCode)) {
-      setTerminalError({
+      const terminal = {
         title: error.errorCode === 'ACCOUNT_UNAVAILABLE' ? 'Tài khoản không khả dụng' : 'Bạn không có quyền chỉnh sửa',
         description: 'Biểu mẫu đã được khóa vì quyền quản lý danh mục hiện không khả dụng.',
-      })
-      return
+      }
+      setTerminalError(terminal)
+      return terminal
     }
     if (error.status === 404 || error.errorCode === 'ADMIN_EXERCISE_NOT_FOUND') {
-      setTerminalError({
+      const terminal = {
         title: 'Không tìm thấy bài tập',
         description: 'Bài tập này không tồn tại hoặc hiện không khả dụng.',
-      })
-      return
+      }
+      setTerminalError(terminal)
+      return terminal
     }
     if (error.errorCode === 'VALIDATION_FAILED') {
       const fieldErrors = mapApiFieldErrors(error.fieldErrors)
@@ -319,18 +357,19 @@ function applyMutationError(
       setFormError(Object.keys(fieldErrors).length > 0
         ? 'Một số trường chưa hợp lệ. Vui lòng kiểm tra các lỗi bên dưới.'
         : 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại biểu mẫu.')
-      return
+      return undefined
     }
     if (error.status === 0) {
       setFormError('Không thể kết nối đến hệ thống. Dữ liệu bạn nhập vẫn được giữ để thử lại.')
-      return
+      return undefined
     }
     if (error.status >= 500) {
       setFormError('Hệ thống đang gặp sự cố. Dữ liệu bạn nhập vẫn được giữ để thử lại sau.')
-      return
+      return undefined
     }
   }
   setFormError('Không thể lưu bài tập. Dữ liệu bạn nhập vẫn được giữ để thử lại.')
+  return undefined
 }
 
 function FormHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
@@ -387,13 +426,12 @@ function EmptyMetadataNotice({ metadata }: { metadata: Awaited<ReturnType<typeof
 function TerminalFormState({
   error,
   onCatalog,
-  exerciseId,
+  onDetail,
 }: {
   error: TerminalFormError
   onCatalog: () => void
-  exerciseId?: string
+  onDetail?: () => void
 }) {
-  const navigate = useNavigate()
   return (
     <StatePanel
       title={error.title}
@@ -401,8 +439,8 @@ function TerminalFormState({
       tone="danger"
       action={(
         <div className="inline-actions inline-actions--center">
-          {exerciseId ? <button onClick={() => navigate(`/exercises/${exerciseId}`)}>Quay lại chi tiết</button> : null}
-          <button className={exerciseId ? 'button-secondary' : undefined} onClick={onCatalog}>Quay lại danh sách</button>
+          {onDetail ? <button onClick={onDetail}>Tải chi tiết mới nhất</button> : null}
+          <button className={onDetail ? 'button-secondary' : undefined} onClick={onCatalog}>Quay lại danh sách</button>
         </div>
       )}
     />
