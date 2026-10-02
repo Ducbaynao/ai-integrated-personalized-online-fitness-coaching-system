@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createExerciseDetail, createExerciseMetadata, createExercisePage } from '../test/exerciseTestData.ts'
 import {
+  activateAdminExercise,
+  archiveAdminExercise,
   createAdminExerciseDraft,
   exerciseQueryKeys,
   getAdminExerciseFormMetadata,
@@ -73,5 +75,28 @@ describe('exercise API contract', () => {
       method: 'PUT',
       body: JSON.stringify({ expectedVersion: 3, exercise: draft }),
     }))
+  })
+
+  it('uses the contract lifecycle paths and exact versioned payloads', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json(createExerciseDetail()))
+    vi.stubGlobal('fetch', fetchMock)
+    const exerciseId = '2c5f9430-c360-4b32-b70a-d6f92b76bfd4'
+
+    await activateAdminExercise(exerciseId, { expectedVersion: 7 })
+    await archiveAdminExercise(exerciseId, { expectedVersion: 8, reason: 'Nội dung đã lỗi thời' })
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `/api/v1/admin/exercises/${exerciseId}/activate`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedVersion: 7 }) }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/admin/exercises/${exerciseId}/archive`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ expectedVersion: 8, reason: 'Nội dung đã lỗi thời' }),
+      }),
+    )
   })
 })

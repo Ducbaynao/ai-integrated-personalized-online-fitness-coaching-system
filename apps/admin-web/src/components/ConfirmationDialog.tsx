@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -6,6 +6,10 @@ interface ConfirmationDialogProps {
   description: string
   confirmLabel: string
   cancelLabel?: string
+  children?: ReactNode
+  confirmDisabled?: boolean
+  busy?: boolean
+  destructive?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -16,12 +20,17 @@ export function ConfirmationDialog({
   description,
   confirmLabel,
   cancelLabel = 'Tiếp tục chỉnh sửa',
+  children,
+  confirmDisabled = false,
+  busy = false,
+  destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const onCancelRef = useRef(onCancel)
+  const busyRef = useRef(busy)
   const generatedId = useId()
   const titleId = `confirmation-title-${generatedId}`
   const descriptionId = `confirmation-description-${generatedId}`
@@ -31,19 +40,31 @@ export function ConfirmationDialog({
   }, [onCancel])
 
   useEffect(() => {
+    busyRef.current = busy
+  }, [busy])
+
+  useEffect(() => {
+    if (open && busy) dialogRef.current?.focus()
+  }, [busy, open])
+
+  useEffect(() => {
     if (!open) return
     const previousFocus = document.activeElement as HTMLElement | null
     cancelRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onCancelRef.current()
+        if (!busyRef.current) onCancelRef.current()
         return
       }
       if (event.key !== 'Tab' || !dialogRef.current) return
       const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
         .filter((element) => !element.hasAttribute('disabled'))
-      if (focusable.length === 0) return
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialogRef.current.focus()
+        return
+      }
       const first = focusable[0]
       const last = focusable.at(-1)!
       if (!dialogRef.current.contains(document.activeElement)) {
@@ -69,7 +90,7 @@ export function ConfirmationDialog({
 
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onCancel()
+      if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       <div
         className="confirmation-dialog"
@@ -77,15 +98,25 @@ export function ConfirmationDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
+        aria-busy={busy}
+        tabIndex={-1}
         ref={dialogRef}
       >
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId}>{description}</p>
+        {children}
         <div className="dialog-actions">
-          <button ref={cancelRef} type="button" className="button-secondary" onClick={onCancel}>
+          <button ref={cancelRef} type="button" className="button-secondary" disabled={busy} onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button type="button" onClick={onConfirm}>{confirmLabel}</button>
+          <button
+            type="button"
+            className={destructive ? 'button-danger' : undefined}
+            disabled={confirmDisabled || busy}
+            onClick={onConfirm}
+          >
+            {busy ? 'Đang xử lý…' : confirmLabel}
+          </button>
         </div>
       </div>
     </div>

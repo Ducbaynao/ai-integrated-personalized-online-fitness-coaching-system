@@ -140,3 +140,11 @@ export interface UpdateAdminExerciseRequest {
   expectedVersion: number
   exercise: AdminExerciseDraftRequest
 }
+
+export interface ExerciseVersionRequest {
+  expectedVersion: number
+}
+
+export interface ArchiveExerciseRequest extends ExerciseVersionRequest {
+  reason: string
+}
