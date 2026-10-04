@@ -39,3 +39,12 @@ Reviewers and coding agents should search for and confirm these statements befor
 - Administrator is platform authority under least privilege;
 - PostgreSQL is the system of record.
 
+## Phase 2 planning traceability (DRAFT)
+
+| Planning source | Repository document | Coverage |
+| --- | --- | --- |
+| Release scope, document version 0.4 | [Release scope](00-project-overview/phase-2-release-scope.md) | F01–F11, D01–D07, release limits and approval record |
+| Feature data/authority, document version 0.4 | [Data and authority matrix](08-ai/phase-2-feature-data-authority-matrix.md) | Eleven feature contracts, context, permissions, lifecycle, retries, Food Confirmation and embedding compatibility |
+| Implementation plan, document version 0.4 | [Implementation plan](07-development/phase-2-implementation-plan.md) | P2-M0–P2-M6, prerequisite evidence, ownership by issue, T01–T28 and evaluation gates |
+
+The planning baseline commit is a historical reference. Importing these documents does not approve decisions, verify the external source DOCX, or demonstrate software completion. Product-description section coverage remains in the matrix above; planned-feature-to-test coverage is owned by implementation-plan section 12.3.

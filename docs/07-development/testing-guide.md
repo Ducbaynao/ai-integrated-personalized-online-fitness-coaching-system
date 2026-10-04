@@ -69,3 +69,8 @@ The CI pipeline runs independent parallel jobs that report failures clearly:
 5. **Contracts & Docs**: `npm run validate:contracts`, `npm run validate:ux-docs`
 6. **Database Migrations Check**: Flyway migration verification against disposable PostgreSQL 18 + pgvector container
 
+## Phase 2 planned verification
+
+The [Phase 2 implementation plan](phase-2-implementation-plan.md) defines T01–T28 and model/retrieval evaluation gates. These are scenarios to implement and execute, not passing-test evidence. Cover mutation rollback, source races against Phase 1 writers, operation/revision/payload retry identity, atomic Food Confirmation, result-type actions and embedding space compatibility. Keep deterministic authorization/integrity tests separate from model quality evaluation; report holdout versions, coverage, citation quality, latency and cost.
+
+Evaluate prerequisites independently from AI additions. A fixture can unblock client development without proving that the source domain is ready for release.

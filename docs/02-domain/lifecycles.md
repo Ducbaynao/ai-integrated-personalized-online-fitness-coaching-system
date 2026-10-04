@@ -147,10 +147,12 @@ stateDiagram-v2
     PENDING --> REJECTED
     PENDING --> EXPIRED
     ACCEPTED --> APPLIED
-    ACCEPTED --> APPLY_FAILED
+    PENDING --> CANCELLED
 ```
 
 Validation failure occurs before a recommendation becomes applicable. Application rechecks current authority, source version, and conflicts to prevent stale recommendations from overwriting newer decisions.
+
+The diagram uses the existing recommendation DB enum. `APPLY_FAILED` is not a persisted enum value; application failure is an operational error. The [Phase 2 V1 proposal](../08-ai/recommendation-lifecycle.md#phase-2-v1-transaction-proposal-draft) keeps ACCEPTED and APPLIED in the same transaction with domain writes and mandatory audit, rolling back all of them on failure. This transaction choice remains DRAFT; the diagram does not claim an implemented asynchronous Apply flow. INFORMATION and Nutrition ESTIMATE do not enter this recommendation lifecycle.
 
 ## Administration workflows
 

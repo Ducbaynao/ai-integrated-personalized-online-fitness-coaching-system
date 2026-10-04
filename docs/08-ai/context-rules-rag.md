@@ -53,3 +53,8 @@ Only eligible `ACTIVE` versions are retrieved for production assistance. Updatin
 
 PostgreSQL with pgvector is sufficient initially. A specialized vector database is considered only after measured vector workload demands it.
 
+## Phase 2 contract details (DRAFT)
+
+The [feature data and authority matrix](phase-2-feature-data-authority-matrix.md) supplies the proposed context envelope, multi-stage access checks and source-change policy. Source revisions come from owning modules, and digests detect changes without replacing transaction concurrency controls. Request, result read and application each require current authorization.
+
+The baseline embedding column is `vector(1536)`. Model output dimension must match the reviewed schema, and query/document embeddings must use a compatible model space/configuration. Matching dimensions alone is insufficient. Model changes require a versioned index/query switch and a coordinated rollback; historical evidence must remain traceable. See matrix section 1.10 for the proposed implementation gate.

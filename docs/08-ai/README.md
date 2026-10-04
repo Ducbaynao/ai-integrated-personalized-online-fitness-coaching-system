@@ -2,6 +2,14 @@
 
 AI Assistance is a shared capability for `SELF_DIRECTED` Students and Trainers operating in `HUMAN_COACH`. It is not a third Coaching Mode, not the system of record, and not a business decision maker.
 
+## Phase 2 reading order and status
+
+1. [Release scope — DRAFT](../00-project-overview/phase-2-release-scope.md).
+2. [Feature data and authority matrix — DRAFT](phase-2-feature-data-authority-matrix.md).
+3. [Implementation plan — DRAFT](../07-development/phase-2-implementation-plan.md).
+
+The documents distinguish inherited invariants from proposed release decisions. DTO names, reason codes, expiry values and retry storage are design proposals, not implemented contracts. Flyway and executable schemas remain the evidence for current database/API structure. The detailed matrix owns the proposed DB/API mapping and V1 transaction behavior; this overview summarizes it without approving it.
+
 ## Supported capabilities
 
 - propose Workout Plans, splits, exercises, replacements, volume, or load changes;
@@ -22,9 +30,16 @@ flowchart TB
     Retrieval --> Model["LLM or vision model"]
     Model --> Structured["Structured output"]
     Structured --> Validate["Schema and domain validation"]
-    Validate --> Recommendation["Pending Recommendation"]
+    Validate --> Kind{"Result type"}
+    Kind --> Information["INFORMATION: scoped explanation"]
+    Kind --> Recommendation["PROPOSAL: pending recommendation"]
+    Kind --> Estimate["ESTIMATE: Nutrition draft"]
+    Kind --> Limited["INSUFFICIENT_DATA or BLOCKED: no application"]
     Recommendation --> Decision["Authorized human decision"]
-    Decision --> Apply["Transactional application"]
+    Decision --> Apply["Spring domain validation and transactional application"]
+    Estimate --> Confirm["Student confirms or corrects food and quantity"]
+    Confirm --> Nutrition["Nutrition validation and deterministic calculation"]
+    Nutrition --> FoodLog["Transactional confirmed Food Log"]
 ```
 
 ## Safety and authority
@@ -38,3 +53,6 @@ flowchart TB
 
 See [context, rules, and RAG](context-rules-rag.md) and [recommendation lifecycle](recommendation-lifecycle.md).
 
+## Result boundaries
+
+INFORMATION has no application action. A validated PROPOSAL becomes a recommendation with the domain's responsible decision maker. ESTIMATE remains a Nutrition draft and uses Food Confirmation, not recommendation Apply. Operational Run state is separate from result type and reason code; see matrix section 1.6. These result labels are the Phase 2 draft contract vocabulary, not additional database enum values.

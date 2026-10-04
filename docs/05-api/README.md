@@ -49,3 +49,6 @@ WebSocket may carry chat messages, read receipts, notifications, and presence/ty
 
 See [authentication and errors](authentication-and-errors.md).
 
+## Phase 2 draft contracts
+
+The [feature data and authority matrix](../08-ai/phase-2-feature-data-authority-matrix.md) is the design input for future AI/Nutrition confirmation endpoints. It distinguishes Run status, result type, reason code, recommendation decisions and Food Confirmation. Operation identity, server-normalized payload fingerprints and committed receipts are proposed semantics; no `Idempotency-Key` header or new endpoint is claimed to exist. Extend and validate executable contracts together with implementation after the relevant decisions are recorded.
