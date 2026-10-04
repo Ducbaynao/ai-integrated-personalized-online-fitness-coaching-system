@@ -44,6 +44,9 @@ export interface AdminExerciseSummary {
   status: ExerciseLifecycleStatus
   version: number
   canonicalReplacementId: string | null
+  muscleGroupCodes: string[]
+  equipmentCodes: string[]
+  mediaAvailable: boolean
   variationCount: number
   updatedAt: string
 }

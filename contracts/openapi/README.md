@@ -13,7 +13,8 @@ Version `0.1.0` currently covers:
 - Trainer Profile activation without automatic coaching authority;
 - Trainer Application submission and status;
 - read-only active Exercise catalog search, detail, and filter metadata for Student and Trainer capabilities;
-- permission-protected Admin Exercise lifecycle and canonical replacement management.
+- permission-protected Admin Exercise lifecycle and canonical replacement management, including
+  deterministic list muscle/equipment collections and safe media availability without storage references.
 
 Later milestones extend the same `/api/v1` contract. Do not add undocumented endpoints in a client or silently change a request, response, error code, enum, or authority rule.
 

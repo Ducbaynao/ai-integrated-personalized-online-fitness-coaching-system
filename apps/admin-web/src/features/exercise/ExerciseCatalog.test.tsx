@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { exerciseQueryKeys } from '../../services/exerciseApi.ts'
-import { createExercisePage } from '../../test/exerciseTestData.ts'
+import { createExercisePage, createExerciseSummary } from '../../test/exerciseTestData.ts'
 import { ExerciseListPage } from './ExerciseListPage.tsx'
 
 function renderList(initialPath = '/exercises') {
@@ -34,12 +34,33 @@ describe('exercise catalog list', () => {
     expect(await screen.findByRole('link', { name: 'Barbell Squat' })).toBeInTheDocument()
     expect(screen.getAllByText('Đang hoạt động')).toHaveLength(2)
     expect(screen.getByRole('columnheader', { name: 'Tên bài tập' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Nhóm cơ' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Thiết bị' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Tư liệu khả dụng' })).toBeInTheDocument()
+    expect(screen.getByText('QUADRICEPS')).toBeInTheDocument()
+    expect(screen.getByText('BARBELL')).toBeInTheDocument()
+    expect(screen.getByText('Chưa có tư liệu khả dụng')).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Tìm kiếm' })).toHaveAttribute(
       'placeholder',
       'Tìm theo tên hoặc mã bài tập',
     )
     expect(screen.getByRole('link', { name: 'Tạo bài tập' })).toHaveAttribute('href', '/exercises/new')
     expect(screen.queryByRole('link', { name: 'Chỉnh sửa' })).not.toBeInTheDocument()
+  })
+
+  it('renders known missing relationships explicitly instead of inventing counts', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(createExercisePage({
+      items: [createExerciseSummary({
+        muscleGroupCodes: [],
+        equipmentCodes: [],
+        mediaAvailable: false,
+      })],
+    }))))
+    renderList()
+
+    expect(await screen.findByRole('link', { name: 'Barbell Squat' })).toBeInTheDocument()
+    expect(screen.getAllByText('Chưa có dữ liệu')).toHaveLength(2)
+    expect(screen.getByText('Chưa có tư liệu khả dụng')).toBeInTheDocument()
   })
 
   it('shows edit only for DRAFT rows', async () => {

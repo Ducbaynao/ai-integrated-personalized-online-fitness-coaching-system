@@ -65,18 +65,50 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
         pageParameters.add(Math.multiplyExact(query.page(), query.size()));
         List<AdminExerciseSummary> items = jdbcTemplate.query(
                 """
-                SELECT e.id, e.code, e.name, c.code AS category_code, e.difficulty,
-                       e.movement_pattern, e.admin_status, e.version,
-                       mapping.canonical_exercise_id,
-                       count(v.id) AS variation_count, e.updated_at
-                FROM fitness.exercises e
-                LEFT JOIN fitness.exercise_categories c ON c.id = e.category_id
-                LEFT JOIN fitness.exercise_canonical_mappings mapping ON mapping.duplicate_exercise_id = e.id
-                LEFT JOIN fitness.exercise_variations v ON v.exercise_id = e.id
+                WITH selected AS (
+                    SELECT e.id, e.code, e.name, e.category_id, e.difficulty,
+                           e.movement_pattern, e.admin_status, e.version, e.updated_at
+                    FROM fitness.exercises e
                 """ + where + "\n" + """
-                GROUP BY e.id, c.code, mapping.canonical_exercise_id
-                ORDER BY lower(e.name) ASC, e.id ASC
-                LIMIT ? OFFSET ?
+                    ORDER BY lower(e.name) ASC, e.id ASC
+                    LIMIT ? OFFSET ?
+                )
+                SELECT selected.id, selected.code, selected.name, c.code AS category_code,
+                       selected.difficulty, selected.movement_pattern, selected.admin_status, selected.version,
+                       mapping.canonical_exercise_id,
+                       ARRAY(
+                           SELECT DISTINCT mg.code
+                           FROM fitness.exercise_variations v
+                           JOIN fitness.exercise_muscles em ON em.exercise_variation_id = v.id
+                           JOIN fitness.muscle_groups mg ON mg.id = em.muscle_group_id
+                           WHERE v.exercise_id = selected.id
+                           ORDER BY mg.code
+                       ) AS muscle_group_codes,
+                       ARRAY(
+                           SELECT DISTINCT eq.code
+                           FROM fitness.exercise_variations v
+                           JOIN fitness.exercise_equipment ee ON ee.exercise_variation_id = v.id
+                           JOIN fitness.equipment eq ON eq.id = ee.equipment_id
+                           WHERE v.exercise_id = selected.id
+                           ORDER BY eq.code
+                       ) AS equipment_codes,
+                       EXISTS(
+                           SELECT 1
+                           FROM fitness.exercise_variations v
+                           JOIN fitness.exercise_media xm ON xm.exercise_variation_id = v.id
+                           JOIN fitness.media_files mf ON mf.id = xm.media_id
+                           WHERE v.exercise_id = selected.id
+                             AND mf.deleted_at IS NULL
+                             AND mf.scan_status = 'CLEAN'
+                       ) AS media_available,
+                       (SELECT count(*) FROM fitness.exercise_variations v
+                        WHERE v.exercise_id = selected.id) AS variation_count,
+                       selected.updated_at
+                FROM selected
+                LEFT JOIN fitness.exercise_categories c ON c.id = selected.category_id
+                LEFT JOIN fitness.exercise_canonical_mappings mapping
+                       ON mapping.duplicate_exercise_id = selected.id
+                ORDER BY lower(selected.name) ASC, selected.id ASC
                 """,
                 (rs, rowNum) -> new AdminExerciseSummary(
                         rs.getObject("id", UUID.class),
@@ -88,6 +120,9 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
                         ExerciseLifecycleStatus.valueOf(rs.getString("admin_status")),
                         rs.getLong("version"),
                         rs.getObject("canonical_exercise_id", UUID.class),
+                        readStringArray(rs, "muscle_group_codes"),
+                        readStringArray(rs, "equipment_codes"),
+                        rs.getBoolean("media_available"),
                         rs.getInt("variation_count"),
                         rs.getTimestamp("updated_at").toInstant()
                 ),
@@ -96,6 +131,14 @@ public class JdbcAdminExerciseRepository implements AdminExerciseRepository {
         long count = total == null ? 0 : total;
         int totalPages = count == 0 ? 0 : (int) ((count + query.size() - 1) / query.size());
         return new AdminExercisePage(items, query.page(), query.size(), count, totalPages);
+    }
+
+    private static List<String> readStringArray(ResultSet resultSet, String column) throws SQLException {
+        java.sql.Array sqlArray = resultSet.getArray(column);
+        if (sqlArray == null) {
+            return List.of();
+        }
+        return List.of((String[]) sqlArray.getArray());
     }
 
     @Override
