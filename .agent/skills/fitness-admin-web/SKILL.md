@@ -30,3 +30,7 @@ Private data panels must require an active privileged-access grant with visible 
 AI Run detail should expose model/prompt versions, request type, validation/rule outcome, latency, token use, error, and recommendation outcome without an Apply button. Replay/evaluation is isolated from live data changes.
 
 Job retry/cancel, feature flag rollout, knowledge publish, trainer verification, moderation, and support correction need conflict/error handling, idempotency feedback, and audit reference. Cover loading, empty, partial, permission-denied, stale, and concurrent-update states.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read F09/F10/F11 and Admin screen/flow specs. Knowledge publication and AI configuration remain permission/audit governed; evaluation/replay cannot call live domain Apply. Show operational metadata without exposing raw private context.

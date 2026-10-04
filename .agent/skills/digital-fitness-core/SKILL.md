@@ -41,3 +41,7 @@ Use the official Vietnamese project name: **HỆ THỐNG HUẤN LUYỆN THỂ H�
 Load the focused skill for the requested area: identity/access; goals/coaching; workout execution; scheduling/collaboration; measurement/progress; nutrition; AI assistance; exercise/knowledge content; trainer workspace; admin governance; backend/data; mobile; admin web; security/operations; testing; commercial expansion; or advanced sensing.
 
 When requirements conflict, preserve the invariants above and call out the conflict. Distinguish target-product design from roadmap order: a later implementation phase does not remove the domain boundary from the target architecture.
+
+## Phase 2 routing
+
+For a Phase 2 task, follow root `AGENTS.md` section “Phase 2 execution” and read the approved release scope, data/authority matrix and implementation plan before the focused skill. Version 1.0/D01–D07 are approved by the project owner on 2026-10-04; implementation evidence and release gates remain separate. Use current executable contracts/Flyway to plan the gap, without asking again for settled design decisions.

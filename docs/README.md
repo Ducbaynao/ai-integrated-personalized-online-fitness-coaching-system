@@ -21,6 +21,16 @@ The documentation describes the target product. The roadmap controls delivery or
 13. [Security and operations](09-security-operations/README.md)
 14. [Source traceability](source-traceability.md)
 
+## Phase 2 planning
+
+Read the Phase 2 documents in this order:
+
+1. [Release scope](00-project-overview/phase-2-release-scope.md): F01–F11, limits, D01–D07 and approval record.
+2. [Feature data and authority matrix](08-ai/phase-2-feature-data-authority-matrix.md): inputs, ownership, result types, source guards, transactions and retries.
+3. [Implementation plan](07-development/phase-2-implementation-plan.md): P2-M0–P2-M6, prerequisites, responsibilities and T01–T28.
+
+These documents are in Vietnamese and use the same domain identifiers as the existing specifications. Their status is **APPROVED**, version 1.0, by the project owner on 2026-10-04. D01–D07 are settled design/release decisions; approval does not demonstrate implementation, specialist review or release readiness. Phase 1 milestones retain their existing names; the `P2-` prefix identifies Phase 2 milestones. Assignments and test evidence belong in issues/PRs.
+
 ## Sources of truth
 
 - PostgreSQL is the source of truth for normalized business data.

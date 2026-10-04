@@ -33,3 +33,7 @@ Test domain state machines and calculations in isolation. Use repository/transac
 Include timezone/DST behavior, retries/idempotency, upload authorization, forced logout, notification preferences, stale clients, concurrent approval, rollback, backup restore, and backward compatibility when relevant.
 
 For defects, first add a failing regression test that expresses the violated product invariant, then apply the narrowest fix.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read implementation-plan section 11 and relevant T01–T28 IDs. Verify deterministic authorization/integrity/concurrency separately from model quality, holdout evaluation, portion coverage and latency/cost; document evidence and unexecuted gates.

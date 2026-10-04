@@ -32,3 +32,7 @@ For text or image input, use recognition/ingredient/portion estimation, database
 Compute calorie, protein, and macro adherence, logging adherence, rolling averages, and trends only with completeness/quality context. Preserve nutrition history across Goals, Coaching Periods, and Trainer changes. A former Trainer loses access to new data; accepted targets remain usable by the Student.
 
 After long inactivity, create a review signal rather than assuming the previous target remains suitable. A changed Fitness Goal should trigger an alignment check/proposal, not automatic target mutation.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read F06–F08 and matrix section 1.9. Confirm selected item groups atomically, guard ownership/preview/catalog versions and retain provenance; do not infer COMPLETE logging from confirmation. D05 defers AI-generated strategic Nutrition Target proposals for this release, while manual Student approval remains.

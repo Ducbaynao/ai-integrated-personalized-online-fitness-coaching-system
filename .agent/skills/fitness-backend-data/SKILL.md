@@ -35,3 +35,7 @@ Create indexes from real query patterns, especially Student/time, Trainer/time, 
 Run notification delivery, food image processing, AI generation, reminders, and statistics asynchronously. Start with simple schedulers/background mechanisms; add a broker only when needed. Make jobs idempotent, observable, retry-safe, and authority-aware.
 
 Review every change for data migration, backward-compatible API behavior, transaction boundaries, authorization, audit, concurrency, and rollback/recovery.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read matrix sections 1.2–1.10 for scoped queries, source concurrency, atomic domain commands, retry receipts and embedding compatibility. Implement only necessary contract/migration changes and test competing domain writers.

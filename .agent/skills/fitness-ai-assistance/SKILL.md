@@ -34,3 +34,13 @@ Retrieve only published/active Knowledge Versions. Store citations/references su
 Audit significant AI Runs with request type, model/version, prompt version, relevant input references, output, validation/rule result, status, latency, tokens, and resulting decision. Operational states may include success, validation failure, model error, timeout, rule blocked, and processing error.
 
 Evaluation/replay may compare prompts/models on privacy-controlled datasets but must never create a live business action. Feed accepted/rejected outcomes into evaluation without silently retraining or changing production behavior.
+
+## Phase 2 planning references
+
+For Phase 2 tasks, read these repository documents in order:
+
+1. `../../../docs/00-project-overview/phase-2-release-scope.md`.
+2. `../../../docs/08-ai/phase-2-feature-data-authority-matrix.md`.
+3. `../../../docs/07-development/phase-2-implementation-plan.md`.
+
+They are APPROVED version 1.0 (project-owner approval on 2026-10-04); D01–D07 do not need repeated approval. Approval does not claim implemented endpoints, enum additions, receipt storage or passing tests. Preserve confirmed invariants and distinguish INFORMATION, PROPOSAL and Nutrition ESTIMATE. Use current Flyway/OpenAPI/schema artifacts to identify implementation gaps. The matrix owns the approved state mapping, transaction/retry semantics and embedding compatibility; do not duplicate a conflicting lifecycle in code or client contracts.

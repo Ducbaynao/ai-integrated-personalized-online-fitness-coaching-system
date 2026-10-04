@@ -41,3 +41,7 @@ The differentiator is not a chatbot. AI is connected to normalized fitness conte
 The long-term platform can serve self-directed people, coached Students, Personal Trainers, online coaches, gyms, and fitness organizations while preserving the same authority and history principles.
 
 See [actors and responsibilities](actors-and-responsibilities.md), [scope and roadmap](scope-and-roadmap.md), and the [glossary](glossary.md).
+
+## Phase 2 release planning
+
+See the [Phase 2 release scope](phase-2-release-scope.md) for the approved first AI release. Read its linked data/authority matrix and implementation plan before assigning work. D01–D07 were approved by the project owner on 2026-10-04; target-product capabilities remain distinct from release limits.

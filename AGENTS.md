@@ -37,6 +37,25 @@
 - Add component-specific `AGENTS.md` files only when the component needs additional rules.
 
 
+## Phase 2 execution
+
+For any Phase 2 task, including Backend, Database, AI, Mobile, Admin, testing, review, or documentation, read these approved documents in order before implementation:
+
+1. [Release scope](docs/00-project-overview/phase-2-release-scope.md): F01–F11, release limits, D01–D07 and approval record.
+2. [Feature data and authority matrix](docs/08-ai/phase-2-feature-data-authority-matrix.md): facts, scopes, result types, source guards, transaction and retry semantics.
+3. [Implementation plan](docs/07-development/phase-2-implementation-plan.md): P2-M0–P2-M6, prerequisites, ownership and T01–T28.
+
+- Version 1.0 and D01–D07 were approved by the project owner on 2026-10-04. Apply these settled decisions without requesting the same approval again. Approval covers scope/design, not test results, specialist review, deployment or Git operations.
+- Then load the focused skills and applicable component `AGENTS.md`, and follow links relevant to the feature. Unrelated Phase 1 maintenance need not read all Phase 2 materials.
+- Before changing a feature, identify its F-ID/P2 milestone, owning module, actor/subject, decision authority, lifecycle, relevant source dependencies, contracts and acceptance/test IDs. Do not invent implementation status from document approval.
+- Inspect current code, Flyway and executable contracts. A missing planned feature is an implementation gap to address within the task scope, not an automatic reason to request design approval again. For a genuine conflict with approved invariants or a new scope/authority decision, describe it and obtain the needed decision before dependent changes; continue unaffected authorized work.
+- Keep Phase 1 prerequisites and AI additions separate. Fixtures unblock development but do not establish real source-domain readiness. Record missing prerequisites and verification limits; never use model output as a replacement for a missing source of truth.
+- INFORMATION has no Apply; PROPOSAL uses authorized recommendation decisions; ESTIMATE uses Student-owned Nutrition Confirm/Correct. AI Run status, result type, error reason and domain lifecycle are distinct.
+- Implement approved atomic Accept-and-Apply and selected-item Food Confirmation through Spring domain commands; preserve provenance/history and mandatory audit. Guard source changes and retry identity, including competing Phase 1 writers. No model/provider call belongs inside the apply transaction.
+- Extend OpenAPI/AI schemas with implementation, add only needed forward Flyway migrations, and test relevant T01–T28 scenarios. Model/retrieval evaluation remains separate from deterministic authorization/integrity tests. Do not claim all planned tests pass without running them.
+- Record unresolved operational values, specialist rule/catalog review, dataset/model selection and release measurements as milestone work. Approval of the plan does not approve unknown production thresholds or prove portion-estimation coverage.
+- Keep summaries, skills and relevant UI/API/domain documentation synchronized with an approved scope change. Assignee/reviewer ownership belongs to the task/issue; product roles do not identify developers.
+
 ## Git safety
 
 - Coding agents may inspect Git using read-only commands such as
