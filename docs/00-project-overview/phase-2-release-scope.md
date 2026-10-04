@@ -1,16 +1,16 @@
 # Phạm vi phát hành Phase 2
 
-**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO  
-**Phiên bản tài liệu:** 0.4  
-**Trạng thái:** DRAFT — chưa phê duyệt  
-**Ngày cập nhật:** 04/10/2026  
-**Vị trí trong repository:** `docs/00-project-overview/phase-2-release-scope.md`  
-**Người phê duyệt / ngày phê duyệt:** Chưa xác định / chưa phê duyệt  
+**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
+**Phiên bản tài liệu:** 1.0\
+**Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
+**Ngày cập nhật:** 04/10/2026\
+**Vị trí trong repository:** `docs/00-project-overview/phase-2-release-scope.md`\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Xác định phạm vi phát hành, giới hạn, người sử dụng và điều kiện nghiệm thu Phase 2.
 
-Tài liệu dành cho thành viên phát triển, người review và AI agent. Các yêu cầu mới là thiết kế đề xuất cho đến khi được phê duyệt; trạng thái tài liệu không chứng minh trạng thái triển khai. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
+Tài liệu dành cho thành viên phát triển, người review và AI agent. Phạm vi và thiết kế trong bản 1.0 được chủ dự án phê duyệt ngày 04/10/2026 theo yêu cầu trong phiên làm việc: “bổ sung đầy đủ các quy tắc, hướng dẫn cần thiết cho agent và chuyển các tài liệu vừa thêm ở dạng draft thành đã được phê duyệt sẵn sàng cho dự án”. Phê duyệt này cho phép dùng làm baseline triển khai; không chứng minh prerequisite, code, test/evaluation hoặc bản phát hành đã hoàn thành. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
 
 **Cách sử dụng:** đọc phạm vi phát hành → ma trận dữ liệu/quyền → kế hoạch triển khai. Tuân thủ `AGENTS.md` và hướng dẫn component trong repository khi thực hiện công việc. Tài liệu kế hoạch không tự cấp quyền Git, triển khai, xuất bản nội dung hoặc thay đổi dữ liệu. Khi tài liệu mới, tài liệu domain và code/schema khác nhau, ghi nhận xung đột và quyết định được phê duyệt trước phần triển khai bị ảnh hưởng; không tự chọn bản thuận tiện hơn. Nguồn trích dẫn tại baseline dùng để truy vết, không dùng để suy đoán các thay đổi về sau.
 
@@ -19,7 +19,7 @@ Tài liệu dành cho thành viên phát triển, người review và AI agent. 
 Cơ sở thiết kế gồm mô tả hệ thống `mô tả ý tưởng đồ án.docx`, tên chính thức và các tài liệu repository tại baseline nêu trên. Các liên kết nguồn được cố định theo commit để kiểm tra lại được.
 
 - **Kế thừa:** invariant của domain/kiến trúc đã có; chuẩn hóa tài liệu không thay đổi các invariant này.
-- **Đề xuất:** phạm vi, thứ tự, giới hạn và tiêu chí Phase 2 cần được duyệt theo D01–D07. Từ “phải” là yêu cầu của thiết kế đề xuất, không phải xác nhận đã có trong sản phẩm.
+- **Đã phê duyệt:** phạm vi, thứ tự, giới hạn và tiêu chí Phase 2 cùng D01–D07 là baseline bản 1.0. Từ “phải” là yêu cầu triển khai/nghiệm thu, không phải xác nhận đã có trong sản phẩm.
 - **Target product:** mô tả hệ thống toàn diện; chức năng được mô tả ở đó không mặc nhiên thuộc bản phát hành Phase 2.
 - **Trạng thái thực hiện:** được xác nhận bằng issue/PR và evidence test; tách biệt DRAFT/APPROVED của tài liệu.
 
@@ -29,7 +29,7 @@ Tài liệu liên quan: [dữ liệu và quyền](../08-ai/phase-2-feature-data-
 
 Student tự tập và Trainer hợp lệ có thể dùng dữ liệu được phép để nhận giải thích, phân tích và đề xuất giáo án. Người có thẩm quyền xem căn cứ, giới hạn, sửa hoặc từ chối đề xuất; backend chỉ áp dụng sau khi xác nhận và kiểm tra lại. Student có thể nhập thực phẩm bằng văn bản/ảnh, sửa nhận diện và khẩu phần trước khi xác nhận Food Log. Admin có công cụ quản trị tri thức, giám sát AI và đánh giá phiên bản trong môi trường không tác động dữ liệu coaching.
 
-**Đề xuất giữ Nutrition AI, food recognition và portion estimation trong Phase 2 cuối cùng**, đúng roadmap hiện có. Có thể demo giáo án trước, nhưng không gọi demo đó là hoàn thành toàn bộ Phase 2.
+**Giữ Nutrition AI, food recognition và portion estimation trong Phase 2 cuối cùng theo D01 đã phê duyệt**, đúng roadmap hiện có. Có thể demo giáo án trước, nhưng không gọi demo đó là hoàn thành toàn bộ Phase 2.
 
 ## 3. Nguyên tắc kế thừa bắt buộc
 
@@ -44,7 +44,7 @@ Student tự tập và Trainer hợp lệ có thể dùng dữ liệu được p
 9. Food recognition là ước lượng. Nutrition Database và phép tính xác định tính calories/macros sau khi món, đơn vị và lượng đã được xác định.
 10. Admin quản trị nền tảng, không thay Student/Trainer quyết định coaching; replay chỉ tạo kết quả đánh giá.
 
-## 4. Danh mục chức năng phát hành đề xuất
+## 4. Danh mục chức năng phát hành đã phê duyệt
 
 Tất cả F01–F11 là **bắt buộc ở bản kết thúc Phase 2 theo phạm vi giới hạn dưới đây**. “Làm sau” trong bảng vẫn nằm trong Phase 2. Chức năng nền tảng cần có phần tối thiểu trước khi làm chức năng người dùng.
 
@@ -86,15 +86,15 @@ Không yêu cầu fine-tune hoặc tự huấn luyện LLM ở Phase 2. Chọn m
 | Pose estimation, đếm rep, sửa tư thế thời gian thực, thiết bị/health platform integrations | Kế thừa roadmap Phase 4; không gộp với food vision |
 | AI tự áp dụng giáo án, tự sửa Goal/Target/Actual Workout | Bị cấm bởi authority model, không phải backlog để bật sau |
 | Admin chấp nhận đề xuất giáo án thay người dùng | Bị cấm bởi authority model |
-| Tự train/retrain sau khi có feedback; fine-tuning dashboard | Đề xuất hoãn; Phase 2 chỉ evaluation và thay cấu hình đã review |
-| AI tạo Fitness Goal Proposal hoặc strategic Nutrition Target Proposal định lượng | Đề xuất hoãn riêng phần AI sinh đề xuất này. Không bỏ Goal/Nutrition Proposal thủ công của target product; F08 chỉ hỗ trợ review target hiện có |
-| Meal plan tự động nhiều ngày, kê chế độ điều trị/phục hồi, chẩn đoán từ hồ sơ/ảnh | Đề xuất không phát hành trong phạm vi AI Assistance ban đầu |
-| Chatbot mở vô hạn, duyệt web trực tiếp khi trả lời, autonomously dùng công cụ ghi DB | Đề xuất ngoài phạm vi; F01 là hỏi đáp kiến thức đã quản trị |
+| Tự train/retrain sau khi có feedback; fine-tuning dashboard | Hoãn trong bản phát hành; Phase 2 chỉ evaluation và thay cấu hình đã review |
+| AI tạo Fitness Goal Proposal hoặc strategic Nutrition Target Proposal định lượng | Hoãn trong bản phát hành riêng phần AI sinh đề xuất này. Không bỏ Goal/Nutrition Proposal thủ công của target product; F08 chỉ hỗ trợ review target hiện có |
+| Meal plan tự động nhiều ngày, kê chế độ điều trị/phục hồi, chẩn đoán từ hồ sơ/ảnh | Không phát hành trong phạm vi AI Assistance ban đầu |
+| Chatbot mở vô hạn, duyệt web trực tiếp khi trả lời, autonomously dùng công cụ ghi DB | Ngoài phạm vi bản phát hành; F01 là hỏi đáp kiến thức đã quản trị |
 | Nhận diện mọi món ăn/ingredient ẩn, xác định chính xác gram từ ảnh bất kỳ | Không cam kết. Bản đầu giới hạn catalog được kiểm thử và yêu cầu Student xác nhận lượng |
-| Tự tối ưu cả chu kỳ dài của Goal, cam kết đạt mục tiêu hoặc tự tăng tải liên tục | Đề xuất ngoài phạm vi; F02 tạo một tuần lịch mẫu có ngày hiệu lực, các lần điều chỉnh phải được review |
-| Tự đổi hàng loạt recurring Appointment từ AI | Đề xuất hoãn; F05 thao tác một Planned Workout mỗi lần và mở workflow Appointment riêng khi cần |
+| Tự tối ưu cả chu kỳ dài của Goal, cam kết đạt mục tiêu hoặc tự tăng tải liên tục | Ngoài phạm vi bản phát hành; F02 tạo một tuần lịch mẫu có ngày hiệu lực, các lần điều chỉnh phải được review |
+| Tự đổi hàng loạt recurring Appointment từ AI | Hoãn trong bản phát hành; F05 thao tác một Planned Workout mỗi lần và mở workflow Appointment riêng khi cần |
 
-Các mục “đề xuất hoãn” cần được người có trách nhiệm phê duyệt phạm vi chấp thuận trước khi đánh dấu release scope là approved; không được âm thầm diễn giải là nội dung vốn đã bị loại khỏi roadmap.
+Các giới hạn/hoãn trong bảng được chấp thuận trong baseline 1.0, đặc biệt D02–D05. Chúng giới hạn bản phát hành, không xóa khả năng của target product. Mở rộng hoặc giảm phạm vi sau đó cần quyết định thay đổi được ghi nhận.
 
 ## 7. Giới hạn đầu vào và trải nghiệm bản đầu
 
@@ -131,35 +131,35 @@ Chỉ coi là hoàn thành khi đồng thời:
 12. Có bảng bàn giao Phase 1 và bảng bổ sung cho AI riêng, kèm evidence và owner. Chưa có bằng chứng prerequisite thì chưa cam kết lịch tích hợp tương ứng.
 13. Retry payload khác, Food Confirmation rollback/retry, UI theo resultType và embedding mismatch đạt T25–T28. Tài liệu lifecycle/API/schema được đồng bộ theo V1 được duyệt trước tích hợp, không còn hai cách diễn giải trạng thái trái nhau.
 
-## 9. Các quyết định cần người có trách nhiệm phê duyệt phạm vi duyệt
+## 9. Các quyết định phạm vi đã phê duyệt
 
-| ID | Phương án đề xuất cụ thể | Tác động |
+| ID | Phương án đã phê duyệt | Tác động |
 |---|---|---|
 | D01 | Giữ cả workout AI và nutrition text/image trong Phase 2 cuối | Demo giáo án trước không đồng nghĩa kết thúc Phase 2 |
 | D02 | F02 sinh một tuần mẫu; F05 một Planned Workout/lần | Giảm độ phức tạp; không tự sinh cả hành trình hoặc đổi recurring series |
 | D03 | HUMAN_COACH: Trainer yêu cầu/quyết định plan; chia sẻ nháp mới cho Student xem | Quyền xem không đồng nhất với quyền quyết định; kế hoạch đã giao tiếp tục được Student dùng |
 | D04 | F06/F07 Student-only; ảnh gốc có scope riêng; V1 xác nhận nguyên tử nhóm item được chọn | Một item lỗi làm cả nhóm không ghi; item bỏ chọn giữ draft; Trainer không xác nhận hộ |
-| D05 | Hoãn AI sinh Goal/strategic Nutrition Target Proposal; F08 chỉ phân tích/review | Đây là giới hạn mới, cần ghi vào scope; workflow thủ công vẫn giữ |
+| D05 | Hoãn AI sinh Goal/strategic Nutrition Target Proposal; F08 chỉ phân tích/review | Giới hạn bản phát hành đã phê duyệt; giữ trong scope; workflow thủ công vẫn giữ |
 | D06 | Benchmark, catalog thử nghiệm và rule policy phải được review trước mở tính năng | Có thể tiếp tục phát triển bằng fixture, không bật một chức năng khi chính sách chưa được duyệt |
 | D07 | Gán owner/reviewer theo issue; migration, authority và contract dùng chung có trách nhiệm review/tích hợp rõ ràng theo kế hoạch mục 9 | Phân công cá nhân quản lý riêng; đổi người thực hiện không đổi quy tắc nghiệp vụ |
 
 ### 9.1. Ghi nhận phê duyệt
 
-Mỗi quyết định cần ghi nội dung được duyệt hoặc phương án thay thế, người duyệt, ngày, version và liên kết issue/PR. Thông qua phân công kỹ thuật không đồng nghĩa phê duyệt chuyên môn. Khi có quyết định thay đổi phạm vi, cập nhật đồng thời các contract/milestone bị ảnh hưởng.
+D01–D07 được duyệt theo yêu cầu trực tiếp của chủ dự án trong phiên làm việc ngày 04/10/2026; chưa có issue/PR phê duyệt riêng. Khi có issue/PR, bổ sung liên kết để truy vết mà không thay ngày phê duyệt. Quyết định thay đổi sau này phải ghi nội dung, người duyệt, ngày và version. Thông qua phân công kỹ thuật không đồng nghĩa phê duyệt chuyên môn. Khi có quyết định thay đổi phạm vi, cập nhật đồng thời các contract/milestone bị ảnh hưởng.
 
 | Quyết định | Trạng thái | Người duyệt | Ngày / tham chiếu |
 |---|---|---|---|
-| D01 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D02 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D03 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D04 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D05 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D06 | Chưa phê duyệt | Chưa xác định | Chưa có |
-| D07 | Chưa phê duyệt | Chưa xác định | Chưa có |
+| D01 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D02 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D03 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D04 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D05 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D06 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D07 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
 
 ## Tài liệu hiện hành trong repository
 
-Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. DRAFT trong bộ tài liệu này không thay đổi invariant đã được xác nhận hoặc chứng minh API đã triển khai.
+Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. APPROVED xác nhận phạm vi và thiết kế; không chứng minh API đã triển khai hoặc test đã đạt. Các invariant đã xác nhận tiếp tục có hiệu lực.
 
 - [Roadmap](scope-and-roadmap.md)
 - [AI subsystem](../08-ai/README.md)

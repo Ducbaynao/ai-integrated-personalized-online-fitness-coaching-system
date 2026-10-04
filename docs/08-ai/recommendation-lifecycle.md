@@ -4,9 +4,9 @@
 
 An AI Run records request type, model/provider, model version, prompt version, selected input references, retrieved Knowledge Versions, structured output, validation result, latency, token/usage data, status, and timestamps.
 
-The database `ai_run_status` at the planning baseline uses `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `REJECTED_BY_VALIDATOR`, and `CANCELLED`. Labels such as `TIMEOUT`, `MODEL_ERROR`, `RULE_BLOCKED`, and `VALIDATION_FAILED` describe operational reasons; they are not additional DB enum values. The proposed mapping is in [matrix section 1.6](phase-2-feature-data-authority-matrix.md#16-ánh-xạ-trạng-thái-db-api-và-ui).
+The database `ai_run_status` at the planning baseline uses `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `REJECTED_BY_VALIDATOR`, and `CANCELLED`. Labels such as `TIMEOUT`, `MODEL_ERROR`, `RULE_BLOCKED`, and `VALIDATION_FAILED` describe operational reasons; they are not additional DB enum values. The approved design mapping is in [matrix section 1.6](phase-2-feature-data-authority-matrix.md#16-ánh-xạ-trạng-thái-db-api-và-ui).
 
-Only a validated PROPOSAL that can change business data becomes a pending recommendation. INFORMATION is a scoped explanation; ESTIMATE remains a Nutrition draft. Evaluation output cannot become an active recommendation. The result-type/API vocabulary remains DRAFT; existing executable contracts must be extended before implementation.
+Only a validated PROPOSAL that can change business data becomes a pending recommendation. INFORMATION is a scoped explanation; ESTIMATE remains a Nutrition draft. Evaluation output cannot become an active recommendation. The result-type/API vocabulary is approved design; existing executable contracts must be extended before implementation.
 
 A valid output that could change business data becomes an AI Recommendation with:
 
@@ -37,10 +37,10 @@ Acceptance/rejection and later outcomes support evaluation. They must not be int
 
 AI Admin may replay authorized/sanitized AI Runs or evaluation datasets to compare prompt/model versions and regression behavior. Replay output is evaluation data only. It cannot create an active Recommendation or apply changes to Student records.
 
-## Phase 2 V1 transaction proposal (DRAFT)
+## Phase 2 V1 transaction design (APPROVED)
 
-The database recommendation enum includes `PENDING`, `ACCEPTED`, `REJECTED`, `APPLIED`, `EXPIRED`, and `CANCELLED`; it does not include `APPLY_FAILED`. The proposed V1 model records `PENDING → ACCEPTED → APPLIED` in one local Spring transaction with the domain change, application references and mandatory audit. On failure, all writes roll back; a failed operational attempt is recorded separately. `ACCEPTED` is not a committed job waiting for later application in this V1 proposal.
+The database recommendation enum includes `PENDING`, `ACCEPTED`, `REJECTED`, `APPLIED`, `EXPIRED`, and `CANCELLED`; it does not include `APPLY_FAILED`. The approved V1 model records `PENDING → ACCEPTED → APPLIED` in one local Spring transaction with the domain change, application references and mandatory audit. On failure, all writes roll back; a failed operational attempt is recorded separately. `ACCEPTED` is not a committed job waiting for later application in this V1 design.
 
-A retry of a committed operation returns its historical receipt only when actor/resource access and the normalized operation/revision/payload identity match. A different payload conflicts. Source guards and expiry protect new application attempts; they must not trigger a second application of a committed operation. Payload modifications require fresh validation and a reviewed preview. See [matrix sections 1.7–1.8](phase-2-feature-data-authority-matrix.md#17-accept-and-apply-rollback-và-retry-trong-v1) for the complete design, which remains subject to approval and implementation tests.
+A retry of a committed operation returns its historical receipt only when actor/resource access and the normalized operation/revision/payload identity match. A different payload conflicts. Source guards and expiry protect new application attempts; they must not trigger a second application of a committed operation. Payload modifications require fresh validation and a reviewed preview. See [matrix sections 1.7–1.8](phase-2-feature-data-authority-matrix.md#17-accept-and-apply-rollback-và-retry-trong-v1) for the complete design, approved by the project owner on 2026-10-04 and still requiring implementation tests.
 
 Food Confirmation is a separate Nutrition command: the selected item group commits atomically, unselected items stay draft, changed catalog/conversion requires a new reviewed preview, and failure rolls back the group. It does not automatically mark a day COMPLETE. See [matrix section 1.9](phase-2-feature-data-authority-matrix.md#19-food-confirmation-nguyên-tử-cho-f06f07).

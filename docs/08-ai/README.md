@@ -4,11 +4,11 @@ AI Assistance is a shared capability for `SELF_DIRECTED` Students and Trainers o
 
 ## Phase 2 reading order and status
 
-1. [Release scope — DRAFT](../00-project-overview/phase-2-release-scope.md).
-2. [Feature data and authority matrix — DRAFT](phase-2-feature-data-authority-matrix.md).
-3. [Implementation plan — DRAFT](../07-development/phase-2-implementation-plan.md).
+1. [Release scope — APPROVED](../00-project-overview/phase-2-release-scope.md).
+2. [Feature data and authority matrix — APPROVED](phase-2-feature-data-authority-matrix.md).
+3. [Implementation plan — APPROVED](../07-development/phase-2-implementation-plan.md).
 
-The documents distinguish inherited invariants from proposed release decisions. DTO names, reason codes, expiry values and retry storage are design proposals, not implemented contracts. Flyway and executable schemas remain the evidence for current database/API structure. The detailed matrix owns the proposed DB/API mapping and V1 transaction behavior; this overview summarizes it without approving it.
+The documents are APPROVED version 1.0 by the project owner on 2026-10-04 and distinguish inherited invariants from release decisions. DTO names, reason codes, expiry values and retry storage specify design intent, not implemented contracts. Flyway and executable schemas remain the evidence for current database/API structure. The detailed matrix owns the approved DB/API mapping and V1 transaction behavior; this overview summarizes the approved baseline without claiming implementation.
 
 ## Supported capabilities
 
@@ -55,4 +55,4 @@ See [context, rules, and RAG](context-rules-rag.md) and [recommendation lifecycl
 
 ## Result boundaries
 
-INFORMATION has no application action. A validated PROPOSAL becomes a recommendation with the domain's responsible decision maker. ESTIMATE remains a Nutrition draft and uses Food Confirmation, not recommendation Apply. Operational Run state is separate from result type and reason code; see matrix section 1.6. These result labels are the Phase 2 draft contract vocabulary, not additional database enum values.
+INFORMATION has no application action. A validated PROPOSAL becomes a recommendation with the domain's responsible decision maker. ESTIMATE remains a Nutrition draft and uses Food Confirmation, not recommendation Apply. Operational Run state is separate from result type and reason code; see matrix section 1.6. These result labels are the Phase 2 approved design vocabulary, not additional database enum values.

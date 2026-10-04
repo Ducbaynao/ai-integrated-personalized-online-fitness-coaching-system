@@ -13,7 +13,7 @@
 9. Spring Boot records the AI Run and rechecks output access. Only a validated business-change PROPOSAL becomes a pending AI Recommendation; INFORMATION returns a scoped explanation without Apply.
 10. The responsible Student or Trainer accepts/rejects the recommendation. Application rechecks current authority and all decision-relevant source dependencies and creates the appropriate minor change or new plan version.
 
-The [Phase 2 matrix](../08-ai/phase-2-feature-data-authority-matrix.md) proposes source-change classification, atomic Accept-and-Apply, rollback and committed-receipt retry handling. These V1 details remain DRAFT; no model call occurs inside the application transaction.
+The [Phase 2 matrix](../08-ai/phase-2-feature-data-authority-matrix.md) defines source-change classification, atomic Accept-and-Apply, rollback and committed-receipt retry handling. These V1 details are approved design; no model call occurs inside the application transaction.
 
 ## Measurement ingestion
 
@@ -36,7 +36,7 @@ Raw provider payload may be retained according to privacy and retention policy, 
 3. Candidates are matched to structured Nutrition Database records.
 4. The Student confirms or corrects identity and quantity.
 5. Nutrition Calculation Engine deterministically calculates calories/macros.
-6. Confirmed Food Log Items store estimate/confirmation/correction provenance. The Phase 2 V1 draft uses a separate Nutrition confirmation transaction for the selected item group, with preview/catalog guards, calculation, provenance, receipt and mandatory audit. Failure rolls back the group; unselected items remain draft and day completeness is not inferred from confirmation.
+6. Confirmed Food Log Items store estimate/confirmation/correction provenance. The approved Phase 2 V1 design uses a separate Nutrition confirmation transaction for the selected item group, with preview/catalog guards, calculation, provenance, receipt and mandatory audit. Failure rolls back the group; unselected items remain draft and day completeness is not inferred from confirmation.
 7. Progress Engine uses Food Logs together with logging completeness and the effective Daily Target.
 
 ## Reschedule acceptance

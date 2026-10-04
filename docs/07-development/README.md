@@ -5,7 +5,7 @@ This section explains how to run, understand, plan, change, and verify the monor
 - [Development setup](setup.md)
 - [Project structure](project-structure.md)
 - [Phase 1 implementation plan](phase-1-implementation-plan.md)
-- [Phase 2 implementation plan — DRAFT](phase-2-implementation-plan.md)
+- [Phase 2 implementation plan — APPROVED](phase-2-implementation-plan.md)
 - [Testing guide](testing-guide.md)
 
 Before changing code, read the repository `AGENTS.md` and any component-specific instructions. A feature change is incomplete when it changes a business rule but leaves the corresponding documentation, contract, migration, or test outdated.

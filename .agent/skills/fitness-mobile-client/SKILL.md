@@ -33,3 +33,7 @@ Use camera/media flows for progress and food photos with explicit preview, conse
 ## Quality
 
 Implement loading, empty, partial-data, stale, offline, permission-denied, and error states. Use stable query keys, targeted invalidation, pagination for histories, and tests for role changes, expired consent, interrupted log entry, timezone display, and AI approval flows.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read the feature matrix and relevant actor screen/flow specs. INFORMATION is view-only; PROPOSAL uses authority-specific decisions; ESTIMATE uses Nutrition Confirm/Correct. Keep operation identity across retries and change it for a new intent; do not report a modified payload as applied using an old receipt.

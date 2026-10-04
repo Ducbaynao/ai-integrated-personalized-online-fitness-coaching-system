@@ -1,20 +1,20 @@
 # Dữ liệu và quyền từng chức năng Phase 2
 
-**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO  
-**Phiên bản tài liệu:** 0.4  
-**Trạng thái:** DRAFT — chưa phê duyệt  
-**Ngày cập nhật:** 04/10/2026  
-**Vị trí trong repository:** `docs/08-ai/phase-2-feature-data-authority-matrix.md`  
-**Người phê duyệt / ngày phê duyệt:** Chưa xác định / chưa phê duyệt  
+**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
+**Phiên bản tài liệu:** 1.0\
+**Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
+**Ngày cập nhật:** 04/10/2026\
+**Vị trí trong repository:** `docs/08-ai/phase-2-feature-data-authority-matrix.md`\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Định nghĩa đầu vào, nguồn dữ liệu, quyền, xử lý dữ liệu thiếu và tính nhất quán khi áp dụng từng chức năng AI.
 
-Tài liệu dành cho thành viên phát triển, người review và AI agent. Các yêu cầu mới là thiết kế đề xuất cho đến khi được phê duyệt; trạng thái tài liệu không chứng minh trạng thái triển khai. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
+Tài liệu dành cho thành viên phát triển, người review và AI agent. Phạm vi và thiết kế trong bản 1.0 được chủ dự án phê duyệt ngày 04/10/2026 theo yêu cầu trong phiên làm việc: “bổ sung đầy đủ các quy tắc, hướng dẫn cần thiết cho agent và chuyển các tài liệu vừa thêm ở dạng draft thành đã được phê duyệt sẵn sàng cho dự án”. Phê duyệt này cho phép dùng làm baseline triển khai; không chứng minh prerequisite, code, test/evaluation hoặc bản phát hành đã hoàn thành. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
 
 **Cách sử dụng:** đọc phạm vi phát hành → ma trận dữ liệu/quyền → kế hoạch triển khai. Tuân thủ `AGENTS.md` và hướng dẫn component trong repository khi thực hiện công việc. Tài liệu kế hoạch không tự cấp quyền Git, triển khai, xuất bản nội dung hoặc thay đổi dữ liệu. Khi tài liệu mới, tài liệu domain và code/schema khác nhau, ghi nhận xung đột và quyết định được phê duyệt trước phần triển khai bị ảnh hưởng; không tự chọn bản thuận tiện hơn. Nguồn trích dẫn tại baseline dùng để truy vết, không dùng để suy đoán các thay đổi về sau.
 
-Tài liệu cụ thể hóa F01–F11 của [phạm vi phát hành](../00-project-overview/phase-2-release-scope.md); milestone và test nằm trong [kế hoạch triển khai](../07-development/phase-2-implementation-plan.md). Tên DTO, mã lỗi, revision token và thời hạn được ghi là đề xuất không có nghĩa đã tồn tại trong DB/API. Invariant về quyền quyết định kế thừa domain; các chi tiết triển khai mới cần được duyệt.
+Tài liệu cụ thể hóa F01–F11 của [phạm vi phát hành](../00-project-overview/phase-2-release-scope.md); milestone và test nằm trong [kế hoạch triển khai](../07-development/phase-2-implementation-plan.md). Tên DTO, mã lỗi, revision token và thời hạn trong thiết kế không có nghĩa đã tồn tại trong DB/API. Invariant về quyền quyết định kế thừa domain; các chi tiết triển khai chưa cụ thể phải được hoàn thiện và review theo milestone, không cần xin lại phê duyệt cho D01–D07 đã chốt.
 
 ## 1. Các quy tắc áp dụng cho mọi chức năng
 
@@ -33,7 +33,7 @@ Tài liệu cụ thể hóa F01–F11 của [phạm vi phát hành](../00-projec
 
 Spring tạo request identity, purpose, actor, subject, scope và resource refs; AI service chỉ biến đổi context đã được phép. Không truyền JWT, email, số điện thoại, private chat, progress photo hoặc hồ sơ đầy đủ chỉ vì chúng sẵn có.
 
-| Trường đề xuất | Ý nghĩa |
+| Trường thiết kế | Ý nghĩa |
 |---|---|
 | `requestId`, `requestType`, `schemaVersion` | Liên kết request, loại chức năng và contract |
 | `subjectRef`, `asOf`, `timezone` | Đối tượng đã kiểm quyền, thời điểm chụp dữ liệu và timezone |
@@ -55,7 +55,7 @@ Spring tạo request identity, purpose, actor, subject, scope và resource refs;
 
 Trainer cần verified/active, relationship và period hợp lệ, domain scope và access level thích hợp. View-only không đủ để áp dụng thay đổi giáo án. Admin không dùng quyền vận hành để quyết định coaching.
 
-Đề xuất cho Phase 2: PT cũ không xem lại nháp AI chứa context cá nhân qua các API AI thông thường sau khi hết scope. Việc giữ hồ sơ PT từng tác giả thuộc retention policy riêng. Student vẫn xem/tiếp tục dùng plan đã được giao; không vì thế được xem mọi ghi chú riêng của Trainer.
+Quy tắc Phase 2 đã phê duyệt: PT cũ không xem lại nháp AI chứa context cá nhân qua các API AI thông thường sau khi hết scope. Việc giữ hồ sơ PT từng tác giả thuộc retention policy riêng. Student vẫn xem/tiếp tục dùng plan đã được giao; không vì thế được xem mọi ghi chú riêng của Trainer.
 
 ### 1.4. Kết quả và tác động
 
@@ -65,7 +65,7 @@ Trainer cần verified/active, relationship và period hợp lệ, domain scope 
 - `INSUFFICIENT_DATA`: danh sách field cần bổ sung và chức năng nào còn dùng được; không tạo recommendation áp dụng.
 - `BLOCKED`: nêu lý do/rule và bước tiếp theo; không cho model tự bỏ qua rule.
 
-Đây là phân loại kết quả API đề xuất, không phải enum lưu DB. Dùng bảng ánh xạ mục 1.6: DB hiện có SUCCEEDED/FAILED/REJECTED_BY_VALIDATOR; TIMEOUT, RULE_BLOCKED hoặc VALIDATION_FAILED là reason/error code theo trường hợp, không tự thêm enum. API phải phân biệt trạng thái xử lý, resultType và reasonCode.
+Đây là phân loại kết quả API của thiết kế đã phê duyệt, không phải enum lưu DB. Dùng bảng ánh xạ mục 1.6: DB hiện có SUCCEEDED/FAILED/REJECTED_BY_VALIDATOR; TIMEOUT, RULE_BLOCKED hoặc VALIDATION_FAILED là reason/error code theo trường hợp, không tự thêm enum. API phải phân biệt trạng thái xử lý, resultType và reasonCode.
 
 `confidence` của model không phải xác suất đã hiệu chỉnh, không tự quyết định quyền hoặc bypass validation. UI ưu tiên nguồn, dữ liệu thiếu và giới hạn hơn một con số phần trăm chắc chắn.
 
@@ -84,9 +84,9 @@ Trainer cần verified/active, relationship và period hợp lệ, domain scope 
 
 ### 1.6. Ánh xạ trạng thái DB, API và UI
 
-Baseline V1__foundation.sql có hai enum riêng; bảng dưới là phương án dùng chúng, chưa phải API đã triển khai.
+Baseline V1__foundation.sql có hai enum riêng; bảng dưới là phương án đã phê duyệt để dùng chúng, chưa phải API đã triển khai.
 
-| Tình huống | ai_run_status trong DB | resultType / reasonCode đề xuất | UI |
+| Tình huống | ai_run_status trong DB | resultType / reasonCode theo thiết kế | UI |
 |---|---|---|---|
 | Đã nhận/chưa xử lý | QUEUED | Chưa có kết quả | Đang chờ |
 | Đang xử lý | RUNNING | Chưa có kết quả | Đang xử lý |
@@ -158,7 +158,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 2. F01 — Giải thích kỹ thuật và nguyên tắc tập
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Bắt buộc: câu hỏi trong phạm vi, ngôn ngữ, tập tri thức ACTIVE liên quan. Nếu hỏi bài cụ thể: Exercise ID/catalog metadata. Context cá nhân chỉ khi người dùng chọn câu hỏi cá nhân hóa; trường cần lấy phụ thuộc câu hỏi, không bắt buộc cân nặng/giới tính cho giải thích chung. |
 | Module nào cung cấp? | Exercise/Content và knowledge service; Student/Coaching/Workout chỉ khi cần context được cấp quyền; AI điều phối. |
@@ -172,7 +172,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 3. F02 — Tạo đề xuất giáo án
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Bắt buộc: Goal ACTIVE và version/target liên quan; authority/period; kinh nghiệm; ngày có thể tập và thời lượng; thiết bị hoặc xác nhận bodyweight; trả lời về hạn chế/bài tránh; ngày bắt đầu; trạng thái lịch sử và continuity. Lấy active plan + version nếu đã có, hoặc xác nhận chưa có plan. Catalog ACTIVE và constraints/rule đã duyệt. Tùy chọn: sở thích, measurements đã validate, lịch sử thực hiện/RPE nếu được phép. Tuổi/chiều cao/cân nặng chỉ bắt buộc khi policy hoặc mục đích cụ thể cần; thiếu body fat không chặn giáo án chung. |
 | Module nào cung cấp? | Goal; Coaching + Auth/Trainer; Student; Exercise; Workout; Schedule; Progress; Measurement nếu liên quan; Knowledge cung cấp căn cứ chuyên môn. |
@@ -188,7 +188,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 4. F03 — Thay bài và điều chỉnh volume/load
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Chung: plan/version và session/exercise đích, lý do, authority, thiết bị/hạn chế hiện tại, Goal liên quan. Thay bài: catalog alternatives, movement/equipment/supervision. Tăng/giảm tải hoặc volume: thêm actual sets/reps/load/RPE đủ chất lượng, coverage window, Progress và continuity/recovery theo rule. |
 | Module nào cung cấp? | Workout, Exercise, Student, Goal, Coaching, Schedule, Progress; Knowledge cho lý do chuyên môn. |
@@ -202,7 +202,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 5. F04 — Tóm tắt tiến độ và hỗ trợ Trainer review
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Khoảng ngày; Goal/version theo thời gian; planned/actual, completion và adherence riêng; Progress signals, coverage, inactivity; measurements chỉ nếu có và phù hợp. Nutrition không lấy mặc định. |
 | Module nào cung cấp? | Progress là nguồn chỉ số; Workout, Goal, Coaching, Measurement cung cấp facts/ref đã chuẩn hóa. |
@@ -215,7 +215,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 6. F05 — Đề xuất xếp lại lịch tập sau buổi bỏ lỡ
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Planned Workout chưa hoàn thành, plan/session revision; actual status; thời gian rảnh, timezone, lịch liên quan; recovery/continuity; supervision requirement; authority. Appointment ref và trạng thái nếu buổi có liên kết, chỉ dữ liệu được phép xem. |
 | Module nào cung cấp? | Workout sở hữu Planned Workout; Schedule sở hữu Appointment/conflict; Student cung cấp availability; Coaching và Progress cung cấp scope/continuity. |
@@ -229,7 +229,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 7. F06 — Nhập thực phẩm bằng văn bản
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Mô tả món/amount/unit, meal/date/timezone, ownership. Food catalog có canonical ID, serving/conversion, nutrient source/revision. Nếu sửa log: Food Log/item revision. Không cần Goal/cân nặng để nhận diện món. |
 | Module nào cung cấp? | Nutrition + Food Database và Calculation Engine; AI phân tích text; User/Student kiểm ownership. |
@@ -239,17 +239,17 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 | Dữ liệu đã đổi thì sao? | Kiểm draft/log revision, ownership, confirmation state và Food Database revision trước tính lại/lưu. Catalog đổi: hiển thị tính toán mới để Student review trước xác nhận. Đổi Goal không tự làm đổi Food Log thực tế. |
 
 **Payload:** candidates với foodId/candidateIds, amount/unit hoặc unknown, provenance, uncertainty; không tin giá trị calories/macros model tự trả.  
-**Nghiệm thu:** xác nhận hoặc sửa trước lưu confirmed; tính toán backend từ catalog; retry không nhân đôi log; correction giữ nguồn và lịch sử. Đề xuất V1 giữ estimate riêng, không đưa vào tổng confirmed intake trước xác nhận. Transaction nhóm item, preview revision, receipt và retry thực hiện theo mục 1.9.
+**Nghiệm thu:** xác nhận hoặc sửa trước lưu confirmed; tính toán backend từ catalog; retry không nhân đôi log; correction giữ nguồn và lịch sử. V1 giữ estimate riêng, không đưa vào tổng confirmed intake trước xác nhận. Transaction nhóm item, preview revision, receipt và retry thực hiện theo mục 1.9.
 
 ## 8. F07 — Nhận diện thức ăn bằng ảnh
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Ảnh thuộc Student, media ref/checksum, định dạng/kích thước hợp lệ, meal/date; Food Database như F06. Thông tin món/serving bổ sung nếu ảnh không đủ. Không gửi metadata ảnh hoặc profile không cần thiết sang provider. |
 | Module nào cung cấp? | Object storage qua backend media contract có scope; Nutrition, Food Database, AI vision/portion/matching. Không cần lập module media mới chỉ để đáp ứng tài liệu này. |
 | Thiếu dữ liệu thì sao? | Ảnh mờ, không phải đồ ăn, món không trong catalog, nhiều thành phần không rõ: hỏi lại/chọn thủ công. Không thấy kích thước chuẩn thì quantity là ước lượng hoặc unknown, bắt buộc Student nhập/xác nhận; không cam kết gram chính xác. |
 | Ai được yêu cầu/xem? | Student sở hữu ảnh/draft; link ảnh có kiểm quyền và thời hạn. Trainer không mặc nhiên xem ảnh gốc khi được chia sẻ Nutrition log. Admin chỉ truy cập khi có permission/purpose hợp lệ. |
-| Ai quyết định? | Student xác nhận/correct món và lượng; Trainer không xác nhận hộ trong Phase 2 đề xuất. |
+| Ai quyết định? | Student xác nhận/correct món và lượng; Trainer không xác nhận hộ trong Phase 2. |
 | Dữ liệu đã đổi thì sao? | Ảnh thay/xóa hoặc mất quyền: không trả estimate cũ như của ảnh mới. Guard media checksum/ref + draft/log + catalog revision. Trước xác nhận xử lý như F06. |
 
 **Giới hạn:** một ảnh bữa ăn mỗi request; nhiều món được review từng item và xác nhận nguyên tử nhóm được chọn theo mục 1.9. Không suy đoán chính xác dầu/gia vị/thành phần bị che. Portion estimation chỉ được nghiệm thu trên tập hỗ trợ và gate coverage/sai số tại kế hoạch mục 11.2; luôn trả unknown/manual là fallback, không chứng minh đã hoàn thành ước lượng.  
@@ -257,7 +257,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 9. F08 — Giải thích tiến độ dinh dưỡng
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Window/timezone, confirmed Food Logs và completeness; Daily Targets đã resolve theo ngày, target version/effective period/override nếu có; Progress nutrition signals. Fitness Goal chỉ nếu cần giải thích liên kết/alignment. |
 | Module nào cung cấp? | Nutrition tính target/actual và hiệu lực; Progress tổng hợp chỉ số; Goal/Coaching cấp liên kết và scope. Knowledge chỉ khi giải thích nguyên tắc liên quan. |
@@ -270,7 +270,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 10. F09 — Quản trị và xuất bản tri thức
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Nội dung, title/topic, nguồn/author, quyền sử dụng nguồn, source date nếu biết, language, review status/reviewer; Document/Version/Chunk/Embedding refs, embedding model/dimension/version, processing status. |
 | Module nào cung cấp? | Content/Knowledge, AI retrieval/indexing, Object storage, Administration và Audit; taxonomy Exercise chỉ để liên kết nội dung. |
@@ -283,7 +283,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 11. F10 — AI Run, vận hành và evaluation/replay
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Run metadata: request type/ref, actor/subject refs cần thiết, prompt/model/rule/schema versions, selected source refs, retrieved versions, validation, result/status, time/latency/usage, decision refs. Evaluation dataset đã được phép/sanitized, rubric và version. |
 | Module nào cung cấp? | AI orchestration, Administration, Audit, các domain query có scope khi cần replay. Không copy raw private payload vào log vận hành phổ thông. |
@@ -296,7 +296,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## 12. F11 — Feedback và kết quả sau áp dụng
 
-| Câu hỏi | Hợp đồng đề xuất |
+| Câu hỏi | Hợp đồng thiết kế |
 |---|---|
 | Cần dữ liệu gì? | Run/recommendation ID được phép xem, actor, helpful/not helpful hoặc reason tùy chọn, timestamp; nếu đánh giá outcome: link plan/session → actual/progress window, coverage/continuity và version. Acceptance/rejection là quyết định riêng đã có audit. |
 | Module nào cung cấp? | AI/feedback, Workout, Progress, Coaching, Audit. Không tạo lại Actual Workout trong module AI. |
@@ -320,7 +320,7 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 
 ## Tài liệu hiện hành trong repository
 
-Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. DRAFT trong bộ tài liệu này không thay đổi invariant đã được xác nhận hoặc chứng minh API đã triển khai.
+Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. APPROVED xác nhận phạm vi và thiết kế; không chứng minh API đã triển khai hoặc test đã đạt. Các invariant đã xác nhận tiếp tục có hiệu lực.
 
 - [Context, rules và RAG](context-rules-rag.md)
 - [Recommendation lifecycle](recommendation-lifecycle.md)

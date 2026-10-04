@@ -1,16 +1,16 @@
 # Kế hoạch triển khai Phase 2
 
-**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO  
-**Phiên bản tài liệu:** 0.4  
-**Trạng thái:** DRAFT — chưa phê duyệt  
-**Ngày cập nhật:** 04/10/2026  
-**Vị trí trong repository:** `docs/07-development/phase-2-implementation-plan.md`  
-**Người phê duyệt / ngày phê duyệt:** Chưa xác định / chưa phê duyệt  
+**Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
+**Phiên bản tài liệu:** 1.0\
+**Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
+**Ngày cập nhật:** 04/10/2026\
+**Vị trí trong repository:** `docs/07-development/phase-2-implementation-plan.md`\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Xác định phụ thuộc, đầu ra milestone, quy trình phối hợp và bằng chứng nghiệm thu Phase 2.
 
-Tài liệu dành cho thành viên phát triển, người review và AI agent. Các yêu cầu mới là thiết kế đề xuất cho đến khi được phê duyệt; trạng thái tài liệu không chứng minh trạng thái triển khai. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
+Tài liệu dành cho thành viên phát triển, người review và AI agent. Phạm vi và thiết kế trong bản 1.0 được chủ dự án phê duyệt ngày 04/10/2026 theo yêu cầu trong phiên làm việc: “bổ sung đầy đủ các quy tắc, hướng dẫn cần thiết cho agent và chuyển các tài liệu vừa thêm ở dạng draft thành đã được phê duyệt sẵn sàng cho dự án”. Phê duyệt này cho phép dùng làm baseline triển khai; không chứng minh prerequisite, code, test/evaluation hoặc bản phát hành đã hoàn thành. Danh tính người thực hiện và reviewer của từng công việc được ghi tại issue/PR, không suy ra từ người đang đọc. Student, Trainer và Admin là vai trò sản phẩm, không phải thành viên phát triển.
 
 **Cách sử dụng:** đọc phạm vi phát hành → ma trận dữ liệu/quyền → kế hoạch triển khai. Tuân thủ `AGENTS.md` và hướng dẫn component trong repository khi thực hiện công việc. Tài liệu kế hoạch không tự cấp quyền Git, triển khai, xuất bản nội dung hoặc thay đổi dữ liệu. Khi tài liệu mới, tài liệu domain và code/schema khác nhau, ghi nhận xung đột và quyết định được phê duyệt trước phần triển khai bị ảnh hưởng; không tự chọn bản thuận tiện hơn. Nguồn trích dẫn tại baseline dùng để truy vết, không dùng để suy đoán các thay đổi về sau.
 
@@ -57,19 +57,19 @@ Phần thiếu thuộc nghiệp vụ Phase 1 phải có issue/estimate riêng; P
 
 ## 2. P2-M0 — Chốt thiết kế và phân công
 
-**Đầu vào:** ba tài liệu đề xuất, mô tả gốc, roadmap và domain rules.
+**Đầu vào:** ba tài liệu APPROVED bản 1.0, mô tả gốc, roadmap và domain rules.
 
 **Công việc:**
 
-1. Chủ dự án duyệt D01–D07 trong release scope hoặc ghi phương án thay thế. Nếu giảm phạm vi Nutrition, sửa roadmap/phạm vi công khai trước khi gọi bản workout-only là Phase 2 hoàn chỉnh.
+1. Đối chiếu D01–D07 đã phê duyệt tại release scope bản 1.0; không xin lại phê duyệt cùng quyết định. Ghi phương án thay thế nếu có thay đổi mới. Nếu giảm phạm vi Nutrition, sửa roadmap/phạm vi công khai trước khi gọi bản workout-only là Phase 2 hoàn chỉnh.
 2. Kiểm tra từng phụ thuộc ở bảng trên bằng API/domain contract và trạng thái triển khai thực tế; ghi đã có/chưa có, người phụ trách và tiêu chí hoàn thành.
-3. Chốt output types, quyền request/view/decide/apply, version guard và lỗi từng chức năng theo ma trận mục 1.6–1.10. Phê duyệt Accept-and-Apply nguyên tử V1 và mapping enum DB/API, không thêm APPLY_FAILED ngầm. Chốt OpenAPI/JSON Schema đợt đầu và quy ước chung; mở rộng contract theo từng feature, không đợi thiết kế chi tiết toàn bộ F01–F11 mới thử pipeline.
+3. Chốt output types, quyền request/view/decide/apply, version guard và lỗi từng chức năng theo ma trận mục 1.6–1.10. Cụ thể hóa Accept-and-Apply nguyên tử V1 và mapping enum DB/API đã phê duyệt, không thêm APPLY_FAILED ngầm. Chốt OpenAPI/JSON Schema đợt đầu và quy ước chung; mở rộng contract theo từng feature, không đợi thiết kế chi tiết toàn bộ F01–F11 mới thử pipeline.
 4. Chốt bộ rule policy sẽ dùng: constraints cần có, ai review, revision, hành vi BLOCK/ASK/ALLOW_WITH_LIMITS. Các ngưỡng chuyên môn về inactivity/recovery/progression phải có căn cứ và người review; không tự chọn số ngày/kg chỉ để qua test.
 5. Chốt catalog exercise/food ban đầu, nguồn được phép sử dụng, reviewer, benchmark và tiêu chí chất lượng. Dữ liệu đánh giá tách khỏi dữ liệu dùng để chỉnh prompt.
 6. Đặt giới hạn vận hành đề xuất: request/image size, timeout, retry, concurrency, rate limit, chi phí mỗi chức năng, retention ảnh/context và dữ liệu gửi provider. Có giá trị cụ thể trước rollout, không để production dùng “TBD”.
 7. Phân rã các công việc thành issue theo kế hoạch được duyệt; mỗi issue có assignee, reviewer, path phụ trách, contract đầu vào/ra, dependency và acceptance. Việc gán người được quản lý tại issue, không suy ra từ tài liệu hoặc vai trò sản phẩm.
 8. Chốt retry identity/revision/fingerprint/receipt và Nutrition confirmation nguyên tử nhóm item theo ma trận 1.7/1.9; UI ESTIMATE dùng Confirm/Correct riêng. Không chọn HTTP header hoặc thêm field DB chỉ vì ví dụ trong tài liệu.
-9. Lập đầu việc đồng bộ `docs/02-domain/lifecycles.md`, `docs/08-ai/recommendation-lifecycle.md`, sơ đồ AI tổng quát và API/schema chịu ảnh hưởng. Baseline lifecycle còn APPLY_FAILED, còn tài liệu AI dùng SUCCESS/TIMEOUT như nhãn vận hành: bản V1 phải giải thích mapping DB/API/reasonCode, rollback và INFORMATION/ESTIMATE không đi qua Apply recommendation. Bản tích hợp tài liệu 0.4 đã cập nhật overview/data-flow và lifecycle để phân biệt enum DB với reason/result types, đồng thời gắn rõ V1 là DRAFT. Gate còn yêu cầu review quyết định và cập nhật executable API/schema cùng implementation; chưa đóng chỉ vì có tài liệu. Không đổi enum hoặc sửa migration cũ chỉ để khớp tài liệu cũ.
+9. Lập đầu việc đồng bộ `docs/02-domain/lifecycles.md`, `docs/08-ai/recommendation-lifecycle.md`, sơ đồ AI tổng quát và API/schema chịu ảnh hưởng. Baseline lifecycle còn APPLY_FAILED, còn tài liệu AI dùng SUCCESS/TIMEOUT như nhãn vận hành: bản V1 phải giải thích mapping DB/API/reasonCode, rollback và INFORMATION/ESTIMATE không đi qua Apply recommendation. Bản tích hợp tài liệu 0.4 đã cập nhật overview/data-flow và lifecycle để phân biệt enum DB với reason/result types, đồng thời gắn rõ V1 là thiết kế đã phê duyệt, chưa phải bằng chứng code. Gate còn yêu cầu review chi tiết kỹ thuật và cập nhật executable API/schema cùng implementation; chưa đóng chỉ vì có tài liệu. Không đổi enum hoặc sửa migration cũ chỉ để khớp tài liệu cũ.
 
 **Đầu ra:** scope được duyệt, dependency checklist, API/schema draft, rule/catalog/evaluation policy được version hóa, backlog và owner.
 
@@ -161,7 +161,7 @@ Phần thiếu thuộc nghiệp vụ Phase 1 phải có issue/estimate riêng; P
 3. F07 thêm upload có ownership, vision recognition/portion candidates và matching; tái sử dụng confirmation pipeline của F06.
 4. Xử lý ảnh mờ/không hỗ trợ, món hỗn hợp/ingredient ẩn, unknown quantity, unmatched food và catalog thay đổi. Fallback text/manual luôn hiện rõ.
 5. Không gửi profile đầy đủ để nhận diện món; không cấp Trainer quyền ảnh chỉ vì có nutrition scope.
-6. F08 đọc Daily Target đã resolve và Progress completeness; hiển thị estimated/confirmed/corrected đúng ý nghĩa. Không tự sinh target định lượng mới trong scope đề xuất.
+6. F08 đọc Daily Target đã resolve và Progress completeness; hiển thị estimated/confirmed/corrected đúng ý nghĩa. Không tự sinh target định lượng mới trong scope đã phê duyệt.
 7. Đánh giá catalog/vision trên tập ảnh được phép, có danh mục món và đáp án; Student confirmation vẫn bắt buộc kể cả khi benchmark tốt. Chốt tập portion hỗ trợ, coverage tối thiểu và ngưỡng sai số theo nhóm trước holdout; all-unknown không đạt gate portion. Nếu thiếu bằng chứng thì đánh dấu experimental/chưa hoàn thành và không tuyên bố hoàn tất toàn bộ scope.
 
 **Đầu ra:** text + image logging end-to-end, nutrition summary, catalog/version và báo cáo giới hạn nhận diện.
@@ -226,7 +226,7 @@ Mẫu issue tối thiểu: feature/milestone ID; mục tiêu; đầu vào/đầu
 
 Không lấy số lượng PDF làm thước đo hoàn thành. Food Database là dữ liệu có cấu trúc, Exercise catalog là danh mục nghiệp vụ; chúng không được thay bằng việc nhét tài liệu vào RAG. Ngưỡng recovery/progression cần rule policy có nguồn, không chỉ một đoạn prompt hoặc câu trả lời mô hình.
 
-## 11. Kiểm thử và đánh giá đề xuất
+## 11. Kiểm thử và đánh giá
 
 ### 11.1. Các gate xác định bắt buộc
 
@@ -265,9 +265,9 @@ Mọi case bên dưới phải đạt; không có “cho phép lỗi” cho vư�
 
 ### 11.2. Chất lượng mô hình và retrieval
 
-Đây là **ngưỡng thử nghiệm đề xuất để P2-M0 duyệt**, không phải kết quả đã đo hoặc bảo đảm an toàn chuyên môn. Có thể điều chỉnh sau pilot nhưng phải version hóa trước khi chấm bản release, không hạ ngưỡng chỉ để che regression.
+Đây là **baseline ngưỡng thử nghiệm đã được phê duyệt trong thiết kế bản 1.0**, không phải kết quả đã đo hoặc bảo đảm an toàn chuyên môn. P2-M0 xác định dataset/reviewer/cách đo; ngưỡng chuyên môn còn thiếu và ngưỡng portion cần được review/chốt trước gate tương ứng. Có thể điều chỉnh sau pilot nhưng phải version hóa trước khi chấm bản release, không hạ ngưỡng chỉ để che regression.
 
-| Nhóm | Tập đánh giá tối thiểu đề xuất | Cách chấm và gate |
+| Nhóm | Tập đánh giá tối thiểu theo baseline | Cách chấm và gate |
 |---|---|---|
 | Retrieval | 30 câu hỏi trong phạm vi có nguồn kỳ vọng + 10 câu không đủ nguồn | Ít nhất 27/30 có nguồn phù hợp trong top 5; 10 câu không đủ nguồn không được trả khẳng định cá nhân hóa thiếu căn cứ |
 | Workout proposals | 40 hồ sơ synthetic được review, phủ hai mode, người mới/nghỉ dài và constraints | Tất cả output được coi là áp dụng được phải qua schema/domain gate. Ít nhất 34/40 trả đúng hành vi kỳ vọng: đề xuất phù hợp hoặc yêu cầu bổ sung/chặn đúng. Reviewer chấm nội dung theo rubric, không chỉ JSON hợp lệ |
@@ -305,7 +305,7 @@ Reviewer nội dung cần hiểu tập luyện/dinh dưỡng trong phạm vi đ�
 | Nutrition AI nằm trong Phase 2 | Mô tả mục 86 và roadmap đều có food/portion | Giữ F06–F08 trong kết thúc Phase 2; làm sau workout |
 | Knowledge, audit, evaluation, feedback là một phần sản phẩm | Mô tả mục 43/48/49 và governance | F09–F11 bắt buộc; Run/audit không đợi tới cuối mới làm |
 | Phase 3/4 khác Phase 2 | Roadmap phân riêng commerce và sensing | Giữ ngoài scope; food vision không đồng nhất pose estimation |
-| Target product có AI Goal/Nutrition proposal | Mô tả mục 6/29/36 có khả năng này, roadmap chưa phân use case chi tiết | Đánh dấu hoãn là quyết định mới D05, không giả là đã bị loại trước đó |
+| Target product có AI Goal/Nutrition proposal | Mô tả mục 6/29/36 có khả năng này, roadmap chưa phân use case chi tiết | Ghi nhận hoãn theo D05 đã phê duyệt, không giả là đã bị loại trước đó |
 
 ### 12.2. Các điểm kiểm soát quyền, dữ liệu và lifecycle
 
@@ -315,7 +315,7 @@ Reviewer nội dung cần hiểu tập luyện/dinh dưỡng trong phạm vi đ�
 | Kiểm quyền lúc tạo nhưng lộ output sau revoke | Kiểm lại khi job hoàn tất, khi đọc và khi apply; output chứa dữ liệu đã thu hồi không tự được xem |
 | Chỉ kiểm planVersion, bỏ qua Goal, thiết bị, actual hoặc mode | Guard theo dependency từng chức năng, dùng revision/watermark từ module nguồn |
 | Student HUMAN_COACH bị coi như không có quyền Goal/Nutrition | Giới hạn quyền quyết định chỉ theo domain; Student luôn giữ ownership Goal/strategic nutrition |
-| Student được xem nháp Trainer hoặc PT được xem ảnh nutrition mặc định | Đề xuất nháp chia sẻ chủ động và media scope riêng; log scope không cấp ảnh/draft scope |
+| Student được xem nháp Trainer hoặc PT được xem ảnh nutrition mặc định | Nháp chia sẻ chủ động theo D03 và media scope riêng; log scope không cấp ảnh/draft scope |
 | Xếp lại workout đồng thời đổi hẹn PT | Tách domain command, change request hai bên và revalidation; không tự đổi recurring series |
 | Ước lượng món được coi là Food Log hoặc calories của LLM là sự thật | Student confirmation + Food DB + deterministic calculation; giữ provenance |
 | Template giáo án theo tuần bị coi là cam kết cả Goal 90/120 ngày | Giới hạn tuần mẫu được gắn nhãn D02, giữ lịch sử và review mỗi lần điều chỉnh |
@@ -349,14 +349,15 @@ Các tiêu chí áp dụng chung vẫn có hiệu lực dù không lặp trong c
 | 0.2 | Mapping DB/API, transaction V1, source guard phân loại, F01/evaluation sớm và gate portion coverage |
 | 0.3 | Retry theo revision/payload; Food Confirmation nguyên tử; tương thích embedding; UI result types; T25–T28 |
 | 0.4 | Chuẩn hóa tài liệu dùng chung; tách phân công cá nhân; bổ sung liên kết, metadata phê duyệt và trách nhiệm theo issue; giữ nguyên scope kỹ thuật |
+| 1.0 | Chủ dự án phê duyệt phạm vi/thiết kế và D01–D07 ngày 04/10/2026; bổ sung routing agent. Giữ riêng gate triển khai/chuyên môn/evaluation, không ghi thành đã kiểm thử |
 
 Bộ tài liệu định nghĩa 11 chức năng, 7 milestone và 28 tình huống T01–T28. Đây là phạm vi cần kiểm chứng, không phải báo cáo test đã đạt. Kết quả thực tế phải có phiên bản code/dataset, môi trường, thời điểm và evidence tại issue/PR hoặc báo cáo evaluation.
 
-Các mục còn phải chốt/kiểm chứng: D01–D07; prerequisite Phase 1; ngưỡng rule chuyên môn; catalog/dataset/reviewer; model/provider; ngân sách, timeout, rate limit, retention; kết quả test/evaluation. Mỗi mục có người chịu trách nhiệm và gate tương ứng, không đóng chỉ vì đã có tài liệu.
+D01–D07 đã được phê duyệt. Các mục còn phải chốt/kiểm chứng: prerequisite Phase 1; ngưỡng rule chuyên môn; catalog/dataset/reviewer; model/provider; ngân sách, timeout, rate limit, retention; kết quả test/evaluation. Mỗi mục có người chịu trách nhiệm và gate tương ứng, không đóng chỉ vì đã có tài liệu.
 
-## 13. Việc bắt đầu ngay sau khi duyệt
+## 13. Việc bắt đầu theo baseline đã phê duyệt
 
-1. Ghi nhận phê duyệt phạm vi và giới hạn D01–D07; đồng bộ tài liệu repository qua quy trình review của dự án. Không đánh dấu APPROVED nếu chưa có quyết định được ghi nhận.
+1. Dùng phạm vi và giới hạn D01–D07 đã ghi nhận APPROVED ngày 04/10/2026; kiểm tra tài liệu/contract bị ảnh hưởng và triển khai theo quy trình review của dự án. Các bước prerequisite, policy chuyên môn, provider/ngân sách và evidence vẫn phải hoàn thành.
 2. Kiểm chứng prerequisites cho F02; hoàn thiện input/output schema và query source/version.
 3. Chuẩn bị bộ tri thức nhỏ phục vụ F01–F03 cùng câu hỏi đánh giá; làm bằng chứng retrieval trước khi thu thập hàng loạt.
 4. Chia prerequisite Phase 1 và phần bổ sung AI thành backlog riêng, cân tải theo assignee và dependency; chạy F01 kiến thức chung và evaluation runner ở P2-M2, bắt đầu F02 sau khi các gate domain đạt.
@@ -365,7 +366,7 @@ Không đặt ngày hoàn thành cụ thể khi chưa biết tiến độ Phase 
 
 ## Tài liệu hiện hành trong repository
 
-Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. DRAFT trong bộ tài liệu này không thay đổi invariant đã được xác nhận hoặc chứng minh API đã triển khai.
+Đọc các tài liệu hiện hành dưới đây khi thực hiện công việc. Liên kết theo commit ở phần nguồn là snapshot để truy vết; nếu code/contract mới khác baseline, ghi nhận khác biệt trước khi triển khai phần chịu ảnh hưởng. APPROVED xác nhận phạm vi và thiết kế; không chứng minh API đã triển khai hoặc test đã đạt. Các invariant đã xác nhận tiếp tục có hiệu lực.
 
 - [Phase 1 prerequisites](phase-1-implementation-plan.md)
 - [Testing guide](testing-guide.md)

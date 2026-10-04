@@ -44,4 +44,4 @@ See [actors and responsibilities](actors-and-responsibilities.md), [scope and ro
 
 ## Phase 2 release planning
 
-See the [Phase 2 release scope](phase-2-release-scope.md) for the proposed first AI release. Read its linked data/authority matrix and implementation plan before assigning work. D01–D07 remain unapproved; target-product capabilities remain distinct from release limits.
+See the [Phase 2 release scope](phase-2-release-scope.md) for the approved first AI release. Read its linked data/authority matrix and implementation plan before assigning work. D01–D07 were approved by the project owner on 2026-10-04; target-product capabilities remain distinct from release limits.

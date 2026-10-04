@@ -31,7 +31,7 @@ Phase 1 implementations may simplify workflows, but the schema must not reduce v
 - structured Workout Plan proposals;
 - Nutrition AI, food recognition, portion estimation, and User confirmation.
 
-The [Phase 2 release scope](phase-2-release-scope.md) expands this roadmap into F01–F11 and explicit release limits. The [data/authority matrix](../08-ai/phase-2-feature-data-authority-matrix.md) and [implementation plan](../07-development/phase-2-implementation-plan.md) describe the proposed implementation. They remain DRAFT until decisions D01–D07 are recorded. In particular, deferring AI-generated Fitness Goal and strategic Nutrition Target proposals is a proposed release limit, not removal of the target-product proposal/Student-approval rules.
+The [Phase 2 release scope](phase-2-release-scope.md) expands this roadmap into F01–F11 and explicit release limits. The [data/authority matrix](../08-ai/phase-2-feature-data-authority-matrix.md) and [implementation plan](../07-development/phase-2-implementation-plan.md) define the approved implementation baseline (version 1.0, project-owner approval on 2026-10-04). D01–D07 are recorded in the release scope; technical prerequisites and release evidence remain to be completed. In particular, deferring AI-generated Fitness Goal and strategic Nutrition Target proposals is an approved release limit, not removal of the target-product proposal/Student-approval rules.
 
 ## Phase 3 Product and commercial expansion
 

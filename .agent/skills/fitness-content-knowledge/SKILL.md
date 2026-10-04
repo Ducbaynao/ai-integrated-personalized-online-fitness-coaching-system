@@ -30,3 +30,7 @@ Maintain structured foods with canonical name, serving, calories, protein, carbo
 ## Governance
 
 Separate content authoring, review, publish, archive, and audit permissions. Publishing or merging is privileged and should be validated and audited. Design moderation and correction workflows so content fixes do not rewrite historical user logs unexpectedly.
+
+## Phase 2 routing
+
+For Phase 2 work, first follow [root agent instructions](../../../AGENTS.md#phase-2-execution) and the approved three-document reading order. Read F09 and matrix section 1.10. Keep ACTIVE-only retrieval, immutable knowledge lineage, matching query/index model spaces and reviewed publication. Separate Exercise/Food catalogs from unstructured RAG knowledge.
