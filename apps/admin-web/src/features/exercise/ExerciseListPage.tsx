@@ -144,6 +144,9 @@ function ExerciseListContent() {
                   <th scope="col">Mã</th>
                   <th scope="col">Trạng thái</th>
                   <th scope="col">Độ khó</th>
+                  <th scope="col">Nhóm cơ</th>
+                  <th scope="col">Thiết bị</th>
+                  <th scope="col">Tư liệu khả dụng</th>
                   <th scope="col">Biến thể</th>
                   <th scope="col">Cập nhật</th>
                   <th scope="col">Thao tác</th>
@@ -164,6 +167,9 @@ function ExerciseListContent() {
                     <td>{exercise.code}</td>
                     <td><span className={`status-badge status-badge--${exercise.status.toLowerCase()}`}>{lifecycleLabels[exercise.status]}</span></td>
                     <td>{exercise.difficulty ? difficultyLabels[exercise.difficulty] : '—'}</td>
+                    <td>{formatCodes(exercise.muscleGroupCodes)}</td>
+                    <td>{formatCodes(exercise.equipmentCodes)}</td>
+                    <td>{exercise.mediaAvailable ? 'Có tư liệu khả dụng' : 'Chưa có tư liệu khả dụng'}</td>
                     <td>{exercise.variationCount.toLocaleString('vi-VN')}</td>
                     <td>{formatDateTime(exercise.updatedAt)}</td>
                     <td>
@@ -206,6 +212,10 @@ function ExerciseListContent() {
       )}
     </section>
   )
+}
+
+function formatCodes(codes: string[]) {
+  return codes.length > 0 ? codes.join(', ') : 'Chưa có dữ liệu'
 }
 
 function PageHeading() {

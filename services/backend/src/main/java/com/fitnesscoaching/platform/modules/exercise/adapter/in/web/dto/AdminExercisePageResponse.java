@@ -22,11 +22,13 @@ public record AdminExercisePageResponse(
     public record Item(
             UUID id, String code, String name, String categoryCode, String difficulty,
             String movementPattern, String status, long version, UUID canonicalReplacementId,
+            List<String> muscleGroupCodes, List<String> equipmentCodes, boolean mediaAvailable,
             int variationCount, Instant updatedAt
     ) {
         static Item fromDomain(AdminExerciseSummary item) {
             return new Item(item.id(), item.code(), item.name(), item.categoryCode(), item.difficulty(),
                     item.movementPattern(), item.status().name(), item.version(), item.canonicalReplacementId(),
+                    item.muscleGroupCodes(), item.equipmentCodes(), item.mediaAvailable(),
                     item.variationCount(), item.updatedAt());
         }
     }

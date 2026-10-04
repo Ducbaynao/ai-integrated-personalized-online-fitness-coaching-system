@@ -243,7 +243,10 @@ paths:
       tags: [Admin Exercise Catalog]
       operationId: searchAdminExercises
       summary: Search Exercises across every lifecycle state
-      description: Requires an active ADMIN role and CATALOG_MANAGE permission. Results are ordered by case-insensitive name, then ID.
+      description: >
+        Requires an active ADMIN role and CATALOG_MANAGE permission. Results are ordered by
+        case-insensitive name, then ID. Muscle/equipment codes and safe media availability are
+        resolved without exposing storage references or multiplying Exercise rows.
       parameters:
         - name: query
           in: query
@@ -2442,7 +2445,7 @@ components:
     AdminExerciseSummaryResponse:
       type: object
       additionalProperties: false
-      required: [id, code, name, status, version, variationCount, updatedAt]
+      required: [id, code, name, status, version, muscleGroupCodes, equipmentCodes, mediaAvailable, variationCount, updatedAt]
       properties:
         id: { type: string, format: uuid }
         code: { type: string }
@@ -2459,6 +2462,19 @@ components:
         status: { $ref: '#/components/schemas/ExerciseLifecycleStatus' }
         version: { type: integer, format: int64, minimum: 0 }
         canonicalReplacementId: { type: [string, 'null'], format: uuid }
+        muscleGroupCodes:
+          type: array
+          uniqueItems: true
+          description: Deterministically ordered muscle-group codes used across this Exercise's variations.
+          items: { type: string }
+        equipmentCodes:
+          type: array
+          uniqueItems: true
+          description: Deterministically ordered equipment codes used across this Exercise's variations.
+          items: { type: string }
+        mediaAvailable:
+          type: boolean
+          description: True only when at least one linked media file is clean and not deleted; storage references are not exposed.
         variationCount: { type: integer, minimum: 0 }
         updatedAt: { type: string, format: date-time }
 

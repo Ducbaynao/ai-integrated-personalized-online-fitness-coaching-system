@@ -88,7 +88,8 @@ class AdminExerciseCatalogIntegrationTest {
         jdbcTemplate.execute("""
                 TRUNCATE TABLE fitness.audit_logs, fitness.exercise_merge_events,
                 fitness.exercise_canonical_mappings, fitness.exercise_guidance,
-                fitness.exercise_tag_assignments, fitness.exercise_tags, fitness.exercise_media,
+                    fitness.exercise_tag_assignments, fitness.exercise_tags, fitness.exercise_media,
+                    fitness.media_files,
                 fitness.exercise_equipment, fitness.exercise_muscles, fitness.exercise_variations,
                 fitness.exercises, fitness.equipment, fitness.muscle_groups, fitness.exercise_categories,
                 fitness.users CASCADE
@@ -180,8 +181,8 @@ class AdminExerciseCatalogIntegrationTest {
                         .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories[*].code", contains("ALPHA_CATEGORY", "STRENGTH")))
-                .andExpect(jsonPath("$.muscleGroups[*].code", contains("ALPHA_MUSCLE", "CORE")))
-                .andExpect(jsonPath("$.equipment[*].code", contains("BODYWEIGHT")))
+                .andExpect(jsonPath("$.muscleGroups[*].code", contains("ALPHA_MUSCLE", "CHEST", "CORE")))
+                .andExpect(jsonPath("$.equipment[*].code", contains("BARBELL", "BODYWEIGHT")))
                 .andExpect(jsonPath("$.tags[*].code", contains("COMPOUND")))
                 .andExpect(jsonPath("$.difficulties", contains("BEGINNER", "INTERMEDIATE", "ADVANCED")))
                 .andExpect(jsonPath("$.movementPatterns[*].code", org.hamcrest.Matchers.not(
@@ -311,14 +312,34 @@ class AdminExerciseCatalogIntegrationTest {
     }
 
     @Test
-    void adminListAndDetailCoverEveryLifecycleWithStablePagination() throws Exception {
+    void adminListProjectsRelationsWithoutDuplicateRowsAndDetailCoversEveryLifecycle() throws Exception {
         mockMvc.perform(get("/api/v1/admin/exercises")
                         .param("page", "0").param("size", "2")
                         .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalItems", is(4)))
                 .andExpect(jsonPath("$.totalPages", is(2)))
-                .andExpect(jsonPath("$.items[*].name", contains("Active Exercise", "Archived Exercise")));
+                .andExpect(jsonPath("$.items", hasSize(2)))
+                .andExpect(jsonPath("$.items[*].name", contains("Active Exercise", "Archived Exercise")))
+                .andExpect(jsonPath("$.items[0].variationCount", is(2)))
+                .andExpect(jsonPath("$.items[0].muscleGroupCodes", contains("CHEST", "CORE")))
+                .andExpect(jsonPath("$.items[0].equipmentCodes", contains("BARBELL", "BODYWEIGHT")))
+                .andExpect(jsonPath("$.items[0].mediaAvailable", is(true)))
+                .andExpect(jsonPath("$.items[1].mediaAvailable", is(false)))
+                .andExpect(jsonPath("$.items[0].objectKey").doesNotExist())
+                .andExpect(content().string(not(containsString("private-fixtures"))))
+                .andExpect(content().string(not(containsString("exercise/active-standard"))));
+
+        mockMvc.perform(get("/api/v1/admin/exercises")
+                        .param("page", "1").param("size", "2")
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(4)))
+                .andExpect(jsonPath("$.items", hasSize(2)))
+                .andExpect(jsonPath("$.items[*].name", contains("Archived Two", "Draft Exercise")))
+                .andExpect(jsonPath("$.items[1].muscleGroupCodes", hasSize(0)))
+                .andExpect(jsonPath("$.items[1].equipmentCodes", hasSize(0)))
+                .andExpect(jsonPath("$.items[1].mediaAvailable", is(false)));
 
         mockMvc.perform(get("/api/v1/admin/exercises")
                         .param("status", "ARCHIVED")
@@ -379,6 +400,20 @@ class AdminExerciseCatalogIntegrationTest {
                 .andExpect(jsonPath("$.status", is("ARCHIVED")))
                 .andExpect(jsonPath("$.version", is(3)));
 
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.exercises WHERE id = ? AND code = 'CREATED_EXERCISE' AND deleted_at IS NULL",
+                UUID.class, createdId)).isEqualTo(createdId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.exercise_variations WHERE exercise_id = ?",
+                Integer.class, createdId)).isEqualTo(1);
+        mockMvc.perform(get("/api/v1/admin/exercises/{id}", createdId)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(createdId.toString())))
+                .andExpect(jsonPath("$.code", is("CREATED_EXERCISE")))
+                .andExpect(jsonPath("$.status", is("ARCHIVED")))
+                .andExpect(jsonPath("$.variations", hasSize(1)));
+
         mockMvc.perform(post("/api/v1/admin/exercises/{id}/activate", createdId)
                         .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":3}"))
@@ -417,6 +452,20 @@ class AdminExerciseCatalogIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.canonicalReplacementId", is(ACTIVE_ID.toString())))
                 .andExpect(jsonPath("$.version", is(1)));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.exercises WHERE id = ? AND code = 'ARCHIVED_EXERCISE' " +
+                        "AND admin_status = 'ARCHIVED' AND deleted_at IS NULL",
+                UUID.class, ARCHIVED_ID)).isEqualTo(ARCHIVED_ID);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.exercise_variations WHERE exercise_id = ?",
+                Integer.class, ARCHIVED_ID)).isEqualTo(1);
+        mockMvc.perform(get("/api/v1/admin/exercises/{id}", ARCHIVED_ID)
+                        .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(ARCHIVED_ID.toString())))
+                .andExpect(jsonPath("$.status", is("ARCHIVED")))
+                .andExpect(jsonPath("$.variations", hasSize(1)));
 
         mockMvc.perform(put("/api/v1/admin/exercises/{id}/canonical-replacement", ARCHIVED_TWO_ID)
                         .header("Authorization", bearer(ADMIN_ID, "ADMIN"))
@@ -515,8 +564,8 @@ class AdminExerciseCatalogIntegrationTest {
     private void insertCatalogFixtures() {
         jdbcTemplate.execute("""
                 INSERT INTO fitness.exercise_categories(code,name) VALUES ('STRENGTH','Strength');
-                INSERT INTO fitness.muscle_groups(code,name) VALUES ('CORE','Core');
-                INSERT INTO fitness.equipment(code,name) VALUES ('BODYWEIGHT','Bodyweight');
+                INSERT INTO fitness.muscle_groups(code,name) VALUES ('CORE','Core'), ('CHEST','Chest');
+                INSERT INTO fitness.equipment(code,name) VALUES ('BODYWEIGHT','Bodyweight'), ('BARBELL','Barbell');
                 INSERT INTO fitness.exercise_tags(code,name) VALUES ('COMPOUND','Compound');
                 INSERT INTO fitness.exercises(id,code,name,category_id,difficulty,movement_pattern,admin_status)
                 SELECT x.id::uuid,x.code,x.name,c.id,x.difficulty,x.pattern,x.status
@@ -528,8 +577,45 @@ class AdminExerciseCatalogIntegrationTest {
                 ) x(id,code,name,difficulty,pattern,status)
                 JOIN fitness.exercise_categories c ON c.code='STRENGTH';
                 INSERT INTO fitness.exercise_variations(id,exercise_id,code,name,difficulty,is_default,is_active)
-                VALUES ('20000000-0000-0000-0000-000000000002',
-                        '10000000-0000-0000-0000-000000000002','ACTIVE_STANDARD','Standard','BEGINNER',true,true);
+                VALUES
+                  ('20000000-0000-0000-0000-000000000002',
+                   '10000000-0000-0000-0000-000000000002','ACTIVE_STANDARD','Standard','BEGINNER',true,true),
+                  ('20000000-0000-0000-0000-000000000012',
+                   '10000000-0000-0000-0000-000000000002','ACTIVE_ALTERNATIVE','Alternative','BEGINNER',false,true),
+                  ('20000000-0000-0000-0000-000000000003',
+                   '10000000-0000-0000-0000-000000000003','ARCHIVED_STANDARD','Archived Standard','BEGINNER',true,true);
+                INSERT INTO fitness.exercise_muscles(exercise_variation_id,muscle_group_id,involvement)
+                SELECT '20000000-0000-0000-0000-000000000002', id, 'PRIMARY'
+                FROM fitness.muscle_groups WHERE code IN ('CORE', 'CHEST');
+                INSERT INTO fitness.exercise_muscles(exercise_variation_id,muscle_group_id,involvement)
+                SELECT '20000000-0000-0000-0000-000000000012', id, 'SECONDARY'
+                FROM fitness.muscle_groups WHERE code = 'CORE';
+                INSERT INTO fitness.exercise_muscles(exercise_variation_id,muscle_group_id,involvement)
+                SELECT '20000000-0000-0000-0000-000000000003', id, 'PRIMARY'
+                FROM fitness.muscle_groups WHERE code = 'CORE';
+                INSERT INTO fitness.exercise_equipment(exercise_variation_id,equipment_id,requirement)
+                SELECT '20000000-0000-0000-0000-000000000002', id, 'REQUIRED'
+                FROM fitness.equipment WHERE code IN ('BODYWEIGHT', 'BARBELL');
+                INSERT INTO fitness.exercise_equipment(exercise_variation_id,equipment_id,requirement)
+                SELECT '20000000-0000-0000-0000-000000000012', id, 'OPTIONAL'
+                FROM fitness.equipment WHERE code = 'BARBELL';
+                INSERT INTO fitness.exercise_equipment(exercise_variation_id,equipment_id,requirement)
+                SELECT '20000000-0000-0000-0000-000000000003', id, 'REQUIRED'
+                FROM fitness.equipment WHERE code = 'BODYWEIGHT';
+                INSERT INTO fitness.media_files(
+                    id, storage_provider, bucket_name, object_key, content_type, size_bytes,
+                    media_purpose, visibility, scan_status)
+                VALUES
+                  ('30000000-0000-0000-0000-000000000001', 'TEST', 'private-fixtures',
+                   'exercise/active-standard', 'image/jpeg', 128, 'EXERCISE_MEDIA', 'PRIVATE', 'CLEAN'),
+                  ('30000000-0000-0000-0000-000000000002', 'TEST', 'private-fixtures',
+                   'exercise/archived-pending', 'video/mp4', 256, 'EXERCISE_MEDIA', 'PRIVATE', 'PENDING');
+                INSERT INTO fitness.exercise_media(exercise_variation_id,media_id,purpose)
+                VALUES
+                  ('20000000-0000-0000-0000-000000000002',
+                   '30000000-0000-0000-0000-000000000001','THUMBNAIL'),
+                  ('20000000-0000-0000-0000-000000000003',
+                   '30000000-0000-0000-0000-000000000002','DEMO_VIDEO');
                 """);
     }
 
