@@ -1,0 +1,343 @@
+# B03 Coaching Relationship and Coaching Period
+
+## 1. Checkpoint and objective
+
+- **Feature ID:** `B03`.
+- **Decision checkpoint:** `B03-PREREQUISITE-DECISIONS`.
+- **Checkpoint branch:** `feature/m2a-coaching-authority-decisions`.
+- **Scope of this checkpoint:** decision and documentation gate only. It does not add a controller, repository, Flyway migration, OpenAPI path, or Mobile implementation.
+- **CONFIRMED REQUIREMENT:** Establish the relationship, effective-period, sharing, and authorization rules for Student-Trainer coaching without deleting or rewriting fitness history.
+
+This record distinguishes confirmed product requirements, current executable evidence, and decisions for later implementation. A proposed API or migration below is not an implemented contract until the corresponding checkpoint changes the executable OpenAPI or Flyway sources.
+
+## 2. Sources and confirmed requirements
+
+The decision is based on:
+
+- `FR-GC-001`, `FR-GC-002`, `FR-GC-010`, and `FR-GC-011` in the functional requirements;
+- the M2 scope and exit criteria in the Phase 1 implementation plan;
+- the Coaching Relationship and Coaching Period lifecycle and the Trainer access checks in the domain documents;
+- ST-17, TR-01, TR-03, and TR-12 in the UI/UX specifications;
+- Flyway V1, V4, and V20 through the latest repository migration at the time of this audit;
+- the current OpenAPI contract and the B01 identity/session and Trainer eligibility implementation;
+- B02 authority, stable-error, audit, optimistic-concurrency, and history-preservation conventions;
+- the B03 source document read from the untracked-files parent of the stash whose message is `wip Minh docs before rebasing B01`.
+
+The following requirements are confirmed:
+
+1. The only Coaching Modes are `SELF_DIRECTED` and `HUMAN_COACH`. AI Assistance is neither a mode nor an authority.
+2. Coaching Mode belongs to an effective Coaching Period, never permanently to Student Profile.
+3. Switching mode or Trainer creates period history and preserves Goals, Plans, Workouts, Measurements, Nutrition, Progress, RPE, and their historical references.
+4. A Trainer role or profile alone never grants Student access. Backend authorization must also validate the active account, active capability, canonical Trainer eligibility, relationship, effective period, sharing scope and level, ownership, and operation-specific policy.
+5. Data Sharing Permission must express domain/resource scope, access level, validity time, and explicit pre-coaching-history access.
+6. Student owns personal data-sharing decisions and Student-owned Goal decisions. Trainer may request access or propose a Goal change; Trainer cannot grant access or accept a proposal on the Student's behalf.
+7. Administrator is platform authority, not coaching authority. Support or privileged access uses a separate permission, purpose, expiry, and audit workflow.
+8. Missing or unavailable data remains unknown. Lack of sharing is not the same as lack of data.
+
+## 3. Existing schema, code, and contract audit
+
+| Area | Executable evidence | Audit result |
+|---|---|---|
+| Relationship | V4 `coaching_relationships` and `coaching_relationship_status_history`; V1 statuses include `PENDING`, `ACTIVE`, `PAUSED`, `ENDED`, `REJECTED`, and `CANCELLED` | The base lifecycle and actor history are representable. The schema has pair-level uniqueness for `PENDING`/`ACTIVE`/`PAUSED`, but it does not prevent two different Trainers from holding current relationships for one Student. |
+| Initiation | V4 stores `requested_by`, Trainer, Student, and request time | A request versus invitation can be derived safely: `requested_by = student_id` is a Student request and `requested_by = trainer_id` is a Trainer invitation. A constraint must ensure the initiator is one of the pair. No parallel invitation table is needed. |
+| Coaching Period | V4 `coaching_periods` carries mode, optional relationship/Trainer, effective timestamps, and a GiST exclusion constraint by Student | V4 already prevents overlapping periods and enforces the basic mode/Trainer shape. It does not itself validate that the referenced relationship belongs to the same Student-Trainer pair or that lifecycle transitions close/open periods atomically. |
+| Sharing | V4 `data_sharing_permissions` carries relationship, Student, Trainer, scope, allow/deny decision, history window, validity window, grant/revoke evidence | Scope and time are present, and V20 adds `FITNESS_GOAL`. Required access level is absent. Pair consistency and history-safe deletion constraints need strengthening. |
+| Trainer eligibility | `TrainerEligibilityService` derives eligibility from account, active Trainer role, active profile, verification/activity state, and restrictions | This is the canonical eligibility input B03 must consume. Acceptance and every Trainer-authorized request recheck it; client state is informational only. |
+| Current coaching authority | `CoachingProposalAuthorityAdapter` checks account, Trainer role/eligibility, active relationship, current `HUMAN_COACH` period, and `FITNESS_GOAL` sharing before Goal Proposal actions | The checks demonstrate the intended policy but are Goal-specific JDBC queries, not yet a reusable Coaching application authority service. B03 must centralize this policy without allowing consumer modules to read Coaching repositories. |
+| Audit and errors | The backend exposes structured errors with stable `errorCode`, request ID, timestamp and field errors; immutable audit services and B02 lifecycle/version conflict conventions exist | B03 should reuse these shapes and audit conventions. Raw exception text must not become Mobile copy. |
+| OpenAPI | No Coaching Relationship, Coaching Period, or Data Sharing paths/schemas exist | All API items in this record are implementation impact, not current executable behavior. |
+| Mobile | ST-17, TR-01, TR-03, and TR-12 are documented; no B03 routes or screens are implemented | Mobile work belongs to a later checkpoint and must reuse B01 session, capability, query-cache, error, and forced-logout behavior. |
+
+## 4. Decision table
+
+| Topic | Decision | Rationale and consequence |
+|---|---|---|
+| Relationship multiplicity | A Student may have at most one current relationship in `ACTIVE` or `PAUSED`. A Student may have pending requests/invitations with different Trainers, but each Student-Trainer pair has at most one current `PENDING`, `ACTIVE`, or `PAUSED` row. | Prevents two active coaches and makes resume deterministic. Accepting a pending relationship while another relationship is `ACTIVE` or `PAUSED` returns a stable conflict; the old relationship must be ended explicitly. |
+| Effective authority | A Student has at most one effective Coaching Period at an instant. Trainer authority exists only for an `ACTIVE` relationship and a matching effective `HUMAN_COACH` period. | Reuses V4's exclusion constraint and denies authority during gaps, pause, or inconsistent data. |
+| Initiation | An eligible, accepting Trainer may be invited by a Student; a Trainer may invite a Student. The counterparty must accept. The initiator cannot accept their own pending relationship. | A common pending relationship record is sufficient; `requested_by` identifies the direction. Eligibility is checked at initiation and again at acceptance. |
+| Pending lifecycle | The initiator may cancel; only the counterparty may accept or reject. Reject/cancel are terminal and preserved. | Makes intent and authority explicit and provides deterministic replay conflicts. |
+| Pause | Either party may pause an `ACTIVE` relationship unilaterally. Pause is immediate, audited, closes the effective `HUMAN_COACH` period, and opens a `SELF_DIRECTED` period at the same boundary. | Either party can withdraw active collaboration safely; paused coaching grants no Trainer access while the Student retains authority over personal data. |
+| Resume | Resume requires both parties. Either party may create a resume request while the relationship remains `PAUSED`; at most one resume request may be pending for that relationship. The initiator may cancel it, while only the counterparty may accept or reject it. The initiator cannot accept their own request. Accept creates a new `HUMAN_COACH` period and never reopens or rewrites the prior period. | A Trainer cannot regain access unilaterally, and a Student cannot reassign coaching responsibility without Trainer consent. Resume-request state is separate from relationship status, so authority remains revoked until the accept transaction commits. |
+| End | Either party may end an `ACTIVE` or `PAUSED` relationship with an explicit confirmation and reason. End is terminal. If a human-coach period is effective, it is closed and a `SELF_DIRECTED` period begins at the same boundary. | Consent/participation can be withdrawn without deleting history. A new collaboration creates a new relationship row. |
+| Paused authority | `PAUSED` grants no Trainer read, contribute, manage, messaging-membership expansion, or plan authority. The Student keeps normal access to their own data. | Relationship status is an authorization input, not only presentation state. Existing grants remain historical but are ineffective while paused. |
+| Ended authority and reads | `ENDED` removes all future coaching authority and all general access to live Student data. A former Trainer may see only minimal immutable receipts of their own prior actions when an owning module later defines a specific lawful/audited read contract; B03 grants no general historical Student-data access. | Preserves identifiers and audit evidence without silently retaining live access. Chat retention/read behavior remains a B08 policy, but cannot be used to regain live coaching data. |
+| Sharing default | Deny by default. No role-derived or relationship-derived implicit grant exists. Student-issued, relationship-bound grants are required in addition to relationship/period/object authority. An effective `DENY` or the absence of a sufficient grant denies access. | Enforces least privilege and distinguishes relationship membership from sensitive-data consent. |
+| Access levels | Add explicit `VIEW`, `CONTRIBUTE`, and `MANAGE`. Levels are ordered for sufficiency (`MANAGE` includes `CONTRIBUTE` and `VIEW`; `CONTRIBUTE` includes `VIEW`), but never override domain authority. | Meets FR-GC-011. For example, `MANAGE` never lets a Trainer accept a Student-owned Goal proposal, and `CONTRIBUTE` permits proposing only when the Goal module also authorizes it. |
+| Grant/effective-authority time | Evaluate account, capability, eligibility, relationship, effective Coaching Period, and sharing-grant validity at the backend's current request time. Pause, revoke, expiry, or end removes authority for the current request even when the requested record was created earlier. | Current authority is one independent time axis. A historical record never preserves the authority that existed when it was created. |
+| Historical-data window | Only after current authority succeeds, compare the historical resource's domain timestamp with the effective grant's explicit `history_from`/`history_until`. A pre-period record is readable only when its scope and historical window permit it. | Resource time is the second independent axis. A timestamp inside the historical window cannot create or revive authority, and a former Trainer cannot use it after pause/end. Student ownership access to the Student's own history is unaffected by Trainer grant windows. |
+| Permission changes | Grant, replace, revoke, and expiry are history-preserving and audited. A change revokes/closes the prior effective row and appends a new row; it does not overwrite who granted the prior decision. | Supports consent history and deterministic effective-time evaluation. |
+| Concurrency | Accept, pause, resume-request actions, end, period switch, and sharing changes lock/recheck the Student authority boundary and use expected versions or equivalent compare-and-set guards. Resume accept/reject/cancel addresses `resumeRequestId`, relationship ID, expected relationship version, and expected request version/concurrency token. Database constraints are the final race backstop. | Exactly one competing transition wins; stale/duplicate/concurrent losers receive stable `409` errors, retain `PAUSED` authority when applicable, and create no partial period, permission, status-history, or audit writes. |
+| Deletion | Relationship, status history, period, sharing decision, and consumer references are never hard-deleted through B03. | Historical identifiers remain resolvable and downstream history is not rewritten. |
+
+## 5. Relationship lifecycle and state machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Student request or Trainer invitation
+    PENDING --> ACTIVE: counterparty accepts
+    PENDING --> REJECTED: counterparty rejects
+    PENDING --> CANCELLED: initiator cancels
+    ACTIVE --> PAUSED: either party pauses
+    ACTIVE --> ENDED: either party ends
+    PAUSED --> PAUSED_RESUME_PENDING: either party requests resume
+    PAUSED_RESUME_PENDING --> PAUSED: initiator cancels
+    PAUSED_RESUME_PENDING --> PAUSED: counterparty rejects
+    PAUSED_RESUME_PENDING --> ACTIVE: counterparty accepts
+    PAUSED --> ENDED: either party ends
+    PAUSED_RESUME_PENDING --> ENDED: either party ends; pending request invalidated
+    REJECTED --> [*]
+    CANCELLED --> [*]
+    ENDED --> [*]
+```
+
+Lifecycle rules:
+
+- Request and invitation creation verify account/capability state, Trainer eligibility, accepting-students/capacity policy when available, distinct Student and Trainer identities, and pair uniqueness.
+- Acceptance repeats every mutable eligibility/capacity check inside the committing transaction. It verifies the accepting actor is the counterparty and no other `ACTIVE` or `PAUSED` relationship exists for the Student.
+- Duplicate or stale lifecycle actions never create duplicate status history or audit rows.
+- Reject/cancel/end are terminal. A later attempt between the same parties creates a new relationship identity and preserves the old one.
+- Pause does not mutate sharing history. It makes all Trainer grants ineffective by relationship/period policy.
+- `PAUSED_RESUME_PENDING` in the diagram is pending-action state, not a new relationship status: the relationship remains `PAUSED`, all Trainer authority remains revoked, and at most one resume request is pending for that relationship.
+- Either party may initiate a resume request. Only its initiator may cancel it; only its counterparty may accept or reject it; its initiator cannot accept it.
+- Resume accept/reject/cancel commands identify both `resumeRequestId` and relationship ID and carry the expected relationship version plus expected request version or an equivalent concurrency token.
+- Ending the relationship atomically invalidates/cancels any pending resume request. A concurrent resume action then observes terminal state and cannot restore authority.
+- Only a committed counterparty acceptance changes `PAUSED` to `ACTIVE`, closes the resume request, and establishes a new human-coach period. It never reopens or rewrites an earlier period.
+- An exact retry is idempotent when the later contract supplies a replay/idempotency key; otherwise a duplicate or stale terminal action returns the documented stable `409` and the authoritative terminal representation can be reloaded. Neither outcome repeats side effects.
+
+## 6. Coaching Period invariants
+
+1. Period intervals use `[started_at, ended_at)` semantics. `ended_at` must be later than `started_at`.
+2. Periods for one Student never overlap. Boundary-adjacent periods are allowed.
+3. `SELF_DIRECTED` has no Trainer or Coaching Relationship reference. `HUMAN_COACH` requires both, and they must match the same relationship pair.
+4. Accepting a relationship closes the current `SELF_DIRECTED` period and creates a new `HUMAN_COACH` period at one transaction timestamp.
+5. Pausing or ending an effective human relationship closes the `HUMAN_COACH` period and creates a `SELF_DIRECTED` period at the same timestamp. Ending an already paused relationship leaves the effective self-directed period unchanged.
+6. Resume confirmation closes the current `SELF_DIRECTED` period and creates a new `HUMAN_COACH` period. It never clears the old human period's `ended_at`.
+7. Switching Trainer requires ending the old relationship/period before accepting the new relationship. Goal, plan, exercise, workout, measurement, nutrition, progress, and source identifiers remain unchanged.
+8. Every authority decision uses the database transaction time supplied by the backend clock consistently; clients do not supply the effective authority timestamp.
+9. Missing or inconsistent current-period data fails closed and produces operational evidence; it never falls back to role-based authority.
+10. Current-request authority and historical-resource time are independent. An effective historical window filters records only after account, capability, relationship, current period, and grant are valid at request time; it cannot preserve Trainer authority after pause/end.
+11. Student ownership access to the Student's own historical records continues across Coaching Period transitions, subject to the owning module's ordinary account, privacy, retention, and object rules rather than Trainer sharing grants.
+
+## 7. Sharing and authorization matrix
+
+All Trainer rows below additionally require an active account, active Trainer capability, canonical eligibility, the matching `ACTIVE` relationship, an effective matching `HUMAN_COACH` period, ownership/object checks, and a non-expired permission at the current backend request time. Student access still passes normal account, capability, ownership, and resource lifecycle checks.
+
+Authorization evaluates two independent time axes in this order:
+
+1. **Grant/effective-authority time:** evaluate the actor, relationship, effective period, and sharing grant at the current request time. Failure denies the request immediately, including for records created while coaching was formerly active.
+2. **Historical-data window:** after current authority succeeds, compare the resource's domain timestamp with the allowed history interval. This window limits which historical records the currently authorized Trainer may read; it never creates authority by itself.
+
+Therefore a pre-coaching record needs both a currently effective authorization chain and a scope/window that includes its timestamp. Pause/end blocks the former Trainer regardless of record timestamp. The Student may still read their own history under the owning module's normal Student policy.
+
+| Operation | Actor | Required sharing scope and minimum level | Result/owner boundary |
+|---|---|---|---|
+| Read own coaching profile/history and sharing decisions | Student owner | No Trainer grant | Allowed; sensitive counterparty fields still follow privacy policy. |
+| Grant/revoke own data sharing | Student owner | No Trainer grant | Allowed and audited; Trainer/Admin cannot grant on Student's behalf. |
+| Read current Goal context | Trainer | `FITNESS_GOAL` + `VIEW` | Goal module remains source of truth. |
+| Create a Goal change proposal | Trainer | `FITNESS_GOAL` + `CONTRIBUTE` | Student remains final decision maker; no direct Goal mutation. |
+| Read workout/performance history | Trainer | `WORKOUT_HISTORY` + `VIEW` | Workout module applies history window, object policy, and data availability. |
+| Read historical plan versions | Trainer | `WORKOUT_PLAN_HISTORY` + `VIEW` | Does not grant current plan editing. |
+| Create/publish/manage the current plan in human coaching | Trainer | proposed `WORKOUT_PLAN` + `MANAGE` | B04 validates Trainer plan authority and version/lifecycle rules. The new scope is justified by the confirmed B04 consumer and must not be inferred from `WORKOUT_PLAN_HISTORY`. |
+| Read body measurements | Trainer | `BODY_METRICS` + `VIEW` | Measurement module applies metric sensitivity and history window. |
+| Read progress photos | Trainer | `PROGRESS_PHOTOS` + `VIEW` | Explicit scope only; media authorization remains separate. |
+| Read nutrition logs | Trainer | `NUTRITION_LOGS` + `VIEW` | `Not shared` and `No data` remain distinct. Strategic nutrition proposal scope is deferred until B07 scope is approved. |
+| Read authorized AI recommendations | Trainer | `AI_RECOMMENDATIONS` + `VIEW` | AI output remains assistance; owning business data policy still applies. |
+| Appointment collaboration | Student/Trainer party | No new data scope in this checkpoint | B06 uses relationship/party/object authority; appointment is not a blanket Student-data grant. |
+| Chat membership/send/read | Student/Trainer member | No new data scope in this checkpoint | B08 owns retention and conversation policy; membership never implies access to linked live domain resources. |
+| Coaching or Student-data operation | Administrator/support | Never satisfied by Trainer sharing | Requires a separate privileged platform workflow with purpose, scope, expiry, step-up where required, and immutable audit. |
+
+No scopes are added for modules without a confirmed consumer. B04 must introduce `WORKOUT_PLAN` with the sharing migration; B07 must decide whether a distinct strategic Nutrition Goal scope is required before implementation.
+
+## 8. Stable error-code proposal
+
+Errors retain the current `ErrorResponse` shape. Client copy is mapped from `errorCode`; raw backend messages are diagnostic only and are never displayed directly.
+
+| HTTP | Stable code | Meaning |
+|---:|---|---|
+| 403 | `TRAINER_NOT_ELIGIBLE` | Trainer eligibility failed at command time. |
+| 403 | `COACHING_COUNTERPARTY_REQUIRED` | Initiator attempted to accept/reject their own pending action or confirm their own resume request. |
+| 403 | `COACHING_AUTHORITY_REQUIRED` | Relationship/period/object authority is absent or ineffective. Use concealed `404` instead where resource-existence policy requires it. |
+| 403 | `DATA_SHARING_PERMISSION_REQUIRED` | No effective allow grant exists for the required scope. |
+| 403 | `DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT` | A grant exists but its access level is below the operation requirement. |
+| 404 | `COACHING_RELATIONSHIP_NOT_FOUND` | Relationship is absent or intentionally concealed from the caller. |
+| 404 | `COACHING_RESUME_REQUEST_NOT_FOUND` | Resume request is absent or concealed. |
+| 409 | `COACHING_REQUEST_ALREADY_PENDING` | The Student-Trainer pair already has a current pending request/invitation. |
+| 409 | `COACHING_STUDENT_ALREADY_ASSIGNED` | The Student already has an `ACTIVE` or `PAUSED` relationship. |
+| 409 | `COACHING_RELATIONSHIP_STATE_CONFLICT` | Lifecycle action is invalid or already completed for the current status/version. |
+| 409 | `COACHING_RESUME_ALREADY_PENDING` | An unresolved resume request already exists. |
+| 409 | `COACHING_RESUME_REQUEST_STATE_CONFLICT` | Resume request was already accepted, rejected, cancelled, invalidated by relationship end, or the requested actor action is no longer valid. |
+| 409 | `COACHING_RESUME_REQUEST_VERSION_CONFLICT` | Expected resume-request version/concurrency token is stale. Relationship remains `PAUSED` unless another valid accept transaction already committed. |
+| 409 | `COACHING_PERIOD_CONFLICT` | A period would overlap or its relationship/pair/effective boundary is inconsistent. |
+| 409 | `DATA_SHARING_PERMISSION_CONFLICT` | Permission state/version changed, overlaps incorrectly, or duplicates the effective decision. |
+| 409 | `COACHING_VERSION_CONFLICT` | Expected relationship/permission version is stale. |
+
+Validation problems remain `400 VALIDATION_FAILED`; authentication/session failures reuse B01 codes; account and capability failures reuse canonical B01 errors. Implementations must translate database unique/exclusion violations to the applicable stable conflict rather than expose SQL details.
+
+## 9. Database and migration impact
+
+V4 is the foundation and must not be edited. At implementation time, use the next available forward-only migration after rechecking the migration directory; this decision record intentionally does not reserve a migration number.
+
+The reviewed migration should:
+
+1. add an explicit access-level enum or constrained code with `VIEW`, `CONTRIBUTE`, and `MANAGE`, and add a non-null access level to new/effective sharing decisions using a safe backfill policy for existing rows;
+2. add the confirmed `WORKOUT_PLAN` scope only when the B04 consumer contract is delivered or include it in the B03 sharing migration with an explicit B04 traceability comment;
+3. add a partial unique constraint/index that prevents more than one `ACTIVE` or `PAUSED` relationship per Student;
+4. constrain `requested_by` to the Student or Trainer on the relationship;
+5. enforce Student-Trainer-relationship consistency for Coaching Period and Data Sharing Permission, preferably with composite keys/foreign keys or equivalent database constraints;
+6. add optimistic version fields for relationship and permission mutations where the chosen persistence model requires them;
+7. add a minimal history-preserving resume-request structure with initiator/counterparty, `PENDING`/`ACCEPTED`/`REJECTED`/`CANCELLED` state, version/concurrency token, decision evidence, at most one pending request per paused relationship, and an atomic invalidation path when the relationship ends;
+8. ensure application-visible hard deletion is unavailable and strengthen cascade behavior where it could erase relationship, status, sharing, or consumer history;
+9. retain and test the V4 period exclusion constraint, pair-level current uniqueness, date/window checks, and indexes for Student/current-status, Trainer/current-status, relationship/history, and effective permission queries.
+
+Migration tests must cover pre-existing rows, constraint mapping, concurrent acceptance, period overlap, permission backfill, and rollback/recovery expectations. PostgreSQL remains the system of record.
+
+## 10. OpenAPI implementation impact
+
+The executable contract is unchanged in this checkpoint. Later checkpoints should add `/api/v1` resources for:
+
+- list/create/detail of relationship requests and invitations visible to the authenticated party;
+- explicit accept, reject, cancel, pause, resume-request, resume-accept, resume-reject, resume-cancel, and end commands; resume actions address `resumeRequestId` plus relationship ID and carry expected relationship and request versions or equivalent concurrency tokens;
+- current Coaching context and append-only Coaching Period history;
+- Student-owned sharing list/grant/replace/revoke commands and Trainer permission summary/request-access views;
+- expected-version fields on conflicting writes and stable errors from section 8.
+
+Lifecycle actions should be explicit commands/subresources rather than unrestricted relationship `PATCH`. Responses must use DTOs, expose only authorized counterparty data, return effective status/period/permission summaries, and never expose persistence entities or SQL/exception text. Eligible-Trainer discovery remains owned by the Trainer module; Coaching consumes its published identifier and eligibility result rather than querying Trainer persistence directly.
+
+## 11. Backend module boundaries
+
+- `coaching` owns relationship, status history, pending lifecycle actions, Coaching Period, sharing decisions, and effective-authority evaluation.
+- `trainer` publishes canonical eligibility/capacity queries. Coaching does not infer eligibility from role claims and does not read Trainer repositories.
+- `student` publishes Student capability/identity checks; it does not own relationship state.
+- `goal`, `workout`, `schedule`, `measurement`, `nutrition`, `chat`, `notification`, and `ai` call Coaching application ports/read models and still enforce their own ownership/lifecycle/object policy.
+- `audit` accepts immutable lifecycle, sharing, permission-denial where policy requires it, and privileged-access evidence.
+- Controllers authenticate/map DTOs only. Transactions, locks, lifecycle validation, period switching, sharing evaluation, and audit orchestration belong in application/domain services.
+- Refactor `CoachingProposalAuthorityAdapter` to delegate to the canonical Coaching authority service when that service exists. Consumer modules must never read Coaching tables or repositories directly.
+
+Recommended published ports include `CoachingRelationshipQuery`, `CurrentCoachingContextQuery`, `CoachingAuthorityQuery`, and `DataSharingAuthorizationQuery`. Inputs include actor, Student, operation, scope, required access level, resource owner/timestamp, and evaluation time; results contain a decision/reason code and authoritative relationship/period/grant identifiers for audit, not raw entities.
+
+## 12. Mobile Student and Trainer states
+
+### Student — ST-17 Coaching Profile
+
+- current `SELF_DIRECTED` or `HUMAN_COACH` mode, responsible Trainer when applicable, relationship status, effective period, and history timeline;
+- eligible-Trainer request, received invitation review, accept/reject, cancel pending, pause, resume request/confirmation, end, and switch-Trainer impact summaries;
+- sharing matrix by domain, level, validity, and history window, with grant/replace/revoke confirmations;
+- explicit first-use, no current Trainer, pending outgoing request, pending invitation, active, paused, ended history, permission, loading, retry, stale conflict, and offline mutation-blocked states.
+
+### Trainer — TR-01, TR-03, and TR-12
+
+- pending invitations/requests in TR-01, ordered as action-required items;
+- relationship/mode/period/permission summary retained in the TR-03 Student workspace header;
+- TR-12 domain rows that distinguish `Không được chia sẻ`, `Chưa có dữ liệu`, `Đã hết hạn`, `Quan hệ đang tạm dừng`, and `Không đủ mức quyền`;
+- Trainer may request access but cannot change the Student's grant;
+- no Student workspace content is rendered before the backend authority response. Permission state replaces protected content rather than briefly showing cached sensitive data.
+
+End/pause/switch and sharing changes require confirmation with an impact summary. Mutation controls prevent double submit, expose progress, preserve focus, and handle `409` by reloading and asking the user to review the new state rather than overwriting it.
+
+## 13. Vietnamese copy, accessibility, and shared states
+
+- All static Mobile copy defaults to Vietnamese. Names and domain values received from the API may retain their source language.
+- Examples include `Tự tập`, `Có huấn luyện viên`, `Lời mời đang chờ`, `Tạm dừng huấn luyện`, `Kết thúc huấn luyện`, `Yêu cầu cấp quyền`, and `Dữ liệu này chưa được chia sẻ`.
+- Do not translate or display raw backend messages. Map stable codes to concise Vietnamese title, explanation, and next action.
+- Loading uses structural skeletons; mutation loading is local and blocks duplicate submission.
+- Empty, no-result, no-data, not-shared, expired, relationship-inactive, permission-denied, offline, retryable-error, and stale-write states are distinct.
+- Status uses text plus semantic styling, never color alone. Touch targets are at least 44 x 44; focus order, screen-reader labels, dynamic type, reduce-motion, and long localized text are supported.
+- Date/time is localized with timezone context. History events name actor, action, and effective time.
+- Sensitive cached sections are removed or invalidated immediately after pause, end, identity change, logout, or a sharing revocation.
+
+## 14. Security and privacy consequences
+
+1. Deny by default and evaluate every Trainer request on the backend. Hidden navigation is not enforcement.
+2. Recheck current account/capability/eligibility/relationship/period/grant/object state at mutation time and for sensitive reads; do not rely on stale JWT role claims or client cache.
+3. Limit responses and logs to the minimum necessary data. Do not put sensitive Student facts in notification previews or audit free text.
+4. Pause/revoke/end must take effect for subsequent requests immediately and trigger relevant cache/session-query invalidation; Redis, if later used, is not authority.
+5. Prevent insecure direct object references by binding relationship and permission IDs to both authenticated party and Student-Trainer pair.
+6. Audit initiation, acceptance/rejection/cancellation, pause/resume/end, period transitions, sharing grant/replace/revoke, and separate Admin/support privileged access.
+7. Former Trainer access to live data is denied. Immutable author receipts, chat retention, legal retention, and support access require separate explicit contracts and cannot be inferred from historic relationship participation.
+
+## 15. Concurrency and history preservation
+
+- Relationship status transition, status-history append, period close/open, sharing consequences, and audit enqueue/record occur in one transaction where they form one business action.
+- Acceptance locks or otherwise serializes the Student assignment boundary before rechecking uniqueness and eligibility. The database unique constraint is the final defense.
+- Period close/open uses one authoritative instant and is protected by the V4 exclusion constraint.
+- Sharing changes use expected version/compare-and-set semantics, close the old effective record, and append the new decision.
+- At most one resume request is `PENDING` per paused relationship. Its create/accept/reject/cancel commands validate the relationship ID and `resumeRequestId` together.
+- Resume accept/reject/cancel compare both the expected relationship version and expected request version/concurrency token. The initiator may cancel; only the counterparty may accept/reject; the initiator cannot self-accept.
+- Resume acceptance atomically closes the pending request, changes the relationship to `ACTIVE`, closes the current self-directed period, and creates a new human-coach period. No prior period boundary is reopened or rewritten.
+- Relationship end atomically changes the relationship to `ENDED` and invalidates/cancels any pending resume request before commit. A racing resume action cannot restore authority.
+- A losing stale, duplicate, or concurrent command returns one stable `409`, leaves authority at the already-committed state, and produces no partial domain history or success audit event. If the API later supports idempotency/replay keys, an exact retry may instead return the same terminal result without repeating effects.
+- No transition changes an old `started_at`, clears an old `ended_at`, rewrites an old relationship identity, or reassigns historical resources to a new Trainer/period.
+- Downstream records retain relationship, period, plan/version, Goal/version, Exercise, and source identifiers even after pause, end, archive, mode change, or Trainer switch.
+
+## 16. Cross-module boundaries B04-B08
+
+| Consumer | B03 contract it may consume | Boundary it must preserve |
+|---|---|---|
+| B04 Workout Plan | current coaching context; `WORKOUT_PLAN` `MANAGE`; relationship/period IDs | Student controls self-directed plans; only the responsible eligible Trainer manages a human-coach plan. Historical archived Exercise resolution remains B04's authorized consumer responsibility. |
+| B05 Workout Logging | authorized workout-history read and immutable source relationship/period/plan-version IDs | Actual Workout remains Student fact; former Trainer does not receive live access merely because they authored a plan. Archived Exercise references stay resolvable in historical logs. |
+| B06 Schedule | active relationship party/context query and lifecycle events | Appointment is separate from Workout and does not itself grant broad Student-data access. Commit-time conflict and supervision rules remain B06-owned. |
+| B07 Nutrition | `NUTRITION_LOGS` read authorization and history window | Missing intake is never zero. Strategic Nutrition Goal/proposal scope and access level must be decided in B07 before adding a new scope. |
+| B08 Chat/Notification | relationship parties/status events and authorized context identifiers | Chat retention/send/read policy is B08-owned. Notifications consume committed facts; neither conversation membership nor a deep link bypasses current domain authorization. |
+
+No consumer may query a Coaching repository directly. Notifications and AI outputs never become sources of relationship, period, or permission truth.
+
+## 17. Acceptance criteria
+
+- A Student can request an eligible Trainer and a Trainer can invite a Student; only the counterparty can accept/reject, and only the initiator can cancel pending.
+- Concurrent accept attempts cannot create two current Trainers or overlapping Coaching Periods for one Student.
+- Accepting coaching changes the effective mode from `SELF_DIRECTED` to `HUMAN_COACH` without resetting any Goal or fitness history.
+- Pause immediately removes Trainer authority and opens a new self-directed period while preserving relationship, period, and sharing history.
+- A paused relationship has at most one pending resume request. Either party may initiate; only the initiator may cancel; only the counterparty may accept/reject; and the initiator cannot self-accept.
+- Resume accept/reject/cancel references the correct `resumeRequestId`, relationship ID, expected relationship version, and expected request version/concurrency token. Stale, duplicate, or concurrent commands do not change authority and return the documented stable result.
+- Relationship end atomically invalidates/cancels a pending resume request. Successful resume acceptance alone restores authority, closes the pending request, and creates a new human-coach period without reopening the earlier one.
+- End removes future Trainer authority and live Student-data access, retains all identifiers/history, and leaves the Student with self-directed authority.
+- A role-only Trainer, an ineligible Trainer, a paused/ended relationship, an expired period, a missing scope, an insufficient access level, or an out-of-window resource is denied server-side.
+- Historical-record timestamp is evaluated only after the Trainer's full authorization chain is valid at current request time. A record inside the history window does not preserve authority after pause/end; the Student retains access to their own history under owning-module policy.
+- Student sharing changes are effective by scope/level/time, auditable, concurrency-safe, and distinguish not-shared from no-data.
+- Admin cannot act as Student or Trainer through B03; privileged support access remains separate and audited.
+- OpenAPI, migration, backend, Mobile, error mapping, and tests agree before any later checkpoint is declared complete.
+
+## 18. Test matrix
+
+| Layer | Required coverage |
+|---|---|
+| Domain/unit | Every allowed/forbidden status transition; relationship and resume-request initiator/counterparty rules; one pending resume; eligibility; pause/end authority removal; resume accept/reject/cancel; access-level sufficiency; independent current-authority and historical-window evaluation; deny-by-default. |
+| Persistence/migration | Existing-row backfill; Student current-relationship uniqueness; pair uniqueness; requested-by constraint; one-pending-resume constraint; resume terminal/invalidation evidence and version token; period pair consistency/no-overlap; permission pair consistency; no hard delete; indexes and enum/code mapping. |
+| Transaction/concurrency | Two accepts for different Trainers; duplicate relationship actions; concurrent resume create; resume accept/reject/cancel races; resume accept versus relationship end; mismatched `resumeRequestId`/relationship ID; stale relationship/request versions; simultaneous permission replacement/revoke; exact winner, stable loser code, unchanged authority on failure, and zero partial writes. |
+| Authorization integration | account/capability/eligibility/relationship/period/scope/level/ownership combinations evaluated at current request time; resource timestamps before/inside/outside the historical window; pre-period history; pause/end with in-window records; Student own-history continuity; cross-Student isolation; revoked/expired states; concealed resource policy; Admin separation. |
+| History integration | self-directed -> Trainer A -> pause -> Trainer A resume -> end -> Trainer B; continuous Goal/plan/workout/measurement/nutrition identifiers and append-only periods/status/sharing/audit evidence. |
+| Contract | Every path/schema/action; resume command binding to `resumeRequestId` and relationship ID; expected relationship/request versions or equivalent tokens; documented retry behavior; `ErrorResponse`; stable `403/404/409`; and no persistence/entity leakage. |
+| Mobile | Vietnamese mapping; pending resume initiator/counterparty actions; relationship remains paused until accept success; loading/empty/error/offline/permission/not-shared/no-data/expired/stale states; confirmation and double-submit; cache purge after revoke/pause/end/logout; deep-link fallback. |
+| Accessibility | 44 x 44 targets, screen-reader status/action labels, focus restoration for dialogs, dynamic type/long Vietnamese copy, semantic error announcement, and no color-only meaning. |
+
+## 19. Implementation impact and delivery sequence
+
+This checkpoint changes documentation only. Later implementation requires coordinated, reviewable changes to:
+
+- a forward-only Flyway migration and migration tests for the gaps in section 9;
+- OpenAPI paths/schemas/errors described in section 10;
+- Coaching domain/application services, persistence adapters, published ports, audit integration, and integration tests;
+- Goal authority adapter delegation to the Coaching authority service;
+- Student/Trainer Mobile routes, typed API/query layer, Vietnamese error mapping, cache invalidation, screens, and accessibility tests;
+- relevant domain/API/UI documentation whenever executable behavior is added.
+
+Do not combine all of B03 into one unreviewable change. Do not modify old migrations, infer permissions from role, expose entities, place business logic in controllers, or restore unrelated B04-B08 stash documents.
+
+## 20. Next checkpoints and branches
+
+| Order | Checkpoint | Recommended branch | Scope |
+|---:|---|---|---|
+| 1 | `B03-RELATIONSHIP-LIFECYCLE` | `feature/m2b-coaching-relationship-lifecycle` | Relationship request/invitation and accept/reject/cancel/pause/resume/end, lifecycle persistence, audit, stable errors, and concurrency tests. |
+| 2 | `B03-COACHING-PERIOD-SHARING` | `feature/m2c-coaching-period-sharing` | Period switching, schema constraints, access level, scoped grants, authority ports, OpenAPI, and authorization/history tests. |
+| 3 | `B03-MOBILE-RELATIONSHIP-FLOWS` | `feature/m2d-mobile-coaching-relationship-flows` | ST-17, TR-01/TR-03/TR-12 integration, Vietnamese states, confirmations, cache invalidation, accessibility, and client contract tests. |
+| 4 | B03 integration/history reconciliation | `feature/m2e-coaching-integration-history-reconciliation` | Cross-module contract checks, end-to-end transition/history/security matrix, documentation reconciliation, and B03 closure evidence. |
+
+The exact next checkpoint is **`B03-RELATIONSHIP-LIFECYCLE`** on **`feature/m2b-coaching-relationship-lifecycle`**, based on the current `m2a` decision branch. Each branch starts from the then-latest reviewed `origin/main`; no branch is created by this documentation checkpoint.
+
+## 21. Definition of Done for this decision gate
+
+- Confirmed requirements, executable evidence, decisions, and future impact are clearly separated.
+- Relationship multiplicity, initiation, pause/resume/end authority, post-relationship live access, sharing access level, history, concurrency, schema, API, module, UI, security, acceptance, and test decisions are recorded.
+- No product code, schema, executable API contract, or Figma source is changed.
+- B04, B06, and B08 are read only for dependency analysis and are not restored.
+- Repository validation passes, tracked changes remain limited to this B03 document and its valid documentation index link, and the documentation stash remains unchanged.
