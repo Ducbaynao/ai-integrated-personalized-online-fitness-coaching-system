@@ -475,8 +475,10 @@ class FitnessGoalProposalIntegrationTest {
     @DisplayName("Authority: Ineligible trainer (profile suspended) is rejected with 403")
     void trainerAuthority_ineligible_rejected() throws Exception {
         UUID studentId = createActiveStudentUser("student.inelig@example.com");
-        UUID trainerId = createActiveTrainerUser("trainer.inelig@example.com", true, false); // is_active = false
+        UUID trainerId = createActiveTrainerUser("trainer.inelig@example.com", true, true);
         createCoachingContext(trainerId, studentId, true, true);
+        // A previously valid relationship remains in history when eligibility is lost.
+        jdbcTemplate.update("UPDATE fitness.trainer_profiles SET is_active=false WHERE user_id=?", trainerId);
         UUID goalId = createActiveGoal(studentId, "Some Goal");
 
         String trainerToken = createAccessToken(trainerId, "trainer.inelig@example.com", List.of("TRAINER"));
@@ -2143,7 +2145,7 @@ class FitnessGoalProposalIntegrationTest {
         String trainerToken = createAccessToken(trainerId, "trainer.periodexp@example.com", List.of("TRAINER"));
 
         // Expire coaching period
-        jdbcTemplate.update("UPDATE fitness.coaching_periods SET ended_at = now() WHERE coaching_relationship_id = ?", relId);
+        jdbcTemplate.update("UPDATE fitness.coaching_periods SET ended_at = clock_timestamp() WHERE coaching_relationship_id = ?", relId);
 
         CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
                 "Proposed Title",
