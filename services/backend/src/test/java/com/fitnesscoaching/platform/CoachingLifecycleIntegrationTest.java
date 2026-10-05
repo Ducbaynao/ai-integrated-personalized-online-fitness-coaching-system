@@ -1,5 +1,7 @@
 package com.fitnesscoaching.platform;
 
+import com.fitnesscoaching.platform.common.exception.AccountUnavailableException;
+import com.fitnesscoaching.platform.common.exception.TrainerCapabilityUnavailableException;
 import com.fitnesscoaching.platform.modules.coaching.application.CoachingFailure;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.out.CoachingStore;
@@ -321,7 +323,38 @@ class CoachingLifecycleIntegrationTest {
     }
 
     @Test
-    void finiteFutureEndedPeriodsAreEffectiveAndCanBeClosedForTransitions() {
+    void formerTrainerCannotReplayEarlierCommandsOrEndReceiptButStudentCanReplay() throws Exception {
+        UUID student = person("STUDENT"), trainer = person("TRAINER");
+        UUID requestKey = UUID.randomUUID(), acceptKey = UUID.randomUUID(), endKey = UUID.randomUUID();
+        Outcome pending = lifecycle.initiate(student, student, trainer, requestKey);
+        Outcome active = lifecycle.relationshipAction(trainer, pending.relationship().id(),
+                "ACCEPT", 0, null, acceptKey);
+        Outcome ended = lifecycle.relationshipAction(trainer, pending.relationship().id(),
+                "END", active.relationship().version(), "finished", endKey);
+        assertThat(ended.relationship().status()).isEqualTo("ENDED");
+
+        assertThat(lifecycle.initiate(student, student, trainer, requestKey).relationship().id())
+                .isEqualTo(pending.relationship().id());
+        for (UUID key : new UUID[]{acceptKey, endKey}) {
+            long version = key.equals(acceptKey) ? 0 : active.relationship().version();
+            String action = key.equals(acceptKey) ? "accept" : "end";
+            String reason = key.equals(endKey) ? ",\"reason\":\"finished\"" : "";
+            mvc.perform(post("/api/v1/coaching/relationships/{id}/{action}", pending.relationship().id(), action)
+                            .with(jwt().jwt(j -> j.subject(trainer.toString())))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"expectedVersion\":%d,\"commandKey\":\"%s\"%s}"
+                                    .formatted(version, key, reason)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("COACHING_RELATIONSHIP_NOT_FOUND"));
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_relationship_status_history WHERE relationship_id=?",
+                Integer.class, pending.relationship().id())).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_command_receipts WHERE actor_id=?",
+                Integer.class, trainer)).isEqualTo(2);
+    }
+
+    @Test
+    void finiteFutureEndedLegacyPeriodCanBeClosedForTransition() {
         UUID student = person("STUDENT"), trainer = person("TRAINER");
         UUID selfId = UUID.randomUUID();
         jdbc.update("""
@@ -335,8 +368,6 @@ class CoachingLifecycleIntegrationTest {
         assertThat(accepted.currentPeriod().mode()).isEqualTo("HUMAN_COACH");
         assertThat(jdbc.queryForObject("SELECT ended_at FROM fitness.coaching_periods WHERE id=?",
                 Timestamp.class, selfId).toInstant()).isBefore(Instant.now());
-        jdbc.update("UPDATE fitness.coaching_periods SET ended_at=now()+interval '1 day' WHERE id=?",
-                accepted.currentPeriod().id());
         assertThat(lifecycle.detail(trainer, pending.relationship().id()).currentPeriod().id())
                 .isEqualTo(accepted.currentPeriod().id());
         Outcome paused = lifecycle.relationshipAction(trainer, pending.relationship().id(),
@@ -346,8 +377,6 @@ class CoachingLifecycleIntegrationTest {
         assertThatThrownBy(() -> jdbc.update("""
                 UPDATE fitness.coaching_periods SET ended_at=now()+interval '1 day' WHERE id=?
                 """, accepted.currentPeriod().id())).isInstanceOf(DataAccessException.class);
-        UUID pausedSelfId = lifecycle.current(student).currentPeriod().id();
-        jdbc.update("UPDATE fitness.coaching_periods SET ended_at=now()+interval '1 day' WHERE id=?", pausedSelfId);
         Outcome resume = lifecycle.createResume(trainer, pending.relationship().id(), 2, null, UUID.randomUUID());
         Outcome resumed = lifecycle.resumeAction(student, pending.relationship().id(), resume.resume().id(),
                 "ACCEPT", 2, 0, UUID.randomUUID());
@@ -361,8 +390,6 @@ class CoachingLifecycleIntegrationTest {
         UUID student = person("STUDENT"), trainer = person("TRAINER");
         Outcome active = accepted(student, trainer);
         UUID commandKey = UUID.randomUUID();
-        jdbc.update("UPDATE fitness.coaching_periods SET ended_at=clock_timestamp()+interval '1 day' WHERE id=?",
-                active.currentPeriod().id());
         reset(audit);
         doAnswer(invocation -> {
             expirePeriodInSeparateTransaction(active.currentPeriod().id());
@@ -537,7 +564,7 @@ class CoachingLifecycleIntegrationTest {
     private void expirePeriodInSeparateTransaction(UUID periodId) throws Exception {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "UPDATE fitness.coaching_periods SET ended_at=clock_timestamp()-interval '1 millisecond' WHERE id=?")) {
+                     "UPDATE fitness.coaching_periods SET ended_at=clock_timestamp() WHERE id=?")) {
             statement.setObject(1, periodId);
             statement.executeUpdate();
         }
@@ -744,6 +771,82 @@ class CoachingLifecycleIntegrationTest {
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM fitness.coaching_command_receipts WHERE actor_id=? AND command_key=?
                 """, Integer.class, trainer, commandKey)).isZero();
+    }
+
+    @Test
+    void accountAndRoleWritersSerializeBeforeAcceptanceRecheck() throws Exception {
+        for (String kind : new String[]{"ACCOUNT", "ROLE"}) {
+            UUID student = person("STUDENT"), trainer = person("TRAINER");
+            Outcome pending = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
+            UUID commandKey = UUID.randomUUID();
+            CountDownLatch writerUpdated = new CountDownLatch(1), releaseWriter = new CountDownLatch(1);
+            CountDownLatch acceptanceLockedStudent = new CountDownLatch(1);
+            AtomicInteger writerPid = new AtomicInteger(), acceptancePid = new AtomicInteger();
+            doAnswer(invocation -> {
+                Object result = invocation.callRealMethod();
+                if (student.equals(invocation.getArgument(0))) {
+                    acceptancePid.set(currentBackendPid());
+                    acceptanceLockedStudent.countDown();
+                }
+                return result;
+            }).when(coachingStore).lockStudent(student);
+
+            try (var pool = Executors.newFixedThreadPool(2)) {
+                var writer = pool.submit(() -> updateTrainerCapabilityInTransaction(
+                        trainer, kind, writerUpdated, releaseWriter, writerPid));
+                assertThat(writerUpdated.await(5, TimeUnit.SECONDS)).isTrue();
+                var acceptance = pool.submit(() -> {
+                    try {
+                        return lifecycle.relationshipAction(trainer, pending.relationship().id(),
+                                "ACCEPT", 0, null, commandKey).relationship().status();
+                    } catch (AccountUnavailableException ex) {
+                        return "ACCOUNT_UNAVAILABLE";
+                    } catch (TrainerCapabilityUnavailableException ex) {
+                        return "TRAINER_CAPABILITY_UNAVAILABLE";
+                    }
+                });
+                try {
+                    assertThat(acceptanceLockedStudent.await(5, TimeUnit.SECONDS)).isTrue();
+                    awaitBlockedBy(acceptancePid.get(), writerPid.get());
+                } finally {
+                    releaseWriter.countDown();
+                }
+                writer.get(10, TimeUnit.SECONDS);
+                assertThat(acceptance.get(10, TimeUnit.SECONDS)).isEqualTo(
+                        kind.equals("ACCOUNT") ? "ACCOUNT_UNAVAILABLE" : "TRAINER_CAPABILITY_UNAVAILABLE");
+            }
+            assertThat(jdbc.queryForObject("SELECT status FROM fitness.coaching_relationships WHERE id=?",
+                    String.class, pending.relationship().id())).isEqualTo("PENDING");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_command_receipts WHERE actor_id=? AND command_key=?",
+                    Integer.class, trainer, commandKey)).isZero();
+            reset(coachingStore);
+        }
+    }
+
+    private Void updateTrainerCapabilityInTransaction(UUID trainer, String kind, CountDownLatch updated,
+                                                       CountDownLatch release, AtomicInteger backendPid) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (Statement pidStatement = connection.createStatement();
+                 ResultSet result = pidStatement.executeQuery("SELECT pg_backend_pid()")) {
+                assertThat(result.next()).isTrue();
+                backendPid.set(result.getInt(1));
+            }
+            String sql = kind.equals("ACCOUNT")
+                    ? "UPDATE fitness.users SET status='SUSPENDED'::fitness.account_status WHERE id=?"
+                    : """
+                      UPDATE fitness.user_roles SET revoked_at=clock_timestamp()
+                      WHERE user_id=? AND role_id=(SELECT id FROM fitness.roles WHERE code='TRAINER')
+                      """;
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, trainer);
+                statement.executeUpdate();
+                updated.countDown();
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            connection.commit();
+        }
+        return null;
     }
 
     private Void updateVerificationInTransaction(UUID trainer, CountDownLatch updated,

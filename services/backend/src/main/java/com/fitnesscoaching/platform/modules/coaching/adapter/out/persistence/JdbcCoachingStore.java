@@ -148,14 +148,16 @@ public class JdbcCoachingStore implements CoachingStore {
                 """, PERIOD, studentId, limit, offset);
     }
 
-    @Override public void closePeriod(Period period, Instant at) {
+    @Override public Instant closePeriod(Period period, Instant at) {
         try {
-            int count = jdbc.update("""
-                    UPDATE fitness.coaching_periods SET ended_at = ?
+            List<Timestamp> closed = jdbc.query("""
+                    UPDATE fitness.coaching_periods SET ended_at = clock_timestamp()
                     WHERE id = ? AND started_at < ? AND (ended_at IS NULL OR ended_at > ?)
                       AND (ended_at IS NULL OR ended_at > clock_timestamp())
-                    """, ts(at), period.id(), ts(at), ts(at));
-            if (count != 1) { throw new CoachingFailure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT"); }
+                    RETURNING ended_at
+                    """, (rs, ignored) -> rs.getTimestamp("ended_at"), period.id(), ts(at), ts(at));
+            if (closed.size() != 1) { throw new CoachingFailure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT"); }
+            return closed.get(0).toInstant();
         } catch (DataAccessException ex) {
             for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
                 if (cause instanceof SQLException sql && "PZ001".equals(sql.getSQLState())) {
