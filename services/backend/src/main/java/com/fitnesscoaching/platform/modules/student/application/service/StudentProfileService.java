@@ -13,6 +13,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.CreateStudentProfileCommand;
 import com.fitnesscoaching.platform.modules.student.application.port.in.CreateStudentProfileUseCase;
+import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.student.application.port.in.GetStudentProfileUseCase;
 import com.fitnesscoaching.platform.modules.student.application.port.in.UpdateStudentProfileCommand;
 import com.fitnesscoaching.platform.modules.student.application.port.in.UpdateStudentProfileUseCase;
@@ -35,7 +36,8 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class StudentProfileService implements CreateStudentProfileUseCase, GetStudentProfileUseCase, UpdateStudentProfileUseCase {
+public class StudentProfileService implements CreateStudentProfileUseCase, GetStudentProfileUseCase,
+        UpdateStudentProfileUseCase, StudentCapabilityQuery {
 
     private final StudentProfilePort studentProfilePort;
     private final UserAccountStatusQuery userAccountStatusQuery;
@@ -43,6 +45,12 @@ public class StudentProfileService implements CreateStudentProfileUseCase, GetSt
     private final UserRoleQuery userRoleQuery;
     private final AuditService auditService;
     private final Clock clock;
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasProfile(UUID userId) {
+        return studentProfilePort.existsByUserId(userId);
+    }
 
     public StudentProfileService(
             StudentProfilePort studentProfilePort,

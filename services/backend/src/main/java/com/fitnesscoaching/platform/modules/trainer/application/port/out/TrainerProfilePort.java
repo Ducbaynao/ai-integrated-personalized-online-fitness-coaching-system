@@ -11,6 +11,8 @@ public interface TrainerProfilePort {
 
     Optional<TrainerProfile> findByUserId(UUID userId);
 
+    void lockForCoachingDecision(UUID userId);
+
     boolean existsByUserId(UUID userId);
 
     boolean existsByPublicSlug(String publicSlug);
