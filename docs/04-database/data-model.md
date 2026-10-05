@@ -13,11 +13,13 @@ erDiagram
     TRAINER_PROFILE ||--o{ TRAINER_CERTIFICATION : owns
     STUDENT_PROFILE ||--o{ COACHING_RELATIONSHIP : participates
     TRAINER_PROFILE ||--o{ COACHING_RELATIONSHIP : participates
+    COACHING_RELATIONSHIP ||--o{ COACHING_RESUME_REQUEST : receives
     COACHING_RELATIONSHIP ||--o{ COACHING_PERIOD : contains
     COACHING_RELATIONSHIP ||--o{ DATA_SHARING_PERMISSION : grants
 ```
 
 Trainer Profile existence, verification status, activity status, relationship state, and permission scope are separate facts.
+V24 gives each relationship an optimistic version and enforces at most one `ACTIVE`/`PAUSED` relationship per Student. A paused relationship can have one pending resume request; terminal requests and status history are retained. `coaching_command_receipts` stores actor-scoped replay outcomes. Effective `HUMAN_COACH` and `SELF_DIRECTED` periods never overlap, and period identity/start timestamps are immutable after creation. Detailed sharing grants and access levels remain a separate checkpoint.
 
 ## Goals and workout
 

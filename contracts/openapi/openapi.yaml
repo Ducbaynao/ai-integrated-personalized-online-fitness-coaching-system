@@ -26,12 +26,169 @@ tags:
     description: Verification review, approval, and rejection of trainer applications by platform administrators.
   - name: Fitness Goal
     description: Student-owned fitness goal management, versioning, objectives, and measurable targets.
+  - name: Coaching Lifecycle
+    description: Student-Trainer relationship and minimal effective-period lifecycle.
   - name: Exercise Catalog
     description: Authenticated Student and Trainer read access to the active Exercise catalog.
   - name: Admin Exercise Catalog
     description: Permission-protected Exercise draft, lifecycle, and canonical replacement management.
 
 paths:
+  /coaching/relationships/me/current:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: getCurrentCoachingRelationship
+      summary: Get the authenticated Student's current relationship and effective period
+      responses:
+        '200': { $ref: '#/components/responses/CoachingOutcome' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/relationships/me/pending:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: listPendingCoachingRelationships
+      summary: List incoming or outgoing pending requests/invitations for the authenticated participant
+      parameters:
+        - { name: direction, in: query, schema: { $ref: '#/components/schemas/CoachingDirection' } }
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingRelationshipPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/relationships/{relationshipId}:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: getCoachingRelationship
+      summary: Get a visible participant relationship and pending resume context
+      responses:
+        '200': { $ref: '#/components/responses/CoachingOutcome' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+  /coaching/relationships/{relationshipId}/history:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: listCoachingRelationshipHistory
+      summary: List append-only status events for a visible relationship
+      parameters:
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingHistoryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+  /coaching/periods/me:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: listMyCoachingPeriods
+      summary: List the authenticated Student's effective-period history
+      parameters:
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingPeriodPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/relationships/requests:
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: requestCoachingRelationship
+      summary: Student requests coaching from an eligible Trainer
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingInitiateRequest' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/relationships/invitations:
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: inviteStudentToCoaching
+      summary: Eligible Trainer invites a Student
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingInitiateRequest' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/relationships/{relationshipId}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [accept, reject, cancel, pause, end] }
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: decideCoachingRelationship
+      summary: Accept, reject, cancel, pause, or end according to participant and state rules
+      description: End requires a nonblank reason; the command is the explicit end confirmation.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingActionRequest' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/relationships/{relationshipId}/resume-requests:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: listCoachingResumeRequests
+      summary: List persisted resume-request decisions for a visible relationship
+      parameters:
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingResumePage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: createCoachingResumeRequest
+      summary: Either participant requests bilateral resumption while paused
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingActionRequest' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/relationships/{relationshipId}/resume-requests/{resumeRequestId}/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+      - { name: resumeRequestId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [accept, reject, cancel] } }
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: decideCoachingResumeRequest
+      summary: Counterparty accepts/rejects or initiator cancels a pending resume request
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingResumeActionRequest' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
   /exercises:
     get:
       tags: [Exercise Catalog]
@@ -1601,7 +1758,76 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    CoachingRelationshipId:
+      name: relationshipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CoachingPage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    CoachingSize:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
   responses:
+    CoachingOutcome:
+      description: Current lifecycle outcome; null fields mean no current relationship, resume request, or period
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingOutcome' }
+    CoachingRelationshipPage:
+      description: Stable requested-at descending page of pending relationships
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingRelationshipPage' }
+    CoachingHistoryPage:
+      description: Stable changed-at descending page of status events
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingHistoryPage' }
+    CoachingResumePage:
+      description: Stable requested-at descending page of resume-request decisions
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingResumePage' }
+    CoachingPeriodPage:
+      description: Stable started-at descending page of periods
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingPeriodPage' }
+    CoachingConcealed:
+      description: >-
+        Relationship, resume request, or counterparty is absent or concealed from this actor.
+        Codes include COACHING_RELATIONSHIP_NOT_FOUND, COACHING_RESUME_REQUEST_NOT_FOUND,
+        and COACHING_COUNTERPARTY_NOT_FOUND.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CoachingForbidden:
+      description: >-
+        Account/capability/Trainer eligibility or participant action is unavailable.
+        Codes include ACCOUNT_UNAVAILABLE, STUDENT_CAPABILITY_UNAVAILABLE,
+        TRAINER_CAPABILITY_UNAVAILABLE, TRAINER_NOT_ELIGIBLE, ACCESS_DENIED,
+        COACHING_COUNTERPARTY_REQUIRED, and COACHING_INITIATOR_REQUIRED.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CoachingConflict:
+      description: >-
+        Stable 409 codes include COACHING_VERSION_CONFLICT, COACHING_RELATIONSHIP_STATE_CONFLICT,
+        COACHING_REQUEST_ALREADY_PENDING, COACHING_STUDENT_ALREADY_ASSIGNED,
+        COACHING_RESUME_ALREADY_PENDING, COACHING_RESUME_REQUEST_STATE_CONFLICT,
+        COACHING_RESUME_REQUEST_VERSION_CONFLICT, COACHING_PERIOD_CONFLICT,
+        and COACHING_IDEMPOTENCY_CONFLICT. A matching actor commandKey and payload returns
+        the recorded relationship/resume outcome without another side effect; currentPeriod is
+        re-projected under current authority. A reused key with different payload conflicts.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     ValidationError:
       description: Request validation failed
       content:
@@ -1672,6 +1898,126 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    CoachingDirection:
+      type: string
+      enum: [INCOMING, OUTGOING]
+    CoachingStatus:
+      type: string
+      enum: [PENDING, ACTIVE, PAUSED, ENDED, REJECTED, CANCELLED]
+    CoachingResumeStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, CANCELLED]
+    CoachingMode:
+      type: string
+      enum: [HUMAN_COACH, SELF_DIRECTED]
+    CoachingInitiateRequest:
+      type: object
+      additionalProperties: false
+      required: [counterpartyId, commandKey]
+      properties:
+        counterpartyId: { type: string, format: uuid }
+        commandKey: { type: string, format: uuid }
+    CoachingActionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+        reason: { type: string, maxLength: 500 }
+    CoachingResumeActionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRelationshipVersion, expectedRequestVersion, commandKey]
+      properties:
+        expectedRelationshipVersion: { type: integer, format: int64, minimum: 0 }
+        expectedRequestVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    CoachingRelationship:
+      type: object
+      required: [id, studentId, trainerId, status, direction, requestedBy, requestedAt, version]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/CoachingStatus' }
+        direction: { $ref: '#/components/schemas/CoachingDirection' }
+        requestedBy: { type: string, format: uuid }
+        requestedAt: { type: string, format: date-time }
+        acceptedAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 0 }
+    CoachingResumeRequest:
+      type: object
+      required: [id, relationshipId, requestedBy, status, version, requestedAt]
+      properties:
+        id: { type: string, format: uuid }
+        relationshipId: { type: string, format: uuid }
+        requestedBy: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/CoachingResumeStatus' }
+        version: { type: integer, format: int64, minimum: 0 }
+        requestedAt: { type: string, format: date-time }
+        decidedBy: { type: [string, 'null'], format: uuid }
+        decidedAt: { type: [string, 'null'], format: date-time }
+    CoachingPeriod:
+      type: object
+      required: [id, mode, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        mode: { $ref: '#/components/schemas/CoachingMode' }
+        relationshipId: { type: [string, 'null'], format: uuid }
+        trainerId: { type: [string, 'null'], format: uuid }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+    CoachingOutcome:
+      type: object
+      required: [relationship, resume, currentPeriod]
+      properties:
+        relationship: { oneOf: [{ $ref: '#/components/schemas/CoachingRelationship' }, { type: 'null' }] }
+        resume: { oneOf: [{ $ref: '#/components/schemas/CoachingResumeRequest' }, { type: 'null' }] }
+        currentPeriod:
+          description: Student's own effective period, or a Trainer's matching effective HUMAN_COACH period only while their relationship and eligibility are active; otherwise null. Re-evaluated on command replay.
+          oneOf: [{ $ref: '#/components/schemas/CoachingPeriod' }, { type: 'null' }]
+    CoachingStatusEvent:
+      type: object
+      required: [id, relationshipId, toStatus, changedBy, changedAt]
+      properties:
+        id: { type: string, format: uuid }
+        relationshipId: { type: string, format: uuid }
+        fromStatus: { oneOf: [{ $ref: '#/components/schemas/CoachingStatus' }, { type: 'null' }] }
+        toStatus: { $ref: '#/components/schemas/CoachingStatus' }
+        changedBy: { type: [string, 'null'], format: uuid }
+        reason: { type: [string, 'null'] }
+        changedAt: { type: string, format: date-time }
+    CoachingRelationshipPage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingRelationship' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+    CoachingHistoryPage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingStatusEvent' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+    CoachingResumePage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingResumeRequest' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+    CoachingPeriodPage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingPeriod' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
     RegisterRequest:
       type: object
       additionalProperties: false

@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.trainer.application.service;
 
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerCoachingEligibilityQuery;
+import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerAvailabilityQuery;
 import com.fitnesscoaching.platform.modules.trainer.application.port.out.TrainerProfilePort;
 import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
@@ -13,7 +14,8 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
-public class TrainerEligibilityService implements TrainerCoachingEligibilityQuery, CoachingAuthorityQuery {
+public class TrainerEligibilityService implements TrainerCoachingEligibilityQuery, CoachingAuthorityQuery,
+        TrainerAvailabilityQuery {
 
     private final TrainerProfilePort trainerProfilePort;
     private final UserAccountStatusQuery userAccountStatusQuery;
@@ -45,5 +47,19 @@ public class TrainerEligibilityService implements TrainerCoachingEligibilityQuer
         TrainerProfile profile = trainerProfilePort.findByUserId(userId).orElse(null);
 
         return CoachingEligibility.evaluate(accountStatus, hasActiveTrainerRole, profile);
+    }
+
+    @Override
+    public boolean isAcceptingStudents(UUID userId) {
+        return getCoachingEligibility(userId).eligible()
+                && trainerProfilePort.findByUserId(userId)
+                .map(TrainerProfile::isAcceptingStudents).orElse(false);
+    }
+
+    @Override
+    public void lockForCoachingDecision(UUID trainerId) {
+        // Caller holds the Student row first; all reads below occur after these locks.
+        userRoleQuery.lockTrainerCapability(trainerId);
+        trainerProfilePort.lockForCoachingDecision(trainerId);
     }
 }

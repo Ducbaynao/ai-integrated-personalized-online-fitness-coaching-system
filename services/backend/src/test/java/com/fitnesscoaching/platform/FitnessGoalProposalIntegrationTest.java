@@ -3,6 +3,9 @@ package com.fitnesscoaching.platform;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.config.JwtProperties;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalTrainerAuthorityPort;
+import com.fitnesscoaching.platform.common.exception.CoachingRelationshipRequiredException;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.*;
 import com.fitnesscoaching.platform.modules.goal.domain.ObjectivePriority;
 import com.fitnesscoaching.platform.modules.goal.domain.ProposalDecision;
@@ -45,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -98,6 +102,12 @@ class FitnessGoalProposalIntegrationTest {
 
     @Autowired
     private JwtProperties jwtProperties;
+
+    @Autowired
+    private CoachingLifecycleUseCase coachingLifecycle;
+
+    @Autowired
+    private GoalTrainerAuthorityPort goalTrainerAuthority;
 
     @MockitoSpyBean
     private AuditService auditService;
@@ -442,6 +452,23 @@ class FitnessGoalProposalIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Authority: finite future-ended human period is effective until pause, then revoked")
+    void trainerAuthority_futureEndedPeriodIsEffectiveUntilPaused() {
+        UUID studentId = createActiveStudentUser("student.future-period@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.future-period@example.com", true, true);
+        UUID relationshipId = createCoachingContext(trainerId, studentId, true, true);
+        jdbcTemplate.update("""
+                UPDATE fitness.coaching_periods SET ended_at=now()+interval '1 day'
+                WHERE coaching_relationship_id=?
+                """, relationshipId);
+
+        goalTrainerAuthority.verifyTrainerCanProposeGoal(trainerId, studentId);
+        coachingLifecycle.relationshipAction(studentId, relationshipId, "PAUSE", 0, null, UUID.randomUUID());
+        assertThatThrownBy(() -> goalTrainerAuthority.verifyTrainerCanProposeGoal(trainerId, studentId))
+                .isInstanceOf(CoachingRelationshipRequiredException.class);
     }
 
     @Test
@@ -801,7 +828,7 @@ class FitnessGoalProposalIntegrationTest {
     void trainerAuthority_lostRelationshipOrPermission_forbidden() throws Exception {
         UUID studentId = createActiveStudentUser("student.lostrel@example.com");
         UUID trainerId = createActiveTrainerUser("trainer.lostrel@example.com", true, true);
-        createCoachingContext(trainerId, studentId, true, true);
+        UUID relationshipId = createCoachingContext(trainerId, studentId, true, true);
         UUID goalId = createActiveGoal(studentId, "Goal for Lost Rel");
 
         String trainerToken = createAccessToken(trainerId, "trainer.lostrel@example.com", List.of("TRAINER"));
@@ -828,7 +855,7 @@ class FitnessGoalProposalIntegrationTest {
 
         // Re-grant permission but end relationship
         jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET decision = 'ALLOW'::fitness.permission_decision WHERE trainer_id = ? AND student_id = ?", trainerId, studentId);
-        jdbcTemplate.update("UPDATE fitness.coaching_relationships SET status = 'ENDED'::fitness.coaching_relationship_status WHERE trainer_id = ? AND student_id = ?", trainerId, studentId);
+        coachingLifecycle.relationshipAction(studentId, relationshipId, "END", 0, "finished", UUID.randomUUID());
 
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", proposalId)
                         .header("Authorization", "Bearer " + trainerToken))
@@ -2084,8 +2111,8 @@ class FitnessGoalProposalIntegrationTest {
                 List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
         );
 
-        // 1. ENDED relationship
-        jdbcTemplate.update("UPDATE fitness.coaching_relationships SET status = 'ENDED'::fitness.coaching_relationship_status WHERE id = ?", relId);
+        // 1. PAUSED relationship
+        coachingLifecycle.relationshipAction(studentId, relId, "PAUSE", 0, null, UUID.randomUUID());
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -2094,8 +2121,8 @@ class FitnessGoalProposalIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("COACHING_RELATIONSHIP_REQUIRED")));
 
-        // 2. PAUSED relationship
-        jdbcTemplate.update("UPDATE fitness.coaching_relationships SET status = 'PAUSED'::fitness.coaching_relationship_status WHERE id = ?", relId);
+        // 2. ENDED relationship
+        coachingLifecycle.relationshipAction(studentId, relId, "END", 1, "finished", UUID.randomUUID());
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -2116,7 +2143,7 @@ class FitnessGoalProposalIntegrationTest {
         String trainerToken = createAccessToken(trainerId, "trainer.periodexp@example.com", List.of("TRAINER"));
 
         // Expire coaching period
-        jdbcTemplate.update("UPDATE fitness.coaching_periods SET started_at = now() - interval '2 days', ended_at = now() - interval '1 day' WHERE coaching_relationship_id = ?", relId);
+        jdbcTemplate.update("UPDATE fitness.coaching_periods SET ended_at = now() WHERE coaching_relationship_id = ?", relId);
 
         CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
                 "Proposed Title",

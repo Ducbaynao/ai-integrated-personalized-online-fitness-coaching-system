@@ -64,6 +64,19 @@ public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAcco
     }
 
     @Override
+    public void lockTrainerCapability(UUID userId) {
+        // NO KEY UPDATE still serializes account/role writers while remaining compatible
+        // with the KEY SHARE locks acquired by coaching audit/history foreign keys.
+        jdbcTemplate.query("SELECT id FROM fitness.users WHERE id = ? FOR NO KEY UPDATE",
+                rs -> { while (rs.next()) { /* hold through caller transaction */ } }, userId);
+        jdbcTemplate.query("""
+                SELECT ur.user_id FROM fitness.user_roles ur
+                JOIN fitness.roles r ON r.id = ur.role_id
+                WHERE ur.user_id = ? AND r.code = 'TRAINER' FOR NO KEY UPDATE OF ur
+                """, rs -> { while (rs.next()) { /* hold through caller transaction */ } }, userId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<String> getEffectivePermissions(UUID userId) {
         return jdbcTemplate.query(

@@ -20,6 +20,12 @@ public class TrainerProfilePersistenceAdapter implements TrainerProfilePort {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @Override
+    public void lockForCoachingDecision(UUID userId) {
+        jdbcTemplate.query("SELECT user_id FROM fitness.trainer_profiles WHERE user_id = ? FOR NO KEY UPDATE",
+                rs -> { while (rs.next()) { /* hold through caller transaction */ } }, userId);
+    }
+
     private final RowMapper<TrainerProfile> rowMapper = (rs, rowNum) -> {
         UUID userId = (UUID) rs.getObject("user_id");
         String publicSlug = rs.getString("public_slug");
