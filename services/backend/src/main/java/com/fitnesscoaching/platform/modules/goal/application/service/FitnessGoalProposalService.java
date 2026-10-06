@@ -216,6 +216,7 @@ public class FitnessGoalProposalService implements
     }
 
     @Override
+    @Transactional
     public GoalProposal getProposalDetail(GetGoalProposalDetailQuery query) {
         if (query.proposalId() == null) {
             throw new ApplicationValidationException("Proposal ID is required",

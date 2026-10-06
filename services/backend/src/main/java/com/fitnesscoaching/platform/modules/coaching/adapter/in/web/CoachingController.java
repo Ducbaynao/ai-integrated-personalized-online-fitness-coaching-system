@@ -1,7 +1,12 @@
 package com.fitnesscoaching.platform.modules.coaching.adapter.in.web;
 
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.Permission;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.*;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
+import com.fitnesscoaching.platform.modules.coaching.domain.SharingDecision;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -23,14 +28,29 @@ import java.util.UUID;
 @RequestMapping("/api/v1/coaching")
 public class CoachingController {
     private final CoachingLifecycleUseCase lifecycle;
+    private final CoachingSharingUseCase sharing;
 
-    public CoachingController(CoachingLifecycleUseCase lifecycle) { this.lifecycle = lifecycle; }
+    public CoachingController(CoachingLifecycleUseCase lifecycle, CoachingSharingUseCase sharing) {
+        this.lifecycle = lifecycle;
+        this.sharing = sharing;
+    }
 
     public record InitiateRequest(@NotNull UUID counterpartyId, @NotNull UUID commandKey) {}
     public record ActionRequest(@NotNull @Min(0) Long expectedVersion, @NotNull UUID commandKey,
                                 @Size(max = 500) String reason) {}
     public record ResumeActionRequest(@NotNull @Min(0) Long expectedRelationshipVersion,
                                       @NotNull @Min(0) Long expectedRequestVersion, @NotNull UUID commandKey) {}
+    public record SharingGrantRequest(@NotNull DataScope dataScope,
+                                      @NotNull SharingDecision decision,
+                                      @NotNull DataAccessLevel accessLevel,
+                                      Instant historyFrom,
+                                      Instant historyUntil,
+                                      Instant validUntil,
+                                      @Min(0) Long expectedPermissionVersion,
+                                      @NotNull UUID commandKey) {}
+    public record SharingRevokeRequest(@NotNull @Min(0) Long expectedPermissionVersion,
+                                       @Size(max = 500) String reason,
+                                       @NotNull UUID commandKey) {}
     public record RelationshipDto(UUID id, UUID studentId, UUID trainerId, String status,
                                   String direction, UUID requestedBy, Instant requestedAt,
                                   Instant acceptedAt, Instant startedAt, Instant endedAt, long version) {
@@ -66,6 +86,20 @@ public class CoachingController {
         static HistoryDto from(History value) {
             return new HistoryDto(value.id(), value.relationshipId(), value.fromStatus(),
                     value.toStatus(), value.changedBy(), value.reason(), value.changedAt());
+        }
+    }
+    public record SharingPermissionDto(UUID id, UUID relationshipId, UUID studentId, UUID trainerId,
+                                       DataScope dataScope, SharingDecision decision,
+                                       DataAccessLevel accessLevel, Instant historyFrom,
+                                       Instant historyUntil, Instant validFrom, Instant validUntil,
+                                       UUID grantedBy, Instant revokedAt, String revokeReason,
+                                       long version, Instant createdAt) {
+        static SharingPermissionDto from(Permission value) {
+            return new SharingPermissionDto(value.id(), value.relationshipId(), value.studentId(),
+                    value.trainerId(), value.dataScope(), value.decision(), value.accessLevel(),
+                    value.historyFrom(), value.historyUntil(), value.validFrom(), value.validUntil(),
+                    value.grantedBy(), value.revokedAt(), value.revokeReason(), value.version(),
+                    value.createdAt());
         }
     }
     public record PageDto<T>(List<T> items, int page, int size) {}
@@ -165,5 +199,35 @@ public class CoachingController {
         return OutcomeDto.from(lifecycle.resumeAction(actor, relationshipId, resumeRequestId,
                 action.toUpperCase(), body.expectedRelationshipVersion(), body.expectedRequestVersion(),
                 body.commandKey()), actor);
+    }
+
+    @GetMapping("/relationships/{relationshipId}/sharing-permissions")
+    public PageDto<SharingPermissionDto> sharingPermissions(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID relationshipId,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(1000000) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return new PageDto<>(sharing.list(actor(jwt), relationshipId, page, size).stream()
+                .map(SharingPermissionDto::from).toList(), page, size);
+    }
+
+    @PostMapping("/relationships/{relationshipId}/sharing-permissions")
+    public SharingPermissionDto grantOrReplaceSharing(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID relationshipId,
+            @Valid @RequestBody SharingGrantRequest body) {
+        return SharingPermissionDto.from(sharing.grantOrReplace(actor(jwt), relationshipId,
+                body.dataScope(), body.decision(), body.accessLevel(), body.historyFrom(),
+                body.historyUntil(), body.validUntil(), body.expectedPermissionVersion(), body.commandKey()));
+    }
+
+    @PostMapping("/relationships/{relationshipId}/sharing-permissions/{permissionId}/revoke")
+    public SharingPermissionDto revokeSharing(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID relationshipId,
+            @PathVariable UUID permissionId,
+            @Valid @RequestBody SharingRevokeRequest body) {
+        return SharingPermissionDto.from(sharing.revoke(actor(jwt), relationshipId, permissionId,
+                body.expectedPermissionVersion(), body.reason(), body.commandKey()));
     }
 }

@@ -8,6 +8,7 @@ import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import org.junit.jupiter.api.Test;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
@@ -44,6 +45,7 @@ class CoachingErrorAdviceTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean CoachingLifecycleUseCase lifecycle;
+    @MockitoBean CoachingSharingUseCase sharing;
     @MockitoBean org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     @Test
@@ -80,6 +82,12 @@ class CoachingErrorAdviceTest {
     void exclusionConstraintRequiresMatchingSqlState() throws Exception {
         assertEnvelope(databaseError("23P01", "coaching_period_no_overlap", SQL_DETAIL),
                 409, "COACHING_PERIOD_CONFLICT", "Coaching operation conflicts with current state");
+    }
+
+    @Test
+    void sharingOverlapUsesStableConflictWithoutLeakingDatabaseDetail() throws Exception {
+        assertEnvelope(databaseError("23P01", "data_sharing_permission_no_overlap", SQL_DETAIL),
+                409, "DATA_SHARING_PERMISSION_CONFLICT", "Coaching operation conflicts with current state");
     }
 
     private void assertEnvelope(DataIntegrityViolationException error, int expectedStatus,

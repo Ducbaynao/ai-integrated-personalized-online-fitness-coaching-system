@@ -19,7 +19,7 @@ erDiagram
 ```
 
 Trainer Profile existence, verification status, activity status, relationship state, and permission scope are separate facts.
-V24 gives each relationship an optimistic version and enforces at most one `ACTIVE`/`PAUSED` relationship per Student. A paused relationship can have one pending resume request; terminal requests and status history are retained. `coaching_command_receipts` stores actor-scoped replay outcomes. Effective `HUMAN_COACH` and `SELF_DIRECTED` periods never overlap, and period identity/start timestamps are immutable after creation. Detailed sharing grants and access levels remain a separate checkpoint.
+V24 gives each relationship an optimistic version and enforces at most one `ACTIVE`/`PAUSED` relationship per Student. A paused relationship can have one pending resume request; terminal requests and status history are retained. `coaching_command_receipts` stores actor-scoped replay outcomes. Effective `HUMAN_COACH` and `SELF_DIRECTED` periods never overlap, and V26 permits a nullable or future scheduled end while preventing extension or expired-period rewrites. V27 adds ordered sharing levels (`VIEW`, `CONTRIBUTE`, `MANAGE`), optimistic decision versions, non-overlapping effective decisions per relationship/scope, restrictive foreign keys, and append/close history guards. Relationship and period existence still grant no data authority by themselves.
 
 ## Goals and workout
 

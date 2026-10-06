@@ -522,6 +522,18 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(DataSharingAccessLevelInsufficientException.class)
+    public ResponseEntity<ErrorResponse> handleDataSharingAccessLevelInsufficient(
+            DataSharingAccessLevelInsufficientException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT",
+                ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        ));
+    }
+
     @ExceptionHandler(AdminExerciseNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAdminExerciseNotFound(AdminExerciseNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
