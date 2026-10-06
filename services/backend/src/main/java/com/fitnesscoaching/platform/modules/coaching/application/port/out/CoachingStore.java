@@ -20,7 +20,7 @@ public interface CoachingStore {
     List<History> history(UUID relationshipId, int limit, int offset);
     Optional<Period> effectivePeriod(UUID studentId, Instant at);
     List<Period> periods(UUID studentId, int limit, int offset);
-    void closePeriod(Period period, Instant at);
+    Instant closePeriod(Period period, Instant at);
     Period openPeriod(UUID studentId, String mode, UUID relationshipId, UUID trainerId, UUID actor, Instant at);
     Optional<Resume> resume(UUID id);
     Optional<Resume> pendingResume(UUID relationshipId);

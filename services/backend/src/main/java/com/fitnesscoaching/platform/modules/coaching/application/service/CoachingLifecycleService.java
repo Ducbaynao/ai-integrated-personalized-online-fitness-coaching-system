@@ -126,9 +126,9 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
             Period oldPeriod = store.effectivePeriod(current.studentId(), requestedAt).orElse(null);
             Instant at = effectiveAt(oldPeriod, requestedAt);
             if (next.equals("ACTIVE")) {
-                closeIfSelfDirected(oldPeriod, at);
+                at = closeIfSelfDirected(oldPeriod, at);
             } else if (current.status().equals("ACTIVE") && (next.equals("PAUSED") || next.equals("ENDED"))) {
-                closeHuman(oldPeriod, current.id(), at);
+                at = closeHuman(oldPeriod, current.id(), at);
             } else if (current.status().equals("PAUSED") && next.equals("ENDED")
                     && oldPeriod != null && !oldPeriod.mode().equals("SELF_DIRECTED")) {
                 throw failure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT");
@@ -142,9 +142,11 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
                 store.openPeriod(current.studentId(), "SELF_DIRECTED", null, null, actor, at);
             }
             if (next.equals("ENDED")) {
-                store.cancelPendingResume(current.id(), actor, at)
-                        .ifPresent(cancelled -> auditResume(actor, current, cancelled,
-                                "RESUME_INVALIDATED_BY_END", "PENDING", "CANCELLED", at));
+                Resume cancelled = store.cancelPendingResume(current.id(), actor, at).orElse(null);
+                if (cancelled != null) {
+                    auditResume(actor, current, cancelled,
+                            "RESUME_INVALIDATED_BY_END", "PENDING", "CANCELLED", at);
+                }
             }
             audit(actor, updated, command, current.status(), next, at);
             return new Outcome(updated, null, null);
@@ -214,7 +216,7 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
                         Instant requestedAt = store.transitionTime();
                         old = store.effectivePeriod(current.studentId(), requestedAt).orElse(null);
                         at = effectiveAt(old, requestedAt);
-                        closeIfSelfDirected(old, at);
+                        at = closeIfSelfDirected(old, at);
                         updated = store.transition(current, "ACTIVE", actor, "RESUME", at);
                     } else {
                         at = store.transitionTime();
@@ -361,17 +363,17 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
     }
     private static CoachingFailure failure(HttpStatus status, String code) { return new CoachingFailure(status, code); }
 
-    private void closeIfSelfDirected(Period old, Instant at) {
-        if (old == null) { return; } // No fabricated pre-feature history.
+    private Instant closeIfSelfDirected(Period old, Instant at) {
+        if (old == null) { return at; } // No fabricated pre-feature history.
         if (!old.mode().equals("SELF_DIRECTED")) { throw failure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT"); }
-        store.closePeriod(old, at);
+        return store.closePeriod(old, at);
     }
-    private void closeHuman(Period old, UUID id, Instant at) {
-        if (old == null) { return; } // Legacy ACTIVE relationship with no period never had effective Trainer authority.
+    private Instant closeHuman(Period old, UUID id, Instant at) {
+        if (old == null) { return at; } // Legacy ACTIVE relationship with no period never had effective Trainer authority.
         if (!old.mode().equals("HUMAN_COACH") || !id.equals(old.relationshipId())) {
             throw failure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT");
         }
-        store.closePeriod(old, at);
+        return store.closePeriod(old, at);
     }
     private Instant now() { return Instant.now(clock).truncatedTo(ChronoUnit.MICROS); }
 
@@ -390,6 +392,8 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
             }
             Outcome saved = mapper.readValue(prior.responseJson(), Outcome.class);
             // A receipt is an idempotent domain result, never a reusable authority snapshot.
+            // A former Trainer cannot recover an ended relationship through a prior command.
+            concealFormerTrainer(actor, visible(actor, saved.relationship().id()));
             return new Outcome(saved.relationship(), saved.resume(), null);
         }
         Outcome outcome = work.get();

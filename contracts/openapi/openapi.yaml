@@ -103,6 +103,7 @@ paths:
       tags: [Coaching Lifecycle]
       operationId: requestCoachingRelationship
       summary: Student requests coaching from an eligible Trainer
+      description: An exact command-key replay is subject to current participant visibility, not historical receipt visibility.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingInitiateRequest' } } } }
       responses:
         '201': { $ref: '#/components/responses/CoachingOutcome' }
@@ -116,6 +117,7 @@ paths:
       tags: [Coaching Lifecycle]
       operationId: inviteStudentToCoaching
       summary: Eligible Trainer invites a Student
+      description: A former Trainer cannot replay an invitation receipt after the relationship has ended; it is concealed as 404.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingInitiateRequest' } } } }
       responses:
         '201': { $ref: '#/components/responses/CoachingOutcome' }
@@ -135,7 +137,11 @@ paths:
       tags: [Coaching Lifecycle]
       operationId: decideCoachingRelationship
       summary: Accept, reject, cancel, pause, or end according to participant and state rules
-      description: End requires a nonblank reason; the command is the explicit end confirmation.
+      description: >-
+        End requires a nonblank reason; the command is the explicit end confirmation.
+        A fresh successful End returns its result, but a former Trainer's later replay
+        of any command receipt, including End, is concealed as 404. Student replay
+        retains access to the saved result under current Student capability checks.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingActionRequest' } } } }
       responses:
         '200': { $ref: '#/components/responses/CoachingOutcome' }
