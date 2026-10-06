@@ -3,12 +3,12 @@
 ## 1. Checkpoint and objective
 
 - **Feature ID:** `B03`.
-- **Current implementation checkpoint:** `B03-COACHING-PERIOD-SHARING`.
-- **Checkpoint branch:** `feature/m2c-coaching-period-sharing`.
-- **Scope of this checkpoint:** backend/schema/OpenAPI sharing authority; Mobile remains out of scope.
+- **Current implementation checkpoint:** `B03-MOBILE-READ-CONTRACTS`.
+- **Checkpoint branch:** `feature/m2e-coaching-mobile-read-contracts`.
+- **Scope of this checkpoint:** backend/OpenAPI read contracts needed by Mobile; Mobile implementation and schema changes remain out of scope.
 - **CONFIRMED REQUIREMENT:** Establish the relationship, effective-period, sharing, and authorization rules for Student-Trainer coaching without deleting or rewriting fitness history.
 
-This record distinguishes confirmed product requirements, executable evidence, and later decisions. The original prerequisite decision gate was merged by PR #40 at `795a84f00a514451d7e37197091c037beb2bfbb3` (decision parent `78d6de6d5053c1cd4038ce19d2483adc7004ebbe`). Relationship lifecycle is implemented through V24-V26. The current sharing checkpoint adds V27, Coaching-owned sharing/authority ports and services, Student-owned sharing commands, Goal delegation, and the OpenAPI sharing contract. Mobile statements remain requirements for a later checkpoint, not implementation claims.
+This record distinguishes confirmed product requirements, executable evidence, and later decisions. The original prerequisite decision gate was merged by PR #40 at `795a84f00a514451d7e37197091c037beb2bfbb3` (decision parent `78d6de6d5053c1cd4038ce19d2483adc7004ebbe`). Relationship lifecycle is implemented through V24-V26 and sharing authority through V27. The current read-contract checkpoint adds privacy-minimal Trainer discovery, exact Student lookup, actor-scoped relationship history, participant summaries, and an authoritative sharing presentation without changing lifecycle or authority rules. Mobile statements remain requirements for a later checkpoint, not implementation claims.
 
 ### B03-RELATIONSHIP-LIFECYCLE implementation boundary
 
@@ -30,6 +30,14 @@ This record distinguishes confirmed product requirements, executable evidence, a
 - `CoachingAuthorityQuery` is the reusable module boundary. Current authority requires active account/capability, canonical Trainer eligibility, `ACTIVE` relationship, matching effective `HUMAN_COACH` period, effective `ALLOW`, scope, and sufficient level. Historical authority first requires current authority and then applies the explicit half-open history window.
 - Goal no longer reads Coaching persistence directly. Proposal view delegates with minimum `VIEW`; proposal creation delegates with minimum `CONTRIBUTE`. `MANAGE` still cannot override Student-owned Goal decisions.
 - Former Trainer sharing-history reads are concealed after `ENDED`. Sharing history and audit evidence remain preserved. Trainer access-request workflow and B04-B08 consumer implementations are not introduced here.
+
+### B03-MOBILE-READ-CONTRACTS implementation boundary
+
+- An authenticated Student can browse or search by display name only Trainers who pass the canonical active account, active Trainer role, verified/active profile, profile-active, and accepting-students filters. The public item contains only `trainerId` and `displayName`.
+- An eligible, accepting Trainer can resolve exactly one active Student by normalized exact email for invitation. There is no Student directory or partial search; missing, inactive, or otherwise unavailable targets share the concealed `COACHING_COUNTERPARTY_NOT_FOUND` response, and the response never returns the email.
+- The actor-scoped relationship collection gives a Student their own pending/current/terminal history. A Trainer sees only permitted pending, active, or paused relationships; terminal relationships remain concealed from a former Trainer. Relationship representations include only the counterparty's user ID and display name.
+- The sharing summary returns every supported scope with a backend-derived `NOT_CONFIGURED`, `ALLOWED`, `DENIED`, `EXPIRED`, or `REVOKED` presentation state. It retains the existing participant and former-Trainer concealment policy and does not create an `allowedActions` contract.
+- These are read projections only. They add no migration, do not alter V24-V27, and do not implement Mobile screens or the deferred Trainer access-request workflow.
 
 ## 2. Sources and confirmed requirements
 
@@ -66,7 +74,7 @@ The following requirements are confirmed:
 | Trainer eligibility | `TrainerEligibilityService` derives eligibility from account, active Trainer role, active profile, and verification/activity state | This is the canonical eligibility input B03 consumes. Runtime policy-restriction and capacity checks are not implemented by this service; accepting-students is checked separately at initiation and acceptance. |
 | Current coaching authority | `CoachingAuthorityQuery` evaluates canonical eligibility, relationship, period, scope, decision, validity and level; Goal delegates through this port | Coaching owns the policy and persistence. Consumer modules do not read Coaching repositories. |
 | Audit and errors | The backend exposes structured errors with stable `errorCode`, request ID, timestamp and field errors; immutable audit services and B02 lifecycle/version conflict conventions exist | B03 reuses these shapes and audit conventions. Raw exception text does not become Mobile copy. |
-| OpenAPI | Lifecycle and Student-owned sharing list/grant-or-replace/revoke paths and schemas exist | Stable validation, concealment, capability and concurrency errors use the common envelope. |
+| OpenAPI | Lifecycle, Student-owned sharing commands/history, privacy-minimal discovery/lookup, actor-scoped relationship collection, participant summary, and sharing-summary paths and schemas exist | Stable validation, concealment, capability and concurrency errors use the common envelope. |
 | Mobile | ST-17, TR-01, TR-03, and TR-12 are documented; no B03 routes or screens are implemented | Mobile work belongs to a later checkpoint and must reuse B01 session, capability, query-cache, error, and forced-logout behavior. |
 
 ## 4. Decision table
@@ -210,13 +218,17 @@ Migration tests cover clean installation, V26-to-V27 upgrade/backfill, constrain
 
 ## 10. OpenAPI implementation
 
-The executable `/api/v1` contract now contains the lifecycle resources from the preceding checkpoint and these sharing resources:
+The executable `/api/v1` contract contains the lifecycle and sharing resources from the preceding checkpoints plus the Mobile-enabling read projections:
 
 - list sharing-decision history for an authenticated relationship participant, while concealing it from a former Trainer after end;
 - grant or replace one scoped decision with level, validity, optional historical window, command key, and expected version for replacement;
+- browse/search the privacy-minimal eligible and accepting Trainer directory as a Student;
+- resolve exactly one available Student by normalized email as an eligible, accepting Trainer without returning that identifier;
+- list the actor's visible relationships, including a Student's terminal history, with privacy-safe counterparty display summaries;
+- obtain the authoritative current presentation state for every sharing scope without client-side history parsing;
 - revoke the current scoped decision with command key, reason, and expected version.
 
-Responses use DTOs and the common error envelope, expose no persistence entities, and document stable sharing validation, authorization, concealment, idempotency, and concurrency errors. Trainer permission-summary and request-access endpoints remain deferred because their state/action contract is unresolved.
+Responses use DTOs and the common error envelope, expose no persistence entities, and document stable sharing validation, authorization, concealment, idempotency, and concurrency errors. The Trainer request-access workflow remains deferred; this checkpoint does not add server-derived `allowedActions`.
 
 ## 11. Backend module boundaries
 
@@ -333,7 +345,7 @@ No consumer may query a Coaching repository directly. Notifications and AI outpu
 
 ## 19. Implementation impact and delivery sequence
 
-The prerequisite decision checkpoint changed documentation only. Relationship lifecycle and the current sharing checkpoint now supply the backend/schema/OpenAPI slices described above. Remaining coordinated, reviewable changes include:
+The prerequisite decision checkpoint changed documentation only. Relationship lifecycle, sharing authority, and the current Mobile read-contract checkpoint now supply the backend/schema/OpenAPI slices described above. Remaining coordinated, reviewable changes include:
 
 - Student/Trainer Mobile routes, typed API/query layer, Vietnamese error mapping, cache invalidation, screens, and accessibility tests;
 - Trainer access-request lifecycle, only after its state/action contract is separately resolved;
@@ -348,16 +360,17 @@ Do not combine all of B03 into one unreviewable change. Do not modify old migrat
 |---:|---|---|---|
 | 1 | `B03-RELATIONSHIP-LIFECYCLE` | `feature/m2b-coaching-relationship-lifecycle` | Relationship request/invitation and accept/reject/cancel/pause/resume/end, lifecycle persistence, audit, stable errors, and concurrency tests. |
 | 2 | `B03-COACHING-PERIOD-SHARING` | `feature/m2c-coaching-period-sharing` | Complete sharing/access-level schema, scoped grants, historical-window authority ports, OpenAPI, and authorization/history tests; reconcile the minimum lifecycle period switching delivered in V24. |
-| 3 | `B03-MOBILE-RELATIONSHIP-FLOWS` | `feature/m2d-mobile-coaching-relationship-flows` | ST-17, TR-01/TR-03/TR-12 integration, Vietnamese states, confirmations, cache invalidation, accessibility, and client contract tests. |
-| 4 | B03 integration/history reconciliation | `feature/m2e-coaching-integration-history-reconciliation` | Cross-module contract checks, end-to-end transition/history/security matrix, documentation reconciliation, and B03 closure evidence. |
+| 3 | `B03-MOBILE-READ-CONTRACTS` | `feature/m2e-coaching-mobile-read-contracts` | Privacy-safe discovery/lookup, relationship/history collection, participant display summary, and authoritative sharing summary. |
+| 4 | `B03-MOBILE-RELATIONSHIP-FLOWS` | To be selected after this checkpoint | ST-17, TR-01/TR-03/TR-12 integration, Vietnamese states, confirmations, cache invalidation, accessibility, and client contract tests. |
+| 5 | B03 integration/history reconciliation | To be selected after Mobile implementation | Cross-module contract checks, end-to-end transition/history/security matrix, documentation reconciliation, and B03 closure evidence. |
 
 After this checkpoint is independently reviewed, tested by Antigravity, and merged by the user, the next planned checkpoint is **`B03-MOBILE-RELATIONSHIP-FLOWS`**. No later branch is created here.
 
-## 21. Definition of Done for this sharing checkpoint
+## 21. Definition of Done for this read-contract checkpoint
 
-- V27 upgrades legacy sharing rows safely and enforces level, non-overlap, version, retention, and effective-query invariants without modifying V24-V26.
-- Student-owned grant/replace/revoke commands are authenticated, idempotent, audited, history-preserving, optimistic-concurrency guarded, and atomic on failure.
-- `CoachingAuthorityQuery` owns deny-by-default current and historical evaluation, including access-level hierarchy and a transaction-safe authority boundary; Goal consumes this port instead of Coaching persistence.
-- OpenAPI and database/domain documentation match the implemented sharing contract and stable errors.
-- Targeted unit, PostgreSQL integration/migration, lifecycle-regression, Goal-authority, and contract/document validations pass before independent Antigravity review and GitHub CI.
+- Trainer discovery is Student-scoped and filters canonical eligibility, active account/capability, and accepting-students state on the backend.
+- Trainer-to-Student selection is exact-only, privacy-minimal, and uses one concealed response for missing or unavailable targets.
+- Actor-scoped relationship history and sharing-summary projections preserve former-Trainer concealment and return no unauthorized PII.
+- Runtime and OpenAPI agree without a schema migration, a Trainer access-request flow, or an invented `allowedActions` contract.
+- Targeted PostgreSQL integration, lifecycle/sharing/Goal-authority regression, and contract/document validations pass before independent Antigravity review and GitHub CI.
 - Mobile flows, Trainer request-access lifecycle, and B04-B08 consumer implementation remain out of scope and are not fabricated in this checkpoint.

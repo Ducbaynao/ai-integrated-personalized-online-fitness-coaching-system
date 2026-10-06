@@ -10,6 +10,9 @@ import com.fitnesscoaching.platform.modules.coaching.application.CoachingFailure
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.out.CoachingSharingStore;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.Permission;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionPresentationState;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionSummary;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionSummaryItem;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.Receipt;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.Relationship;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -29,9 +32,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 @Service
 public class CoachingSharingService implements CoachingSharingUseCase {
@@ -61,6 +67,45 @@ public class CoachingSharingService implements CoachingSharingUseCase {
             throw failure(HttpStatus.NOT_FOUND, "COACHING_RELATIONSHIP_NOT_FOUND");
         }
         return store.permissions(relationshipId, size, page * size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PermissionSummary summary(UUID actorId, UUID relationshipId) {
+        Relationship relationship = visibleParticipant(actorId, relationshipId);
+        if (relationship.trainerId().equals(actorId) && relationship.status().equals("ENDED")) {
+            throw failure(HttpStatus.NOT_FOUND, "COACHING_RELATIONSHIP_NOT_FOUND");
+        }
+        Instant evaluatedAt = store.transitionTime();
+        Map<DataScope, Permission> latestByScope = store.latestPermissionsAt(relationshipId, evaluatedAt).stream()
+                .collect(Collectors.toMap(Permission::dataScope, Function.identity()));
+        List<PermissionSummaryItem> items = java.util.Arrays.stream(DataScope.values())
+                .map(scope -> summarize(scope, latestByScope.get(scope), evaluatedAt))
+                .toList();
+        return new PermissionSummary(relationship.id(), relationship.status(), evaluatedAt, items);
+    }
+
+    private static PermissionSummaryItem summarize(DataScope scope, Permission permission, Instant evaluatedAt) {
+        if (permission == null) {
+            return new PermissionSummaryItem(scope, PermissionPresentationState.NOT_CONFIGURED,
+                    null, null, null, null, null, null, null, null);
+        }
+        PermissionPresentationState state;
+        if (permission.revokedAt() != null) {
+            state = PermissionPresentationState.REVOKED;
+        } else if (permission.validUntil() != null && !permission.validUntil().isAfter(evaluatedAt)) {
+            state = PermissionPresentationState.EXPIRED;
+        } else if (permission.decision() == SharingDecision.ALLOW) {
+            state = PermissionPresentationState.ALLOWED;
+        } else {
+            state = PermissionPresentationState.DENIED;
+        }
+        boolean currentlyEffective = state == PermissionPresentationState.ALLOWED
+                || state == PermissionPresentationState.DENIED;
+        return new PermissionSummaryItem(scope, state, permission.decision(), permission.accessLevel(),
+                currentlyEffective ? permission.id() : null,
+                currentlyEffective ? permission.version() : null,
+                permission.historyFrom(), permission.historyUntil(), permission.validFrom(), permission.validUntil());
     }
 
     @Override

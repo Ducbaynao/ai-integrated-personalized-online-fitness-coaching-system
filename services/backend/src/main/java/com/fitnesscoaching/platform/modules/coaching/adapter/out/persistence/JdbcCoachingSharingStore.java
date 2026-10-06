@@ -102,6 +102,16 @@ public class JdbcCoachingSharingStore implements CoachingSharingStore {
     }
 
     @Override
+    public List<Permission> latestPermissionsAt(UUID relationshipId, Instant at) {
+        return jdbc.query("""
+                SELECT DISTINCT ON (data_scope) *
+                FROM fitness.data_sharing_permissions
+                WHERE relationship_id = ? AND valid_from <= ?
+                ORDER BY data_scope, valid_from DESC, created_at DESC, id DESC
+                """, PERMISSION, relationshipId, timestamp(at));
+    }
+
+    @Override
     public Optional<Permission> permission(UUID permissionId) {
         return first(jdbc.query("SELECT * FROM fitness.data_sharing_permissions WHERE id = ?",
                 PERMISSION, permissionId));

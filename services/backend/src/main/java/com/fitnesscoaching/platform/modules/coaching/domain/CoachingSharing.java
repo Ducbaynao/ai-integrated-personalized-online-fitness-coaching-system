@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.coaching.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public final class CoachingSharing {
@@ -78,4 +79,36 @@ public final class CoachingSharing {
             UUID periodId,
             Permission permission
     ) {}
+
+    public enum PermissionPresentationState {
+        NOT_CONFIGURED,
+        ALLOWED,
+        DENIED,
+        EXPIRED,
+        REVOKED
+    }
+
+    public record PermissionSummaryItem(
+            DataScope dataScope,
+            PermissionPresentationState state,
+            SharingDecision decision,
+            DataAccessLevel accessLevel,
+            UUID permissionId,
+            Long version,
+            Instant historyFrom,
+            Instant historyUntil,
+            Instant validFrom,
+            Instant validUntil
+    ) {}
+
+    public record PermissionSummary(
+            UUID relationshipId,
+            String relationshipStatus,
+            Instant evaluatedAt,
+            List<PermissionSummaryItem> items
+    ) {
+        public PermissionSummary {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
+    }
 }

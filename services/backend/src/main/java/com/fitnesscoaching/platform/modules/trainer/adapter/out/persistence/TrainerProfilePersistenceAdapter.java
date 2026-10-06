@@ -94,6 +94,18 @@ public class TrainerProfilePersistenceAdapter implements TrainerProfilePort {
     }
 
     @Override
+    public List<UUID> findDiscoverableTrainerIds() {
+        return jdbcTemplate.query("""
+                SELECT user_id
+                FROM fitness.trainer_profiles
+                WHERE verification_status = 'VERIFIED'::fitness.trainer_verification_state
+                  AND activity_status = 'ACTIVE'::fitness.trainer_activity_status
+                  AND is_active = true
+                  AND is_accepting_students = true
+                """, (rs, ignored) -> rs.getObject("user_id", UUID.class));
+    }
+
+    @Override
     public boolean existsByUserId(UUID userId) {
         Boolean exists = jdbcTemplate.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM fitness.trainer_profiles WHERE user_id = ?)",
