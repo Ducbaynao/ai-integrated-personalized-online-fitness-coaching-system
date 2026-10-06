@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.coaching.application.port.in;
 
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.Permission;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionSummary;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.coaching.domain.SharingDecision;
@@ -11,6 +12,8 @@ import java.util.UUID;
 
 public interface CoachingSharingUseCase {
     List<Permission> list(UUID actorId, UUID relationshipId, int page, int size);
+
+    PermissionSummary summary(UUID actorId, UUID relationshipId);
 
     Permission grantOrReplace(UUID actorId, UUID relationshipId, DataScope dataScope,
                               SharingDecision decision, DataAccessLevel accessLevel,

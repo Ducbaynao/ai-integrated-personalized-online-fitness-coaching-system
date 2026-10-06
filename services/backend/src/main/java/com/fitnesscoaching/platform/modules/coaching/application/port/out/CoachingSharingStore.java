@@ -24,6 +24,8 @@ public interface CoachingSharingStore {
 
     List<Permission> permissions(UUID relationshipId, int limit, int offset);
 
+    List<Permission> latestPermissionsAt(UUID relationshipId, Instant at);
+
     Optional<Permission> permission(UUID permissionId);
 
     Optional<Permission> effectivePermission(UUID relationshipId, DataScope scope, Instant at);

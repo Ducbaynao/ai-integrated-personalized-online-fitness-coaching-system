@@ -69,6 +69,13 @@ public class JdbcCoachingStore implements CoachingStore {
                 """, Boolean.class, studentId, trainerId));
     }
 
+    @Override public boolean currentPair(UUID studentId, UUID trainerId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.coaching_relationships
+                WHERE student_id = ? AND trainer_id = ? AND status IN ('PENDING', 'ACTIVE', 'PAUSED'))
+                """, Boolean.class, studentId, trainerId));
+    }
+
     @Override public List<Relationship> pending(UUID actorId, boolean incoming, boolean studentCapability,
                                                  boolean trainerCapability, int limit, int offset) {
         String sql = incoming ? """
@@ -84,6 +91,23 @@ public class JdbcCoachingStore implements CoachingStore {
                 """;
         return jdbc.query(sql, RELATIONSHIP, actorId, studentCapability, actorId,
                 trainerCapability, actorId, limit, offset);
+    }
+
+    @Override
+    public List<Relationship> relationships(UUID actorId, boolean studentCapability,
+                                            boolean trainerCapability, boolean trainerEligible,
+                                            int limit, int offset) {
+        return jdbc.query("""
+                SELECT * FROM fitness.coaching_relationships
+                WHERE (? AND student_id = ?)
+                   OR (? AND trainer_id = ? AND (
+                        status = 'PAUSED'::fitness.coaching_relationship_status
+                        OR (? AND status IN ('PENDING', 'ACTIVE'))
+                   ))
+                ORDER BY requested_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """, RELATIONSHIP, studentCapability, actorId, trainerCapability, actorId,
+                trainerEligible, limit, offset);
     }
 
     @Override public Relationship create(UUID studentId, UUID trainerId, UUID initiator, Instant at) {

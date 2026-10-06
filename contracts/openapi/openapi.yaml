@@ -36,6 +36,65 @@ tags:
     description: Permission-protected Exercise draft, lifecycle, and canonical replacement management.
 
 paths:
+  /coaching/trainers:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: searchDiscoverableTrainers
+      summary: Browse eligible Trainers who are accepting Students
+      description: Returns a privacy-minimal public projection. Eligibility and availability are filtered by the backend.
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string, maxLength: 160, default: '' }
+          description: Case-insensitive literal substring match on display name.
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/TrainerDirectoryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/students/lookup:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: lookupStudentForCoachingInvitation
+      summary: Resolve one Student by exact email for an eligible Trainer invitation
+      description: >-
+        Exact normalized lookup only; never returns a Student directory or partial matches.
+        Missing, inactive, and unavailable Student targets share the same concealed 404 behavior.
+        The response does not expose the matched email.
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string, format: email, maxLength: 320 }
+      responses:
+        '200':
+          description: Privacy-minimal Student display summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudentLookup' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+  /coaching/relationships/me:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: listVisibleCoachingRelationships
+      summary: List actor-visible relationships with privacy-safe counterparty summaries
+      description: >-
+        Students receive their own pending, active, paused, and terminal history. Trainers receive
+        only currently visible pending, active, or paused relationships; former-Trainer terminal
+        relationships remain concealed.
+      parameters:
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingRelationshipPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
   /coaching/relationships/me/current:
     get:
       tags: [Coaching Lifecycle]
@@ -230,6 +289,26 @@ paths:
         '403': { $ref: '#/components/responses/CoachingForbidden' }
         '404': { $ref: '#/components/responses/CoachingConcealed' }
         '409': { $ref: '#/components/responses/CoachingSharingConflict' }
+  /coaching/relationships/{relationshipId}/sharing-permissions/summary:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+    get:
+      tags: [Coaching Data Sharing]
+      operationId: getCoachingSharingPermissionSummary
+      summary: Get the authoritative current sharing presentation for every supported scope
+      description: >-
+        The backend selects the latest decision and classifies replacement, revocation, and expiry.
+        Relationship status remains a separate authority input. A former Trainer cannot read this
+        summary after the relationship ends.
+      responses:
+        '200':
+          description: Authoritative sharing presentation summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingSharingPermissionSummary' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingSharingConcealed' }
   /coaching/relationships/{relationshipId}/sharing-permissions/{permissionId}/revoke:
     parameters:
       - { $ref: '#/components/parameters/CoachingRelationshipId' }
@@ -1850,6 +1929,11 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/CoachingRelationshipPage' }
+    TrainerDirectoryPage:
+      description: Stable display-name ascending page of discoverable Trainer summaries
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TrainerDirectoryPage' }
     CoachingHistoryPage:
       description: Stable changed-at descending page of status events
       content:
@@ -2008,6 +2092,39 @@ components:
       type: string
       description: Ordered sufficiency is MANAGE > CONTRIBUTE > VIEW; owning-domain rules still apply.
       enum: [VIEW, CONTRIBUTE, MANAGE]
+    CoachingPermissionPresentationState:
+      type: string
+      description: Backend-derived presentation state of the latest decision for one scope.
+      enum: [NOT_CONFIGURED, ALLOWED, DENIED, EXPIRED, REVOKED]
+    ParticipantSummary:
+      type: object
+      additionalProperties: false
+      required: [userId, displayName]
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string }
+    TrainerDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [trainerId, displayName]
+      properties:
+        trainerId: { type: string, format: uuid }
+        displayName: { type: string }
+    TrainerDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TrainerDirectoryItem' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+    StudentLookup:
+      type: object
+      additionalProperties: false
+      required: [studentId, displayName]
+      properties:
+        studentId: { type: string, format: uuid }
+        displayName: { type: string }
     CoachingInitiateRequest:
       type: object
       additionalProperties: false
@@ -2062,11 +2179,12 @@ components:
         commandKey: { type: string, format: uuid }
     CoachingRelationship:
       type: object
-      required: [id, studentId, trainerId, status, direction, requestedBy, requestedAt, version]
+      required: [id, studentId, trainerId, counterparty, status, direction, requestedBy, requestedAt, version]
       properties:
         id: { type: string, format: uuid }
         studentId: { type: string, format: uuid }
         trainerId: { type: string, format: uuid }
+        counterparty: { $ref: '#/components/schemas/ParticipantSummary' }
         status: { $ref: '#/components/schemas/CoachingStatus' }
         direction: { $ref: '#/components/schemas/CoachingDirection' }
         requestedBy: { type: string, format: uuid }
@@ -2172,6 +2290,41 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/CoachingSharingPermission' } }
         page: { type: integer, minimum: 0 }
         size: { type: integer, minimum: 1 }
+    CoachingSharingPermissionSummaryItem:
+      type: object
+      additionalProperties: false
+      required: [dataScope, state]
+      properties:
+        dataScope: { $ref: '#/components/schemas/CoachingDataScope' }
+        state: { $ref: '#/components/schemas/CoachingPermissionPresentationState' }
+        decision: { oneOf: [{ $ref: '#/components/schemas/CoachingSharingDecision' }, { type: 'null' }] }
+        accessLevel: { oneOf: [{ $ref: '#/components/schemas/CoachingDataAccessLevel' }, { type: 'null' }] }
+        permissionId:
+          type: [string, 'null']
+          format: uuid
+          description: Present only while the latest decision is currently effective.
+        version:
+          type: [integer, 'null']
+          format: int64
+          minimum: 0
+          description: Optimistic token present only with an effective permission.
+        historyFrom: { type: [string, 'null'], format: date-time }
+        historyUntil: { type: [string, 'null'], format: date-time, description: Exclusive upper bound. }
+        validFrom: { type: [string, 'null'], format: date-time }
+        validUntil: { type: [string, 'null'], format: date-time, description: Exclusive upper bound. }
+    CoachingSharingPermissionSummary:
+      type: object
+      additionalProperties: false
+      required: [relationshipId, relationshipStatus, evaluatedAt, items]
+      properties:
+        relationshipId: { type: string, format: uuid }
+        relationshipStatus: { $ref: '#/components/schemas/CoachingStatus' }
+        evaluatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items: { $ref: '#/components/schemas/CoachingSharingPermissionSummaryItem' }
     RegisterRequest:
       type: object
       additionalProperties: false

@@ -4,12 +4,15 @@ import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface TrainerProfilePort {
 
     Optional<TrainerProfile> findByUserId(UUID userId);
+
+    List<UUID> findDiscoverableTrainerIds();
 
     void lockForCoachingDecision(UUID userId);
 

@@ -8,7 +8,9 @@ import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
 import com.fitnesscoaching.platform.common.web.RequestIdFilter;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingMobileReadUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserDirectoryQuery;
 import org.junit.jupiter.api.Test;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
@@ -45,7 +47,9 @@ class CoachingErrorAdviceTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean CoachingLifecycleUseCase lifecycle;
+    @MockitoBean CoachingMobileReadUseCase mobileRead;
     @MockitoBean CoachingSharingUseCase sharing;
+    @MockitoBean UserDirectoryQuery users;
     @MockitoBean org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     @Test

@@ -1,12 +1,18 @@
 package com.fitnesscoaching.platform.modules.coaching.adapter.in.web;
 
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingMobileReadUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.Permission;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionSummary;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.PermissionSummaryItem;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.*;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.coaching.domain.SharingDecision;
+import com.fitnesscoaching.platform.modules.trainer.application.model.TrainerDirectoryItem;
+import com.fitnesscoaching.platform.modules.user.application.model.UserDisplaySummary;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserDirectoryQuery;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -20,7 +26,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Validated
@@ -29,10 +37,15 @@ import java.util.UUID;
 public class CoachingController {
     private final CoachingLifecycleUseCase lifecycle;
     private final CoachingSharingUseCase sharing;
+    private final CoachingMobileReadUseCase mobileRead;
+    private final UserDirectoryQuery users;
 
-    public CoachingController(CoachingLifecycleUseCase lifecycle, CoachingSharingUseCase sharing) {
+    public CoachingController(CoachingLifecycleUseCase lifecycle, CoachingSharingUseCase sharing,
+                              CoachingMobileReadUseCase mobileRead, UserDirectoryQuery users) {
         this.lifecycle = lifecycle;
         this.sharing = sharing;
+        this.mobileRead = mobileRead;
+        this.users = users;
     }
 
     public record InitiateRequest(@NotNull UUID counterpartyId, @NotNull UUID commandKey) {}
@@ -51,16 +64,11 @@ public class CoachingController {
     public record SharingRevokeRequest(@NotNull @Min(0) Long expectedPermissionVersion,
                                        @Size(max = 500) String reason,
                                        @NotNull UUID commandKey) {}
-    public record RelationshipDto(UUID id, UUID studentId, UUID trainerId, String status,
+    public record ParticipantDto(UUID userId, String displayName) {}
+    public record RelationshipDto(UUID id, UUID studentId, UUID trainerId, ParticipantDto counterparty,
+                                  String status,
                                   String direction, UUID requestedBy, Instant requestedAt,
-                                  Instant acceptedAt, Instant startedAt, Instant endedAt, long version) {
-        static RelationshipDto from(Relationship value, UUID actor) {
-            if (value == null) { return null; }
-            return new RelationshipDto(value.id(), value.studentId(), value.trainerId(), value.status(),
-                    value.directionFor(actor), value.requestedBy(), value.requestedAt(), value.acceptedAt(),
-                    value.startedAt(), value.endedAt(), value.version());
-        }
-    }
+                                  Instant acceptedAt, Instant startedAt, Instant endedAt, long version) {}
     public record ResumeDto(UUID id, UUID relationshipId, UUID requestedBy, String status,
                             long version, Instant requestedAt, UUID decidedBy, Instant decidedAt) {
         static ResumeDto from(Resume value) {
@@ -76,10 +84,6 @@ public class CoachingController {
         }
     }
     public record OutcomeDto(RelationshipDto relationship, ResumeDto resume, PeriodDto currentPeriod) {
-        static OutcomeDto from(Outcome value, UUID actor) {
-            return new OutcomeDto(RelationshipDto.from(value.relationship(), actor),
-                    ResumeDto.from(value.resume()), PeriodDto.from(value.currentPeriod()));
-        }
     }
     public record HistoryDto(UUID id, UUID relationshipId, String fromStatus, String toStatus,
                              UUID changedBy, String reason, Instant changedAt) {
@@ -102,14 +106,102 @@ public class CoachingController {
                     value.createdAt());
         }
     }
+    public record TrainerDirectoryDto(UUID trainerId, String displayName) {
+        static TrainerDirectoryDto from(TrainerDirectoryItem value) {
+            return new TrainerDirectoryDto(value.trainerId(), value.displayName());
+        }
+    }
+    public record StudentLookupDto(UUID studentId, String displayName) {}
+    public record PermissionSummaryItemDto(DataScope dataScope, String state,
+                                           SharingDecision decision, DataAccessLevel accessLevel,
+                                           UUID permissionId, Long version,
+                                           Instant historyFrom, Instant historyUntil,
+                                           Instant validFrom, Instant validUntil) {
+        static PermissionSummaryItemDto from(PermissionSummaryItem value) {
+            return new PermissionSummaryItemDto(value.dataScope(), value.state().name(), value.decision(),
+                    value.accessLevel(), value.permissionId(), value.version(), value.historyFrom(),
+                    value.historyUntil(), value.validFrom(), value.validUntil());
+        }
+    }
+    public record PermissionSummaryDto(UUID relationshipId, String relationshipStatus,
+                                       Instant evaluatedAt, List<PermissionSummaryItemDto> items) {
+        static PermissionSummaryDto from(PermissionSummary value) {
+            return new PermissionSummaryDto(value.relationshipId(), value.relationshipStatus(),
+                    value.evaluatedAt(), value.items().stream().map(PermissionSummaryItemDto::from).toList());
+        }
+    }
     public record PageDto<T>(List<T> items, int page, int size) {}
 
     private static UUID actor(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 
+    private OutcomeDto outcomeDto(Outcome value, UUID actor) {
+        return new OutcomeDto(relationshipDto(value.relationship(), actor),
+                ResumeDto.from(value.resume()), PeriodDto.from(value.currentPeriod()));
+    }
+
+    private RelationshipDto relationshipDto(Relationship value, UUID actor) {
+        if (value == null) { return null; }
+        UUID counterpartyId = value.studentId().equals(actor) ? value.trainerId() : value.studentId();
+        return relationshipDto(value, actor, requireSummaries(List.of(counterpartyId)).get(counterpartyId));
+    }
+
+    private List<RelationshipDto> relationshipDtos(List<Relationship> values, UUID actor) {
+        Collection<UUID> ids = values.stream()
+                .map(value -> value.studentId().equals(actor) ? value.trainerId() : value.studentId())
+                .toList();
+        Map<UUID, UserDisplaySummary> summaries = requireSummaries(ids);
+        return values.stream().map(value -> {
+            UUID counterpartyId = value.studentId().equals(actor) ? value.trainerId() : value.studentId();
+            return relationshipDto(value, actor, summaries.get(counterpartyId));
+        }).toList();
+    }
+
+    private RelationshipDto relationshipDto(Relationship value, UUID actor, UserDisplaySummary counterparty) {
+        return new RelationshipDto(value.id(), value.studentId(), value.trainerId(),
+                new ParticipantDto(counterparty.userId(), counterparty.displayName()), value.status(),
+                value.directionFor(actor), value.requestedBy(), value.requestedAt(), value.acceptedAt(),
+                value.startedAt(), value.endedAt(), value.version());
+    }
+
+    private Map<UUID, UserDisplaySummary> requireSummaries(Collection<UUID> ids) {
+        Map<UUID, UserDisplaySummary> summaries = users.findDisplaySummaries(ids);
+        if (summaries.size() != ids.stream().distinct().count()) {
+            throw new IllegalStateException("Coaching participant display summary is unavailable");
+        }
+        return summaries;
+    }
+
     @GetMapping("/relationships/me/current")
     public OutcomeDto current(@AuthenticationPrincipal Jwt jwt) {
         UUID actor = actor(jwt);
-        return OutcomeDto.from(lifecycle.current(actor), actor);
+        return outcomeDto(lifecycle.current(actor), actor);
+    }
+
+    @GetMapping("/trainers")
+    public PageDto<TrainerDirectoryDto> trainers(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "") @Size(max = 160) String query,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(1000000) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        var result = mobileRead.discoverTrainers(actor(jwt), query, page, size);
+        return new PageDto<>(result.items().stream().map(TrainerDirectoryDto::from).toList(),
+                result.page(), result.size());
+    }
+
+    @GetMapping("/students/lookup")
+    public StudentLookupDto lookupStudent(@AuthenticationPrincipal Jwt jwt,
+                                          @RequestParam @Size(max = 320) String email) {
+        UserDisplaySummary result = mobileRead.lookupStudent(actor(jwt), email);
+        return new StudentLookupDto(result.userId(), result.displayName());
+    }
+
+    @GetMapping("/relationships/me")
+    public PageDto<RelationshipDto> relationships(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(1000000) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        UUID actor = actor(jwt);
+        return new PageDto<>(relationshipDtos(mobileRead.relationships(actor, page, size), actor), page, size);
     }
 
     @GetMapping("/relationships/me/pending")
@@ -118,14 +210,13 @@ public class CoachingController {
                                             @RequestParam(defaultValue = "0") @Min(0) @Max(1000000) int page,
                                             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         UUID actor = actor(jwt);
-        return new PageDto<>(lifecycle.pending(actor, direction, page, size).stream()
-                .map(value -> RelationshipDto.from(value, actor)).toList(), page, size);
+        return new PageDto<>(relationshipDtos(lifecycle.pending(actor, direction, page, size), actor), page, size);
     }
 
     @GetMapping("/relationships/{relationshipId}")
     public OutcomeDto detail(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID relationshipId) {
         UUID actor = actor(jwt);
-        return OutcomeDto.from(lifecycle.detail(actor, relationshipId), actor);
+        return outcomeDto(lifecycle.detail(actor, relationshipId), actor);
     }
 
     @GetMapping("/relationships/{relationshipId}/history")
@@ -151,7 +242,7 @@ public class CoachingController {
         UUID actor = actor(jwt);
         Outcome result = lifecycle.initiate(actor, actor, body.counterpartyId(), body.commandKey());
         return ResponseEntity.created(URI.create("/api/v1/coaching/relationships/" + result.relationship().id()))
-                .body(OutcomeDto.from(result, actor));
+                .body(outcomeDto(result, actor));
     }
 
     @PostMapping("/relationships/invitations")
@@ -160,14 +251,14 @@ public class CoachingController {
         UUID actor = actor(jwt);
         Outcome result = lifecycle.initiate(actor, body.counterpartyId(), actor, body.commandKey());
         return ResponseEntity.created(URI.create("/api/v1/coaching/relationships/" + result.relationship().id()))
-                .body(OutcomeDto.from(result, actor));
+                .body(outcomeDto(result, actor));
     }
 
     @PostMapping("/relationships/{relationshipId}/{action:accept|reject|cancel|pause|end}")
     public OutcomeDto relationshipAction(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID relationshipId,
                                          @PathVariable String action, @Valid @RequestBody ActionRequest body) {
         UUID actor = actor(jwt);
-        return OutcomeDto.from(lifecycle.relationshipAction(actor, relationshipId, action.toUpperCase(),
+        return outcomeDto(lifecycle.relationshipAction(actor, relationshipId, action.toUpperCase(),
                 body.expectedVersion(), body.reason(), body.commandKey()), actor);
     }
 
@@ -179,7 +270,7 @@ public class CoachingController {
         Outcome result = lifecycle.createResume(actor, relationshipId, body.expectedVersion(),
                 body.reason(), body.commandKey());
         return ResponseEntity.created(URI.create("/api/v1/coaching/relationships/" + relationshipId
-                        + "/resume-requests/" + result.resume().id())).body(OutcomeDto.from(result, actor));
+                        + "/resume-requests/" + result.resume().id())).body(outcomeDto(result, actor));
     }
 
     @GetMapping("/relationships/{relationshipId}/resume-requests")
@@ -196,7 +287,7 @@ public class CoachingController {
                                    @PathVariable UUID resumeRequestId, @PathVariable String action,
                                    @Valid @RequestBody ResumeActionRequest body) {
         UUID actor = actor(jwt);
-        return OutcomeDto.from(lifecycle.resumeAction(actor, relationshipId, resumeRequestId,
+        return outcomeDto(lifecycle.resumeAction(actor, relationshipId, resumeRequestId,
                 action.toUpperCase(), body.expectedRelationshipVersion(), body.expectedRequestVersion(),
                 body.commandKey()), actor);
     }
@@ -209,6 +300,12 @@ public class CoachingController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return new PageDto<>(sharing.list(actor(jwt), relationshipId, page, size).stream()
                 .map(SharingPermissionDto::from).toList(), page, size);
+    }
+
+    @GetMapping("/relationships/{relationshipId}/sharing-permissions/summary")
+    public PermissionSummaryDto sharingPermissionSummary(
+            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID relationshipId) {
+        return PermissionSummaryDto.from(sharing.summary(actor(jwt), relationshipId));
     }
 
     @PostMapping("/relationships/{relationshipId}/sharing-permissions")

@@ -13,8 +13,13 @@ public interface CoachingStore {
     Optional<Relationship> relationship(UUID id);
     Optional<Relationship> currentRelationship(UUID studentId);
     boolean pendingPair(UUID studentId, UUID trainerId);
+
+    boolean currentPair(UUID studentId, UUID trainerId);
     List<Relationship> pending(UUID actorId, boolean incoming, boolean studentCapability,
                                boolean trainerCapability, int limit, int offset);
+    List<Relationship> relationships(UUID actorId, boolean studentCapability,
+                                     boolean trainerCapability, boolean trainerEligible,
+                                     int limit, int offset);
     Relationship create(UUID studentId, UUID trainerId, UUID initiator, Instant at);
     Relationship transition(Relationship relationship, String next, UUID actor, String reason, Instant at);
     List<History> history(UUID relationshipId, int limit, int offset);
