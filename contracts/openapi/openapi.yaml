@@ -28,6 +28,8 @@ tags:
     description: Student-owned fitness goal management, versioning, objectives, and measurable targets.
   - name: Coaching Lifecycle
     description: Student-Trainer relationship and minimal effective-period lifecycle.
+  - name: Coaching Data Sharing
+    description: Student-owned scoped sharing decisions and immutable decision history.
   - name: Exercise Catalog
     description: Authenticated Student and Trainer read access to the active Exercise catalog.
   - name: Admin Exercise Catalog
@@ -195,6 +197,55 @@ paths:
         '403': { $ref: '#/components/responses/CoachingForbidden' }
         '404': { $ref: '#/components/responses/CoachingConcealed' }
         '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/relationships/{relationshipId}/sharing-permissions:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+    get:
+      tags: [Coaching Data Sharing]
+      operationId: listCoachingSharingPermissions
+      summary: List append-only sharing-decision history visible to a current participant
+      description: A former Trainer cannot use this endpoint after the relationship ends; the relationship is concealed as 404.
+      parameters:
+        - { $ref: '#/components/parameters/CoachingPage' }
+        - { $ref: '#/components/parameters/CoachingSize' }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingSharingPermissionPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+    post:
+      tags: [Coaching Data Sharing]
+      operationId: grantOrReplaceCoachingSharingPermission
+      summary: Student grants, denies, or replaces one scoped sharing decision
+      description: >-
+        Only the Student owner may mutate sharing. Relationship and Coaching Period alone grant no data
+        authority. expectedPermissionVersion is omitted for the first effective decision and is required
+        when replacing one. Exact actor-scoped command-key replay returns the recorded result.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingSharingGrantRequest' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingSharingPermission' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingSharingConflict' }
+  /coaching/relationships/{relationshipId}/sharing-permissions/{permissionId}/revoke:
+    parameters:
+      - { $ref: '#/components/parameters/CoachingRelationshipId' }
+      - { $ref: '#/components/parameters/CoachingSharingPermissionId' }
+    post:
+      tags: [Coaching Data Sharing]
+      operationId: revokeCoachingSharingPermission
+      summary: Student revokes an effective sharing decision without deleting its history
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingSharingRevokeRequest' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingSharingPermission' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingSharingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingSharingConflict' }
   /exercises:
     get:
       tags: [Exercise Catalog]
@@ -1596,8 +1647,8 @@ paths:
       summary: Create a goal proposal for an active student fitness goal
       description: >-
         Allows an authorized, eligible Trainer with an active coaching relationship,
-        active human coaching period, and active data-sharing permission to propose
-        modifications to an active fitness goal.
+        active human coaching period, and active FITNESS_GOAL sharing permission at
+        CONTRIBUTE or MANAGE to propose modifications to an active fitness goal.
       parameters:
         - name: goalId
           in: path
@@ -1620,8 +1671,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403':
           description: >-
-            Forbidden - Trainer is not eligible, coaching relationship is required,
-            or data sharing permission is missing.
+            Forbidden codes include TRAINER_NOT_ELIGIBLE, COACHING_RELATIONSHIP_REQUIRED,
+            DATA_SHARING_PERMISSION_REQUIRED, and DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -1694,7 +1745,11 @@ paths:
                 $ref: '#/components/schemas/GoalProposalResponse'
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403':
-          description: Forbidden - Requester is not the proposal student or creator trainer
+          description: >-
+            Forbidden - requester is not the proposal Student or creator Trainer, or the creator
+            Trainer lacks current FITNESS_GOAL VIEW authority. Codes include
+            GOAL_PROPOSAL_ACCESS_DENIED, TRAINER_NOT_ELIGIBLE, COACHING_RELATIONSHIP_REQUIRED,
+            DATA_SHARING_PERMISSION_REQUIRED, and DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -1778,6 +1833,11 @@ components:
       name: size
       in: query
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    CoachingSharingPermissionId:
+      name: permissionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
 
   responses:
     CoachingOutcome:
@@ -1805,6 +1865,28 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/CoachingPeriodPage' }
+    CoachingSharingPermission:
+      description: Persisted sharing decision, including version and revocation evidence
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingSharingPermission' }
+    CoachingSharingPermissionPage:
+      description: Stable valid-from descending page of immutable sharing decisions
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CoachingSharingPermissionPage' }
+    CoachingSharingConcealed:
+      description: Permission or relationship is absent or concealed; codes include DATA_SHARING_PERMISSION_NOT_FOUND and COACHING_RELATIONSHIP_NOT_FOUND.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CoachingSharingConflict:
+      description: >-
+        Stable 409 codes include DATA_SHARING_PERMISSION_CONFLICT,
+        COACHING_RELATIONSHIP_STATE_CONFLICT, and COACHING_IDEMPOTENCY_CONFLICT.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     CoachingConcealed:
       description: >-
         Relationship, resume request, or counterparty is absent or concealed from this actor.
@@ -1916,6 +1998,16 @@ components:
     CoachingMode:
       type: string
       enum: [HUMAN_COACH, SELF_DIRECTED]
+    CoachingDataScope:
+      type: string
+      enum: [FITNESS_GOAL, WORKOUT_PLAN, WORKOUT_HISTORY, WORKOUT_PLAN_HISTORY, BODY_METRICS, PROGRESS_PHOTOS, NUTRITION_LOGS, AI_RECOMMENDATIONS]
+    CoachingSharingDecision:
+      type: string
+      enum: [ALLOW, DENY]
+    CoachingDataAccessLevel:
+      type: string
+      description: Ordered sufficiency is MANAGE > CONTRIBUTE > VIEW; owning-domain rules still apply.
+      enum: [VIEW, CONTRIBUTE, MANAGE]
     CoachingInitiateRequest:
       type: object
       additionalProperties: false
@@ -1938,6 +2030,35 @@ components:
       properties:
         expectedRelationshipVersion: { type: integer, format: int64, minimum: 0 }
         expectedRequestVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    CoachingSharingGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [dataScope, decision, accessLevel, commandKey]
+      dependentRequired:
+        historyUntil: [historyFrom]
+      properties:
+        dataScope: { $ref: '#/components/schemas/CoachingDataScope' }
+        decision: { $ref: '#/components/schemas/CoachingSharingDecision' }
+        accessLevel: { $ref: '#/components/schemas/CoachingDataAccessLevel' }
+        historyFrom: { type: string, format: date-time }
+        historyUntil:
+          type: string
+          format: date-time
+          description: Exclusive upper bound; must be later than historyFrom.
+        validUntil:
+          type: string
+          format: date-time
+          description: Exclusive authority expiry; must be in the future when submitted.
+        expectedPermissionVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    CoachingSharingRevokeRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedPermissionVersion, commandKey]
+      properties:
+        expectedPermissionVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, maxLength: 500 }
         commandKey: { type: string, format: uuid }
     CoachingRelationship:
       type: object
@@ -2022,6 +2143,33 @@ components:
       required: [items, page, size]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/CoachingPeriod' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+    CoachingSharingPermission:
+      type: object
+      required: [id, relationshipId, studentId, trainerId, dataScope, decision, accessLevel, validFrom, grantedBy, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        relationshipId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        dataScope: { $ref: '#/components/schemas/CoachingDataScope' }
+        decision: { $ref: '#/components/schemas/CoachingSharingDecision' }
+        accessLevel: { $ref: '#/components/schemas/CoachingDataAccessLevel' }
+        historyFrom: { type: [string, 'null'], format: date-time }
+        historyUntil: { type: [string, 'null'], format: date-time, description: Exclusive upper bound. }
+        validFrom: { type: string, format: date-time }
+        validUntil: { type: [string, 'null'], format: date-time, description: Exclusive upper bound. }
+        grantedBy: { type: string, format: uuid }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokeReason: { type: [string, 'null'] }
+        version: { type: integer, format: int64, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+    CoachingSharingPermissionPage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingSharingPermission' } }
         page: { type: integer, minimum: 0 }
         size: { type: integer, minimum: 1 }
     RegisterRequest:

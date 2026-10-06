@@ -4,8 +4,13 @@ import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.config.JwtProperties;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
+import com.fitnesscoaching.platform.modules.coaching.domain.SharingDecision;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalTrainerAuthorityPort;
 import com.fitnesscoaching.platform.common.exception.CoachingRelationshipRequiredException;
+import com.fitnesscoaching.platform.common.exception.DataSharingAccessLevelInsufficientException;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.*;
 import com.fitnesscoaching.platform.modules.goal.domain.ObjectivePriority;
 import com.fitnesscoaching.platform.modules.goal.domain.ProposalDecision;
@@ -108,6 +113,9 @@ class FitnessGoalProposalIntegrationTest {
 
     @Autowired
     private GoalTrainerAuthorityPort goalTrainerAuthority;
+
+    @Autowired
+    private CoachingSharingUseCase coachingSharing;
 
     @MockitoSpyBean
     private AuditService auditService;
@@ -248,8 +256,12 @@ class FitnessGoalProposalIntegrationTest {
 
         if (grantPermission) {
             jdbcTemplate.update("""
-                    INSERT INTO fitness.data_sharing_permissions (id, relationship_id, student_id, trainer_id, data_scope, decision, valid_from, granted_by, created_at)
-                    VALUES (gen_random_uuid(), ?, ?, ?, 'FITNESS_GOAL'::fitness.data_scope_code, 'ALLOW'::fitness.permission_decision, now(), ?, now())
+                    INSERT INTO fitness.data_sharing_permissions
+                    (id, relationship_id, student_id, trainer_id, data_scope, decision, access_level,
+                     valid_from, granted_by, created_at)
+                    VALUES (gen_random_uuid(), ?, ?, ?, 'FITNESS_GOAL'::fitness.data_scope_code,
+                            'ALLOW'::fitness.permission_decision, 'CONTRIBUTE'::fitness.data_access_level,
+                            now(), ?, now())
                     """,
                     relId, studentId, trainerId, studentId);
         }
@@ -452,6 +464,23 @@ class FitnessGoalProposalIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
+    }
+
+    @Test
+    @DisplayName("Authority: FITNESS_GOAL VIEW permits proposal read but not proposal creation")
+    void trainerAuthority_viewOnlyGrantCannotPropose() {
+        UUID studentId = createActiveStudentUser("student.view-only@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.view-only@example.com", true, true);
+        UUID relationshipId = createCoachingContext(trainerId, studentId, true, false);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (relationship_id,student_id,trainer_id,data_scope,decision,access_level,valid_from,granted_by)
+                VALUES (?,?,?,'FITNESS_GOAL','ALLOW','VIEW',clock_timestamp(),?)
+                """, relationshipId, studentId, trainerId, studentId);
+
+        goalTrainerAuthority.verifyTrainerCanViewProposal(trainerId, studentId);
+        assertThatThrownBy(() -> goalTrainerAuthority.verifyTrainerCanProposeGoal(trainerId, studentId))
+                .isInstanceOf(DataSharingAccessLevelInsufficientException.class);
     }
 
     @Test
@@ -847,16 +876,20 @@ class FitnessGoalProposalIntegrationTest {
                 .andReturn();
         UUID proposalId = UUID.fromString((String) objectMapper.readValue(res.getResponse().getContentAsString(), Map.class).get("id"));
 
-        // Revoke permission by setting to DENY
-        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET decision = 'DENY'::fitness.permission_decision WHERE trainer_id = ? AND student_id = ?", trainerId, studentId);
+        // Replace the effective decision with an append-only DENY decision.
+        coachingSharing.grantOrReplace(studentId, relationshipId, DataScope.FITNESS_GOAL,
+                SharingDecision.DENY, DataAccessLevel.VIEW, null, null, null,
+                0L, UUID.randomUUID());
 
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", proposalId)
                         .header("Authorization", "Bearer " + trainerToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
 
-        // Re-grant permission but end relationship
-        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET decision = 'ALLOW'::fitness.permission_decision WHERE trainer_id = ? AND student_id = ?", trainerId, studentId);
+        // Re-grant permission through a new decision row, then end the relationship.
+        coachingSharing.grantOrReplace(studentId, relationshipId, DataScope.FITNESS_GOAL,
+                SharingDecision.ALLOW, DataAccessLevel.CONTRIBUTE, null, null, null,
+                1L, UUID.randomUUID());
         coachingLifecycle.relationshipAction(studentId, relationshipId, "END", 0, "finished", UUID.randomUUID());
 
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", proposalId)
@@ -2186,7 +2219,12 @@ class FitnessGoalProposalIntegrationTest {
         );
 
         // 1. Revoked permission
-        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET revoked_at = now() - interval '10 minutes' WHERE relationship_id = ?", relId);
+        UUID permissionId = jdbcTemplate.queryForObject("""
+                SELECT id FROM fitness.data_sharing_permissions
+                WHERE relationship_id=? AND data_scope='FITNESS_GOAL' AND revoked_at IS NULL
+                """, UUID.class, relId);
+        coachingSharing.revoke(studentId, relId, permissionId, 0L,
+                "test revocation", UUID.randomUUID());
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -2196,7 +2234,13 @@ class FitnessGoalProposalIntegrationTest {
                 .andExpect(jsonPath("$.errorCode", is("DATA_SHARING_PERMISSION_REQUIRED")));
 
         // 2. Expired valid_until
-        jdbcTemplate.update("UPDATE fitness.data_sharing_permissions SET revoked_at = NULL, valid_from = now() - interval '2 days', valid_until = now() - interval '1 day' WHERE relationship_id = ?", relId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (relationship_id,student_id,trainer_id,data_scope,decision,access_level,
+                 valid_from,valid_until,granted_by,version)
+                VALUES (?,?,?,'FITNESS_GOAL','ALLOW','CONTRIBUTE',
+                        now()-interval '2 days',now()-interval '1 day',?,1)
+                """, relId, studentId, trainerId, studentId);
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)

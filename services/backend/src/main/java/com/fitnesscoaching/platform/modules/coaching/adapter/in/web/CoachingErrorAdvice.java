@@ -68,6 +68,10 @@ public class CoachingErrorAdvice {
         if ("23P01".equals(error.sqlState()) && "coaching_period_no_overlap".equals(error.constraint())) {
             return "COACHING_PERIOD_CONFLICT";
         }
+        if ("23P01".equals(error.sqlState())
+                && "data_sharing_permission_no_overlap".equals(error.constraint())) {
+            return "DATA_SHARING_PERMISSION_CONFLICT";
+        }
         return null;
     }
 
