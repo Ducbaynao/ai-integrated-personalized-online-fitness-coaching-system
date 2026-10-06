@@ -89,6 +89,10 @@ export function canAccessFitnessGoals(user: CurrentUserResponse | null): boolean
   return Boolean(user?.capabilities?.hasStudentProfile);
 }
 
+export function canAccessCoaching(user: CurrentUserResponse | null): boolean {
+  return Boolean(user?.capabilities?.hasStudentProfile || user?.capabilities?.hasTrainerProfile);
+}
+
 /**
  * Deep link guard: check if user can access trainer profile screen.
  */

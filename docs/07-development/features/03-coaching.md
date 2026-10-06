@@ -3,12 +3,12 @@
 ## 1. Checkpoint and objective
 
 - **Feature ID:** `B03`.
-- **Current implementation checkpoint:** `B03-MOBILE-READ-CONTRACTS`.
-- **Checkpoint branch:** `feature/m2e-coaching-mobile-read-contracts`.
-- **Scope of this checkpoint:** backend/OpenAPI read contracts needed by Mobile; Mobile implementation and schema changes remain out of scope.
+- **Current implementation checkpoint:** `B03-MOBILE-RELATIONSHIP-FLOWS`.
+- **Checkpoint branch:** `feature/m2f-mobile-coaching-flows`.
+- **Scope of this checkpoint:** Student/Trainer Mobile relationship lifecycle and sharing presentation/edit flows over the merged backend/OpenAPI contract; backend and schema changes remain out of scope.
 - **CONFIRMED REQUIREMENT:** Establish the relationship, effective-period, sharing, and authorization rules for Student-Trainer coaching without deleting or rewriting fitness history.
 
-This record distinguishes confirmed product requirements, executable evidence, and later decisions. The original prerequisite decision gate was merged by PR #40 at `795a84f00a514451d7e37197091c037beb2bfbb3` (decision parent `78d6de6d5053c1cd4038ce19d2483adc7004ebbe`). Relationship lifecycle is implemented through V24-V26 and sharing authority through V27. The current read-contract checkpoint adds privacy-minimal Trainer discovery, exact Student lookup, actor-scoped relationship history, participant summaries, and an authoritative sharing presentation without changing lifecycle or authority rules. Mobile statements remain requirements for a later checkpoint, not implementation claims.
+This record distinguishes confirmed product requirements, executable evidence, and later decisions. The original prerequisite decision gate was merged by PR #40 at `795a84f00a514451d7e37197091c037beb2bfbb3` (decision parent `78d6de6d5053c1cd4038ce19d2483adc7004ebbe`). Relationship lifecycle is implemented through V24-V26 and sharing authority through V27. The merged read contracts provide privacy-minimal Trainer discovery, exact Student lookup, actor-scoped relationship history, participant summaries, and an authoritative sharing presentation. The current Mobile checkpoint consumes those contracts without changing lifecycle or authority rules.
 
 ### B03-RELATIONSHIP-LIFECYCLE implementation boundary
 
@@ -75,7 +75,7 @@ The following requirements are confirmed:
 | Current coaching authority | `CoachingAuthorityQuery` evaluates canonical eligibility, relationship, period, scope, decision, validity and level; Goal delegates through this port | Coaching owns the policy and persistence. Consumer modules do not read Coaching repositories. |
 | Audit and errors | The backend exposes structured errors with stable `errorCode`, request ID, timestamp and field errors; immutable audit services and B02 lifecycle/version conflict conventions exist | B03 reuses these shapes and audit conventions. Raw exception text does not become Mobile copy. |
 | OpenAPI | Lifecycle, Student-owned sharing commands/history, privacy-minimal discovery/lookup, actor-scoped relationship collection, participant summary, and sharing-summary paths and schemas exist | Stable validation, concealment, capability and concurrency errors use the common envelope. |
-| Mobile | ST-17, TR-01, TR-03, and TR-12 are documented; no B03 routes or screens are implemented | Mobile work belongs to a later checkpoint and must reuse B01 session, capability, query-cache, error, and forced-logout behavior. |
+| Mobile | ST-17, TR-01, TR-03, and TR-12 relationship/lifecycle/sharing routes are implemented in this checkpoint | Mobile reuses B01 session, capability, query-cache, error, and forced-logout behavior; B04-B08 workspace content remains separate. |
 
 ## 4. Decision table
 
@@ -361,10 +361,10 @@ Do not combine all of B03 into one unreviewable change. Do not modify old migrat
 | 1 | `B03-RELATIONSHIP-LIFECYCLE` | `feature/m2b-coaching-relationship-lifecycle` | Relationship request/invitation and accept/reject/cancel/pause/resume/end, lifecycle persistence, audit, stable errors, and concurrency tests. |
 | 2 | `B03-COACHING-PERIOD-SHARING` | `feature/m2c-coaching-period-sharing` | Complete sharing/access-level schema, scoped grants, historical-window authority ports, OpenAPI, and authorization/history tests; reconcile the minimum lifecycle period switching delivered in V24. |
 | 3 | `B03-MOBILE-READ-CONTRACTS` | `feature/m2e-coaching-mobile-read-contracts` | Privacy-safe discovery/lookup, relationship/history collection, participant display summary, and authoritative sharing summary. |
-| 4 | `B03-MOBILE-RELATIONSHIP-FLOWS` | To be selected after this checkpoint | ST-17, TR-01/TR-03/TR-12 integration, Vietnamese states, confirmations, cache invalidation, accessibility, and client contract tests. |
+| 4 | `B03-MOBILE-RELATIONSHIP-FLOWS` | `feature/m2f-mobile-coaching-flows` | ST-17, TR-01/TR-03/TR-12 integration, Vietnamese states, confirmations, cache invalidation, accessibility, and client contract tests. |
 | 5 | B03 integration/history reconciliation | To be selected after Mobile implementation | Cross-module contract checks, end-to-end transition/history/security matrix, documentation reconciliation, and B03 closure evidence. |
 
-After this checkpoint is independently reviewed, tested by Antigravity, and merged by the user, the next planned checkpoint is **`B03-MOBILE-RELATIONSHIP-FLOWS`**. No later branch is created here.
+After this checkpoint is independently reviewed, tested by Antigravity, and merged by the user, the next planned checkpoint is **B03 integration/history reconciliation**. No later branch is created here.
 
 ## 21. Definition of Done for this read-contract checkpoint
 

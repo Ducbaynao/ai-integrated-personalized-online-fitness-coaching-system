@@ -140,6 +140,23 @@ export function TrainerHomeScreen() {
         </Pressable>
       </View>
 
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+        ]}>
+        <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Quan hệ huấn luyện</Text>
+        <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>Xử lý lời mời, yêu cầu và quản lý học viên theo trạng thái từ hệ thống.</Text>
+        <Pressable
+          testID="trainer-view-coaching-button"
+          accessibilityRole="button"
+          accessibilityLabel="Quản lý quan hệ huấn luyện"
+          onPress={() => router.push('/coaching' as any)}
+          style={[styles.secondaryButton, { borderColor: themeColors.primary }]}>
+          <Text style={[styles.secondaryButtonText, { color: themeColors.primary }]}>Mở quan hệ huấn luyện</Text>
+        </Pressable>
+      </View>
+
       {/* Cross-activation Card (Trainer -> Student) */}
       {canCrossActivateStudent && (
         <View

@@ -25,6 +25,16 @@ Exercise catalog dùng route authenticated chung cho Student và Trainer:
 - `/(app)/exercises`: màn hình duyệt, tìm kiếm và lọc Exercise Library (`ExerciseCatalogScreen` - ST-21). Trong khi Plan stack chưa được triển khai, route được mở từ một entry nhỏ trên landing screen của từng capability và không tạo thêm bottom tab.
 - `/(app)/exercises/[exerciseId]`: màn hình chi tiết Exercise (`ExerciseDetailScreen` - ST-22), mở từ row ST-21 bằng Exercise UUID. Route dùng chung cho Student và Trainer, xử lý tham số không hợp lệ trước khi gửi request và không tạo thêm bottom tab.
 
+Coaching relationship dùng stack authenticated chung, với nội dung và mutation được giới hạn theo active capability và authority từ backend:
+
+- `/(app)/coaching`: danh sách quan hệ của actor, gồm pending, active, paused và historical states; mở từ landing screen Student hoặc Trainer trong checkpoint hiện tại.
+- `/(app)/coaching/trainers`: Student-only Trainer directory và flow gửi yêu cầu.
+- `/(app)/coaching/invite`: Trainer-only exact-email Student lookup và flow gửi lời mời; yêu cầu capability `canCoach` hiện có, còn backend vẫn revalidate khi submit.
+- `/(app)/coaching/[relationshipId]`: trạng thái quan hệ, kỳ hiện tại được phép xem, accept/reject/cancel/pause/resume/end.
+- `/(app)/coaching/[relationshipId]/sharing`: authoritative sharing summary; Student owner chỉnh quyền khi relationship active/paused, Trainer chỉ đọc trạng thái backend trả về.
+
+Các route B03 không suy authority từ role. Backend vẫn revalidate mọi command; invalid/stale identifiers hoặc relationship đã bị conceal được hiển thị như trạng thái không còn quyền xem.
+
 Chat, notification và AI Assistance mở theo icon hoặc từ context; không biến AI thành tab/coaching mode riêng.
 
 ## Trainer Mobile
