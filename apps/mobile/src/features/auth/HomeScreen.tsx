@@ -164,6 +164,15 @@ export function HomeScreen() {
               </Pressable>
 
               <Pressable
+                testID="view-workout-plans-button"
+                accessibilityRole="button"
+                accessibilityLabel="Mở kế hoạch tập luyện"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/workout-plans' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Kế hoạch tập luyện →</Text>
+              </Pressable>
+
+              <Pressable
                 testID="view-coaching-button"
                 accessibilityRole="button"
                 accessibilityLabel="Quản lý quan hệ huấn luyện"

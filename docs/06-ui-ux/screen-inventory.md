@@ -19,8 +19,8 @@
 | ST-02 | Current Goal | Target, timeline, active training time, progress |
 | ST-03 | Goal Proposal Detail | Current vs proposed, reason, accept/reject |
 | ST-04 | Goal History | Version, transition, previous goals |
-| ST-05 | Plan and Calendar | Planned workout, appointment, schedule adherence |
-| ST-06 | Workout Plan Detail | Version, exercise, ownership, assigned by |
+| ST-05 | Plan and Calendar | Route `/(app)/workout-plans`; authoritative current plan, draft/paused/history collection entry; Planned Workout calendar remains B06 |
+| ST-06 | Workout Plan Detail | Routes `/(app)/workout-plans/[planId]`, `/history`, `/edit`; owner/read context, sessions/prescriptions, immutable versions, SELF_DIRECTED authoring and explicit Trainer-delivered successor |
 | ST-07 | Workout Execution | Set, rep, weight, RPE, notes, performed date |
 | ST-08 | Workout Result | Actual vs planned, completion, reschedule context |
 | ST-09 | Progress Dashboard | Current Goal/Lifetime, trend, continuity |
