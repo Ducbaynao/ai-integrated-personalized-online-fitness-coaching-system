@@ -46,9 +46,9 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 |---|---|---|
 | TR-01 | Trainer Overview | Sessions, review due, attention queue; B03 pending relationships are available from `/(app)/coaching` |
 | TR-02 | Student List | Needs attention, on track, inactive, review due |
-| TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; later modules add program, workout, progress, nutrition, schedule, messages, and AI |
+| TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; B04 Program context at `/(app)/coaching/[relationshipId]/program` lists only backend-visible current/history plans and removes Student plan cache on authority loss |
 | TR-04 | Attention Signal Detail | Evidence, severity, acknowledge/resolve |
-| TR-05 | Plan Builder | Workout plan and significant/minor change |
+| TR-05 | Plan Builder | Trainer create/edit DRAFT at relationship/Student-scoped routes; detail/version history and significant complete-snapshot publication under `/(app)/students/[studentId]/workout-plans/[planId]`; occurrence-scoped minor change remains B05 |
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |
 | TR-07 | Nutrition Proposal Builder | Strategic target proposal |
 | TR-08 | Coaching Review | Review data, request data, feedback, plan action |

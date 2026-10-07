@@ -18,10 +18,14 @@ export function normalizeWorkoutPlanId(value: unknown): string | null {
 const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
 
 export const workoutPlanApi = {
-  list(page = 0, size = WORKOUT_PLAN_PAGE_SIZE) {
-    return request<WorkoutPage<WorkoutPlanSummary>>(`/workout-plans?${pageQuery(page, size)}`, { method: 'GET' });
+  list(page = 0, size = WORKOUT_PLAN_PAGE_SIZE, studentId?: string) {
+    const studentQuery = studentId ? `studentId=${encodeURIComponent(studentId)}&` : '';
+    return request<WorkoutPage<WorkoutPlanSummary>>(`/workout-plans?${studentQuery}${pageQuery(page, size)}`, { method: 'GET' });
   },
-  current() { return request<WorkoutPlanDetail>('/workout-plans/current', { method: 'GET' }); },
+  current(studentId?: string) {
+    const query = studentId ? `?studentId=${encodeURIComponent(studentId)}` : '';
+    return request<WorkoutPlanDetail>(`/workout-plans/current${query}`, { method: 'GET' });
+  },
   detail(planId: string) { return request<WorkoutPlanDetail>(`/workout-plans/${planId}`, { method: 'GET' }); },
   versions(planId: string, page = 0, size = WORKOUT_PLAN_PAGE_SIZE) {
     return request<WorkoutPage<WorkoutPlanVersionSummary>>(`/workout-plans/${planId}/versions?${pageQuery(page, size)}`, { method: 'GET' });

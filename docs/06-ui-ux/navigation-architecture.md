@@ -32,6 +32,10 @@ Coaching relationship dùng stack authenticated chung, với nội dung và muta
 - `/(app)/coaching/invite`: Trainer-only exact-email Student lookup và flow gửi lời mời; yêu cầu capability `canCoach` hiện có, còn backend vẫn revalidate khi submit.
 - `/(app)/coaching/[relationshipId]`: trạng thái quan hệ, kỳ hiện tại được phép xem, accept/reject/cancel/pause/resume/end.
 - `/(app)/coaching/[relationshipId]/sharing`: authoritative sharing summary; Student owner chỉnh quyền khi relationship active/paused, Trainer chỉ đọc trạng thái backend trả về.
+- `/(app)/coaching/[relationshipId]/program`: Trainer-only TR-03 Program context. Route tải Workout Plan khi relationship đang ACTIVE và backend summary cho phép VIEW; PAUSED/ended/authority-loss không preload dữ liệu riêng tư.
+- `/(app)/coaching/[relationshipId]/workout-plans/new`: Trainer tạo complete DRAFT snapshot cho Student trong relationship hiện tại khi backend cho phép MANAGE.
+- `/(app)/students/[studentId]/workout-plans/[planId]`: plan summary, immutable version history, archived/unavailable Exercise presentation và lifecycle commands. `studentId` là cache scope; backend vẫn xác minh plan ownership/visibility.
+- `/(app)/students/[studentId]/workout-plans/[planId]/builder`: edit DRAFT hoặc publish significant replacement version. Route không hỗ trợ occurrence-scoped minor adjustments.
 
 Các route B03 không suy authority từ role. Backend vẫn revalidate mọi command; invalid/stale identifiers hoặc relationship đã bị conceal được hiển thị như trạng thái không còn quyền xem.
 
@@ -56,6 +60,8 @@ Bottom navigation:
 3. `Schedule`: appointment, conflict và reschedule request.
 4. `Messages`: conversation theo coaching relationship.
 5. `Profile`: availability, verification, capacity và role switcher.
+
+Workout Plan routes của Trainer luôn đi từ Student Coaching Workspace. `VIEW` và `WORKOUT_PLAN_HISTORY VIEW` chỉ mở nội dung tương ứng; chỉ `WORKOUT_PLAN MANAGE` mới hiển thị authoring entry, và backend recheck authority, optimistic version cùng command key khi submit. Cache key chứa `studentId`; END/403/404 concealment xóa toàn bộ Workout Plan cache của Student trước khi trở về route an toàn.
 
 ## Admin Web
 

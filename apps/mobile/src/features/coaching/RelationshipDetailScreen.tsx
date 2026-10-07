@@ -11,6 +11,7 @@ import { coachingQueryKeys, useRelationshipDetail, useRelationshipHistory } from
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from './components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
+import { removeStudentWorkoutPlanCache } from '@/features/workout-plan/workoutPlanCache';
 
 type PendingAction = { kind: 'relationship'; action: RelationshipAction } | { kind: 'resume'; action: ResumeAction } | { kind: 'request-resume' };
 const labels: Record<RelationshipAction | ResumeAction | 'request-resume', string> = {
@@ -18,7 +19,7 @@ const labels: Record<RelationshipAction | ResumeAction | 'request-resume', strin
 };
 
 export function RelationshipDetailScreen({ relationshipId }: { relationshipId: string }) {
-  const { user } = useAuth();
+  const { user, activeCapability } = useAuth();
   const query = useRelationshipDetail(relationshipId);
   const historyQuery = useRelationshipHistory(relationshipId);
   const queryClient = useQueryClient();
@@ -43,6 +44,10 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       setPendingAction(null); setReason(''); commandKey.current = null;
       queryClient.setQueryData(coachingQueryKeys.detail(relationshipId), result);
       await queryClient.invalidateQueries({ queryKey: coachingQueryKeys.relationships() });
+      const updatedRelationship = result.relationship;
+      if (updatedRelationship && updatedRelationship.trainerId === user?.id && updatedRelationship.status !== 'ACTIVE') {
+        removeStudentWorkoutPlanCache(queryClient, updatedRelationship.studentId);
+      }
       if (action.kind === 'relationship' && action.action === 'end' && result.relationship?.trainerId === user?.id) {
         queryClient.removeQueries({ queryKey: coachingQueryKeys.detail(relationshipId) });
         queryClient.removeQueries({ queryKey: coachingQueryKeys.history(relationshipId) });
@@ -83,6 +88,7 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       {actionPolicy?.canRequestResume ? <CoachingButton label={labels['request-resume']} onPress={() => openAction({ kind: 'request-resume' })} /> : null}
     </View>
     <CoachingButton testID="open-sharing-button" label="Xem quyền chia sẻ dữ liệu" secondary onPress={() => router.push(`/coaching/${relationship.id}/sharing` as never)} />
+    {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? <CoachingButton testID="open-program-button" label="Mở chương trình tập luyện" secondary onPress={() => router.push(`/coaching/${relationship.id}/program` as never)} /> : null}
     <CoachingCard testID="relationship-history">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử quan hệ</Text>
       {historyQuery.isPending ? <CoachingState busy title="Đang tải lịch sử" message="Vui lòng chờ trong giây lát." /> : null}
