@@ -7,6 +7,8 @@ import com.fitnesscoaching.platform.modules.coaching.application.port.in.Current
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.ActivateCommand;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CreateStudentSuccessorCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CreateDraftCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.UpdateDraftCommand;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort.OpenVersion;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort.Receipt;
@@ -63,6 +65,40 @@ class WorkoutPlanCommandServiceTest {
         verify(store).activate(planId, versionId, student, 0, at);
         verify(store).saveReceipt(any(Receipt.class));
         verify(audit).recordAudit(any());
+    }
+
+    @Test void createsStudentOwnedDraftInSelfDirectedContext() {
+        UUID createdPlan = UUID.randomUUID(); UUID createdVersion = UUID.randomUUID();
+        Instant at = Instant.parse("2026-10-07T10:00:00Z");
+        when(store.lockReceipt(student, "create-key")).thenReturn(Optional.empty());
+        when(contexts.findEffectiveContext(student, true)).thenReturn(Optional.of(selfContext()));
+        when(exercises.lockAuthoringReferences(List.of())).thenReturn(List.of());
+        when(store.databaseNow()).thenReturn(at);
+        when(store.createDraft(student, periodId, student, DecisionOwnerType.STUDENT,
+                "Kế hoạch", null, at, List.of())).thenReturn(new Successor(createdPlan, createdVersion));
+
+        var result = service.createDraft(new CreateDraftCommand(
+                student, student, " Kế hoạch ", null, List.of(), "create-key"));
+
+        assertThat(result.planId()).isEqualTo(createdPlan);
+        assertThat(result.planVersionNumber()).isOne();
+        verify(store).createDraft(student, periodId, student, DecisionOwnerType.STUDENT,
+                "Kế hoạch", null, at, List.of());
+    }
+
+    @Test void staleDraftUpdateFailsBeforeReplacingPublishedSnapshot() {
+        when(store.findPlanStudent(planId)).thenReturn(student);
+        when(store.lockReceipt(student, "update-key")).thenReturn(Optional.empty());
+        when(contexts.findEffectiveContext(student, true)).thenReturn(Optional.of(selfContext()));
+        when(store.lockPlan(planId)).thenReturn(new WorkoutPlan(planId, student, WorkoutPlanStatus.DRAFT, 3,
+                DecisionOwnerType.STUDENT, student, periodId, null, null));
+
+        assertThatThrownBy(() -> service.updateDraft(new UpdateDraftCommand(
+                planId, student, 2, "Kế hoạch", null, List.of(), "update-key")))
+                .isInstanceOf(WorkoutPlanFailure.class)
+                .extracting(ex -> ((WorkoutPlanFailure) ex).error())
+                .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_VERSION_CONFLICT);
+        verify(store, never()).updateDraft(any(), any(), any(), anyLong(), any(), any(), any(), any());
     }
 
     @Test void studentCannotStrategicallyMutateTrainerAuthoredAggregate() {

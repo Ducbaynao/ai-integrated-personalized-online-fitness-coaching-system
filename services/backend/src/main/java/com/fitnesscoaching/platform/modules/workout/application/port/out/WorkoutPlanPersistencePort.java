@@ -17,9 +17,15 @@ public interface WorkoutPlanPersistencePort {
     Optional<Receipt> lockReceipt(UUID actorId, String commandKey);
     WorkoutPlan lockPlan(UUID planId);
     OpenVersion lockOpenVersion(UUID planId);
+    Integer findVersionNumber(UUID planId, UUID versionId);
     List<UUID> exerciseVariationIds(UUID versionId);
     Instant databaseNow();
     boolean hasAnotherActivePlan(UUID studentId, UUID excludingPlanId);
+    Successor createDraft(UUID studentId, UUID coachingPeriodId, UUID actorId,
+                          com.fitnesscoaching.platform.modules.workout.domain.DecisionOwnerType ownerType,
+                          String name, String description, Instant at, List<WorkoutSessionTemplate> sessions);
+    void updateDraft(UUID planId, UUID versionId, UUID actorId, long expectedVersion,
+                     String name, String description, Instant at, List<WorkoutSessionTemplate> sessions);
     void activate(UUID planId, UUID versionId, UUID actorId, long expectedVersion, Instant at);
     void transition(UUID planId, UUID actorId, long expectedVersion, WorkoutPlanStatus from,
                     WorkoutPlanStatus to, String reason, Instant at);

@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.common.exception.DataSharingAccessLevelInsufficientException;
 import com.fitnesscoaching.platform.common.exception.DataSharingPermissionRequiredException;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanQueryUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.*;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
@@ -61,12 +62,35 @@ class WorkoutPlanPersistenceIntegrationTest {
     }
 
     @Autowired WorkoutPlanCommandUseCase commands;
+    @Autowired WorkoutPlanQueryUseCase queries;
     @Autowired JdbcTemplate jdbc;
     @MockitoSpyBean AuditService audit;
     @MockitoSpyBean WorkoutPlanPersistencePort store;
     @Autowired ExerciseReferenceQuery exerciseReferences;
 
     @BeforeEach void resetSpies() { reset(audit, store); }
+
+    @Test
+    void draftAuthoringPersistsReplacementSnapshotAndReadProjection() {
+        Fixture f = fixture();
+        CommandResult created = commands.createDraft(new CreateDraftCommand(f.studentId(), f.studentId(),
+                "Kế hoạch API", "Bản nháp", blueprint(f.variationId()), "create-draft-api"));
+
+        var initial = queries.version(f.studentId(), created.planId(), created.planVersionId());
+        assertThat(initial.sessions()).hasSize(1);
+        assertThat(initial.sessions().getFirst().prescriptions()).hasSize(1);
+        assertThat(initial.sessions().getFirst().prescriptions().getFirst().exercise().state())
+                .isEqualTo("ACTIVE");
+
+        CommandResult updated = commands.updateDraft(new UpdateDraftCommand(created.planId(), f.studentId(), 0,
+                "Kế hoạch API đã sửa", null, List.of(), "update-draft-api"));
+        var detail = queries.detail(f.studentId(), created.planId());
+        var replacement = queries.version(f.studentId(), created.planId(), created.planVersionId());
+
+        assertThat(updated.aggregateVersion()).isOne();
+        assertThat(detail.plan().name()).isEqualTo("Kế hoạch API đã sửa");
+        assertThat(replacement.sessions()).isEmpty();
+    }
 
     @Test
     void activationIsIdempotentAndPublicationUsesOneBoundaryWithoutRemappingOccurrence() {

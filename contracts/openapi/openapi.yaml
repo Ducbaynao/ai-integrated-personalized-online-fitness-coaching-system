@@ -34,6 +34,8 @@ tags:
     description: Authenticated Student and Trainer read access to the active Exercise catalog.
   - name: Admin Exercise Catalog
     description: Permission-protected Exercise draft, lifecycle, and canonical replacement management.
+  - name: Workout Plan
+    description: Actor-scoped Workout Plan authoring, lifecycle, immutable versions, and occurrence adjustments.
 
 paths:
   /coaching/trainers:
@@ -1891,6 +1893,211 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /workout-plans:
+    get:
+      tags: [Workout Plan]
+      operationId: listVisibleWorkoutPlans
+      summary: List actor-visible Workout Plans
+      description: >-
+        A Student lists their own plans. A Trainer must retain current WORKOUT_PLAN VIEW authority;
+        historical items additionally require WORKOUT_PLAN_HISTORY VIEW. Former Trainers and unrelated
+        actors receive no recoverable plan history.
+      parameters:
+        - name: studentId
+          in: query
+          schema: { type: string, format: uuid }
+          description: Defaults to the authenticated actor; Trainers use it to select the current Student.
+        - { $ref: '#/components/parameters/WorkoutPlanPage' }
+        - { $ref: '#/components/parameters/WorkoutPlanSize' }
+      responses:
+        '200':
+          description: Stable created-at descending page of visible plans
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanPage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    post:
+      tags: [Workout Plan]
+      operationId: createWorkoutPlanDraft
+      summary: Create a Workout Plan draft
+      description: SELF_DIRECTED Students create Student-owned drafts; the current HUMAN_COACH Trainer requires WORKOUT_PLAN MANAGE.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateWorkoutPlanDraftRequest' } } }
+      responses:
+        '201':
+          description: Draft created
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /workout-plans/current:
+    get:
+      tags: [Workout Plan]
+      operationId: getCurrentWorkoutPlan
+      summary: Get the Student's ACTIVE Workout Plan
+      parameters:
+        - name: studentId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Current ACTIVE plan, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+  /workout-plans/{planId}:
+    get:
+      tags: [Workout Plan]
+      operationId: getWorkoutPlan
+      summary: Get an actor-visible Workout Plan
+      parameters: [{ $ref: '#/components/parameters/WorkoutPlanId' }]
+      responses:
+        '200': { description: Plan detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+  /workout-plans/{planId}/draft:
+    put:
+      tags: [Workout Plan]
+      operationId: updateWorkoutPlanDraft
+      summary: Replace the editable DRAFT snapshot
+      parameters: [{ $ref: '#/components/parameters/WorkoutPlanId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateWorkoutPlanDraftRequest' } } }
+      responses:
+        '200': { description: Draft replaced, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /workout-plans/{planId}/activate:
+    post:
+      tags: [Workout Plan]
+      operationId: activateWorkoutPlan
+      summary: Activate the initial locked version using the DB timestamp
+      parameters: [{ $ref: '#/components/parameters/WorkoutPlanId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanVersionedCommandRequest' } } }
+      responses:
+        '200': { description: Plan activated, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /workout-plans/{planId}/transitions:
+    post:
+      tags: [Workout Plan]
+      operationId: transitionWorkoutPlan
+      summary: Apply one approved lifecycle transition
+      description: Invalid edges and every transition out of ARCHIVED return WORKOUT_PLAN_LIFECYCLE_CONFLICT.
+      parameters: [{ $ref: '#/components/parameters/WorkoutPlanId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransitionWorkoutPlanRequest' } } }
+      responses:
+        '200': { description: Lifecycle transitioned, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /workout-plans/{planId}/versions:
+    get:
+      tags: [Workout Plan]
+      operationId: listWorkoutPlanVersions
+      summary: List visible immutable version history
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutPlanId' }
+        - { $ref: '#/components/parameters/WorkoutPlanPage' }
+        - { $ref: '#/components/parameters/WorkoutPlanSize' }
+      responses:
+        '200': { description: Version-number descending page, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanVersionPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+    post:
+      tags: [Workout Plan]
+      operationId: publishWorkoutPlanVersion
+      summary: Atomically publish a significant complete replacement version
+      description: >-
+        Uses one authoritative DB boundary to close the previous version and open the immutable successor.
+        Already-materialized Planned Workouts are never rewritten. No client effective timestamp is accepted.
+      parameters: [{ $ref: '#/components/parameters/WorkoutPlanId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PublishWorkoutPlanVersionRequest' } } }
+      responses:
+        '201':
+          description: Version published
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /workout-plans/{planId}/versions/{versionId}:
+    get:
+      tags: [Workout Plan]
+      operationId: getWorkoutPlanVersion
+      summary: Get one visible version with sessions and prescriptions
+      description: Archived Exercise references retain historical presentation and canonical replacement metadata when available.
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutPlanId' }
+        - { $ref: '#/components/parameters/WorkoutPlanVersionId' }
+      responses:
+        '200': { description: Version detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanVersionDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+  /workout-plans/successors:
+    post:
+      tags: [Workout Plan]
+      operationId: createStudentWorkoutPlanSuccessor
+      summary: Create a Student-owned SELF_DIRECTED successor from a Trainer-delivered locked version
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateWorkoutPlanSuccessorRequest' } } }
+      responses:
+        '201':
+          description: Successor draft created with explicit lineage
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutPlanCommandResponse' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+  /planned-workouts/{occurrenceId}/adjustments:
+    post:
+      tags: [Workout Plan]
+      operationId: recordPlannedWorkoutOccurrenceAdjustment
+      summary: Append one occurrence-scoped adjustment
+      description: This endpoint never changes the plan template or any other occurrence.
+      parameters: [{ $ref: '#/components/parameters/PlannedWorkoutOccurrenceId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutOccurrenceAdjustmentRequest' } } }
+      responses:
+        '200':
+          description: Idempotent replay of the recorded occurrence adjustment; adjustmentId is null
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutOccurrenceAdjustmentResponse' } } }
+        '201':
+          description: Adjustment appended
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutOccurrenceAdjustmentResponse' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutPlanForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1899,6 +2106,29 @@ components:
       bearerFormat: JWT
 
   parameters:
+    WorkoutPlanId:
+      name: planId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutPlanVersionId:
+      name: versionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PlannedWorkoutOccurrenceId:
+      name: occurrenceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutPlanPage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    WorkoutPlanSize:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
     CoachingRelationshipId:
       name: relationshipId
       in: path
@@ -1919,6 +2149,24 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    WorkoutPlanConcealed:
+      description: >-
+        Plan, version, or occurrence is absent or concealed. Codes include WORKOUT_PLAN_NOT_FOUND,
+        WORKOUT_PLAN_VERSION_NOT_FOUND, and PLANNED_WORKOUT_NOT_FOUND.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutPlanForbidden:
+      description: >-
+        Current ownership or Coaching authority is insufficient. Codes include WORKOUT_PLAN_ACCESS_DENIED
+        and COACHING_PERIOD_REQUIRED. Trainer mutations require WORKOUT_PLAN MANAGE; current reads require VIEW.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutPlanConflict:
+      description: >-
+        Stable codes include WORKOUT_PLAN_LIFECYCLE_CONFLICT, ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS,
+        WORKOUT_PLAN_VERSION_CONFLICT, PLANNED_WORKOUT_VERSION_CONFLICT, WORKOUT_PLAN_IDEMPOTENCY_CONFLICT,
+        WORKOUT_PLAN_IMMUTABLE, WORKOUT_PLAN_SUCCESSOR_REQUIRED, WORKOUT_PLAN_EXERCISE_UNAVAILABLE,
+        and WORKOUT_PLAN_EFFECTIVE_TIME_CONFLICT. A replay with the same actor, commandKey, command type,
+        and logical payload returns the original domain effect; reuse with another payload conflicts.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     CoachingOutcome:
       description: Current lifecycle outcome; null fields mean no current relationship, resume request, or period
       content:
@@ -2070,6 +2318,264 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    WorkoutPlanStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED]
+    WorkoutPlanDecisionOwnerType:
+      type: string
+      enum: [STUDENT, TRAINER]
+    WorkoutPlanReadContext:
+      type: string
+      enum: [CURRENT, HISTORICAL]
+    WorkoutPlanExercisePresentationState:
+      type: string
+      enum: [ACTIVE, ARCHIVED, UNAVAILABLE]
+    WorkoutPlanPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanSummary' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    WorkoutPlanVersionPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanVersionSummary' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    WorkoutPlanSummary:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, name, source, status, aggregateVersion, decisionOwnerType,
+        decisionOwnerId, createdAt, updatedAt, readContext]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        fitnessGoalId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        source: { type: string }
+        status: { $ref: '#/components/schemas/WorkoutPlanStatus' }
+        aggregateVersion: { type: integer, format: int64, minimum: 0 }
+        decisionOwnerType: { $ref: '#/components/schemas/WorkoutPlanDecisionOwnerType' }
+        decisionOwnerId: { type: string, format: uuid }
+        basedOnPlanId: { type: [string, 'null'], format: uuid }
+        basedOnPlanVersionId: { type: [string, 'null'], format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        currentVersionId: { type: [string, 'null'], format: uuid }
+        currentVersionNumber: { type: [integer, 'null'], minimum: 1 }
+        currentVersionEffectiveFrom: { type: [string, 'null'], format: date-time }
+        currentVersionLockedAt: { type: [string, 'null'], format: date-time }
+        readContext: { $ref: '#/components/schemas/WorkoutPlanReadContext' }
+    WorkoutPlanDetail:
+      type: object
+      additionalProperties: false
+      required: [plan]
+      properties:
+        plan: { $ref: '#/components/schemas/WorkoutPlanSummary' }
+        currentVersion:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutPlanVersionSummary' }
+            - { type: 'null' }
+    WorkoutPlanVersionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, planId, versionNumber, effectiveFrom, changeLevel,
+        createdBy, createdAt, current, readContext]
+      properties:
+        id: { type: string, format: uuid }
+        planId: { type: string, format: uuid }
+        versionNumber: { type: integer, minimum: 1 }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveUntil: { type: [string, 'null'], format: date-time }
+        changeLevel: { type: string, enum: [INITIAL, MAJOR, AI_ACCEPTED] }
+        changeReason: { type: [string, 'null'] }
+        changeSummary: { type: [string, 'null'] }
+        createdBy: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        lockedAt: { type: [string, 'null'], format: date-time }
+        current: { type: boolean }
+        readContext: { $ref: '#/components/schemas/WorkoutPlanReadContext' }
+    WorkoutPlanVersionDetail:
+      type: object
+      additionalProperties: false
+      required: [version, sessions]
+      properties:
+        version: { $ref: '#/components/schemas/WorkoutPlanVersionSummary' }
+        sessions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanSession' } }
+    WorkoutPlanSession:
+      type: object
+      additionalProperties: false
+      required: [id, weekNumber, dayNumber, sequenceNumber, name, prescriptions]
+      properties:
+        id: { type: string, format: uuid }
+        weekNumber: { type: integer, minimum: 1 }
+        dayNumber: { type: integer, minimum: 1 }
+        sequenceNumber: { type: integer, minimum: 1 }
+        name: { type: string }
+        focus: { type: [string, 'null'] }
+        estimatedDurationMinutes: { type: [integer, 'null'], minimum: 1 }
+        notes: { type: [string, 'null'] }
+        prescriptions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanPrescription' } }
+    WorkoutPlanPrescription:
+      type: object
+      additionalProperties: false
+      required: [id, exerciseVariationId, sequenceNumber, exercise]
+      properties:
+        id: { type: string, format: uuid }
+        exerciseVariationId: { type: string, format: uuid }
+        sequenceNumber: { type: integer, minimum: 1 }
+        targetSets: { type: [integer, 'null'], minimum: 1 }
+        targetRepsMin: { type: [integer, 'null'], minimum: 0 }
+        targetRepsMax: { type: [integer, 'null'], minimum: 0 }
+        targetLoad: { type: [number, 'null'], minimum: 0 }
+        restSeconds: { type: [integer, 'null'], minimum: 0 }
+        durationSeconds: { type: [integer, 'null'], minimum: 0 }
+        instructions: { type: [string, 'null'] }
+        exercise: { $ref: '#/components/schemas/WorkoutPlanExercisePresentation' }
+    WorkoutPlanExercisePresentation:
+      type: object
+      additionalProperties: false
+      required: [variationId, state]
+      properties:
+        variationId: { type: string, format: uuid }
+        exerciseId: { type: [string, 'null'], format: uuid }
+        exerciseName: { type: [string, 'null'] }
+        variationName: { type: [string, 'null'] }
+        state: { $ref: '#/components/schemas/WorkoutPlanExercisePresentationState' }
+        canonicalExerciseId: { type: [string, 'null'], format: uuid }
+        canonicalExerciseName: { type: [string, 'null'] }
+    WorkoutPlanSessionInput:
+      type: object
+      additionalProperties: false
+      required: [weekNumber, dayNumber, sequenceNumber, name, prescriptions]
+      properties:
+        weekNumber: { type: integer, minimum: 1 }
+        dayNumber: { type: integer, minimum: 1 }
+        sequenceNumber: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 180 }
+        focus: { type: [string, 'null'], maxLength: 160 }
+        estimatedDurationMinutes: { type: [integer, 'null'], minimum: 1 }
+        notes: { type: [string, 'null'] }
+        prescriptions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanPrescriptionInput' } }
+    WorkoutPlanPrescriptionInput:
+      type: object
+      additionalProperties: false
+      required: [exerciseVariationId, sequenceNumber]
+      properties:
+        exerciseVariationId: { type: string, format: uuid }
+        sequenceNumber: { type: integer, minimum: 1 }
+        targetSets: { type: [integer, 'null'], minimum: 1 }
+        targetRepsMin: { type: [integer, 'null'], minimum: 0 }
+        targetRepsMax: { type: [integer, 'null'], minimum: 0 }
+        targetLoad: { type: [number, 'null'], minimum: 0 }
+        restSeconds: { type: [integer, 'null'], minimum: 0 }
+        durationSeconds: { type: [integer, 'null'], minimum: 0 }
+        instructions: { type: [string, 'null'] }
+    CreateWorkoutPlanDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [studentId, name, sessions, commandKey]
+      properties:
+        studentId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'] }
+        sessions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanSessionInput' } }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    UpdateWorkoutPlanDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, name, sessions, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'] }
+        sessions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanSessionInput' } }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    WorkoutPlanVersionedCommandRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    TransitionWorkoutPlanRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, target, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        target: { $ref: '#/components/schemas/WorkoutPlanStatus' }
+        reason: { type: [string, 'null'] }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    PublishWorkoutPlanVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, reason, sessions, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 100 }
+        summary: { type: [string, 'null'] }
+        sessions: { type: array, minItems: 1, items: { $ref: '#/components/schemas/WorkoutPlanSessionInput' } }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    CreateWorkoutPlanSuccessorRequest:
+      type: object
+      additionalProperties: false
+      required: [sourcePlanId, sourceVersionId, name, commandKey]
+      properties:
+        sourcePlanId: { type: string, format: uuid }
+        sourceVersionId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    WorkoutOccurrenceAdjustmentRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, type, afterValue, reason, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        type: { type: string, enum: [EXERCISE_SWAP, LOAD, REPS, SETS, DURATION, ORDER, NOTE, OTHER] }
+        plannedSessionExerciseId: { type: [string, 'null'], format: uuid }
+        replacementVariationId: { type: [string, 'null'], format: uuid }
+        beforeValue: {}
+        afterValue: { not: { type: 'null' } }
+        reason: { type: string, minLength: 1 }
+        commandKey: { $ref: '#/components/schemas/WorkoutPlanCommandKey' }
+    WorkoutPlanCommandKey:
+      type: string
+      minLength: 1
+      maxLength: 120
+      description: Stable caller-generated key scoped to the authenticated actor and logical command.
+    WorkoutPlanCommandResponse:
+      type: object
+      additionalProperties: false
+      required: [planId, status, aggregateVersion, effectiveAt, replayed]
+      properties:
+        planId: { type: string, format: uuid }
+        planVersionId: { type: [string, 'null'], format: uuid }
+        planVersionNumber: { type: [integer, 'null'], minimum: 1 }
+        status: { $ref: '#/components/schemas/WorkoutPlanStatus' }
+        aggregateVersion: { type: integer, format: int64, minimum: 0 }
+        effectiveAt: { type: string, format: date-time }
+        replayed: { type: boolean }
+    WorkoutOccurrenceAdjustmentResponse:
+      type: object
+      additionalProperties: false
+      required: [plannedWorkoutId, occurrenceVersion, replayed]
+      properties:
+        plannedWorkoutId: { type: string, format: uuid }
+        adjustmentId: { type: [string, 'null'], format: uuid, description: Null on idempotent replay. }
+        occurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        replayed: { type: boolean }
     CoachingDirection:
       type: string
       enum: [INCOMING, OUTGOING]
