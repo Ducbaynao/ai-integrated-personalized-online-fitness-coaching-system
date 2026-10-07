@@ -37,6 +37,11 @@ export default function AppLayout() {
       <Stack.Screen name="coaching/invite" />
       <Stack.Screen name="coaching/[relationshipId]/index" />
       <Stack.Screen name="coaching/[relationshipId]/sharing" />
+      <Stack.Screen name="workout-plans/index" />
+      <Stack.Screen name="workout-plans/new" />
+      <Stack.Screen name="workout-plans/[planId]/index" />
+      <Stack.Screen name="workout-plans/[planId]/history" />
+      <Stack.Screen name="workout-plans/[planId]/edit" />
     </Stack>
   );
 }

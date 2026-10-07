@@ -35,6 +35,16 @@ Coaching relationship dùng stack authenticated chung, với nội dung và muta
 
 Các route B03 không suy authority từ role. Backend vẫn revalidate mọi command; invalid/stale identifiers hoặc relationship đã bị conceal được hiển thị như trạng thái không còn quyền xem.
 
+Workout Plan của Student dùng stack authenticated và yêu cầu Student Profile:
+
+- `/(app)/workout-plans`: ST-05 Plan hub; current ACTIVE luôn lấy từ endpoint current authoritative, còn collection chỉ dùng để mở draft, paused, completed và historical plans.
+- `/(app)/workout-plans/new`: tạo SELF_DIRECTED DRAFT; backend quyết định eligibility theo Coaching Period hiện tại.
+- `/(app)/workout-plans/[planId]`: ST-06 metadata, owner/read context, current version content, activation và lifecycle theo authority.
+- `/(app)/workout-plans/[planId]/history`: version list/detail bất biến và explicit Student successor từ Trainer-authored locked version.
+- `/(app)/workout-plans/[planId]/edit`: complete replacement DRAFT snapshot hoặc significant version publication; không dùng cho occurrence-scoped minor adjustment.
+
+Workout Plan query keys được scope theo Student identity và bị xóa cùng toàn bộ React Query cache khi logout/forced logout. Published history, archived Exercise và unavailable Exercise luôn read-only; canonical metadata chỉ để tham khảo, không remap historical reference.
+
 Chat, notification và AI Assistance mở theo icon hoặc từ context; không biến AI thành tab/coaching mode riêng.
 
 ## Trainer Mobile
