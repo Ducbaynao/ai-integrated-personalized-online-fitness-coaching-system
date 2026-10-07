@@ -82,6 +82,13 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
         }
     }
 
+    @Override public Integer findVersionNumber(UUID planId, UUID versionId) {
+        return jdbc.query("""
+                SELECT version_number FROM fitness.workout_plan_versions
+                WHERE workout_plan_id=? AND id=?
+                """, (rs, row) -> rs.getInt(1), planId, versionId).stream().findFirst().orElse(null);
+    }
+
     @Override public List<UUID> exerciseVariationIds(UUID versionId) {
         return jdbc.query("""
                 SELECT e.exercise_variation_id FROM fitness.workout_plan_session_exercises e
@@ -99,6 +106,43 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
                 SELECT EXISTS(SELECT 1 FROM fitness.workout_plans
                 WHERE student_id=? AND status='ACTIVE' AND id<>?)
                 """, Boolean.class, studentId, excludingPlanId));
+    }
+
+    @Override public Successor createDraft(UUID studentId, UUID periodId, UUID actorId,
+                                           DecisionOwnerType ownerType, String name, String description,
+                                           Instant at, List<WorkoutSessionTemplate> sessions) {
+        UUID planId = UUID.randomUUID(); UUID versionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.workout_plans
+                (id,student_id,coaching_period_id,name,description,source,status,created_by,
+                 decision_owner_type,decision_owner_id,created_at,updated_at)
+                VALUES (?,?,?,?,?,?::fitness.plan_source,'DRAFT',?,?::fitness.workout_plan_decision_owner,?,?,?)
+                """, planId, studentId, periodId, name, description, ownerType.name(), actorId,
+                ownerType.name(), ownerType == DecisionOwnerType.STUDENT ? studentId : actorId, ts(at), ts(at));
+        jdbc.update("""
+                INSERT INTO fitness.workout_plan_versions
+                (id,workout_plan_id,version_number,effective_from,change_level,change_reason,created_by,created_at)
+                VALUES (?,?,1,?,'INITIAL','DRAFT_CREATED',?,?)
+                """, versionId, planId, ts(at), actorId, ts(at));
+        insertSessions(versionId, sessions);
+        history(planId, null, WorkoutPlanStatus.DRAFT, actorId, "DRAFT_CREATED", 0, at);
+        return new Successor(planId, versionId);
+    }
+
+    @Override public void updateDraft(UUID planId, UUID versionId, UUID actorId, long expected,
+                                      String name, String description, Instant at,
+                                      List<WorkoutSessionTemplate> sessions) {
+        Timestamp lockedAt = jdbc.queryForObject(
+                "SELECT locked_at FROM fitness.workout_plan_versions WHERE id=? FOR UPDATE", Timestamp.class, versionId);
+        if (lockedAt != null) throw new WorkoutPlanFailure(WorkoutPlanError.WORKOUT_PLAN_IMMUTABLE,
+                "Locked workout plan version is immutable");
+        int changed = jdbc.update("""
+                UPDATE fitness.workout_plans SET name=?,description=?,version=version+1,updated_at=?
+                WHERE id=? AND status='DRAFT' AND version=?
+                """, name, description, ts(at), planId, expected);
+        if (changed != 1) throw conflict(WorkoutPlanError.WORKOUT_PLAN_VERSION_CONFLICT);
+        jdbc.update("DELETE FROM fitness.workout_plan_sessions WHERE workout_plan_version_id=?", versionId);
+        insertSessions(versionId, sessions);
     }
 
     @Override public void activate(UUID planId, UUID versionId, UUID actorId, long expected, Instant at) {

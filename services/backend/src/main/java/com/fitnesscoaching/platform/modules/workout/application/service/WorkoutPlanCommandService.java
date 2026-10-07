@@ -37,6 +37,56 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         this.exercises = exercises; this.audit = audit; this.objectMapper = objectMapper;
     }
 
+    @Override public CommandResult createDraft(CreateDraftCommand c) {
+        requireBase(c.actorId(), c.commandKey());
+        if (c.studentId() == null) throw failure(WorkoutPlanError.VALIDATION_FAILED);
+        List<WorkoutSessionTemplate> sessions = c.sessions() == null ? List.of() : List.copyOf(c.sessions());
+        validateDraft(c.name(), sessions);
+        String hash = hash("CREATE_DRAFT", c.studentId(), c.name(), c.description(), sessions);
+        store.lockStudentAndActor(c.studentId(), c.actorId());
+        Optional<Receipt> prior = receipt(c.actorId(), c.commandKey(), "CREATE_DRAFT", hash);
+        if (prior.isPresent()) return replay(prior.get(), c.actorId(), c.studentId());
+        var context = requireContext(c.studentId());
+        DecisionOwnerType owner = authorizeDraftOwner(c.studentId(), c.actorId(), context);
+        validateExercises(sessions.stream().flatMap(s -> s.prescriptions().stream())
+                .map(ExercisePrescription::exerciseVariationId).toList());
+        Instant at = store.databaseNow();
+        Successor created = store.createDraft(c.studentId(), context.periodId(), c.actorId(), owner,
+                c.name().trim(), c.description(), at, sessions);
+        recordAudit(c.actorId(), "WORKOUT_PLAN_DRAFT_CREATED", created.planId(), at);
+        store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "CREATE_DRAFT", hash, created.planId(),
+                created.versionId(), null, "DRAFT", 0L, at, "{}", at));
+        return new CommandResult(created.planId(), created.versionId(), 1, WorkoutPlanStatus.DRAFT, 0, at, false);
+    }
+
+    @Override public CommandResult updateDraft(UpdateDraftCommand c) {
+        requireBase(c.actorId(), c.commandKey());
+        if (c.planId() == null) throw failure(WorkoutPlanError.VALIDATION_FAILED);
+        List<WorkoutSessionTemplate> sessions = c.sessions() == null ? List.of() : List.copyOf(c.sessions());
+        validateDraft(c.name(), sessions);
+        String hash = hash("UPDATE_DRAFT", c.planId(), c.expectedVersion(), c.name(), c.description(), sessions);
+        UUID student = store.findPlanStudent(c.planId());
+        store.lockStudentAndActor(student, c.actorId());
+        Optional<Receipt> prior = receipt(c.actorId(), c.commandKey(), "UPDATE_DRAFT", hash);
+        if (prior.isPresent()) return replay(prior.get(), c.actorId(), student);
+        var context = requireContext(student);
+        WorkoutPlan plan = store.lockPlan(c.planId());
+        authorizeStrategic(plan, c.actorId(), context);
+        requireVersion(plan.version(), c.expectedVersion());
+        if (plan.status() != WorkoutPlanStatus.DRAFT) throw failure(WorkoutPlanError.WORKOUT_PLAN_IMMUTABLE);
+        OpenVersion version = store.lockOpenVersion(plan.id());
+        validateExercises(sessions.stream().flatMap(s -> s.prescriptions().stream())
+                .map(ExercisePrescription::exerciseVariationId).toList());
+        Instant at = store.databaseNow();
+        store.updateDraft(plan.id(), version.id(), c.actorId(), c.expectedVersion(), c.name().trim(),
+                c.description(), at, sessions);
+        recordAudit(c.actorId(), "WORKOUT_PLAN_DRAFT_UPDATED", plan.id(), at);
+        store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "UPDATE_DRAFT", hash, plan.id(), version.id(),
+                null, "DRAFT", c.expectedVersion() + 1, at, "{}", at));
+        return new CommandResult(plan.id(), version.id(), version.versionNumber(), WorkoutPlanStatus.DRAFT,
+                c.expectedVersion() + 1, at, false);
+    }
+
     @Override public CommandResult activate(ActivateCommand c) {
         requireBase(c.actorId(), c.commandKey());
         String hash = hash("ACTIVATE", c.planId(), c.expectedVersion());
@@ -58,7 +108,8 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         recordAudit(c.actorId(), "WORKOUT_PLAN_ACTIVATED", plan.id(), at);
         store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "ACTIVATE", hash, plan.id(), version.id(), null,
                 "ACTIVE", c.expectedVersion() + 1, at, "{}", at));
-        return new CommandResult(plan.id(), version.id(), WorkoutPlanStatus.ACTIVE, c.expectedVersion() + 1, at, false);
+        return new CommandResult(plan.id(), version.id(), version.versionNumber(), WorkoutPlanStatus.ACTIVE,
+                c.expectedVersion() + 1, at, false);
     }
 
     @Override public CommandResult transition(TransitionCommand c) {
@@ -81,7 +132,7 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         recordAudit(c.actorId(), "WORKOUT_PLAN_" + c.target().name(), plan.id(), at);
         store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "TRANSITION", hash, plan.id(), null, null,
                 c.target().name(), c.expectedVersion() + 1, at, "{}", at));
-        return new CommandResult(plan.id(), null, c.target(), c.expectedVersion() + 1, at, false);
+        return new CommandResult(plan.id(), null, null, c.target(), c.expectedVersion() + 1, at, false);
     }
 
     @Override public CommandResult publishVersion(PublishVersionCommand c) {
@@ -108,7 +159,8 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         recordAudit(c.actorId(), "WORKOUT_PLAN_VERSION_PUBLISHED", plan.id(), boundary);
         store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "PUBLISH", hash, plan.id(), versionId, null,
                 plan.status().name(), c.expectedVersion() + 1, boundary, "{}", boundary));
-        return new CommandResult(plan.id(), versionId, plan.status(), c.expectedVersion() + 1, boundary, false);
+        return new CommandResult(plan.id(), versionId, previous.versionNumber() + 1, plan.status(),
+                c.expectedVersion() + 1, boundary, false);
     }
 
     @Override public CommandResult createStudentSuccessor(CreateStudentSuccessorCommand c) {
@@ -138,7 +190,8 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         recordAudit(c.actorId(), "WORKOUT_PLAN_SUCCESSOR_CREATED", successor.planId(), at);
         store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "SUCCESSOR", hash, successor.planId(),
                 successor.versionId(), null, "DRAFT", 0L, at, "{}", at));
-        return new CommandResult(successor.planId(), successor.versionId(), WorkoutPlanStatus.DRAFT, 0, at, false);
+        return new CommandResult(successor.planId(), successor.versionId(), 1,
+                WorkoutPlanStatus.DRAFT, 0, at, false);
     }
 
     @Override public OccurrenceResult adjustOccurrence(AdjustOccurrenceCommand c) {
@@ -193,6 +246,18 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
             throw failure(WorkoutPlanError.WORKOUT_PLAN_ACCESS_DENIED);
     }
 
+    private DecisionOwnerType authorizeDraftOwner(UUID student, UUID actor,
+                                                   CurrentCoachingContextQuery.CurrentCoachingContext context) {
+        if (context.mode() == CurrentCoachingContextQuery.Mode.SELF_DIRECTED) {
+            if (!actor.equals(student)) throw failure(WorkoutPlanError.WORKOUT_PLAN_ACCESS_DENIED);
+            return DecisionOwnerType.STUDENT;
+        }
+        if (context.trainerId() == null || !actor.equals(context.trainerId()))
+            throw failure(WorkoutPlanError.WORKOUT_PLAN_ACCESS_DENIED);
+        trainerAuthority(actor, student, DataAccessLevel.MANAGE);
+        return DecisionOwnerType.TRAINER;
+    }
+
     private void authorizeLifecycle(WorkoutPlan plan, UUID actor,
                                     CurrentCoachingContextQuery.CurrentCoachingContext context,
                                     WorkoutPlanStatus target) {
@@ -227,9 +292,20 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
     private void validateBlueprint(String reason, List<WorkoutSessionTemplate> sessions) {
         if (sessions.isEmpty() || reason == null || reason.isBlank() || reason.length() > 100)
             throw failure(WorkoutPlanError.VALIDATION_FAILED);
+        validateSessions(sessions);
+    }
+
+    private void validateDraft(String name, List<WorkoutSessionTemplate> sessions) {
+        if (name == null || name.isBlank() || name.length() > 200)
+            throw failure(WorkoutPlanError.VALIDATION_FAILED);
+        validateSessions(sessions);
+    }
+
+    private void validateSessions(List<WorkoutSessionTemplate> sessions) {
         Set<String> sessionKeys = new HashSet<>();
         for (WorkoutSessionTemplate session : sessions) {
-            if (session.name().length() > 180
+            if (session.name().length() > 180 || (session.focus() != null && session.focus().length() > 160)
+                    || (session.estimatedDurationMinutes() != null && session.estimatedDurationMinutes() <= 0)
                     || !sessionKeys.add(session.weekNumber() + ":" + session.dayNumber() + ":" + session.sequenceNumber()))
                 throw failure(WorkoutPlanError.VALIDATION_FAILED);
             Set<Integer> exerciseSequences = new HashSet<>();
@@ -255,7 +331,9 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
 
     private CommandResult replay(Receipt r, UUID actor, UUID student) {
         authorizeRead(actor, student);
-        return new CommandResult(r.planId(), r.planVersionId(), WorkoutPlanStatus.valueOf(r.status()),
+        Integer versionNumber = r.planVersionId() == null ? null
+                : store.findVersionNumber(r.planId(), r.planVersionId());
+        return new CommandResult(r.planId(), r.planVersionId(), versionNumber, WorkoutPlanStatus.valueOf(r.status()),
                 Objects.requireNonNullElse(r.resultingVersion(), 0L), r.effectiveAt(), true);
     }
 
