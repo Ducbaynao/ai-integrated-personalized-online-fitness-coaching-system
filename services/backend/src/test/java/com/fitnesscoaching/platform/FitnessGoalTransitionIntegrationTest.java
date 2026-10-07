@@ -788,9 +788,13 @@ class FitnessGoalTransitionIntegrationTest {
         // 1. Seed workout_plan linked to goalId
         UUID workoutPlanId = UUID.randomUUID();
         jdbcTemplate.update("""
-                INSERT INTO fitness.workout_plans (id, student_id, fitness_goal_id, name, source, status, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, 'Hypertrophy Plan', 'STUDENT'::fitness.plan_source, 'DRAFT'::fitness.plan_status, ?, now(), now())
-                """, workoutPlanId, studentId, goalId, studentId);
+                INSERT INTO fitness.workout_plans
+                (id, student_id, fitness_goal_id, name, source, status, created_by,
+                 decision_owner_type, decision_owner_id, created_at, updated_at)
+                VALUES (?, ?, ?, 'Hypertrophy Plan', 'STUDENT'::fitness.plan_source,
+                        'DRAFT'::fitness.plan_status, ?, 'STUDENT'::fitness.workout_plan_decision_owner,
+                        ?, now(), now())
+                """, workoutPlanId, studentId, goalId, studentId, studentId);
 
         // 2. Seed nutrition_goal linked to goalId
         UUID nutritionGoalId = UUID.randomUUID();
