@@ -1,0 +1,520 @@
+[
+  {
+    "claim_id": "ODS-C01",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-01",
+    "title_vi": "Phạm vi: thực phẩm bổ sung và thành tích thể thao",
+    "summary_vi": "Tài liệu gốc là fact sheet dành cho chuyên gia y tế của NIH Office of Dietary Supplements (ODS), mô tả thành phần được quảng bá hoặc nghiên cứu để hỗ trợ vận động/thành tích thể thao. Tuyên bố của nhà bán hàng không phải kết luận hiệu quả của ODS.",
+    "source_section_ids": [
+      "ODS-S01",
+      "ODS-S02",
+      "ODS-S32"
+    ],
+    "issue_ids": [
+      "ODS-Q10"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C02",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-02",
+    "title_vi": "Nền tảng dinh dưỡng và bối cảnh thống kê",
+    "summary_vi": "Nền tảng là đủ năng lượng, dinh dưỡng, nước, thể lực và tập luyện phù hợp. Supplement có thể bổ sung cho nền tảng này, không thay thế nó. Hoạt động sức bền trên một giờ hoặc môi trường khắc nghiệt có thể cần xem thêm nước, điện giải và carbohydrate; nguồn không đưa công thức cá nhân đầy đủ.",
+    "source_section_ids": [
+      "ODS-S01",
+      "ODS-S32"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C03",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-03",
+    "title_vi": "Đọc bằng chứng, cơ chế và sản phẩm phối hợp",
+    "summary_vi": "Phần lớn nghiên cứu trong fact sheet liên quan người đã có tập luyện, thường người trưởng thành trẻ và nam nhiều hơn nữ. Mẫu nhỏ, thời gian ngắn, bài kiểm tra trong phòng thí nghiệm và confounder làm giới hạn suy rộng. Không áp ngay sang người mới tập, trẻ em, người bệnh hoặc loại hoạt động chưa nghiên cứu.",
+    "source_section_ids": [
+      "ODS-S01",
+      "ODS-S02"
+    ],
+    "issue_ids": [
+      "ODS-Q12"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C04",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-04",
+    "title_vi": "Chất chống oxy hóa: vitamin C, vitamin E, CoQ10",
+    "summary_vi": "Các thử nghiệm nhỏ được nguồn dẫn không cho thấy cải thiện thành tích trực tiếp nhất quán. Liều bổ sung cao có thể làm giảm một số đáp ứng thích nghi; kết quả tế bào, VO 2 max, sức mạnh và tăng cơ không phải cùng một chỉ số.",
+    "source_section_ids": [
+      "ODS-S03"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C05",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-05",
+    "title_vi": "Arginine",
+    "summary_vi": "Bằng chứng hạn chế, kết quả mâu thuẫn; tổng quan được nguồn dẫn nhìn chung cho thấy ít hoặc không có cải thiện thành tích/phục hồi. Tăng hormone hoặc chỉ số sinh hóa không đồng nghĩa tăng cơ.",
+    "source_section_ids": [
+      "ODS-S04"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C06",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-06",
+    "title_vi": "Củ dền và nước củ dền",
+    "summary_vi": "Một số thử nghiệm cho thấy lợi ích sức bền/time trial, nhưng không phải mọi thử nghiệm. Nguồn mô tả lợi ích có thể rõ hơn ở người hoạt động thể chất giải trí so với vận động viên ưu tú; ít dữ liệu về hoạt động kỵ khí.",
+    "source_section_ids": [
+      "ODS-S05"
+    ],
+    "issue_ids": [
+      "ODS-Q02"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C07",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-07",
+    "title_vi": "Beta-alanine",
+    "summary_vi": "Kết quả không đồng nhất giữa tổng quan và tổ chức. Một số dữ liệu hỗ trợ hoạt động cường độ cao ngắn đến trung bình; nguồn dẫn ISSN nhấn mạnh trên 60 giây, AND/DoC/ACSM nêu 60–240 giây. Không suy ra lợi ích chắc chắn trong mọi bài tập hoặc tăng cơ.",
+    "source_section_ids": [
+      "ODS-S06"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C08",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-08",
+    "title_vi": "HMB — beta-hydroxy-beta-methylbutyrate",
+    "summary_vi": "Có thể hỗ trợ phục hồi khi buổi tập gây tổn thương cơ đủ mức; lợi ích khác về sức mạnh/tăng cơ không đồng nhất vì mẫu, liều và chương trình nghiên cứu rất khác nhau. Các tổ chức được dẫn không có cùng kết luận.",
+    "source_section_ids": [
+      "ODS-S07"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C09",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-09",
+    "title_vi": "Betaine",
+    "summary_vi": "Một số nghiên cứu nhỏ, chủ yếu ở nam giới, cho kết quả mâu thuẫn và lợi ích sức mạnh/công suất thường khiêm tốn.",
+    "source_section_ids": [
+      "ODS-S08"
+    ],
+    "issue_ids": [
+      "ODS-Q03"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C10",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-10",
+    "title_vi": "BCAA — leucine, isoleucine, valine",
+    "summary_vi": "Ít bằng chứng lợi ích sức bền aerobic; dữ liệu tăng cơ/sức mạnh và kích thích MPS ngoài tác dụng của lượng protein chất lượng đủ là không nhất quán.",
+    "source_section_ids": [
+      "ODS-S09"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C11",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-11",
+    "title_vi": "Caffeine",
+    "summary_vi": "Nhiều thử nghiệm cho thấy có thể hỗ trợ một số hoạt động sức bền hoặc kéo dài ngắt quãng; đáp ứng cá nhân khác nhau. Dùng nhiều hơn không chắc thêm hiệu quả và có thể tăng tác dụng bất lợi.",
+    "source_section_ids": [
+      "ODS-S10"
+    ],
+    "issue_ids": [
+      "ODS-Q01",
+      "ODS-Q06",
+      "ODS-Q11"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C12",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-12",
+    "title_vi": "Citrulline và citrulline malate",
+    "summary_vi": "Ít nghiên cứu, thời gian ngắn và kết quả mâu thuẫn: có thử nghiệm bench press tốt hơn nhưng thử nghiệm treadmill khác không tốt hơn. Tăng chất chuyển hóa nitric oxide không chứng minh tăng thành tích.",
+    "source_section_ids": [
+      "ODS-S11"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C13",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-13",
+    "title_vi": "Creatine",
+    "summary_vi": "Là thành phần được nghiên cứu nhiều trong nguồn; có thể hỗ trợ sức mạnh, công suất, nhiều set nỗ lực tối đa và thích nghi với tập. Hiệu quả thay đổi giữa cá nhân; nguồn đánh giá giá trị thấp hơn cho hoạt động sức bền không phụ thuộc hệ năng lượng này.",
+    "source_section_ids": [
+      "ODS-S12"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C14",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-14",
+    "title_vi": "Nhung hươu — deer antler velvet",
+    "summary_vi": "Các thử nghiệm nhỏ được dẫn gần như không cung cấp bằng chứng cải thiện aerobic/kỵ khí, sức mạnh hoặc sức bền.",
+    "source_section_ids": [
+      "ODS-S13"
+    ],
+    "issue_ids": [
+      "ODS-Q07"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C15",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-15",
+    "title_vi": "DHEA — dehydroepiandrosterone",
+    "summary_vi": "Nghiên cứu ít, các thử nghiệm ở nam giới được dẫn không cho cải thiện rõ về sức mạnh, khả năng aerobic, khối nạc hoặc testosterone so với placebo.",
+    "source_section_ids": [
+      "ODS-S14"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C16",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-16",
+    "title_vi": "Nhân sâm — ginseng",
+    "summary_vi": "Phần lớn thử nghiệm nhỏ không cho lợi ích thành tích rõ. Một thử nghiệm nhỏ khác có kết quả tốt hơn không đủ đảo thành bảo đảm cho mọi loại sâm.",
+    "source_section_ids": [
+      "ODS-S15"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C17",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-17",
+    "title_vi": "Glutamine",
+    "summary_vi": "Ít nghiên cứu trực tiếp; một thử nghiệm không cải thiện sức mạnh/khối nạc. Một nghiên cứu khác có tín hiệu phục hồi sau eccentric exercise, chưa đủ kết luận rộng. Ít hỗ trợ cho ngăn nhiễm trùng đường hô hấp do tập.",
+    "source_section_ids": [
+      "ODS-S16"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C18",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-18",
+    "title_vi": "Sắt",
+    "summary_vi": "Điều chỉnh thiếu máu thiếu sắt có thể cải thiện năng lực hoạt động. Kết quả với thiếu sắt nhẹ không thiếu máu còn mâu thuẫn; lợi ích không đồng nghĩa người đủ sắt nên dùng thêm.",
+    "source_section_ids": [
+      "ODS-S17"
+    ],
+    "issue_ids": [
+      "ODS-Q08"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C19",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-19",
+    "title_vi": "Protein",
+    "summary_vi": "Đủ protein hỗ trợ đáp ứng và phục hồi tập luyện. Nguồn dẫn nghiên cứu về thời điểm nhưng cũng dẫn meta-analysis không cho lợi ích rõ khi uống trong một giờ trước/sau; không coi cửa sổ 30 phút là bắt buộc. Pre-sleep casein có tín hiệu trong một số thử nghiệm, không bảo đảm tăng cơ cho mọi người.",
+    "source_section_ids": [
+      "ODS-S18"
+    ],
+    "issue_ids": [
+      "ODS-Q04"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C20",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-20",
+    "title_vi": "Quercetin",
+    "summary_vi": "Nhiều thử nghiệm nhỏ, ngắn thường cho không hoặc rất ít lợi ích sức bền/VO 2 max; ý nghĩa thực tế có thể khác ý nghĩa trong phòng thí nghiệm.",
+    "source_section_ids": [
+      "ODS-S19"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C21",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-21",
+    "title_vi": "Ribose",
+    "summary_vi": "Nghiên cứu hạn chế cho ít hoặc không có lợi ích năng lực aerobic/kỵ khí ở người lớn khỏe mạnh đã tập và chưa tập.",
+    "source_section_ids": [
+      "ODS-S20"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C22",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-22",
+    "title_vi": "Sodium bicarbonate — natri bicarbonat",
+    "summary_vi": "Nhiều nghiên cứu nhỏ, ngắn cho kết quả mâu thuẫn; có thể có lợi ích nhỏ đến vừa trong một số hoạt động mạnh kéo dài vài phút/ngắt quãng. Một số người không có lợi hoặc thành tích kém hơn.",
+    "source_section_ids": [
+      "ODS-S21"
+    ],
+    "issue_ids": [
+      "ODS-Q05"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C23",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-23",
+    "title_vi": "Anh đào chua — tart/sour cherry",
+    "summary_vi": "Dữ liệu ít, không đồng nhất về phục hồi sức mạnh/đau cơ. Kết quả 13% thời gian chạy ngắn hơn là của một thử nghiệm nhỏ cụ thể, không dự báo cho mọi vận động viên.",
+    "source_section_ids": [
+      "ODS-S22"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C24",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-24",
+    "title_vi": "Tribulus terrestris",
+    "summary_vi": "Các thử nghiệm nhỏ/ngắn được dẫn không cho lợi ích rõ về hormone, sức mạnh hay khối nạc. Câu “none since 2007” chỉ phản ánh bản nguồn, không phải xác nhận tổng quan toàn bộ nghiên cứu đến 2026.",
+    "source_section_ids": [
+      "ODS-S23"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C25",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-25",
+    "title_vi": "Androstenedione: hormone tiền chất và rủi ro",
+    "summary_vi": "Androstenedione là tiền chất hormone, khác thực phẩm bổ sung protein thông thường. Hai thử nghiệm được nguồn dẫn không cho lợi ích thành tích/tăng khối nạc rõ, nhưng có thay đổi bất lợi về HDL cholesterol và hormone.",
+    "source_section_ids": [
+      "ODS-S24",
+      "ODS-S25"
+    ],
+    "issue_ids": [
+      "ODS-Q09"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C26",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-26",
+    "title_vi": "DMAA và DMBA: chất kích thích và sản phẩm pha trộn",
+    "summary_vi": "Nguồn mô tả DMAA là chất kích thích từng được dùng trong pre-workout; nghiên cứu trong tệp không đánh giá nó ở người như một ergogenic aid. Nguồn ghi các báo cáo bệnh/tử vong liên quan sản phẩm có DMAA và hành động FDA năm 2013. Báo cáo liên quan không tự xác định nguyên nhân của từng ca.",
+    "source_section_ids": [
+      "ODS-S24",
+      "ODS-S26"
+    ],
+    "issue_ids": [
+      "ODS-Q09"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C27",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-27",
+    "title_vi": "Ephedra và ephedrine: phân biệt bối cảnh nghiên cứu",
+    "summary_vi": "Ephedra là thực vật có alkaloid ephedrine; không đồng nhất chế phẩm Ephedra với ephedrine tổng hợp. Các kết quả 20–30% trong tệp liên quan một số nghiên cứu phối hợp ephedrine–caffeine cấp tính, không chứng minh dùng Ephedra lâu dài cải thiện thành tích an toàn.",
+    "source_section_ids": [
+      "ODS-S24",
+      "ODS-S27"
+    ],
+    "issue_ids": [
+      "ODS-Q09"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C28",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-28",
+    "title_vi": "Quản lý thực phẩm bổ sung: bối cảnh Hoa Kỳ",
+    "summary_vi": "Theo văn bản ODS, supplement tại Hoa Kỳ được quản lý trong bối cảnh DSHEA 1994 và khác thuốc kê đơn/không kê đơn ở quy trình tiền kiểm. Nhà sản xuất có trách nhiệm về an toàn và tính trung thực của nhãn; văn bản mô tả khả năng FDA/FTC xử lý sản phẩm hoặc tuyên bố không phù hợp.",
+    "source_section_ids": [
+      "ODS-S28"
+    ],
+    "issue_ids": [
+      "ODS-Q09"
+    ],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C29",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-29",
+    "title_vi": "An toàn, sản phẩm pha trộn và tương tác thuốc",
+    "summary_vi": "Supplement có thể gây tác dụng bất lợi và tương tác thuốc. Hoạt chất thực vật hoặc phối hợp nhiều thành phần có thể chưa được xác định/kiểm tra đầy đủ. Sản phẩm tăng cơ có thể có thành phần không khai báo, gồm thuốc/hormone/SARM; người thi đấu có thể chịu hậu quả xét nghiệm dù không biết sản phẩm bị pha trộn.",
+    "source_section_ids": [
+      "ODS-S29",
+      "ODS-S30",
+      "ODS-S31"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  },
+  {
+    "claim_id": "ODS-C30",
+    "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-30",
+    "title_vi": "Cách tiếp cận bổ sung hợp lý và giới hạn theo nhóm tuổi",
+    "summary_vi": "Nguồn nhấn mạnh chỉ một số ít thành phần có cơ sở khoa học hỗ trợ trong những bối cảnh cụ thể. Ăn uống đủ, uống đủ nước, thể lực và tập luyện phù hợp là nền tảng; supplement không thay thế các yếu tố này.",
+    "source_section_ids": [
+      "ODS-S32",
+      "ODS-S01"
+    ],
+    "issue_ids": [],
+    "evidence_grade": null,
+    "status": "DRAFT",
+    "reviewer": null,
+    "automatic_rule_enabled": false,
+    "retrieval_enabled": false,
+    "reference_marker_bibliography_unavailable": true
+  }
+]

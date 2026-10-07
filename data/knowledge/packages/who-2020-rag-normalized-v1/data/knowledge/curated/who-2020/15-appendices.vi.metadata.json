@@ -1,0 +1,47 @@
+{
+  "document_id": "WHO-PA-SB-2020-VI-15",
+  "source_id": "WHO-PA-SB-2020",
+  "title": "Tài liệu tham khảo, phụ lục và nguồn bổ sung",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-06",
+  "source_publication_year": 2020,
+  "source_pdf_page_ranges": [
+    [
+      85,
+      104
+    ],
+    [
+      6,
+      7
+    ]
+  ],
+  "source_printed_page_ranges": [
+    [
+      "75",
+      null
+    ],
+    [
+      "iv",
+      "v"
+    ]
+  ],
+  "source_url": "https://www.who.int/publications/i/item/9789240015128",
+  "source_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "population_tags": [
+    "research_and_review_audiences"
+  ],
+  "content_role": "reference_only",
+  "recommendation_ids": [],
+  "retrieval_enabled": false,
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "official_translation": false,
+  "commercial_use_clearance": "NOT_CONFIRMED",
+  "source_currentness": "2020 edition; later updates not assessed in this normalization",
+  "translation_review_status": "PENDING",
+  "technical_checks": "See review-report.md; not clinical approval",
+  "source_pdf": "../../raw/who-physical-activity-sedentary-behaviour-2020.pdf"
+}

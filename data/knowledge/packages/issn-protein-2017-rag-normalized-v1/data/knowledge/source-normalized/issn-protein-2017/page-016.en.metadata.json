@@ -1,0 +1,17 @@
+{
+  "document_id": "ISSN-PROTEIN-EXERCISE-2017-EN-P016",
+  "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+  "source_pdf_pages": [
+    16,
+    16
+  ],
+  "language": "en",
+  "status": "DRAFT",
+  "version": "1.0.0",
+  "reviewer": null,
+  "retrieval_enabled": false,
+  "source_sha256": "7a97a81db0334c95ddd17a2009200e7f38945988b3e1dd5aa70f73a502fe8140",
+  "license": "CC BY 4.0",
+  "content_role": "source_reference",
+  "note": "Page is not a semantic chunk. Do not split at page end if a sentence/section continues. Do not index pages and fulltext simultaneously."
+}

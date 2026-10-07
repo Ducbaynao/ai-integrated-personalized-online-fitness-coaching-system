@@ -1,0 +1,17 @@
+{
+  "source_bytes_identical": true,
+  "line_coverage_exactly_once": 539,
+  "source_sections": 32,
+  "curated_articles": 31,
+  "table_rows": 21,
+  "claims": 30,
+  "numeric_contexts": 24,
+  "open_review_issues": 12,
+  "candidate_cases": 42,
+  "json_and_jsonl_parse": true,
+  "reference_marker_count": 219,
+  "metadata_draft_retrieval_off": true,
+  "medical_review": "NOT_DONE",
+  "rag_evaluation": "NOT_RUN",
+  "source_webpage_full_diff": "NOT_DONE"
+}

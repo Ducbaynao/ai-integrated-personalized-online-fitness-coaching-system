@@ -1,0 +1,204 @@
+[
+  {
+    "claim_id": "NW01",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Lifestyle habits",
+    "statement_vi": "Dư năng lượng kéo dài có thể góp phần tăng cân.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-02"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW02",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Where you live, work, play, and worship",
+    "statement_vi": "Môi trường có thể hỗ trợ lựa chọn lối sống lành mạnh.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-03"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW03",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "How much sleep you get",
+    "statement_vi": "Khoảng ngủ trong nguồn cho tuổi 18–64: 7–9 giờ mỗi đêm.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-04"
+    ],
+    "quantitative_parameters": {
+      "age_min": 18,
+      "age_max": 64,
+      "min": 7,
+      "max": 9,
+      "unit": "hours_per_night"
+    },
+    "reference_ids": [
+      4
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW04",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "How much sleep you get",
+    "statement_vi": "Khoảng ngủ trong nguồn cho tuổi từ 65: 7–8 giờ mỗi đêm.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-04"
+    ],
+    "quantitative_parameters": {
+      "age_min": 65,
+      "age_max": null,
+      "min": 7,
+      "max": 8,
+      "unit": "hours_per_night"
+    },
+    "reference_ids": [
+      4
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW05",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "How much sleep you get",
+    "statement_vi": "Thiếu ngủ có liên quan đến tăng cân; có thể ảnh hưởng cảm giác đói và lựa chọn ăn uống.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-04"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [
+      5
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW06",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Medicines",
+    "statement_vi": "Một số thuốc có thể góp phần tăng cân; không áp dụng cho mọi thuốc trong nhóm.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-05"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [
+      6
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW07",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Health problems",
+    "statement_vi": "Một số bệnh nội tiết, tổn thương vùng dưới đồi, trầm cảm và căng thẳng kéo dài có thể góp phần tăng cân.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-06"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [
+      6
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW08",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Health problems",
+    "statement_vi": "Một số rối loạn ăn uống có thể liên quan đến tăng cân; mô tả không phải hướng dẫn hay tiêu chuẩn chẩn đoán.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-06"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW09",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Family history and genes",
+    "statement_vi": "Cha mẹ có thừa cân/béo phì liên quan đến nguy cơ cao hơn ở con.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-07"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [
+      7
+    ],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW10",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Family history and genes",
+    "statement_vi": "Béo phì ở mẹ trong thai kỳ và béo phì ở trẻ/thanh thiếu niên được nêu là yếu tố liên quan nguy cơ béo phì ở con hoặc khi trưởng thành.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-07"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [
+      8
+    ],
+    "reference_scope_note": "[8] attached to maternal pregnancy sentence; childhood-to-adult sentence has no explicit marker in excerpt",
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  },
+  {
+    "claim_id": "NW11",
+    "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+    "source_section": "Family history and genes",
+    "statement_vi": "Gen có thể ảnh hưởng lượng/phân bố mỡ, cảm giác thèm ăn và hoạt động thể chất.",
+    "document_ids": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-07"
+    ],
+    "quantitative_parameters": null,
+    "reference_ids": [],
+    "reference_scope_note": null,
+    "evidence_grade": null,
+    "evidence_grade_note": "NIDDK public health information; no formal GRADE supplied",
+    "status": "DRAFT",
+    "automatic_rule_enabled": false
+  }
+]

@@ -1,0 +1,47 @@
+{
+  "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+  "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+  "title": "Tình trạng sức khỏe và rối loạn ăn uống",
+  "language": "vi",
+  "version": "1.1.0",
+  "status": "DRAFT",
+  "reviewer": "Chủ dự án — xác nhận trực tiếp của người dùng",
+  "reviewed_at": "2026-10-08",
+  "prepared_at": "2026-10-08",
+  "technical_review_status": "EDITORIAL_SEPARATION_COMPLETED",
+  "specialist_review_readiness": "HELD_AS_DRAFT",
+  "blocker_reason": "Nội dung liên quan đến bệnh nội tiết và rối loạn ăn uống nhạy cảm; cần reviewer y khoa / tâm lý lâm sàng duyệt và platform safety boundary tích hợp trước khi xem xét phát hành.",
+  "project_usage_policy": "Không suy ra chẩn đoán PCOS, Cushing, suy giáp, trầm cảm hay rối loạn ăn uống từ cân nặng hoặc câu hỏi. Không cung cấp hướng dẫn gây nôn, lạm dụng thuốc nhuận tràng, nhịn ăn bù hoặc tập bù. Nếu người dùng mô tả mất kiểm soát ăn uống hoặc hành vi bù trừ, phản hồi hỗ trợ và khuyến khích được chuyên gia y tế đánh giá; không chuyển ngay sang đề xuất siết kcal. Đây là quy tắc sử dụng của dự án, được tách khỏi nội dung tri thức nguồn NIDDK theo finding KR05.",
+  "lineage": {
+    "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+    "base_version": "1.0.0",
+    "base_package": "niddk-weight-factors-rag-normalized-v1",
+    "base_content_path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.md",
+    "base_sha256": "28ea32f116a3e96714ee22ccb50d9d0d44353b8bd0bee366be93449540fffa7a",
+    "changelog": "Xử lý finding KR05: Tách phần 'Giới hạn sử dụng của dự án' ra khỏi nội dung bài để lưu trong metadata policy; chỉ giữ nội dung tri thức trích dẫn từ NIDDK; giữ nguyên trạng thái DRAFT chờ reviewer y khoa/tâm lý lâm sàng. Cập nhật đường dẫn truy vết nguồn relative (../../packages/); ghi nhận phê duyệt chuyên môn trực tiếp của chủ dự án ngày 2026-10-08; giữ nguyên publication DRAFT và retrieval_enabled=false."
+  },
+  "source_last_reviewed": "2023-05",
+  "source_url": "https://www.niddk.nih.gov/health-information/weight-management/adult-overweight-obesity/factors-affecting-weight-health",
+  "source_sections": [
+    "Health problems"
+  ],
+  "source_sha256": "d880c41997e5eae1dd4c087ef7c1421c5ccc89b6141fe97463c0c6982c5020c8",
+  "population_tags": [
+    "adults"
+  ],
+  "content_role": "general_knowledge",
+  "claim_ids": [
+    "NW07",
+    "NW08"
+  ],
+  "retrieval_enabled": false,
+  "license_url": "https://www.niddk.nih.gov/copyright",
+  "translation_review_status": "PENDING",
+  "source_raw": "../../packages/niddk-weight-factors-rag-normalized-v1/data/knowledge/raw/niddk-weight-factors-user-excerpt.en.md",
+  "specialist_review_status": "APPROVED",
+  "specialist_review_scope": "Phê duyệt nội dung chuyên môn dựa trên xác nhận trực tiếp của chủ dự án ngày 2026-10-08",
+  "specialist_review_record": "data/knowledge/review-records/project-owner-specialist-review-2026-10-08.json",
+  "publication_lifecycle": "DRAFT",
+  "publication_status_reason": "Chưa xuất bản qua Spring Content publishing workflow; phê duyệt chuyên môn độc lập với vòng đời kích hoạt hệ thống",
+  "technical_readiness": "HELD_AS_DRAFT"
+}

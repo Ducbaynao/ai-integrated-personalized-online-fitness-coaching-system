@@ -1,0 +1,122 @@
+[
+  {
+    "issue_id": "ODS-Q01",
+    "raw_line": 262,
+    "title_vi": "Caffeine: ví dụ quy đổi không khớp",
+    "finding_vi": "2–6 mg/kg với70 kg tương ứng140–420 mg bằng phép tính; nguồn lại ghi210–420 mg.",
+    "handling_vi": "Không sửa ngầm; cách ly ví dụ sai khỏi chunk trả lời và calculator.",
+    "category": "ARITHMETIC_INCONSISTENCY",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q02",
+    "raw_line": 179,
+    "title_vi": "Beetroot: nitric acid/nitric oxide",
+    "finding_vi": "Nguồn nói chuyển thành nitric oxide rồi gọi nitric acid là chất giãn mạch.",
+    "handling_vi": "Giữ nguyên nguồn; không dùng acid nitric làm giải thích/khuyến nghị; reviewer kiểm tra thuật ngữ.",
+    "category": "TERMINOLOGY_REVIEW",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q03",
+    "raw_line": 233,
+    "title_vi": "Betaine: nitric acid",
+    "finding_vi": "Thân nguồn dùng nitric acid, bảng dùng nitric oxide.",
+    "handling_vi": "Giữ cờ chờ rà soát, không khẳng định cơ chế bị nghi vấn.",
+    "category": "TERMINOLOGY_REVIEW",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q04",
+    "raw_line": 416,
+    "title_vi": "Protein thực vật: diễn đạt “lacks”",
+    "finding_vi": "Nguồn nói soy lacks methionine và rice lacks isoleucine; dễ bị diễn giải thành không có amino acid đó.",
+    "handling_vi": "Không đưa câu này vào claim kiến thức đã duyệt; cần chuyên gia và nguồn nguyên thủy để phân biệt thiếu tương đối/giới hạn và vắng mặt.",
+    "category": "SCIENTIFIC_REVIEW",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q05",
+    "raw_line": 456,
+    "title_vi": "Bicarbonate: câu mâu thuẫn",
+    "finding_vi": "Câu “generally much less...” theo lượng300 mg/kg có vẻ mâu thuẫn với phần efficacy dùng cùng lượng.",
+    "handling_vi": "Chưa kết luận intended wording; không sửa ngầm, không dùng làm dosing rule.",
+    "category": "INTERNAL_WORDING_CONFLICT",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q06",
+    "raw_line": 280,
+    "title_vi": "Caffeine: quy tắc thi đấu có thời điểm",
+    "finding_vi": "Nguồn nêu IOC12 và NCAA15 mcg/ml cùng WADA không cấm; không đủ xác nhận hiệu lực hiện tại.",
+    "handling_vi": "Không áp dụng hiện hành; cần danh sách/chính sách chính thức theo tổ chức, năm, loại thi đấu.",
+    "category": "CURRENTNESS_REVIEW",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q07",
+    "raw_line": 83,
+    "title_vi": "Deer antler: bảng dễ gộp tác dụng phụ/cấm",
+    "finding_vi": "Bảng liệt kê adverse effects gắn prescription IGF-1 và banned; thân bài giải thích rõ hơn.",
+    "handling_vi": "Giữ context: không gán tác dụng phụ của thuốc IGF-1 cho mọi nhung hươu; không gộp mọi sản phẩm thành một banned ingredient.",
+    "category": "TABLE_CONTEXT_REQUIRED",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q08",
+    "raw_line": 389,
+    "title_vi": "Iron: UL so với độc tính cấp",
+    "finding_vi": "UL45 mg/ngày tuổi≥14 khác liều cấp tính>20 mg/kg; liều điều trị khác nhu cầu/RDA.",
+    "handling_vi": "Không đánh đồng các ngưỡng, không gợi ý liều điều trị hoặc tự bù sắt.",
+    "category": "UNIT_AND_CONTEXT_REVIEW",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q09",
+    "raw_line": 486,
+    "title_vi": "Banned substances/regulation: phạm vi Mỹ và thời điểm",
+    "finding_vi": "Mô tả FDA/DSHEA, năm2004/2013 và anti-doping không phải pháp luật Việt Nam hay chứng nhận năm2026.",
+    "handling_vi": "Giữ historical/source context; cần xác minh riêng trước tư vấn pháp lý/quy định hiện hành.",
+    "category": "JURISDICTION_CURRENTNESS",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q10",
+    "raw_line": 539,
+    "title_vi": "Thiếu bibliography, title và disclaimer trong tệp",
+    "finding_vi": "Tệp có các chỉ số1–219 nhưng không có danh mục References; cũng không có tiêu đề trang/Updated/Disclaimer.",
+    "handling_vi": "Khôi phục metadata từ trang chính thức riêng; đánh dấu bibliography_missing, không tạo219 tài liệu hoặc nói đã đọc chúng.",
+    "category": "INPUT_SCOPE",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q11",
+    "raw_line": 271,
+    "title_vi": "Safety caffeine400–500: khác nguồn và nhóm",
+    "finding_vi": "Bảng gom400–500, thân bài nêu FDA400 và AMA500; adolescents/energy drinks có bối cảnh khác.",
+    "handling_vi": "Không gộp thành một UL chung hoặc an toàn cá nhân; không áp cho thai kỳ/bệnh lý/thiếu niên.",
+    "category": "AUTHORITY_AND_POPULATION",
+    "status": "OPEN",
+    "medical_reviewer": null
+  },
+  {
+    "issue_id": "ODS-Q12",
+    "raw_line": 140,
+    "title_vi": "Bảng thành phần đơn khác blend",
+    "finding_vi": "Chú thích bảng nêu evidence cho từng thành phần, phối hợp có thể khác.",
+    "handling_vi": "Giữ cùng bảng/dữ liệu; không suy ra pre-workout blend an toàn/hiệu quả từ từng thành phần.",
+    "category": "COMBINATION_SCOPE",
+    "status": "OPEN",
+    "medical_reviewer": null
+  }
+]

@@ -79,6 +79,8 @@ jobs:
       - run: npm ci
       - run: npm run validate:contracts
       - run: npm run validate:ux-docs
+      - run: npm run validate:knowledge
+      - run: npm run test:knowledge
 
   migrations:
     name: Database Migrations Check

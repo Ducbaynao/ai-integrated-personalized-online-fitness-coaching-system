@@ -1,0 +1,55 @@
+{
+  "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+  "source_title": "Factors Affecting Weight & Health",
+  "publisher": "National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK), NIH",
+  "source_url": "https://www.niddk.nih.gov/health-information/weight-management/adult-overweight-obesity/factors-affecting-weight-health",
+  "source_last_reviewed": "2023-05",
+  "publication_date": null,
+  "verified_at": "2026-10-07",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "retrieval_enabled": false,
+  "input_type": "user_pasted_excerpt",
+  "raw_file": "raw/niddk-weight-factors-user-excerpt.en.md",
+  "raw_sha256": "d880c41997e5eae1dd4c087ef7c1421c5ccc89b6141fe97463c0c6982c5020c8",
+  "raw_fidelity": "Body text and links preserved; NBSP/trailing spacing normalized. Not byte-identical to chat input.",
+  "scope": "All six body sections supplied by user. No page introduction, navigation, footer or image bytes. Bibliography restored separately from verified source.",
+  "sections": [
+    {
+      "section_id": "S01",
+      "heading": "Lifestyle habits",
+      "raw_order": 1
+    },
+    {
+      "section_id": "S02",
+      "heading": "Where you live, work, play, and worship",
+      "raw_order": 2
+    },
+    {
+      "section_id": "S03",
+      "heading": "How much sleep you get",
+      "raw_order": 3
+    },
+    {
+      "section_id": "S04",
+      "heading": "Medicines",
+      "raw_order": 4
+    },
+    {
+      "section_id": "S05",
+      "heading": "Health problems",
+      "raw_order": 5
+    },
+    {
+      "section_id": "S06",
+      "heading": "Family history and genes",
+      "raw_order": 6
+    }
+  ],
+  "bibliography_file": "source-normalized/niddk-weight-factors-references.json",
+  "image_included": false,
+  "studies_independently_reviewed": false,
+  "reviewer": null,
+  "license_url": "https://www.niddk.nih.gov/copyright",
+  "policy_status": "PROPOSED_NOT_PROJECT_APPROVED"
+}

@@ -1,0 +1,19 @@
+{
+  "document_id": "WHO-PA-SB-2020-SOURCE-ANNEX-2",
+  "title": "Phụ lục 2: thành viên, reviewer, WHO",
+  "language": "en",
+  "source_id": "WHO-PA-SB-2020",
+  "source_pdf_pages": [
+    98,
+    101
+  ],
+  "content_role": "reference_only",
+  "status": "DRAFT",
+  "reviewer": null,
+  "version": "1.0.0",
+  "source_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "retrieval_enabled": false,
+  "duplicate_of_fulltext": true,
+  "note": "Choose one English source representation; do not index fulltext plus section files together."
+}

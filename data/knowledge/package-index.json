@@ -1,0 +1,2822 @@
+{
+  "format_version": 1,
+  "purpose": "F01_PREPARATION",
+  "status": "DRAFT",
+  "retrieval_enabled": false,
+  "packages": [
+    {
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "package_path": "packages/issn-protein-2017-rag-normalized-v1",
+      "manifest_path": "data/knowledge/issn-protein-2017-source-manifest.json",
+      "attribution_path": "LICENSE-ATTRIBUTION.md",
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "files": [
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/01-scope.vi.md",
+          "sha256": "78f5c8cab39d2524bc9a309de18800280ae92ccd4f2f085180e4fd6e71d7f084",
+          "bytes": 2334,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/01-scope.vi.metadata.json",
+          "sha256": "2850ad0d689e3b4f339b9588155948f30ac4c02fe178b78be292d1bbf3bd687c",
+          "bytes": 1082,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/02-glossary.vi.md",
+          "sha256": "c1ecba811d1ea2fbe844ebb047f8bb639fdc894b24b0fd4f2497507114c97ecb",
+          "bytes": 4284,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/02-glossary.vi.metadata.json",
+          "sha256": "b2885abe4cd05c51f2445d450d5f083755e37b2ab1b6a29af8ad09d25c9a76b8",
+          "bytes": 1114,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/03-daily-protein.vi.md",
+          "sha256": "7b1ec84cf3163abfd2dbeaa5395b8fbd246ce5c5d6f8b8ff01c01bcca488e251",
+          "bytes": 4025,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/03-daily-protein.vi.metadata.json",
+          "sha256": "8636d7c1c946015d69c4cd9d310c5dfc91b9d25ae064ed8c500b825d81fd7819",
+          "bytes": 1161,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+          "sha256": "d289f99bbd4b3850203d59647994dab9852889f2047f84ed9c6b57f5ab9a304e",
+          "bytes": 3362,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.metadata.json",
+          "sha256": "b7ef89c13b7034752a7a61a56dadae43786815ef7bedf5b59fafbbf0dea9d1a9",
+          "bytes": 1128,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/05-timing.vi.md",
+          "sha256": "68475349754eff6f9334ba05226539b42b9bb25d1956a4b46a0eeb304bb5f7f1",
+          "bytes": 3462,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/05-timing.vi.metadata.json",
+          "sha256": "8a9a915a110504695cfc22abf86f8de06f66529d0d6a70f50ed57cae7f1d7448",
+          "bytes": 1131,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/06-pre-sleep.vi.md",
+          "sha256": "daa174d02d500915fb15d989632b09cb083d05192bd2c88485aff9179297f942",
+          "bytes": 2845,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/06-pre-sleep.vi.metadata.json",
+          "sha256": "cb5b3229a9e55bafeb54d06f2ebfbd7f64329e596b6505d4e9275830c6425a10",
+          "bytes": 1109,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/07-endurance.vi.md",
+          "sha256": "767ac43eabcf6108dbb00160f6e31cfe9dea8ff997bc8c4e69c57d4dcea7bef7",
+          "bytes": 2729,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/07-endurance.vi.metadata.json",
+          "sha256": "d76ab30288b90906980269ed2b115e286e0281bc95864e0ea251bae023cbc624",
+          "bytes": 1085,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/08-strength.vi.md",
+          "sha256": "7dfb17cffec691ac7f539718dfd18e9023100c0cec2ef72734609ac78b2c262f",
+          "bytes": 1875,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/08-strength.vi.metadata.json",
+          "sha256": "0c38e2f750c078d32ee170e5d3e382cd05dbd70ee9c83ad8f42c0bc3f4892eb1",
+          "bytes": 1038,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/09-body-composition.vi.md",
+          "sha256": "cf6a7e7136d9851ca75f3b0d9dcec6116b0131f35ae86f823343466f8942e65a",
+          "bytes": 1989,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/09-body-composition.vi.metadata.json",
+          "sha256": "47e8939b142b8a94719014cc20f790162bc14a86ed357ac40abdabd7c429e677",
+          "bytes": 1069,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/10-quality.vi.md",
+          "sha256": "43d0a1bed87f1d6b7f1fe29b5d6233c2fa5962b19c233411cee150007554683a",
+          "bytes": 2968,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/10-quality.vi.metadata.json",
+          "sha256": "25317c9816e26ecacaa5134a08f70da35696b3ec1826d0104c168d229909cf85",
+          "bytes": 1145,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/11-milk.vi.md",
+          "sha256": "d19d284966667d968db047d00369646ca67eb8c31283d7245e0b0e97a2bfa228",
+          "bytes": 2177,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/11-milk.vi.metadata.json",
+          "sha256": "c6872b816dbab1f042e94c41c532970ae2cd0e1ea91c1ed567d4ee539de5111d",
+          "bytes": 1074,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/12-egg-meat.vi.md",
+          "sha256": "d0ed9629f7ec9cb51dad542dd34f0a1bdcdff8dddbfc6062655b601f2dcf257c",
+          "bytes": 2140,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/12-egg-meat.vi.metadata.json",
+          "sha256": "0291ae45a88b21a75dd6978e7f4abc478cd2131bb67a27eebfcc0afe282f14fb",
+          "bytes": 1047,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/13-plant.vi.md",
+          "sha256": "afeb826107808cf4663d90de8a1eaec7db672b9a8d698deda888349e762e2cfc",
+          "bytes": 2306,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/13-plant.vi.metadata.json",
+          "sha256": "c5991a4831d8b0c52356ff3b25c2afb12dfe61fd60bebe2c866cde9deb006593",
+          "bytes": 1085,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/14-blends.vi.md",
+          "sha256": "d299d7e1484c7c26483c4fb345a4910fd77b8e5649018156c9bbc8d31266f151",
+          "bytes": 1617,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/14-blends.vi.metadata.json",
+          "sha256": "8700b6b237dba1173025198b1b9379174ff7541214321a7727f0e343eba39902",
+          "bytes": 1023,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/15-processing.vi.md",
+          "sha256": "3e62d33827e0e1716af98da502b261cb9626b6bb4530865cc07162b20b399161",
+          "bytes": 2178,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/15-processing.vi.metadata.json",
+          "sha256": "93f41606ec91f74e0cd6fb4f7d9dc60ef704df2c42515ea909879f9b22b0e778",
+          "bytes": 1046,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/16-safety.vi.md",
+          "sha256": "3c64f4b2557019be9508f32229404a1d443055153eed37af545904eb539607f7",
+          "bytes": 2310,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/16-safety.vi.metadata.json",
+          "sha256": "ca0cf5e520e66bd4eca4ac416c777477f08612b4ba5d8fdbbb970d5820a61fa4",
+          "bytes": 1051,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/17-conclusion-provenance.vi.md",
+          "sha256": "74f9ec1079c7291067fa00c8eab17acdcdd0a56390e98182838c0498aea6289c",
+          "bytes": 2637,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/17-conclusion-provenance.vi.metadata.json",
+          "sha256": "651c240b1efdbf97605960a68f925de0c43c130a8cd90d4a11895c89ff2966f6",
+          "bytes": 1061,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/18-project-usage.vi.md",
+          "sha256": "ac34014e209eb8969eb0315cc038f15ab7a16d31d8b08dfafa65cedeaa13bc29",
+          "bytes": 3217,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/issn-protein-2017/18-project-usage.vi.metadata.json",
+          "sha256": "60e08d8188f41e681030ecfccd3dbad8f1b70f8c08362664d6ecab7399943872",
+          "bytes": 1050,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/evaluation/f01-issn-protein-2017-candidate-cases.jsonl",
+          "sha256": "e19ba5bed26bb14f7a6e654085895302266650dca84c2c6d64b75eba16b25d85",
+          "bytes": 14125,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/issn-protein-2017-position-statements.vi.json",
+          "sha256": "0a66ecbf42c62ad62f5eb519e3c5d259f6d622fbd6875c898096dbbaf9c7781f",
+          "bytes": 13833,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/issn-protein-2017-source-manifest.json",
+          "sha256": "3ce4f35e345bed3609155b05e4a5bfb91ee1706e038d4fafd37dafb52ab7811d",
+          "bytes": 3849,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/issn-protein-2017-source-page-map.json",
+          "sha256": "fc6a6a6789065059346654750482a9eead3d82ee8e87a6b2a66261a02a1649c6",
+          "bytes": 6176,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/raw/issn-protein-and-exercise-2017.pdf",
+          "sha256": "7a97a81db0334c95ddd17a2009200e7f38945988b3e1dd5aa70f73a502fe8140",
+          "bytes": 672473,
+          "storage": "LOCAL_OBJECT_STAGING",
+          "local_staging_path": "infrastructure/data/knowledge/7a97a81db0334c95ddd17a2009200e7f38945988b3e1dd5aa70f73a502fe8140.pdf",
+          "object_key": null
+        },
+        {
+          "path": "data/knowledge/README-issn-protein-2017.md",
+          "sha256": "6c83087f2d3f80ce1b115c838256ed1efe44d40bd28a7dd54c2c350547b418c5",
+          "bytes": 3856,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-001.en.md",
+          "sha256": "e7005ce8d812d87bc5f44ac35f1b8d0026de554c501b8ec8f9006507794bb3eb",
+          "bytes": 4150,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-001.en.metadata.json",
+          "sha256": "9f6b6ec679bb2a171341bc1f3e75206e684715e1919c108d5c7c82dd7055409a",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-002.en.md",
+          "sha256": "44c8f9f07d97820062ff38a9aae79ae24eead53045494583dbe2fde063f6aefe",
+          "bytes": 6956,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-002.en.metadata.json",
+          "sha256": "f5841e7e69af69aa5d7d0878b89ca3602c8fc28058c87ca5d6284c561c949323",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-003.en.md",
+          "sha256": "613377df261f5a3157a9528826d30c407859f8c6b6ef6f978d5dba6b6ab5d9b8",
+          "bytes": 7399,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-003.en.metadata.json",
+          "sha256": "4b0e6d717559f84702b26cfd09ed025cefed2025f537b74cbbda9b4f2201fb13",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-004.en.md",
+          "sha256": "a036d5591bc32d30b6045af19470988b5922fdac6620ab76e5b204e25df055df",
+          "bytes": 7561,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-004.en.metadata.json",
+          "sha256": "34088ea869f50a5b5821e354c876c2e0f5206782401aee779216c04dbfbbdbfd",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-005.en.md",
+          "sha256": "7ad4a6ba8f4a2fcd265f8f290d40e4de1dbf0dd22a960a395598081cad3f9e35",
+          "bytes": 7456,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-005.en.metadata.json",
+          "sha256": "b62a904299a5e78a258dd303a9eab675cd129a1fdc8e6cf644e04e09968aa87e",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-006.en.md",
+          "sha256": "169778cfde08062222cf6b371ff3203c9b2569c6849471ab981a18e27fc7005e",
+          "bytes": 7463,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-006.en.metadata.json",
+          "sha256": "2aebc003c8420c61c3cc281b641022f03e537a857ec11cb9b2a5952333813c6a",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-007.en.md",
+          "sha256": "88c618e6960950031072459a16c5bc4e09fb19c6110cfdbf361eef54dd05511a",
+          "bytes": 7373,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-007.en.metadata.json",
+          "sha256": "f04b186d55da8326abb726705e79a53cb36c7325dda09e36a388042fe32b8a2c",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-008.en.md",
+          "sha256": "8972ef24787939d8491ae6b02ac1ae0fd59c34bc231d82fa564c83f03e2c49ff",
+          "bytes": 7576,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-008.en.metadata.json",
+          "sha256": "c2f7774e94c681b8852c0c454de2d8f87477d78cd68bc06c15a3226dc669e425",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-009.en.md",
+          "sha256": "c2fbdee0b488f8570751b516a9862318fc92f0bfaa9395c1e17c338c28210e58",
+          "bytes": 7402,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-009.en.metadata.json",
+          "sha256": "f2582a6267fe8a54d829d20b6d22b755ea0e797ac8f6cfe29d0280bb8c1c2e4f",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-010.en.md",
+          "sha256": "9bc2c3bb0512e4dd63ace05ca2a6961e82fb50888a913368eec1371b07ab010f",
+          "bytes": 7514,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-010.en.metadata.json",
+          "sha256": "196931b49f2400db36ecc834a9d330e62feee4541257a5e06cf534bb758a5b88",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-011.en.md",
+          "sha256": "5bb1490c2196669aaa2c1fc02dcc164359ab99726d2204cae7bfee743817c9d1",
+          "bytes": 7263,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-011.en.metadata.json",
+          "sha256": "8745b7c1d37e12e5801713a6dd913b94cd7aabbedba3340f5ef3a0ab340c16a2",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-012.en.md",
+          "sha256": "4a4b175fb5ef7fb8f7d1559576dd3f708e9a21dbd3f75ba63b104cf0cc499440",
+          "bytes": 7041,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-012.en.metadata.json",
+          "sha256": "b143d076e53403691709284ec1dca63cac2ac4816ab28fec95b2505ae37f265c",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-013.en.md",
+          "sha256": "2a64ec0423b216c54c15b677f69bb74f847491cbd1bedb257b20a913c901e74a",
+          "bytes": 7362,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-013.en.metadata.json",
+          "sha256": "1bcafe6d425de0689439a7b4c0301446e50fd5fc6de7a050d7a15b498ab69fd8",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-014.en.md",
+          "sha256": "6e1e152007086a4288f6c46f1d9932fec7adb0c0d3b7cffd8fe9af08fcd82e28",
+          "bytes": 7423,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-014.en.metadata.json",
+          "sha256": "5151fb817a5cbafbd0a4568572755ac79c8ef5d6a8f46f0014701defe0263826",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-015.en.md",
+          "sha256": "0edc085b0c9e7d734d67e50670dd5cddd01c036f607465faad8de9360d7e76e5",
+          "bytes": 7437,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-015.en.metadata.json",
+          "sha256": "cf22cd4f020f8054cb295fbba3737aff3d7a16e965cc505d58018a453032a896",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-016.en.md",
+          "sha256": "c607380c440eee5ec5d49229db87d996d00972d091618d1ccbca7c32d322e981",
+          "bytes": 7530,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-016.en.metadata.json",
+          "sha256": "382cc31cf531c3a414910dce83e6b1a2f98d087383510e3178d8bac27f49e7cb",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-017.en.md",
+          "sha256": "963e58c2acaa2aa06818b07e45b06452fac2878b3c70e7151af371355f73355c",
+          "bytes": 7448,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-017.en.metadata.json",
+          "sha256": "3ab65b008a32c93b2ddf111c6ff72eb1f4144ae494dfefb771fb4713714e50df",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-018.en.md",
+          "sha256": "254d1bcb3b75b4c1a2418225c0003c43145849aecc2e5ab12fafa1e582a93d7d",
+          "bytes": 7356,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-018.en.metadata.json",
+          "sha256": "12d583b8aa8b97cc8b182a98d49f4bb3ad35cc22481b6999534d006a197112b9",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-019.en.md",
+          "sha256": "342420877ded358fd54eac9d36c6ed4246ebdca6c1f03cb510776863ac3da76a",
+          "bytes": 7175,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-019.en.metadata.json",
+          "sha256": "edd9c1a5a176d553078c8b74d063415371012367b6f0d97a3e3c6369550f7b9d",
+          "bytes": 560,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-020.en.md",
+          "sha256": "644ed9887ee59a875363800977c37b697ee585001707da6f7c3b7733825db263",
+          "bytes": 10854,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-020.en.metadata.json",
+          "sha256": "8a2b8c87d1249671be320aba4f1e28cc909a5c0e3471eeeda06ff540c9c05aa5",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-021.en.md",
+          "sha256": "f9348cd24a4dba513cd41dd33e3119240f8a41a4eef507f7a74b22742b118cfd",
+          "bytes": 11320,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-021.en.metadata.json",
+          "sha256": "691101cb0e5a252702874b91b04bb7345618c9f4ab48ca7ab0be15725c2d7c90",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-022.en.md",
+          "sha256": "bdb2a28da2716f90eb72909ae12141eb42dbd7a2ec5170667b65bb74e1a730b9",
+          "bytes": 11343,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-022.en.metadata.json",
+          "sha256": "205411e87e12e2989b8cb353d625d5494493866fd60f87273bedb8ed62355fd8",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-023.en.md",
+          "sha256": "ca049def24f2cd8d14c7f98f0a1e55cc5a7a1c64258c167774edf4ae800b28d5",
+          "bytes": 11245,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-023.en.metadata.json",
+          "sha256": "b0766d4a3a1c33ad49cb3b388f3a1565039f03f8d45b2904d994501c860ff3ae",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-024.en.md",
+          "sha256": "680a7249636f65feb53ab8a24bc01a5bad3767be31711894095631b13b09407e",
+          "bytes": 11333,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-024.en.metadata.json",
+          "sha256": "44a9bb1f476f396bb173ed1af9a212a9406bc27f4eeeef8512912c40f07d92a7",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-025.en.md",
+          "sha256": "8119d5e0a1c4c68d259bee85f32f8441ea227b289bbef89d357778a4d31fc012",
+          "bytes": 10891,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017/page-025.en.metadata.json",
+          "sha256": "0cafa5ac8908da9b1ded6a8d51e859b17019864b19ce9f4e4641a01777b1b5b2",
+          "bytes": 558,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/issn-protein-2017-fulltext.en.md",
+          "sha256": "f4d8e0965d0b7923c3f7462cddf66f0e65ee372184b619552fcbafce33ab60fe",
+          "bytes": 197086,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "issn-protein-2017-normalized.vi.md",
+          "sha256": "8f2f46187f38a2a58aa8416d7af61a90d20f3bfb0f480d331f623c695b1d267d",
+          "bytes": 49513,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "LICENSE-ATTRIBUTION.md",
+          "sha256": "26a8ae4c447d3440c90ca5ea395d24b73c5a7dfbece32d15d13fa2f94870b928",
+          "bytes": 1790,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "README.md",
+          "sha256": "f569d6ec7e45956b0167a76d49368c1dca39b9a9af0c01cbbaf1b0f0b9ff9044",
+          "bytes": 4016,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "review-report.md",
+          "sha256": "26fd2586063825c8eaaeb2b19a5d0f81f475b8f6a6440342fca6429bcfe0fa62",
+          "bytes": 3968,
+          "storage": "REPOSITORY_TEXT"
+        }
+      ],
+      "articles": [
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-01",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/01-scope.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/01-scope.vi.md",
+          "content_sha256": "78f5c8cab39d2524bc9a309de18800280ae92ccd4f2f085180e4fd6e71d7f084",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-02",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/02-glossary.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/02-glossary.vi.md",
+          "content_sha256": "c1ecba811d1ea2fbe844ebb047f8bb639fdc894b24b0fd4f2497507114c97ecb",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/03-daily-protein.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/03-daily-protein.vi.md",
+          "content_sha256": "7b1ec84cf3163abfd2dbeaa5395b8fbd246ce5c5d6f8b8ff01c01bcca488e251",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+          "content_sha256": "d289f99bbd4b3850203d59647994dab9852889f2047f84ed9c6b57f5ab9a304e",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-05",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/05-timing.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/05-timing.vi.md",
+          "content_sha256": "68475349754eff6f9334ba05226539b42b9bb25d1956a4b46a0eeb304bb5f7f1",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-06",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/06-pre-sleep.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/06-pre-sleep.vi.md",
+          "content_sha256": "daa174d02d500915fb15d989632b09cb083d05192bd2c88485aff9179297f942",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-07",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/07-endurance.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/07-endurance.vi.md",
+          "content_sha256": "767ac43eabcf6108dbb00160f6e31cfe9dea8ff997bc8c4e69c57d4dcea7bef7",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-08",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/08-strength.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/08-strength.vi.md",
+          "content_sha256": "7dfb17cffec691ac7f539718dfd18e9023100c0cec2ef72734609ac78b2c262f",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-09",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/09-body-composition.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/09-body-composition.vi.md",
+          "content_sha256": "cf6a7e7136d9851ca75f3b0d9dcec6116b0131f35ae86f823343466f8942e65a",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-10",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/10-quality.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/10-quality.vi.md",
+          "content_sha256": "43d0a1bed87f1d6b7f1fe29b5d6233c2fa5962b19c233411cee150007554683a",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-11",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/11-milk.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/11-milk.vi.md",
+          "content_sha256": "d19d284966667d968db047d00369646ca67eb8c31283d7245e0b0e97a2bfa228",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-12",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/12-egg-meat.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/12-egg-meat.vi.md",
+          "content_sha256": "d0ed9629f7ec9cb51dad542dd34f0a1bdcdff8dddbfc6062655b601f2dcf257c",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-13",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/13-plant.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/13-plant.vi.md",
+          "content_sha256": "afeb826107808cf4663d90de8a1eaec7db672b9a8d698deda888349e762e2cfc",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-14",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/14-blends.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/14-blends.vi.md",
+          "content_sha256": "d299d7e1484c7c26483c4fb345a4910fd77b8e5649018156c9bbc8d31266f151",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-15",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/15-processing.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/15-processing.vi.md",
+          "content_sha256": "3e62d33827e0e1716af98da502b261cb9626b6bb4530865cc07162b20b399161",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-16",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/16-safety.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/16-safety.vi.md",
+          "content_sha256": "3c64f4b2557019be9508f32229404a1d443055153eed37af545904eb539607f7",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-17",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/17-conclusion-provenance.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/17-conclusion-provenance.vi.md",
+          "content_sha256": "74f9ec1079c7291067fa00c8eab17acdcdd0a56390e98182838c0498aea6289c",
+          "content_role": "reference_only"
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-18",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/issn-protein-2017/18-project-usage.vi.metadata.json",
+          "content_path": "data/knowledge/curated/issn-protein-2017/18-project-usage.vi.md",
+          "content_sha256": "ac34014e209eb8969eb0315cc038f15ab7a16d31d8b08dfafa65cedeaa13bc29",
+          "content_role": "project_guidance"
+        }
+      ]
+    },
+    {
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "package_path": "packages/niddk-weight-factors-rag-normalized-v1",
+      "manifest_path": "data/knowledge/niddk-weight-factors-source-manifest.json",
+      "attribution_path": "LICENSE-ATTRIBUTION-niddk.md",
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "files": [
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.md",
+          "sha256": "b75825137a19e142ea32c380c965afee91deb6f8307c7a7834bca0626855b523",
+          "bytes": 1475,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.metadata.json",
+          "sha256": "7d8bdba7977b9415ec2afae8dc54d1d1ccc237878fb97999913f1e1cf90457ba",
+          "bytes": 1395,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/02-lifestyle.vi.md",
+          "sha256": "70ebd4fcf742f8d07d8586608b67c13ed2960f56c196f0c64d74de7af4612ef1",
+          "bytes": 1749,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/02-lifestyle.vi.metadata.json",
+          "sha256": "859a2f34f75e540ea3132e8d8175d86918e82401914641f7f1a2aaf7d8857eb0",
+          "bytes": 1272,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/03-environment.vi.md",
+          "sha256": "9f7d22bd11c213fd19b60ff848a5ab814f35c99b4489a2309015cc29680df96d",
+          "bytes": 1484,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/03-environment.vi.metadata.json",
+          "sha256": "e5eb25a4ef85e20c1d7021043f87bfa3b39d0741d821ded5a64cfab561742ca2",
+          "bytes": 1311,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/04-sleep.vi.md",
+          "sha256": "4ba66733c47e58fa077b34c7818ca79aefac149ba7167f20a75839e67fea535b",
+          "bytes": 1748,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/04-sleep.vi.metadata.json",
+          "sha256": "1498227e86470d86bd0be1110821fb060be28d81e206d799707fec34367035c7",
+          "bytes": 1307,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/05-medicines.vi.md",
+          "sha256": "6b344cca9a7a69e055d6067b6cdf69ce6acf6ee90d0f404b5114fcbffb5241c0",
+          "bytes": 2303,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/05-medicines.vi.metadata.json",
+          "sha256": "3db5b8394755c66cc3c1a2d712e9ec20b893c62aa6bf1e7d54c2f9250b4ebb06",
+          "bytes": 1263,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.md",
+          "sha256": "28ea32f116a3e96714ee22ccb50d9d0d44353b8bd0bee366be93449540fffa7a",
+          "bytes": 2247,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.metadata.json",
+          "sha256": "5306902c8aaa2a9f75e9d2bec01a92c0872c0060d980783c6746d2a168b9ef3d",
+          "bytes": 1284,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/07-family-genes.vi.md",
+          "sha256": "d465b1f28206a79e71cd92f57850e7de3b5903ef859a2f6b3f8b265e4cac2022",
+          "bytes": 1458,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/07-family-genes.vi.metadata.json",
+          "sha256": "88babd4d88c6fff661e9effa3788a99851a5f7e6e34105a6a5f6ebc165ce812b",
+          "bytes": 1339,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/08-project-usage.vi.md",
+          "sha256": "ef46e0e7614544dec48fd03d8295d55bf555836adf9c370a74f119f531e04e2c",
+          "bytes": 3269,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/niddk-weight-factors/08-project-usage.vi.metadata.json",
+          "sha256": "b3196c51575f086dabd8e9b546beac69cac91a9a70364c4795385197f146da01",
+          "bytes": 1225,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/evaluation/f01-niddk-weight-factors-candidate-cases.jsonl",
+          "sha256": "0a3c9619a81169477f8c2b3e4467457afeb68141ee95580d0c3841cd86157dd4",
+          "bytes": 9111,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/niddk-weight-factors-claims.vi.json",
+          "sha256": "2073f23ca2e494651331ee5b2b0b0be6f2aecc73c81d846a3f98cef00480b28d",
+          "bytes": 6962,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/niddk-weight-factors-source-manifest.json",
+          "sha256": "e33666362f5a39b712787c75f06d5200e90adc23881c084ce636c6558e3168b1",
+          "bytes": 1892,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/raw/niddk-weight-factors-user-excerpt.en.md",
+          "sha256": "d880c41997e5eae1dd4c087ef7c1421c5ccc89b6141fe97463c0c6982c5020c8",
+          "bytes": 6081,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/README-niddk-weight-factors.md",
+          "sha256": "aa4b35f38601cdfe93e5045f09716b56116430c46ba1424c077afbd0cdbdaa84",
+          "bytes": 2492,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/niddk-weight-factors-excerpt.en.md",
+          "sha256": "8dc9158fb908ab5ef2ac6a895c816ca704ac726ec6467937e9394b79534abbd3",
+          "bytes": 6361,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/niddk-weight-factors-references.json",
+          "sha256": "99dee78a3932501e9b97c1e7296db23f519ad9f97da28c16549be6cc4558e3a2",
+          "bytes": 1476,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "LICENSE-ATTRIBUTION-niddk.md",
+          "sha256": "d36f98a5ed974dd251f2981bf3c33e4e20e3f9e23361975df199df19fe4035b5",
+          "bytes": 1615,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "niddk-weight-factors-normalized.vi.md",
+          "sha256": "a68f70c04e738143eb9a3814c86941ccd61bc1e7e5b3502bd0da91ac620d0f50",
+          "bytes": 17803,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "README-niddk-weight-factors.md",
+          "sha256": "29c9981f6b8bedf6ef10230f8ed8456cd6bff47635226f68a967450f36de7b35",
+          "bytes": 2650,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "review-report-niddk.md",
+          "sha256": "c35703d75e9667bb9874e56eea50c8c58033be2c661ceeda8c56a2264fb2efb4",
+          "bytes": 4162,
+          "storage": "REPOSITORY_TEXT"
+        }
+      ],
+      "articles": [
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.md",
+          "content_sha256": "b75825137a19e142ea32c380c965afee91deb6f8307c7a7834bca0626855b523",
+          "content_role": "overview"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/02-lifestyle.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/02-lifestyle.vi.md",
+          "content_sha256": "70ebd4fcf742f8d07d8586608b67c13ed2960f56c196f0c64d74de7af4612ef1",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/03-environment.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/03-environment.vi.md",
+          "content_sha256": "9f7d22bd11c213fd19b60ff848a5ab814f35c99b4489a2309015cc29680df96d",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/04-sleep.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/04-sleep.vi.md",
+          "content_sha256": "4ba66733c47e58fa077b34c7818ca79aefac149ba7167f20a75839e67fea535b",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-05",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/05-medicines.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/05-medicines.vi.md",
+          "content_sha256": "6b344cca9a7a69e055d6067b6cdf69ce6acf6ee90d0f404b5114fcbffb5241c0",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.md",
+          "content_sha256": "28ea32f116a3e96714ee22ccb50d9d0d44353b8bd0bee366be93449540fffa7a",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-07",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/07-family-genes.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/07-family-genes.vi.md",
+          "content_sha256": "d465b1f28206a79e71cd92f57850e7de3b5903ef859a2f6b3f8b265e4cac2022",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-08",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/niddk-weight-factors/08-project-usage.vi.metadata.json",
+          "content_path": "data/knowledge/curated/niddk-weight-factors/08-project-usage.vi.md",
+          "content_sha256": "ef46e0e7614544dec48fd03d8295d55bf555836adf9c370a74f119f531e04e2c",
+          "content_role": "project_guidance"
+        }
+      ]
+    },
+    {
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "package_path": "packages/ods-exercise-supplements-rag-normalized-v1",
+      "manifest_path": "data/knowledge/ods-exercise-supplements-source-manifest.json",
+      "attribution_path": "LICENSE-ATTRIBUTION-ods.md",
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "files": [
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/01-overview.vi.md",
+          "sha256": "d94c6e92649603579ca2eb5d6c2249ee3ee84e43b6676f0fd1efcf10b18a925d",
+          "bytes": 2079,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/01-overview.vi.metadata.json",
+          "sha256": "41cd1c308dfc7f3f8f5b1d70b73e130bc8ec0bc026e295df77b895bb69f73d3f",
+          "bytes": 1504,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/02-foundation.vi.md",
+          "sha256": "6045c4fd1428788321ebc6a9bce6d4a22e26b1295bbb6f75437896e7b3db119b",
+          "bytes": 1984,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/02-foundation.vi.metadata.json",
+          "sha256": "67ebb8623457acaf640853d2e58fa1061e28c3bf87703ee6d5847cddcf73dc6a",
+          "bytes": 1441,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/03-evidence-and-blends.vi.md",
+          "sha256": "f414964fbebda4b5f224595b658d899bbc5dcbe9b6001819284d89081e7a3ad6",
+          "bytes": 2109,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/03-evidence-and-blends.vi.metadata.json",
+          "sha256": "a6f2aabe3fcbaf95fde5878271441a40a1b912f16c7ed8c428bc54d3d8c7448a",
+          "bytes": 1464,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/04-antioxidants.vi.md",
+          "sha256": "105b49bf8757815ee54dbbe8291af92e07deef0cc566b1033620a24bb7d8101a",
+          "bytes": 2050,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/04-antioxidants.vi.metadata.json",
+          "sha256": "52cbf479302e232f2d65aab4748ddd64ce5c96d1455f2f04404ffe0aaacb5506",
+          "bytes": 1392,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/05-arginine.vi.md",
+          "sha256": "212f389cbee3ac8eb0d8cdf6271611fbd13ddc172e26c8e1143652c246d7924e",
+          "bytes": 1717,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/05-arginine.vi.metadata.json",
+          "sha256": "47a792a6c738b530e1d7768bdd0f64af9daa906e8e8e277db1a64270977a98ef",
+          "bytes": 1348,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/06-beetroot.vi.md",
+          "sha256": "84429f235f8de48b9f0fe8c36bbcd6f30abfb57cb264a02b9f2802ba535ae7f6",
+          "bytes": 2085,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/06-beetroot.vi.metadata.json",
+          "sha256": "680386c6f42941db47895a972503ee5f8c74bcfcb55efc951493360409285e5f",
+          "bytes": 1390,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/07-beta-alanine.vi.md",
+          "sha256": "b67ffc1a244499768da1db7e4a17a6a6f5748fefecb42b34b1fa4b9fe88d6057",
+          "bytes": 1856,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/07-beta-alanine.vi.metadata.json",
+          "sha256": "9258f307c2fa7fc443dd7b84bf63814b1e9db63e37b309d544fc2a871cc90ce9",
+          "bytes": 1352,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/08-hmb.vi.md",
+          "sha256": "c54975ae6d6ed7b3ae45ddfab246978d6960fa554a22f806ceeec9a03361fe4f",
+          "bytes": 1825,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/08-hmb.vi.metadata.json",
+          "sha256": "68986adb0b7cb1fba43dbf0b2d8b8a9cca313b42562ae1c245b4f8bc19118e2a",
+          "bytes": 1380,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/09-betaine.vi.md",
+          "sha256": "0d6ac73bfa68172835c9a3c24a61d0fccc89bb92765d6d7eb63815399242a77f",
+          "bytes": 1604,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/09-betaine.vi.metadata.json",
+          "sha256": "98bdef92a6580f5c5cd9ff29e8707de661ec3f0e1873f6b385b7c9dda64ee3de",
+          "bytes": 1364,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/10-bcaa.vi.md",
+          "sha256": "d11eaac2c8ed2361c699f9b76835b2ff6e2d12e575d6955543784b98b9da10c4",
+          "bytes": 1740,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/10-bcaa.vi.metadata.json",
+          "sha256": "0d2dc46d7e33d79dfcbefe25bb65f5f77ce875ed7163ce0a4a7d3978fed8bf35",
+          "bytes": 1376,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/11-caffeine.vi.md",
+          "sha256": "637968572f297d6c4d5ed22bf99ea438f3b9374990a66977a5407353b1b9eae7",
+          "bytes": 2241,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/11-caffeine.vi.metadata.json",
+          "sha256": "ababb5864cd398f8d3bbb7d5776882bdfb41fe367c0f0cca2980d54f8fb99739",
+          "bytes": 1395,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/12-citrulline.vi.md",
+          "sha256": "0473e40b85e3b4fbdd0a0bb4137ce6f0567f66d69873c17a68a9d3b0606c83d8",
+          "bytes": 1756,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/12-citrulline.vi.metadata.json",
+          "sha256": "0aaf6e06a102e1363739c40981836a26998988c27191cffbc99ff0ae8f22a838",
+          "bytes": 1372,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/13-creatine.vi.md",
+          "sha256": "cea2e253fd51e85d90455a7cdf419ee8df0c49146e85aa8b2214a9c3e8a19502",
+          "bytes": 2033,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/13-creatine.vi.metadata.json",
+          "sha256": "f77cb399af888702e1693b7841e3cf67ab5577e9aeeb469cdba38ec1cb392cb4",
+          "bytes": 1348,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/14-deer-antler.vi.md",
+          "sha256": "4e0aa2816c3047f6fb2a65f620fc3b01371d30c46c666ba90329f05616d3bcf6",
+          "bytes": 1875,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/14-deer-antler.vi.metadata.json",
+          "sha256": "a6aa4f7e77e62a96a9667f9279d572efa3920f0f43f033fc349445c3ad05c8a4",
+          "bytes": 1392,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/15-dhea.vi.md",
+          "sha256": "e7f6d057c437e2c26a7cb8d96f60f462b845b81b22091194f7f3ff5f41201b68",
+          "bytes": 1638,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/15-dhea.vi.metadata.json",
+          "sha256": "f1a69ae94050e00d9c9b2ae965f3532d2b5d120c96c912103c8f18ee9b539ad6",
+          "bytes": 1371,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/16-ginseng.vi.md",
+          "sha256": "050f321debdf314449a0ca577b391e2f9209d75849d2dddd9a02ac574fe809b2",
+          "bytes": 1509,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/16-ginseng.vi.metadata.json",
+          "sha256": "cca7987e3ea21849f8277a141fefecbbb34c984165985c4f9146ccd968a7c11e",
+          "bytes": 1362,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/17-glutamine.vi.md",
+          "sha256": "ba695fef398720a3155680058249258aba041e16dee5f0a240b68e424b418b41",
+          "bytes": 1695,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/17-glutamine.vi.metadata.json",
+          "sha256": "6ce0dba003a6e0159147d11a4e9d2331b0200f0b9faa772019ee6496c1141c61",
+          "bytes": 1349,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/18-iron.vi.md",
+          "sha256": "fe2f6889ed6c384b03d7c381c7523ff50458d0e33b474e43c2c9f8f5e551c962",
+          "bytes": 1983,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/18-iron.vi.metadata.json",
+          "sha256": "09af0c1baa0201c7ca5678091e25e575201994e9dcff0e8b4aa9348dc0179f5c",
+          "bytes": 1362,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/19-protein.vi.md",
+          "sha256": "ee88109679a77385fed6e2b05eedc26174c83830ed75c4823eb001c62cbbd50e",
+          "bytes": 2289,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/19-protein.vi.metadata.json",
+          "sha256": "1ff7d45cb9686881d56fa94ba562032d4a97dfb1904e86933574d69a89f1b96f",
+          "bytes": 1364,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/20-quercetin.vi.md",
+          "sha256": "1cb97aeef992820c180cb9d801ec60c594aa98cb4b849f92b1a6f66b1dcb237d",
+          "bytes": 1606,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/20-quercetin.vi.metadata.json",
+          "sha256": "8d18486653b29b1072251a1bbf7bd08c1feac884c20ca08fbba75b5031e7b1d5",
+          "bytes": 1349,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/21-ribose.vi.md",
+          "sha256": "b24ad722c6144fabc63adcb43e2d6abc48f6f3cf24db0d2126443603b92bd7f4",
+          "bytes": 1336,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/21-ribose.vi.metadata.json",
+          "sha256": "a0141380f9e1dfe5d27b5c2d58afaea55adaea9d7e549b7472b1a351b0348448",
+          "bytes": 1346,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/22-bicarbonate.vi.md",
+          "sha256": "51b5f825672060c23152fdc7c13275f8e55b9fc460f47d54d3d90a5186530c2c",
+          "bytes": 2026,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/22-bicarbonate.vi.metadata.json",
+          "sha256": "97ee274ea0231c47f269c2c18928199460ed24f2710ab4f4576ad10149ec87d2",
+          "bytes": 1396,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/23-tart-cherry.vi.md",
+          "sha256": "328face7b76a4ea0a734c5cc5fc40a7d087b8a2b4332073e4a33e6d1124cb224",
+          "bytes": 1651,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/23-tart-cherry.vi.metadata.json",
+          "sha256": "9fb67d0f595899c10e0d8e09fb8abcdd6a65e7203da65dea074d44e912db5f94",
+          "bytes": 1375,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/24-tribulus.vi.md",
+          "sha256": "7425cae205970857d71282d7c32695a07cd59972231d4869c82f4eafbe8da2d8",
+          "bytes": 1810,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/24-tribulus.vi.metadata.json",
+          "sha256": "326dbd3209ab0a019cac117d750f43ac77da6550e2904e6882ce99cffbd73b0c",
+          "bytes": 1359,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/25-androstenedione.vi.md",
+          "sha256": "74db0e8a94bd71f10affbc826a6858159a52677d9ca251f654518e881a132e95",
+          "bytes": 1417,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/25-androstenedione.vi.metadata.json",
+          "sha256": "62de994cdc947b282be279d54dc2e388f94698f92ed430ac27084ccbbdb43fee",
+          "bytes": 1473,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/26-dmaa-dmba.vi.md",
+          "sha256": "075c23a398146a7ea4db048bcb27df087a10b56312c5dd6d578ffdfdd7d6a405",
+          "bytes": 1669,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/26-dmaa-dmba.vi.metadata.json",
+          "sha256": "224d54abdff888c6b56665b87f3dbf17f79d80cd0dacc4b0d1548b6e38723fcf",
+          "bytes": 1484,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/27-ephedra.vi.md",
+          "sha256": "27418cc272b4d957cc05fc218eab40e59a9c43cc60b3a67c34d430f1f781e78b",
+          "bytes": 1572,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/27-ephedra.vi.metadata.json",
+          "sha256": "29376164d3472c5a5c74ab91370601434ecb05b873ba3c02f715881fbbb57fda",
+          "bytes": 1484,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/28-regulation.vi.md",
+          "sha256": "b827e59ecb8545978299fd8408c5d3def7e32b86c361d4850b78575a49940a5a",
+          "bytes": 1568,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/28-regulation.vi.metadata.json",
+          "sha256": "f9dde72ac326e4198c34f2df463f02625d43d8c28b444d51f4af45903b82a1c0",
+          "bytes": 1430,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/29-safety-and-interactions.vi.md",
+          "sha256": "9207ae87bcceb3756590574e69ae29d5fedbe48bd2470fcea54d40c53cf1c4eb",
+          "bytes": 2495,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/29-safety-and-interactions.vi.metadata.json",
+          "sha256": "bc4736a3283306bc04e7fcae7755ec6e1425ae493e6aab06e9354ba308a7fb8b",
+          "bytes": 1496,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/30-sensible-approach.vi.md",
+          "sha256": "bf81f926304d3719e42e564a9089f1d0eeef9470f78651c38f5dee3d90b588d6",
+          "bytes": 1571,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/30-sensible-approach.vi.metadata.json",
+          "sha256": "466bdf5337340dea9fb8cfbc0eca065d891dd9c0163b7b20736819f3f4b091c6",
+          "bytes": 1459,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/31-project-usage.vi.md",
+          "sha256": "fb40ca50985fae991677c449f6b3fc4d1eb9797935a5a192284779bc900f1b74",
+          "bytes": 3088,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/ods-exercise-supplements/31-project-usage.vi.metadata.json",
+          "sha256": "c297a87a5dbb918477cf6ccea0085fdb9de6366160b376be1bb4a8ce0df12918",
+          "bytes": 1342,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/evaluation/f01-ods-exercise-supplements-candidate-cases.jsonl",
+          "sha256": "9edaddcb4382e302262a4edf912d997d5c3621240d8022de6ba27a7c1351a6b2",
+          "bytes": 25002,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-claims.vi.json",
+          "sha256": "dd9322236389018b2bff8d60a29c260cb0203db2a355b3cda1321299cf9f051c",
+          "bytes": 21825,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-numeric-contexts.json",
+          "sha256": "4e23633732464caa06d91d90d68dedec6e33930b6f408a463b682ad14b776cbf",
+          "bytes": 12767,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-reference-markers.json",
+          "sha256": "1e27aaadea452762aad195fc6e08e654b759e5ba72eeaf3a31dbd9bf2b448e01",
+          "bytes": 29524,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-review-issues.json",
+          "sha256": "4235d6ee12b670e9854f3d74cb0fb79f751ce7ce2f8e15d2633de104fbfaea16",
+          "bytes": 5717,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-source-manifest.json",
+          "sha256": "b8a0e0684e5a63fcfb573b55da41242d59987281c674d2162040617c5d479437",
+          "bytes": 1444,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-source-map.json",
+          "sha256": "15ead8651f14be34abafc78b4fc86084e587b22a3a83fffe9144c18e7890fa6e",
+          "bytes": 7706,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/ods-exercise-supplements-table-1.en.json",
+          "sha256": "29f99a3d2a30e8ced5c3ee4c569b5f1f4c0482253e594034f0cd0233eb311f76",
+          "bytes": 20789,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/raw/ods-exercise-supplements-user-text.en.txt",
+          "sha256": "0ec1dcad16e08bd79006875fe770583fb1e7014a1ef0bf67bf9d26fac0f207d9",
+          "bytes": 111009,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/README-ods-exercise-supplements.md",
+          "sha256": "210e38df3cdb3ad0b4f695c58085198cd17a847a8595b0f309759a21cf6ee6aa",
+          "bytes": 3495,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/01-section.en.md",
+          "sha256": "987ea6c8caaa3354c74fc9c4e803c686ec685101e3ecad07b57d57053c3a16d8",
+          "bytes": 7273,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/01-section.en.metadata.json",
+          "sha256": "9359f33a80441089ae9cd44c354d7f9f7d301a7479aced205005f5dff9fb11e4",
+          "bytes": 402,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/02-section.en.md",
+          "sha256": "ccff7f2e2821b653ffd241f87e46b97274359b1877bb4f55ff1fb72fffffd2c6",
+          "bytes": 13549,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/02-section.en.metadata.json",
+          "sha256": "d7c5477fd43e7f87cb8a6294c7f8b9d28a0694221157de117a216be0729eea44",
+          "bytes": 473,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/03-section.en.md",
+          "sha256": "0db5a0ee1d6dd76293b27867181d8da4c513fc1b7a981128cf09474b407f4efa",
+          "bytes": 5257,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/03-section.en.metadata.json",
+          "sha256": "fb940cd910a5f6a97fcebd877d9ef1d21cb915e8a3515ed90cf0b91c83f54dcc",
+          "bytes": 446,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/04-section.en.md",
+          "sha256": "1ff4646507847ca3f9512edd21a939b371990faba3511f68d40e186b78c4da9b",
+          "bytes": 3807,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/04-section.en.metadata.json",
+          "sha256": "944210d9e5028dfdacf43aa6f7eb553a917c3387d7629e886ec68c9c8a0c18d6",
+          "bytes": 401,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/05-section.en.md",
+          "sha256": "20dbd12bfccf3613e281ec59eacb76eea1e77c4cd393ee58247c2cece3dbe9b6",
+          "bytes": 4138,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/05-section.en.metadata.json",
+          "sha256": "6e0b5efa5f50b9d35db08a941d12ef952dab60967400e5dec8f68d9109f78af9",
+          "bytes": 415,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/06-section.en.md",
+          "sha256": "fdd1708cccb2717ef8202a4a3b1b0f08b7c13beedff939fecdc0b26d6c7909e1",
+          "bytes": 7159,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/06-section.en.metadata.json",
+          "sha256": "3bc7b86f2418def7c4447a736720b2b16a759fc01b636caf5b555e704be38c3a",
+          "bytes": 405,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/07-section.en.md",
+          "sha256": "314559fd5e7c026e127ad63a5d293db48aaf81ab1f0d7cee82005e58b9fb880d",
+          "bytes": 4448,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/07-section.en.metadata.json",
+          "sha256": "3642c34dc9fdf7edca25e4f74a9e91bd30086cb36ee01c5e9ad38d653a31c5ab",
+          "bytes": 425,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/08-section.en.md",
+          "sha256": "21c3e20b99d832ceeec688346116d7731d556e579638244ecca43f7d119fb68b",
+          "bytes": 1417,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/08-section.en.metadata.json",
+          "sha256": "d9f8e253457fe116e273cb52dbb6d0b2ef2e400626e67739ec0f657067a0ecd2",
+          "bytes": 400,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/09-section.en.md",
+          "sha256": "02da08f23e6bbdfbc98b5cf09366a7c4e1f3a0c9b359d433eb14f9206e8ae81d",
+          "bytes": 2833,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/09-section.en.metadata.json",
+          "sha256": "2eaa71210df413951582bc5e96172017bf1ac56c4e35ae637a385310ebcb0eef",
+          "bytes": 419,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/10-section.en.md",
+          "sha256": "c5bef66d43dee25b31533482469cd0c75682271f7563e8421377df389f71281e",
+          "bytes": 6477,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/10-section.en.metadata.json",
+          "sha256": "b38019007311aac93023ef76a9d3938850e52f0545eda43d417e96f1f1d68db1",
+          "bytes": 401,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/11-section.en.md",
+          "sha256": "eeb58e8b8cb317844366eddad1ba2791f50990d782f922baae83a72f51972a77",
+          "bytes": 3448,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/11-section.en.metadata.json",
+          "sha256": "fe53899945ff2d8f9f60d3173967de7d3306a52fc5c2c6060724e8935f55df0e",
+          "bytes": 403,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/12-section.en.md",
+          "sha256": "09d94b1e3e77849ecc737ccc17c8f165665a2c9ad9f88caa8f94b1c7202fcda5",
+          "bytes": 6903,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/12-section.en.metadata.json",
+          "sha256": "07f95cd728eafebce6fb1c9c604c554790e0793e98c675b5f733dfb16e18a9c1",
+          "bytes": 401,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/13-section.en.md",
+          "sha256": "b6c3664e6159364eb6ceb39495d5d8c40f03ee1fa595c6a202c585d3d50040f5",
+          "bytes": 1912,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/13-section.en.metadata.json",
+          "sha256": "82974cfeefde2ba9eeb2cb00132610f55b80f18292403f7736d36142672369d8",
+          "bytes": 411,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/14-section.en.md",
+          "sha256": "aebd9100a4ff2c517d641d5774b9603684b179d6e1483e7ea1cf2e05050e3488",
+          "bytes": 1920,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/14-section.en.metadata.json",
+          "sha256": "e86f99d4b97f09ac2470ae95b4908c2178b885b140c98555e307d18b32f494c3",
+          "bytes": 415,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/15-section.en.md",
+          "sha256": "32891c9c285e051aed5a7cae2b915a3b2c99fe4479a59571171c1e9a933d9093",
+          "bytes": 2226,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/15-section.en.metadata.json",
+          "sha256": "8976dc32172eec8182c0e50584ceebde50d6f2f407428cec14fcf1942859388a",
+          "bytes": 400,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/16-section.en.md",
+          "sha256": "7a9f5592491feb3e286cdf5fd502310d694ee2d747fb60196da8d3e893389960",
+          "bytes": 2385,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/16-section.en.metadata.json",
+          "sha256": "78a24d6e0b57002efc3758d0f69634d606ee85a20f08ac1b09d79a20f0e0b8fd",
+          "bytes": 402,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/17-section.en.md",
+          "sha256": "300b57158b4a8ff64b1ca5e126d7609c0c2733e2bff44455d1d902be4a2d29b6",
+          "bytes": 5084,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/17-section.en.metadata.json",
+          "sha256": "e0eed06f3ce6c9cdba2a686a108e48d4a0c08755eb8e59319a1c340f4ef5cc26",
+          "bytes": 397,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/18-section.en.md",
+          "sha256": "c4dbea734429f0d2dc48321c19324a6cf77b09c88a09521c745d49d2227fbf0b",
+          "bytes": 5777,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/18-section.en.metadata.json",
+          "sha256": "9b49b4a93fce3a535f1b456d9d5c017c9609a5c59d345c51124b89d7539064f7",
+          "bytes": 400,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/19-section.en.md",
+          "sha256": "217a15bafe0b2c3fc9024f15f87f8ec6ef0113e1a2df865c734fb00e52ed56ff",
+          "bytes": 2204,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/19-section.en.metadata.json",
+          "sha256": "b6114a9b5c20222c1fd286a1758f4497e4186e488b0723be5d7e6f6ee6c9edbd",
+          "bytes": 402,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/20-section.en.md",
+          "sha256": "7b9f5cf3bf5c5148a70b6c9813c9b07e3085f218b26b6c8fe41866a91098f251",
+          "bytes": 935,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/20-section.en.metadata.json",
+          "sha256": "0bb4a6bedb961bbb9e476facbd2d0f41a15696ac3483f23cc807eb1155d465bb",
+          "bytes": 399,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/21-section.en.md",
+          "sha256": "cc4dbcfc6183d5d72ce760259bf965b5a287af53330bcd4ce3825081eed7844b",
+          "bytes": 3975,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/21-section.en.metadata.json",
+          "sha256": "99d77fd03e2624bc64562ab66e07192769a890eb88dd58b057c5aabcc85162c7",
+          "bytes": 411,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/22-section.en.md",
+          "sha256": "1a2fb7ba0f0fab81c5968f9828bb1c256e44c1bdd4153c591130c1dec268d8f1",
+          "bytes": 3062,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/22-section.en.metadata.json",
+          "sha256": "f9c892d18a6914001d743f436348a68b8e92577b8f450372d0b63cdf21a0222f",
+          "bytes": 412,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/23-section.en.md",
+          "sha256": "a174582cb92e4f9c9689ae1238eaafaf75481907821226b76cd31ca80f51cdc0",
+          "bytes": 2746,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/23-section.en.metadata.json",
+          "sha256": "973cd6636ffbc2a34af2e859cf62c2cae3cf4b9d60da4ec2d87d8b75be934dd7",
+          "bytes": 412,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/24-section.en.md",
+          "sha256": "3905a81a5aeac766480068b8824d11fa3578a65d6fcd45e57585f819914a8bcb",
+          "bytes": 365,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/24-section.en.metadata.json",
+          "sha256": "f045b4d48ea142d23e95822509f82914047a77575591d44b223553c2a84a0045",
+          "bytes": 436,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/25-section.en.md",
+          "sha256": "36943cbf0a9dfbeae7100d7b6a5d85c65c7f69917fea77820edd5d7f283d55fe",
+          "bytes": 2534,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/25-section.en.metadata.json",
+          "sha256": "faf34ed5b288095ee9d83e0f4951eeaa3382ee45fe7f3eace86e9cf3de6df035",
+          "bytes": 408,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/26-section.en.md",
+          "sha256": "029bcc703b013b454e4af05b791dc0b7ff3000645d667a0b6fe693a7d5190c8b",
+          "bytes": 1655,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/26-section.en.metadata.json",
+          "sha256": "ac4c416c135d37d5724349b552fafc0f797e937ffaaca3afd0c55be1689cc668",
+          "bytes": 410,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/27-section.en.md",
+          "sha256": "7135a4c7ed57178a774367a68d04956897b87ba0f18c9478bcf70ef8dcc102d2",
+          "bytes": 1697,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/27-section.en.metadata.json",
+          "sha256": "ea41823960ac061ebfe17796cbd7e6b1e419ec737acd7df0103afc63e3da6ed9",
+          "bytes": 400,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/28-section.en.md",
+          "sha256": "bfa0afec2c902ea5e4824274c615c55a6a5cb7256d05750fcc1af7edcace7912",
+          "bytes": 1574,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/28-section.en.metadata.json",
+          "sha256": "872d1237535f87ad2b0a829d8bc198048ff092c130c52bdd4032163213635171",
+          "bytes": 471,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/29-section.en.md",
+          "sha256": "4b2f334a22db1a55b923b2eaf3569e8532fc03a4e760c21c6442594e45b9cf31",
+          "bytes": 1098,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/29-section.en.metadata.json",
+          "sha256": "83a4ffb808114a74891f2fdd7a268e9ebf8076e3e4dc6814767062b590c9c60f",
+          "bytes": 414,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/30-section.en.md",
+          "sha256": "73ec8862f13e09e3fbd4e6579cec4002f9c28f5d59ffb3eb3004722af83c1219",
+          "bytes": 2151,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/30-section.en.metadata.json",
+          "sha256": "83e4b67dafe78162a34a18c99d25bd9bc001bb9d6ae0e3945b9416425afd85a8",
+          "bytes": 428,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/31-section.en.md",
+          "sha256": "9feb1c0a9e0285660b48e9e9f425f4da423112cf022da077c7a18dd94e98fca8",
+          "bytes": 1242,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/31-section.en.metadata.json",
+          "sha256": "9a2e540dd4bc757b36e0dc1545790983de12f93f55bc2bad1fda85d5df400f4a",
+          "bytes": 422,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/32-section.en.md",
+          "sha256": "bb8acb77085323a3199a3c5c4f1d3317b7c192cd11e91c44c65c5d6712e895fd",
+          "bytes": 1968,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements/32-section.en.metadata.json",
+          "sha256": "0dc7e104ae84b44c855298a5ba4ba9eb925a305d861fb5d26bfbe9f81653074b",
+          "bytes": 466,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/ods-exercise-supplements-fulltext.en.md",
+          "sha256": "ced8a87cf012e8d4d8ad6c2c54a4c2a15ca7c12447993e5470135bce3052a8bf",
+          "bytes": 114077,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "LICENSE-ATTRIBUTION-ods.md",
+          "sha256": "f8e65cb8301d77e7749903478d9c6818b673d3981bfbff018ffaad805d8b0927",
+          "bytes": 1605,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "ods-exercise-supplements-normalized.vi.md",
+          "sha256": "a74470e25c74ded709aa36e244fb983c590b15031afd9e40b193e326e42c766f",
+          "bytes": 62813,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "README-ods-exercise-supplements.md",
+          "sha256": "210e38df3cdb3ad0b4f695c58085198cd17a847a8595b0f309759a21cf6ee6aa",
+          "bytes": 3495,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "review-report-ods.md",
+          "sha256": "d16dd1d12e631d3e39192d49356e716c213dbb2d82b9d5716782dada38edb481",
+          "bytes": 7341,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "validation-results-ods.json",
+          "sha256": "42af2335f69f2ffb5f056835d7f5932aa3728c888b6e5882a59325ee7b6653ed",
+          "bytes": 450,
+          "storage": "REPOSITORY_TEXT"
+        }
+      ],
+      "articles": [
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-01",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/01-overview.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/01-overview.vi.md",
+          "content_sha256": "d94c6e92649603579ca2eb5d6c2249ee3ee84e43b6676f0fd1efcf10b18a925d",
+          "content_role": "overview"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-02",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/02-foundation.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/02-foundation.vi.md",
+          "content_sha256": "6045c4fd1428788321ebc6a9bce6d4a22e26b1295bbb6f75437896e7b3db119b",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-03",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/03-evidence-and-blends.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/03-evidence-and-blends.vi.md",
+          "content_sha256": "f414964fbebda4b5f224595b658d899bbc5dcbe9b6001819284d89081e7a3ad6",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-04",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/04-antioxidants.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/04-antioxidants.vi.md",
+          "content_sha256": "105b49bf8757815ee54dbbe8291af92e07deef0cc566b1033620a24bb7d8101a",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-05",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/05-arginine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/05-arginine.vi.md",
+          "content_sha256": "212f389cbee3ac8eb0d8cdf6271611fbd13ddc172e26c8e1143652c246d7924e",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-06",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/06-beetroot.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/06-beetroot.vi.md",
+          "content_sha256": "84429f235f8de48b9f0fe8c36bbcd6f30abfb57cb264a02b9f2802ba535ae7f6",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-07",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/07-beta-alanine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/07-beta-alanine.vi.md",
+          "content_sha256": "b67ffc1a244499768da1db7e4a17a6a6f5748fefecb42b34b1fa4b9fe88d6057",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-08",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/08-hmb.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/08-hmb.vi.md",
+          "content_sha256": "c54975ae6d6ed7b3ae45ddfab246978d6960fa554a22f806ceeec9a03361fe4f",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-09",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/09-betaine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/09-betaine.vi.md",
+          "content_sha256": "0d6ac73bfa68172835c9a3c24a61d0fccc89bb92765d6d7eb63815399242a77f",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-10",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/10-bcaa.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/10-bcaa.vi.md",
+          "content_sha256": "d11eaac2c8ed2361c699f9b76835b2ff6e2d12e575d6955543784b98b9da10c4",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-11",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/11-caffeine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/11-caffeine.vi.md",
+          "content_sha256": "637968572f297d6c4d5ed22bf99ea438f3b9374990a66977a5407353b1b9eae7",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-12",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/12-citrulline.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/12-citrulline.vi.md",
+          "content_sha256": "0473e40b85e3b4fbdd0a0bb4137ce6f0567f66d69873c17a68a9d3b0606c83d8",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-13",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/13-creatine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/13-creatine.vi.md",
+          "content_sha256": "cea2e253fd51e85d90455a7cdf419ee8df0c49146e85aa8b2214a9c3e8a19502",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-14",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/14-deer-antler.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/14-deer-antler.vi.md",
+          "content_sha256": "4e0aa2816c3047f6fb2a65f620fc3b01371d30c46c666ba90329f05616d3bcf6",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-15",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/15-dhea.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/15-dhea.vi.md",
+          "content_sha256": "e7f6d057c437e2c26a7cb8d96f60f462b845b81b22091194f7f3ff5f41201b68",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-16",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/16-ginseng.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/16-ginseng.vi.md",
+          "content_sha256": "050f321debdf314449a0ca577b391e2f9209d75849d2dddd9a02ac574fe809b2",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-17",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/17-glutamine.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/17-glutamine.vi.md",
+          "content_sha256": "ba695fef398720a3155680058249258aba041e16dee5f0a240b68e424b418b41",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-18",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/18-iron.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/18-iron.vi.md",
+          "content_sha256": "fe2f6889ed6c384b03d7c381c7523ff50458d0e33b474e43c2c9f8f5e551c962",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-19",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/19-protein.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/19-protein.vi.md",
+          "content_sha256": "ee88109679a77385fed6e2b05eedc26174c83830ed75c4823eb001c62cbbd50e",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-20",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/20-quercetin.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/20-quercetin.vi.md",
+          "content_sha256": "1cb97aeef992820c180cb9d801ec60c594aa98cb4b849f92b1a6f66b1dcb237d",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-21",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/21-ribose.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/21-ribose.vi.md",
+          "content_sha256": "b24ad722c6144fabc63adcb43e2d6abc48f6f3cf24db0d2126443603b92bd7f4",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-22",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/22-bicarbonate.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/22-bicarbonate.vi.md",
+          "content_sha256": "51b5f825672060c23152fdc7c13275f8e55b9fc460f47d54d3d90a5186530c2c",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-23",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/23-tart-cherry.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/23-tart-cherry.vi.md",
+          "content_sha256": "328face7b76a4ea0a734c5cc5fc40a7d087b8a2b4332073e4a33e6d1124cb224",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-24",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/24-tribulus.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/24-tribulus.vi.md",
+          "content_sha256": "7425cae205970857d71282d7c32695a07cd59972231d4869c82f4eafbe8da2d8",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-25",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/25-androstenedione.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/25-androstenedione.vi.md",
+          "content_sha256": "74db0e8a94bd71f10affbc826a6858159a52677d9ca251f654518e881a132e95",
+          "content_role": "historical_regulatory_information"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-26",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/26-dmaa-dmba.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/26-dmaa-dmba.vi.md",
+          "content_sha256": "075c23a398146a7ea4db048bcb27df087a10b56312c5dd6d578ffdfdd7d6a405",
+          "content_role": "historical_regulatory_information"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-27",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/27-ephedra.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/27-ephedra.vi.md",
+          "content_sha256": "27418cc272b4d957cc05fc218eab40e59a9c43cc60b3a67c34d430f1f781e78b",
+          "content_role": "historical_regulatory_information"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-28",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/28-regulation.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/28-regulation.vi.md",
+          "content_sha256": "b827e59ecb8545978299fd8408c5d3def7e32b86c361d4850b78575a49940a5a",
+          "content_role": "historical_regulatory_information"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-29",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/29-safety-and-interactions.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/29-safety-and-interactions.vi.md",
+          "content_sha256": "9207ae87bcceb3756590574e69ae29d5fedbe48bd2470fcea54d40c53cf1c4eb",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-30",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/30-sensible-approach.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/30-sensible-approach.vi.md",
+          "content_sha256": "bf81f926304d3719e42e564a9089f1d0eeef9470f78651c38f5dee3d90b588d6",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-31",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/ods-exercise-supplements/31-project-usage.vi.metadata.json",
+          "content_path": "data/knowledge/curated/ods-exercise-supplements/31-project-usage.vi.md",
+          "content_sha256": "fb40ca50985fae991677c449f6b3fc4d1eb9797935a5a192284779bc900f1b74",
+          "content_role": "project_guidance"
+        }
+      ]
+    },
+    {
+      "source_id": "WHO-PA-SB-2020",
+      "package_path": "packages/who-2020-rag-normalized-v1",
+      "manifest_path": "data/knowledge/source-manifest.json",
+      "attribution_path": "LICENSE-ATTRIBUTION.md",
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "files": [
+        {
+          "path": "data/knowledge/curated/who-2020/01-scope.vi.md",
+          "sha256": "83f7921e04986d1d3843ceb5d07d7911aac0c93dd81b87ab6f4659fae42277c1",
+          "bytes": 2893,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/01-scope.vi.metadata.json",
+          "sha256": "2cc0cc8c4fbed5aa04768953393cfd3945bf7812f6ce1c9e05ddf031f30420c5",
+          "bytes": 1296,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/02-glossary.vi.md",
+          "sha256": "e5ba0ac1da1d49d92d55897da537a17cd7cd34662841c8df75576af65b743ab3",
+          "bytes": 5038,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/02-glossary.vi.metadata.json",
+          "sha256": "587740166342f972bff626a90d264323c37e357198bbbcc685c8588057cce30d",
+          "bytes": 1158,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/03-intensity.vi.md",
+          "sha256": "105839965aba23a1a1c6bdc116eaae28be0e729fda870473a140c6144786e835",
+          "bytes": 2200,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/03-intensity.vi.metadata.json",
+          "sha256": "a0acb2ac5a9adf6467f568679821e07e25b7cb21e9f67537cb299aa404fdbb62",
+          "bytes": 1220,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/04-children.vi.md",
+          "sha256": "df6d40ff8fb90337c6afa2315fd8abbae08bb6226adad9f5a3a0813073e647e2",
+          "bytes": 2728,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/04-children.vi.metadata.json",
+          "sha256": "47dfcbc172b07e620556aced23616c218513a6ca0d75cd8c462a1b35c2d84cc1",
+          "bytes": 1194,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/05-adults-activity.vi.md",
+          "sha256": "2a44bb5061ad3e28f761c3b6ef6e6f5f7b1c71b367e2431061e8da405dae3fc7",
+          "bytes": 3768,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/05-adults-activity.vi.metadata.json",
+          "sha256": "6f1888222ee77706734ed8de86283186bfc83ee904685deefd97f3696fbea38c",
+          "bytes": 1206,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/06-adults-sedentary.vi.md",
+          "sha256": "8dc3555454e284110c745cce526a3846e4d3575d471a5267c21ef1d1eddff999",
+          "bytes": 2552,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/06-adults-sedentary.vi.metadata.json",
+          "sha256": "ca6636ee3b4c693fb04f80918a284a29d08a17b8b1dbcfa0552533644982d528",
+          "bytes": 1174,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/07-older.vi.md",
+          "sha256": "144aa8edfea8a92228c854ba94daa15f3b74795f84c17b9244ee20c2b796f704",
+          "bytes": 3828,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/07-older.vi.metadata.json",
+          "sha256": "b516ff19af9fe1874dfd167b654906913a212363f7dc3022efa5ca25b86fee0e",
+          "bytes": 1233,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/08-pregnancy.vi.md",
+          "sha256": "c2a6e02dcc051d1ae8191f7da7602d6e2a2645dafa42e81c81f5ddff231f2eb8",
+          "bytes": 4248,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/08-pregnancy.vi.metadata.json",
+          "sha256": "7e3907448ae1fda7f8231590179630808d30c8c2024e2a2c811a2dc788306f7e",
+          "bytes": 1211,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/09-chronic.vi.md",
+          "sha256": "c5b859a1612194649c2bb603394baaacdbf6e59bdf9fad2e3654881eaf330699",
+          "bytes": 5944,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/09-chronic.vi.metadata.json",
+          "sha256": "40d683a7099de84bfe6d4637a893a9bf47f7da7afd630df3a530c29383205249",
+          "bytes": 1263,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/10-children-disability.vi.md",
+          "sha256": "7f5c602e09ff9a317491564820d51bec4fdbd49c683fd49abd5cdc704e3359d1",
+          "bytes": 2783,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/10-children-disability.vi.metadata.json",
+          "sha256": "b91f54c7135eb7d5ddebd655a6730d26426c79c03090be2129d3293c08974937",
+          "bytes": 1279,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/11-adults-disability.vi.md",
+          "sha256": "251867d00d5d7e5f00b81b86144996abe78c3ae262b86d964080468e9060aaac",
+          "bytes": 4643,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/11-adults-disability.vi.metadata.json",
+          "sha256": "8f87bf82eb763258178e75621c9711bd803ec5faf623b9a554a8cda3975eee0a",
+          "bytes": 1259,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/12-methods-evidence.vi.md",
+          "sha256": "dd02b185680651414f66eda55e72808f3fbba64edf5825775e55e11e45163601",
+          "bytes": 3742,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/12-methods-evidence.vi.metadata.json",
+          "sha256": "8e3d60cd9604ff0e7e2cc5c5fcd43828d795eff95155dd1493c2033830098f9b",
+          "bytes": 1238,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/13-research-gaps.vi.md",
+          "sha256": "8329175898fe2d7f939f7e0bce7b0f2168843ad6813ec55d64194dd99d9d40f0",
+          "bytes": 2997,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/13-research-gaps.vi.metadata.json",
+          "sha256": "ceb9d844a850b5428e045a8b50f25a2b57a33a678be9729bb8da8d16b1ca3ebd",
+          "bytes": 1577,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/14-implementation.vi.md",
+          "sha256": "24f689e086ea2ca327f789f07d413c6577676ff18b0738fbb18a8dd2551fe50d",
+          "bytes": 2821,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/14-implementation.vi.metadata.json",
+          "sha256": "dd7edef6c2f30239f095d4a4d40c3e7b3f1e5ab3ef2424c3d785ead20d559c6a",
+          "bytes": 1178,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/15-appendices.vi.md",
+          "sha256": "201a237a6329bbcbb41a0f1eff2264099d7e97da830677f9ead7ac09631d7733",
+          "bytes": 2163,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/15-appendices.vi.metadata.json",
+          "sha256": "321b26c71cc2205a18e4429896d41753edc50a8d3ba9fdaae4eebb18f07ccb6c",
+          "bytes": 1243,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/16-project-usage.vi.md",
+          "sha256": "dc7dbd57b006c1547d473f0f551efc2b34fa08627e298b799a1328333f4ff91b",
+          "bytes": 3489,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/curated/who-2020/16-project-usage.vi.metadata.json",
+          "sha256": "ac6760e8ff17fab8fd1a1b3e00b2bf7582c845de3a493d817523ee69f03c127c",
+          "bytes": 1288,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/evaluation/f01-who-2020-candidate-cases.jsonl",
+          "sha256": "fb2d1f35ad8c8bd5ac1d0f825b5fb5c8a53bf62a04fee93fc649719cc114ea9d",
+          "bytes": 9410,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/raw/who-physical-activity-sedentary-behaviour-2020.pdf",
+          "sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+          "bytes": 4041257,
+          "storage": "LOCAL_OBJECT_STAGING",
+          "local_staging_path": "infrastructure/data/knowledge/50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88.pdf",
+          "object_key": null
+        },
+        {
+          "path": "data/knowledge/README.md",
+          "sha256": "8f4eda449fcbfe300e4b434f507518f427d5e556e52e3501c5756e4c10d00206",
+          "bytes": 3852,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/recommendations.vi.json",
+          "sha256": "b38c9761a2cf9a1747c99686e3840ccd7e4e51c34772d13f15b79a6d6094913c",
+          "bytes": 26721,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-manifest.json",
+          "sha256": "609f84c14ff4ea61c9ba899ecdc3b9d761bf32ab75dc3301f75911005d82a0aa",
+          "bytes": 6096,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/abbreviations.en.md",
+          "sha256": "e539bf150909f678767ce871d2a4dfc1fcc18a398e00101165f86cbfa4add42b",
+          "bytes": 1323,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/abbreviations.en.metadata.json",
+          "sha256": "ccc2973336bc2931626ccabb972c7f1857fc4ca85182e3fbc2e701f9adb8dfd3",
+          "bytes": 578,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/adults-activity.en.md",
+          "sha256": "4c05b7c622169203f3f346e65216bbc4b346b1fc08c19f3a107db6b957f5f1e8",
+          "bytes": 47858,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/adults-activity.en.metadata.json",
+          "sha256": "5ad5832fac7630a8e28ae7394096c816261947f4eb59312f1d5f77b2d3b9b98a",
+          "bytes": 598,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/adults-sedentary.en.md",
+          "sha256": "5215ec13d3b47e095d016987fd1055fbec671b63bfe9278f70635505acc0f08f",
+          "bytes": 37631,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/adults-sedentary.en.metadata.json",
+          "sha256": "c72ea28001e397d4a8603c2238a635efe91b39d68ac1709c06762fd0b112fca8",
+          "bytes": 603,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-1.en.md",
+          "sha256": "1cdadff25b8e8cb9487ccb077b435e9aeddf4b203dc15c22f5d1e71f3a993a23",
+          "bytes": 11169,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-1.en.metadata.json",
+          "sha256": "0488b196a42e91ab2f241e8feadf221b62da8b7685c509c459338428d8d7dc02",
+          "bytes": 592,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-2.en.md",
+          "sha256": "e2305cf1440df5271a14d4a023fae30e2e39259c59cb045799ba9ce6489ca079",
+          "bytes": 18572,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-2.en.metadata.json",
+          "sha256": "aa442691a373fb6bad8a1fcbe1d3a88e0c52803f68d99fc54f72feea99312ce2",
+          "bytes": 599,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-3.en.md",
+          "sha256": "5a8d9f2044972b679a96d9399a2833b393c0a8ba34e324184f5d9286aca43d00",
+          "bytes": 11503,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/annex-3.en.metadata.json",
+          "sha256": "a2e6e79564e500b5f2f9f8ca86c78de264d1d3d006329b4b6155a61ae015959e",
+          "bytes": 594,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/back-cover.en.md",
+          "sha256": "67b09b91bd1f82356f69a2dc444c87458ceae2f93f259113c8d0cf2611b66890",
+          "bytes": 227,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/back-cover.en.metadata.json",
+          "sha256": "f7c192ee49095859de52f0211af990bd0fe0502cf007862e42951aa8e017b77e",
+          "bytes": 569,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/background.en.md",
+          "sha256": "77e6eec48c979b399b7e08b80f5c430f122e9d46b0b8bc36df94d954df31c26f",
+          "bytes": 18247,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/background.en.metadata.json",
+          "sha256": "92726a18c6401a58e050f6f7da874b48cf4409ee4792d24a65ab27b3ace5deb9",
+          "bytes": 590,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/children-activity.en.md",
+          "sha256": "d6949d933e15f8f562b0be84b7cc7191349ae66fc0950d5d81ad9feb251b6a52",
+          "bytes": 21285,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/children-activity.en.metadata.json",
+          "sha256": "af7f2083a8853f10779a6313b7681d4723daca049c029e351c4a2fbcce682dbe",
+          "bytes": 599,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/children-sedentary.en.md",
+          "sha256": "7be2f45362b1b91d993fc907a3f05d871d248ce95e68f260264a4b9dd2bc4a0a",
+          "bytes": 18298,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/children-sedentary.en.metadata.json",
+          "sha256": "60573b246ad04cb9c5baabbf4cd1c3dfdfdc0eec1e6cfda3fa69e83f1438f972",
+          "bytes": 604,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/chronic-activity.en.md",
+          "sha256": "63185ace01ddefcd584faf864882334e41c68030c33fb2c717f9c8ea6d7cf4a5",
+          "bytes": 41862,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/chronic-activity.en.metadata.json",
+          "sha256": "77a46aa90ccd884b46a6f897cc074d2db0261be8582a29bbf2278ce4038a0002",
+          "bytes": 615,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/chronic-sedentary.en.md",
+          "sha256": "71a4f78f314d2db711593f5e5f09354f81226edd4dd2994e00dfdd3488e2b480",
+          "bytes": 7613,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/chronic-sedentary.en.metadata.json",
+          "sha256": "f42eb7beae3acaa13c77e369584d602c95ddf00a424a0bbe6896d40269d7bf29",
+          "bytes": 620,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/disability-activity.en.md",
+          "sha256": "666887f87b4a3568d8273a892bc9169192e1a645be1b42575fdbee4a3fdec93e",
+          "bytes": 25736,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/disability-activity.en.metadata.json",
+          "sha256": "c0d94a2cc4fb61aaef261007fd060fff73f1239fef736d847509959c8b90b68d",
+          "bytes": 611,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/disability-sedentary.en.md",
+          "sha256": "568900e2fb3f27bd5d9bcd14b04211490db75a983a48da4de7b4db26145d3657",
+          "bytes": 7841,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/disability-sedentary.en.metadata.json",
+          "sha256": "bfa952f60438bfc819ee07af32f39c330c1ecc748bbc5c60455708436082e9c5",
+          "bytes": 616,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/evidence-to-recommendations.en.md",
+          "sha256": "5d6542f2d5de54b1631205b3991a26441b437c63aa406157699166b72513f1ed",
+          "bytes": 23447,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/evidence-to-recommendations.en.metadata.json",
+          "sha256": "a42d360713c7910c76880634dab5b3ac66243bbd63410c8bd5b22cc6a89f6850",
+          "bytes": 618,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/executive-summary.en.md",
+          "sha256": "0bcff60771944e78c09382f194cb748adea45083332a22ba753c0f41924409e0",
+          "bytes": 79778,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/executive-summary.en.metadata.json",
+          "sha256": "126a7869545a7eb66675b33456368dceca33182d1e45b623aef5e9869be5f20f",
+          "bytes": 590,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/front-matter.en.md",
+          "sha256": "62e4b53cd0c82954f0ea7b7a9db7495dbbd6da7d2803187dc8c911304f922bd7",
+          "bytes": 16225,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/front-matter.en.metadata.json",
+          "sha256": "a201a100013127a81ab18cabbb1d0fddde99585e5e2ffea93b3ec1d52d065d55",
+          "bytes": 608,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/glossary.en.md",
+          "sha256": "cd82161b1740ab77b2a4cc7689131e3a7672ef17383dece377dea561764a3839",
+          "bytes": 13865,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/glossary.en.metadata.json",
+          "sha256": "fe972b3a5615156bae5cc75abffec3286c4b2f86d0b80fa673ad40503e8fdf96",
+          "bytes": 573,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/implementation.en.md",
+          "sha256": "6520d8e8228a8916fdb783753ad9b4783f41a95a8432f694727d90125b8d618b",
+          "bytes": 27734,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/implementation.en.metadata.json",
+          "sha256": "664c96a8d280abac0782c5b661ec29084247e93bbbe578fc372c45d9b262b95c",
+          "bytes": 617,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/methods.en.md",
+          "sha256": "3e57bafc6707e03daf7dfe6e8d449e7c435d99d3b12ad31fcbc7f13eeaa2120f",
+          "bytes": 47953,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/methods.en.metadata.json",
+          "sha256": "981a2010e2077f1ea85c417279e22a581b6a26d0f43148196dc8e6316addc800",
+          "bytes": 582,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/older-activity.en.md",
+          "sha256": "d2f96336aade161279aeb25b671ccee72dc1c0d9077daab2bedf9b352b961afc",
+          "bytes": 17310,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/older-activity.en.metadata.json",
+          "sha256": "91983d234def65610ba79359365bc0f92c382ece06f75993c0d08d581bce9a0e",
+          "bytes": 597,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/older-sedentary.en.md",
+          "sha256": "2d1023a6d70519d0e26dafc57036d58d8339b081bea048dc0ec3210d79c58bdf",
+          "bytes": 4059,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/older-sedentary.en.metadata.json",
+          "sha256": "c200dec841408b249a2d4ff2cdd8f7c307af39ebdc148d6424d288f83ea59bb8",
+          "bytes": 602,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/pregnancy-activity.en.md",
+          "sha256": "0f537c8611d89abdb7169340e3f653238ffc072cb5887f8fc17967b6587c5f8c",
+          "bytes": 18523,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/pregnancy-activity.en.metadata.json",
+          "sha256": "dd5bb6079290b23122543bda8ffae969aaeb9260ce339707b8893c08521e28bb",
+          "bytes": 609,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/pregnancy-sedentary.en.md",
+          "sha256": "6b2e8bb26a8d59e233c86b5eaa6ef5e2c98fa22b9c48d5e0018631a2d9c26728",
+          "bytes": 3085,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/pregnancy-sedentary.en.metadata.json",
+          "sha256": "31e0b89f29531c9496417099c12e70a2c13fa1dd352a906b2224f15bfc684f43",
+          "bytes": 614,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/recommendation-introduction.en.md",
+          "sha256": "cc276b6ee9406b2a488b3b7b947a38ac691632f5de8799f45cd6a4706023c15a",
+          "bytes": 2913,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/recommendation-introduction.en.metadata.json",
+          "sha256": "f887052d2a2ba5c83e0c3e96865d44a89d26599579cf408ef22c5720c9e97a97",
+          "bytes": 604,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/references.en.md",
+          "sha256": "ddfc3ff2b3ab15fe74828328876804b4ca490cbb4929ea8d420c7b197469418e",
+          "bytes": 49578,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/references.en.metadata.json",
+          "sha256": "4123edf0b592ab20654a23317e238e01e8cc7ee55a6443f30f3acd9261112c95",
+          "bytes": 581,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/research-needs.en.md",
+          "sha256": "143accbc5a60b44140523eb37d2c7441eaa10e029fd3bbe145ee18b04b4fc27d",
+          "bytes": 2496,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020/research-needs.en.metadata.json",
+          "sha256": "5ab7814b1353ca27cfce2e36cd1468eea5b1fe48b26dbe7afcfc8db3a8f0bd24",
+          "bytes": 586,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-normalized/who-2020-fulltext.en.md",
+          "sha256": "f26ef88bb50f0aacde8c55a2ce42beed27a184e9d40f7f5f19605d80e99d0ce5",
+          "bytes": 573507,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "data/knowledge/source-page-map.json",
+          "sha256": "a74f9b986bda9c9c4b43c3dd80ddf79587324b67bd3deab15b5850ceabb93559",
+          "bytes": 35676,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "LICENSE-ATTRIBUTION.md",
+          "sha256": "22eb5f4ff222bab517818cd001e2a9470c44ac63a73d529e1b6ebf0bf27d22f7",
+          "bytes": 1658,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "README.md",
+          "sha256": "3b85b7257b06bca053d3caf6ee03a50e77d9cb3ce1b65cafbd374f3766282e9b",
+          "bytes": 4026,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "review-report.md",
+          "sha256": "e6e3351fef0f6f8ba81328e72f5f3da3f87396eb0fa6b70279edc1616cb9aecc",
+          "bytes": 3701,
+          "storage": "REPOSITORY_TEXT"
+        },
+        {
+          "path": "who-2020-normalized.vi.md",
+          "sha256": "aa7c390b8f54853c46ebe6a82a92abfc3ce73569c232c276b160c0c847cf6d5d",
+          "bytes": 56972,
+          "storage": "REPOSITORY_TEXT"
+        }
+      ],
+      "articles": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-01",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/01-scope.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/01-scope.vi.md",
+          "content_sha256": "83f7921e04986d1d3843ceb5d07d7911aac0c93dd81b87ab6f4659fae42277c1",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-02",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/02-glossary.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/02-glossary.vi.md",
+          "content_sha256": "e5ba0ac1da1d49d92d55897da537a17cd7cd34662841c8df75576af65b743ab3",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-03",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/03-intensity.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/03-intensity.vi.md",
+          "content_sha256": "105839965aba23a1a1c6bdc116eaae28be0e729fda870473a140c6144786e835",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-04",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/04-children.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/04-children.vi.md",
+          "content_sha256": "df6d40ff8fb90337c6afa2315fd8abbae08bb6226adad9f5a3a0813073e647e2",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/05-adults-activity.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/05-adults-activity.vi.md",
+          "content_sha256": "2a44bb5061ad3e28f761c3b6ef6e6f5f7b1c71b367e2431061e8da405dae3fc7",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-06",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/06-adults-sedentary.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/06-adults-sedentary.vi.md",
+          "content_sha256": "8dc3555454e284110c745cce526a3846e4d3575d471a5267c21ef1d1eddff999",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-07",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/07-older.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/07-older.vi.md",
+          "content_sha256": "144aa8edfea8a92228c854ba94daa15f3b74795f84c17b9244ee20c2b796f704",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-08",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/08-pregnancy.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/08-pregnancy.vi.md",
+          "content_sha256": "c2a6e02dcc051d1ae8191f7da7602d6e2a2645dafa42e81c81f5ddff231f2eb8",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-09",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/09-chronic.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/09-chronic.vi.md",
+          "content_sha256": "c5b859a1612194649c2bb603394baaacdbf6e59bdf9fad2e3654881eaf330699",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-10",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/10-children-disability.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/10-children-disability.vi.md",
+          "content_sha256": "7f5c602e09ff9a317491564820d51bec4fdbd49c683fd49abd5cdc704e3359d1",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-11",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/11-adults-disability.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/11-adults-disability.vi.md",
+          "content_sha256": "251867d00d5d7e5f00b81b86144996abe78c3ae262b86d964080468e9060aaac",
+          "content_role": "general_knowledge"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-12",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/12-methods-evidence.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/12-methods-evidence.vi.md",
+          "content_sha256": "dd02b185680651414f66eda55e72808f3fbba64edf5825775e55e11e45163601",
+          "content_role": "methodology"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-13",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/13-research-gaps.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/13-research-gaps.vi.md",
+          "content_sha256": "8329175898fe2d7f939f7e0bce7b0f2168843ad6813ec55d64194dd99d9d40f0",
+          "content_role": "methodology"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-14",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/14-implementation.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/14-implementation.vi.md",
+          "content_sha256": "24f689e086ea2ca327f789f07d413c6577676ff18b0738fbb18a8dd2551fe50d",
+          "content_role": "reference_only"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-15",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/15-appendices.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/15-appendices.vi.md",
+          "content_sha256": "201a237a6329bbcbb41a0f1eff2264099d7e97da830677f9ead7ac09631d7733",
+          "content_role": "reference_only"
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-16",
+          "version": "1.0.0",
+          "metadata_path": "data/knowledge/curated/who-2020/16-project-usage.vi.metadata.json",
+          "content_path": "data/knowledge/curated/who-2020/16-project-usage.vi.md",
+          "content_sha256": "dc7dbd57b006c1547d473f0f551efc2b34fa08627e298b799a1328333f4ff91b",
+          "content_role": "project_guidance"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,677 @@
+{
+  "source_id": "WHO-PA-SB-2020",
+  "schema_version": "draft-1",
+  "records": [
+    {
+      "recommendation_id": "C01",
+      "population": "children_5_17",
+      "statement_vi": "Trung bình ít nhất 60 phút/ngày tính trên cả tuần, cường độ vừa đến mạnh, chủ yếu aerobic.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 35,
+      "source_printed_page": "25",
+      "conditions": [],
+      "quantitative_parameters": {
+        "minutes_per_day_average_min": 60,
+        "aggregation": "average_across_week"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "C02",
+      "population": "children_5_17",
+      "statement_vi": "Đưa aerobic cường độ mạnh và hoạt động tăng cường cơ, xương vào ít nhất 3 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 35,
+      "source_printed_page": "25",
+      "conditions": [],
+      "quantitative_parameters": {
+        "days_per_week_min": 3
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "C03",
+      "population": "children_5_17",
+      "statement_vi": "Hạn chế thời gian ít vận động, đặc biệt thời gian màn hình giải trí.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 39,
+      "source_printed_page": "29",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A01",
+      "population": "adults_18_64",
+      "statement_vi": "Thực hiện hoạt động thể chất thường xuyên.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 42,
+      "source_printed_page": "32",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A02",
+      "population": "adults_18_64",
+      "statement_vi": "Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh, hoặc kết hợp tương đương.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 42,
+      "source_printed_page": "32",
+      "conditions": [],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_range": [
+          150,
+          300
+        ],
+        "vigorous_minutes_per_week_range": [
+          75,
+          150
+        ],
+        "relationship": "OR_OR_EQUIVALENT_COMBINATION"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A03",
+      "population": "adults_18_64",
+      "statement_vi": "Tăng cường cơ ở cường độ vừa hoặc cao hơn, tác động tất cả nhóm cơ chính, ít nhất 2 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 42,
+      "source_printed_page": "32",
+      "conditions": [],
+      "quantitative_parameters": {
+        "days_per_week_min": 2,
+        "all_major_muscle_groups": true
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A04",
+      "population": "adults_18_64",
+      "statement_vi": "Có thể tăng aerobic cường độ vừa vượt 300 phút/tuần, hoặc cường độ mạnh vượt 150 phút/tuần, hoặc kết hợp tương đương để có thêm lợi ích.",
+      "strength": "CONDITIONAL",
+      "certainty": "MODERATE",
+      "source_pdf_page": 42,
+      "source_printed_page": "32",
+      "conditions": [],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_exclusive_min": 300,
+        "vigorous_minutes_per_week_exclusive_min": 150
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A05",
+      "population": "adults_18_64",
+      "statement_vi": "Hạn chế thời gian ít vận động; thay bằng vận động ở bất kỳ cường độ nào, kể cả nhẹ.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 48,
+      "source_printed_page": "38",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "A06",
+      "population": "adults_18_64",
+      "statement_vi": "Để giảm tác động bất lợi của mức ít vận động cao, hướng đến nhiều hoạt động cường độ vừa đến mạnh hơn mức khuyến nghị.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 48,
+      "source_printed_page": "38",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O01",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Thực hiện hoạt động thể chất thường xuyên.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 53,
+      "source_printed_page": "43",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O02",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh, hoặc kết hợp tương đương.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 53,
+      "source_printed_page": "43",
+      "conditions": [],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_range": [
+          150,
+          300
+        ],
+        "vigorous_minutes_per_week_range": [
+          75,
+          150
+        ],
+        "relationship": "OR_OR_EQUIVALENT_COMBINATION"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O03",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Tăng cường cơ ở cường độ vừa hoặc cao hơn, tác động tất cả nhóm cơ chính, ít nhất 2 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 53,
+      "source_printed_page": "43",
+      "conditions": [],
+      "quantitative_parameters": {
+        "days_per_week_min": 2,
+        "all_major_muscle_groups": true
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O04",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Người từ 65 tuổi: hoạt động đa thành phần đa dạng, nhấn mạnh thăng bằng chức năng và sức mạnh ở cường độ vừa hoặc cao hơn, ít nhất 3 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 53,
+      "source_printed_page": "43",
+      "conditions": [
+        "Chỉ áp dụng mục này cho người từ 65 tuổi."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 3,
+        "age_min": 65
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O05",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Có thể tăng aerobic cường độ vừa vượt 300 phút/tuần, hoặc cường độ mạnh vượt 150 phút/tuần, hoặc kết hợp tương đương để có thêm lợi ích.",
+      "strength": "CONDITIONAL",
+      "certainty": "MODERATE",
+      "source_pdf_page": 53,
+      "source_printed_page": "43",
+      "conditions": [],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_exclusive_min": 300,
+        "vigorous_minutes_per_week_exclusive_min": 150
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O06",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Hạn chế thời gian ít vận động; thay bằng vận động ở bất kỳ cường độ nào, kể cả nhẹ.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 56,
+      "source_printed_page": "46",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "O07",
+      "population": "older_adults_65_plus",
+      "statement_vi": "Để giảm tác động bất lợi của mức ít vận động cao, hướng đến nhiều hoạt động cường độ vừa đến mạnh hơn mức khuyến nghị.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 56,
+      "source_printed_page": "46",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "P01",
+      "population": "pregnant_postpartum",
+      "statement_vi": "Vận động thường xuyên trong thai kỳ và sau sinh.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 57,
+      "source_printed_page": "47",
+      "conditions": [
+        "Không có chống chỉ định."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "P02",
+      "population": "pregnant_postpartum",
+      "statement_vi": "Ít nhất 150 phút aerobic cường độ vừa mỗi tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 57,
+      "source_printed_page": "47",
+      "conditions": [
+        "Không có chống chỉ định."
+      ],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_min": 150
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "P03",
+      "population": "pregnant_postpartum",
+      "statement_vi": "Kết hợp đa dạng aerobic và tăng cường cơ; giãn cơ nhẹ có thể có lợi.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 57,
+      "source_printed_page": "47",
+      "conditions": [
+        "Không có chống chỉ định."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "P04",
+      "population": "pregnant_postpartum",
+      "statement_vi": "Có thể tiếp tục các hoạt động đã quen trước thai kỳ, kể cả aerobic cường độ mạnh.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 57,
+      "source_printed_page": "47",
+      "conditions": [
+        "Đã quen các hoạt động đó trước thai kỳ.",
+        "Không có chống chỉ định; chăm sóc và tư vấn thai sản phù hợp."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "P05",
+      "population": "pregnant_postpartum",
+      "statement_vi": "Hạn chế ít vận động; thay bằng vận động bất kỳ cường độ nào, kể cả nhẹ.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 61,
+      "source_printed_page": "51",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H01",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Thực hiện hoạt động thể chất thường xuyên.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 62,
+      "source_printed_page": "52",
+      "conditions": [
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H02",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh, hoặc kết hợp tương đương.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 62,
+      "source_printed_page": "52",
+      "conditions": [
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_range": [
+          150,
+          300
+        ],
+        "vigorous_minutes_per_week_range": [
+          75,
+          150
+        ],
+        "relationship": "OR_OR_EQUIVALENT_COMBINATION"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H03",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Tăng cường cơ ở cường độ vừa hoặc cao hơn, tác động tất cả nhóm cơ chính, ít nhất 2 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 63,
+      "source_printed_page": "53",
+      "conditions": [
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 2,
+        "all_major_muscle_groups": true
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H04",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Người từ 65 tuổi: hoạt động đa thành phần đa dạng, nhấn mạnh thăng bằng chức năng và sức mạnh ở cường độ vừa hoặc cao hơn, ít nhất 3 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 63,
+      "source_printed_page": "53",
+      "conditions": [
+        "Chỉ áp dụng mục này cho người từ 65 tuổi.",
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 3,
+        "age_min": 65
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H05",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Có thể tăng aerobic cường độ vừa vượt 300 phút/tuần, hoặc cường độ mạnh vượt 150 phút/tuần, hoặc kết hợp tương đương để có thêm lợi ích.",
+      "strength": "CONDITIONAL",
+      "certainty": "MODERATE",
+      "source_pdf_page": 63,
+      "source_printed_page": "53",
+      "conditions": [
+        "Khi không có chống chỉ định.",
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_exclusive_min": 300,
+        "vigorous_minutes_per_week_exclusive_min": 150
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H06",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Hạn chế thời gian ít vận động; thay bằng vận động ở bất kỳ cường độ nào, kể cả nhẹ.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 68,
+      "source_printed_page": "58",
+      "conditions": [
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "H07",
+      "population": "adults_18_plus_specified_chronic_conditions",
+      "statement_vi": "Để giảm tác động bất lợi của mức ít vận động cao, hướng đến nhiều hoạt động cường độ vừa đến mạnh hơn mức khuyến nghị.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 68,
+      "source_printed_page": "58",
+      "conditions": [
+        "Phạm vi: người sống sau chẩn đoán ung thư, tăng huyết áp, đái tháo đường type 2, HIV.",
+        "Thực hiện khi có thể, phù hợp khả năng và không có chống chỉ định; không thay hướng dẫn lâm sàng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "DC01",
+      "population": "children_5_17_disability",
+      "statement_vi": "Trung bình ít nhất 60 phút/ngày trên cả tuần, cường độ vừa đến mạnh, chủ yếu aerobic.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 70,
+      "source_printed_page": "60",
+      "conditions": [
+        "Trong khả năng và với hoạt động phù hợp tình trạng sức khỏe/chức năng."
+      ],
+      "quantitative_parameters": {
+        "minutes_per_day_average_min": 60,
+        "aggregation": "average_across_week"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "DC02",
+      "population": "children_5_17_disability",
+      "statement_vi": "Đưa aerobic cường độ mạnh và hoạt động tăng cường cơ, xương vào ít nhất 3 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 70,
+      "source_printed_page": "60",
+      "conditions": [
+        "Trong khả năng và với hoạt động phù hợp."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 3
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "DC03",
+      "population": "children_5_17_disability",
+      "statement_vi": "Hạn chế thời gian ít vận động, đặc biệt thời gian màn hình giải trí.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 74,
+      "source_printed_page": "64",
+      "conditions": [],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D01",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Thực hiện hoạt động thể chất thường xuyên.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 71,
+      "source_printed_page": "61",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D02",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh, hoặc kết hợp tương đương.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 71,
+      "source_printed_page": "61",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_range": [
+          150,
+          300
+        ],
+        "vigorous_minutes_per_week_range": [
+          75,
+          150
+        ],
+        "relationship": "OR_OR_EQUIVALENT_COMBINATION"
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D03",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Tăng cường cơ ở cường độ vừa hoặc cao hơn, tác động tất cả nhóm cơ chính, ít nhất 2 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 71,
+      "source_printed_page": "61",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 2,
+        "all_major_muscle_groups": true
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D04",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Người từ 65 tuổi: hoạt động đa thành phần đa dạng, nhấn mạnh thăng bằng chức năng và sức mạnh ở cường độ vừa hoặc cao hơn, ít nhất 3 ngày/tuần.",
+      "strength": "STRONG",
+      "certainty": "MODERATE",
+      "source_pdf_page": 71,
+      "source_printed_page": "61",
+      "conditions": [
+        "Chỉ áp dụng mục này cho người từ 65 tuổi.",
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {
+        "days_per_week_min": 3,
+        "age_min": 65
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D05",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Có thể tăng aerobic cường độ vừa vượt 300 phút/tuần, hoặc cường độ mạnh vượt 150 phút/tuần, hoặc kết hợp tương đương để có thêm lợi ích.",
+      "strength": "CONDITIONAL",
+      "certainty": "MODERATE",
+      "source_pdf_page": 71,
+      "source_printed_page": "61",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {
+        "moderate_minutes_per_week_exclusive_min": 300,
+        "vigorous_minutes_per_week_exclusive_min": 150
+      },
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D06",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Hạn chế thời gian ít vận động; thay bằng vận động ở bất kỳ cường độ nào, kể cả nhẹ.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 74,
+      "source_printed_page": "64",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    },
+    {
+      "recommendation_id": "D07",
+      "population": "adults_18_plus_disability",
+      "statement_vi": "Để giảm tác động bất lợi của mức ít vận động cao, hướng đến nhiều hoạt động cường độ vừa đến mạnh hơn mức khuyến nghị.",
+      "strength": "STRONG",
+      "certainty": "LOW",
+      "source_pdf_page": 74,
+      "source_printed_page": "64",
+      "conditions": [
+        "Thực hiện khi có thể và trong khả năng; hoạt động phù hợp mức vận động hiện tại, sức khỏe và chức năng."
+      ],
+      "quantitative_parameters": {},
+      "source_id": "WHO-PA-SB-2020",
+      "review_status": "DRAFT",
+      "automatic_rule_enabled": false
+    }
+  ],
+  "note": "Local preparation format, not approved project API/DB contract. Not executable Rule Engine policy."
+}

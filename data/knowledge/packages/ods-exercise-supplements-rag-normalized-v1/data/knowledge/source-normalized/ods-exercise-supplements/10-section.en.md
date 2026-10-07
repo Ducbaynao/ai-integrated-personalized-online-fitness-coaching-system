@@ -1,0 +1,32 @@
+# Caffeine
+
+Source section: ODS-S10; raw lines 256–281.
+
+```text
+Caffeine
+Caffeine is a methylated xanthine naturally found in variable amounts in coffee; tea; cacao pods (the source of chocolate); and other herbal/botanical sources, such as guarana, kola (or cola) nut, and yerba mate. Caffeine stimulates the central nervous system, muscles, and other organs such as the heart by binding to adenosine receptors on cells, thereby blocking the activity of adenosine, a neuromodulator with sedative-like properties [83,84]. In this way, caffeine enhances arousal, increases vigor, and reduces fatigue [13,85,86]. Caffeine also appears to reduce perceived pain and exertion [13,85]. During the early stages of endurance exercise, caffeine might mobilize free fatty acids as a source of energy and spare muscle glycogen [38].
+
+Caffeine is commonly used in energy drinks and shots touted for their performance-enhancement effects [87,88]. It is also found in energy gels containing carbohydrates and electrolytes as well as in anhydrous caffeine-only pills.
+
+Efficacy
+Many studies have shown that caffeine might enhance performance in athletes when they ingest about 2–6 mg/kg body weight before exercise by improving endurance, strength, and power in high-intensity team sports activities [13,85,89,90]. For an individual weighing 154 pounds (70 kg), this dose is equivalent to 210–420 mg caffeine. Taking more, however, is unlikely to improve performance further and increases the risk of side effects.
+
+A review of the literature found that caffeine intake affected sport-specific performance (e.g., running, cycling, swimming, and rowing), as measured in time trials. Although 30 of the 33 trials showed positive improvements in performance, the improvements were not statistically significant in half of them [85]. In these studies, performance improvement ranged from a decrease of 0.7% to an increase of 17.3%, suggesting that the caffeine was very helpful to some participants but slightly impaired performance in others. Factors such as the timing of ingestion, caffeine intake mode or form, and habituation to caffeine could also have accounted for the varied effects on performance.
+
+Caffeine supplementation is more likely to help with endurance-type activities (such as running) and activities of long duration with intermittent activity (such as soccer) than more anaerobic, short-term bouts of intense exercise (such as sprinting or lifting weights) [91]. Some evidence suggests that caffeine is more likely to improve performance in people who are not habituated to it [85]. Limiting caffeine intake to 50 mg/day or abstaining from caffeine for 2–7 days before taking it for an athletic event might maximize any ergogenic effect. However, other evidence shows no habituation effect of caffeine consumption on performance [92].
+
+Safety
+Heavy caffeine use (500 mg/day or more) might diminish rather than enhance physical performance and could also disturb sleep and cause irritability and anxiety [93]. Other adverse effects of caffeine include insomnia, restlessness, nausea, vomiting, tachycardia, and arrhythmia [94-97]. Caffeine does not induce diuresis or increase sweat loss during exercise and therefore does not reduce fluid balance in the body that would adversely affect performance [13,90,98].
+
+For healthy adults, the U.S. Food and Drug Administration (FDA) states that 400 mg/day caffeine does not usually have dangerous adverse effects [99]. The American Medical Association recommends that adults limit their intake of caffeine to 500 mg/day and that adolescents consume no more than 100 mg/day [100]. The American Academy of Pediatrics warns that caffeine-containing energy drinks in particular have no place in the diets of children or adolescents and are not suitable for use during routine physical activity [101].
+
+Pure powdered caffeine is available as a dietary supplement and is very potent. A single tablespoon contains 10 g caffeine, and an acute oral dose of 10 to 14 g caffeine (approximately 150–200 mg/kg) can be fatal [91]. Furthermore, combining caffeine with other stimulants could increase the potential for adverse effects [94]. At least two young men have died as a result of taking an unknown amount of pure powdered caffeine [102].
+
+Implications for use
+Caffeine is easily and rapidly absorbed, even from the buccal membranes in the mouth, and is distributed throughout the body and brain. It reaches peak concentrations in the blood within 45 minutes of consumption and has a half-life of about 4–5 hours [83]. For a potential benefit to athletic performance, users should consume caffeine 15 to 60 minutes before exercise [13,85]. Consumption of caffeine with fluid during exercise of long duration might extend any performance improvements [85].
+
+In a position statement, the AND, DoC, and ACSM state that caffeine supplementation reduces perceived fatigue and enables users to sustain exercise at the desired intensity longer [12]. The U.S. Department of Defense states that caffeine supplementation at 2–6 mg/kg body weight is linked to enhanced physical performance and the effects of smaller doses usually last longer and are greater in people who do not usually consume caffeine [89]. It adds that caffeine could reduce perceived exertion when exercise lasts longer. In a position statement, the ISSN describes caffeine as effective in trained athletes for improving sports performance and notes that supplementation with about 3–6 mg/kg has an ergogenic effect on sustained maximal endurance exercise but not necessarily on strength-power performance [13]. The Australian Institute of Sport supports the use of caffeine for improving sports performance in suitable athletic competitions under the direction of an expert in sports medicine, but it notes that more research might be required to understand how caffeine should be used for best results [29].
+
+The International Olympic Committee considers caffeine to be a controlled or restricted substance; Olympic athletes may consume it until urinary concentrations exceed 12 mcg/ml [103]. The National Collegiate Athletic Association prohibits use of caffeine from any source in amounts that would lead to urine concentrations exceeding 15 mcg/ml [104,105]. (Consuming about 500 mg caffeine produces a urinary caffeine concentration of 15 mcg/ml within 2–3 hours [106].) The World Anti-Doping Agency does not prohibit or limit caffeine use [107].
+
+```
