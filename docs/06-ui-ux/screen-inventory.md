@@ -31,7 +31,7 @@
 | ST-14 | Food Photo Confirmation | AI estimate, confidence, correction |
 | ST-15 | Nutrition Goal and Proposal | Lifecycle/version/approval |
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
-| ST-17 | Coaching Profile | Mode, trainer, period, sharing permission |
+| ST-17 | Coaching Profile | Route `/(app)/coaching`; relationship lifecycle, current period, history list, and Student-owned sharing permission management |
 | ST-18 | Reschedule Request | Conflict, accept/reject, workout independence |
 | ST-19 | Chat | Relationship-scoped messages |
 | ST-20 | Notification Center | Deep links and preferences |
@@ -44,9 +44,9 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 
 | ID | Màn hình | Core capability |
 |---|---|---|
-| TR-01 | Trainer Overview | Sessions, review due, attention queue |
+| TR-01 | Trainer Overview | Sessions, review due, attention queue; B03 pending relationships are available from `/(app)/coaching` |
 | TR-02 | Student List | Needs attention, on track, inactive, review due |
-| TR-03 | Student Coaching Workspace | Overview, program, workout, progress, nutrition, schedule, messages, AI, history |
+| TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; later modules add program, workout, progress, nutrition, schedule, messages, and AI |
 | TR-04 | Attention Signal Detail | Evidence, severity, acknowledge/resolve |
 | TR-05 | Plan Builder | Workout plan and significant/minor change |
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |
@@ -55,7 +55,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | TR-09 | Trainer Schedule | Appointment, availability, conflict |
 | TR-10 | Reschedule Request | Trainer-initiated flow and revalidation |
 | TR-11 | AI Insight Review | Accept/modify/reject for Trainer workflow |
-| TR-12 | Student Data Permission | Allowed/limited/not shared states |
+| TR-12 | Student Data Permission | Route `/(app)/coaching/[relationshipId]/sharing`; authoritative allowed/denied/expired/revoked/not-configured states and VIEW/CONTRIBUTE/MANAGE levels |
 
 ## Admin Web
 

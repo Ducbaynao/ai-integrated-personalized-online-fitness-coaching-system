@@ -162,6 +162,15 @@ export function HomeScreen() {
                 onPress={() => router.push('/exercises' as any)}>
                 <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Thư viện bài tập →</Text>
               </Pressable>
+
+              <Pressable
+                testID="view-coaching-button"
+                accessibilityRole="button"
+                accessibilityLabel="Quản lý quan hệ huấn luyện"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/coaching' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Quan hệ huấn luyện →</Text>
+              </Pressable>
             </>
           )}
 
