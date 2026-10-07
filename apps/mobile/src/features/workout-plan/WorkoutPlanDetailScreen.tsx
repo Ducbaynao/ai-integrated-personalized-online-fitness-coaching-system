@@ -8,9 +8,11 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutPlanApi } from '@/services/workoutPlanApi';
 import { WorkoutPlanStatus } from '@/types/workoutPlan';
+import { TrainerWorkoutPlanDetailScreen } from './TrainerWorkoutPlanDetailScreen';
+import { WorkoutPlanVersionContent } from './components/WorkoutPlanVersionContent';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from './components/WorkoutUi';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from './workoutPlanQueries';
-import { isWorkoutStaleConflict, workoutExerciseStateLabels, workoutOwnerLabels, workoutPlanErrorMessage, workoutStatusLabels } from './workoutPlanMessages';
+import { isWorkoutStaleConflict, workoutOwnerLabels, workoutPlanErrorMessage, workoutStatusLabels } from './workoutPlanMessages';
 
 type PendingCommand = 'ACTIVATE' | WorkoutPlanStatus;
 const labels: Partial<Record<PendingCommand, string>> = { ACTIVATE: 'Kích hoạt kế hoạch', ACTIVE: 'Tiếp tục kế hoạch', PAUSED: 'Tạm dừng kế hoạch', COMPLETED: 'Hoàn thành kế hoạch', ARCHIVED: 'Lưu trữ kế hoạch' };
@@ -23,7 +25,20 @@ function actions(status: WorkoutPlanStatus, studentOwned: boolean): WorkoutPlanS
   return [];
 }
 
-export function WorkoutPlanDetailScreen({ planId }: { planId: string }) {
+interface WorkoutPlanDetailScreenProps {
+  planId: string;
+  studentId?: string;
+  relationshipId?: string;
+}
+
+export function WorkoutPlanDetailScreen({ planId, studentId, relationshipId }: WorkoutPlanDetailScreenProps) {
+  if (studentId && relationshipId) {
+    return <TrainerWorkoutPlanDetailScreen planId={planId} studentId={studentId} relationshipId={relationshipId} />;
+  }
+  return <StudentWorkoutPlanDetailScreen planId={planId} />;
+}
+
+function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
   const { user, activeCapability } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
@@ -95,21 +110,7 @@ export function WorkoutPlanDetailScreen({ planId }: { planId: string }) {
       {!mutableContext ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Đây là bản ghi lịch sử chỉ để xem.</Text> : null}
     </WorkoutCard>
 
-    {currentVersion ? <WorkoutCard testID="plan-session-content">
-      <Text style={[styles.h2, { color: theme.textPrimary }]}>Nội dung phiên bản hiện tại</Text>
-      {versionQuery.isPending ? <WorkoutState busy title="Đang tải buổi tập" message="Vui lòng chờ trong giây lát." /> : null}
-      {versionQuery.isError ? <WorkoutState title="Không thể tải nội dung" message={workoutPlanErrorMessage(versionQuery.error)} onRetry={() => versionQuery.refetch()} /> : null}
-      {versionQuery.data?.sessions.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản này chưa có buổi tập.</Text> : null}
-      {versionQuery.data?.sessions.map((session) => <View key={session.id}>
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Tuần {session.weekNumber}, ngày {session.dayNumber}: {session.name}</Text>
-        {session.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {session.focus}</Text> : null}
-        {session.prescriptions.map((item) => <View key={item.id}>
-          <Text style={[styles.body, { color: theme.textPrimary }]}>{item.sequenceNumber}. {item.exercise.exerciseName ?? 'Bài tập không khả dụng'}{item.exercise.variationName ? ` · ${item.exercise.variationName}` : ''}</Text>
-          <Text style={[styles.body, { color: item.exercise.state === 'ACTIVE' ? theme.textSecondary : theme.warningText }]}>{workoutExerciseStateLabels[item.exercise.state]}{item.targetSets !== null ? ` · ${item.targetSets} hiệp` : ''}{item.targetRepsMin !== null ? ` · ${item.targetRepsMin}${item.targetRepsMax !== null ? `–${item.targetRepsMax}` : ''} reps` : ''}</Text>
-          {item.exercise.canonicalExerciseName ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bài canonical hiện tại: {item.exercise.canonicalExerciseName} — tham khảo, không thay thế bản ghi gốc.</Text> : null}
-        </View>)}
-      </View>)}
-    </WorkoutCard> : null}
+    {currentVersion ? <WorkoutPlanVersionContent testID="plan-session-content" title="Nội dung phiên bản hiện tại" detail={versionQuery.data} isPending={versionQuery.isPending} isError={versionQuery.isError} error={versionQuery.error} onRetry={() => versionQuery.refetch()} /> : null}
 
     <WorkoutButton testID="open-plan-history-button" label="Xem lịch sử phiên bản" secondary onPress={() => router.push(`/workout-plans/${plan.id}/history` as never)} />
     {mutableContext && studentOwned && plan.status === 'DRAFT' ? <View style={styles.row}><WorkoutButton testID="edit-plan-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/workout-plans/${plan.id}/edit?mode=draft` as never)} /><WorkoutButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} /></View> : null}

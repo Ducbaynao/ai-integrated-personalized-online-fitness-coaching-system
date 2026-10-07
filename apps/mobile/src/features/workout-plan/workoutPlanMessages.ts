@@ -20,6 +20,9 @@ const messages: Record<string, string> = {
   WORKOUT_PLAN_SUCCESSOR_REQUIRED: 'Hãy tạo một kế hoạch kế nhiệm do Học viên sở hữu để tiếp tục chỉnh sửa.',
   WORKOUT_PLAN_EXERCISE_UNAVAILABLE: 'Một biến thể bài tập đã chọn không còn khả dụng.',
   WORKOUT_PLAN_EFFECTIVE_TIME_CONFLICT: 'Mốc hiệu lực của phiên bản đã xung đột. Hãy tải lại kế hoạch.',
+  DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT: 'Mức quyền hiện tại không đủ cho thao tác này.',
+  TRAINER_NOT_ELIGIBLE: 'Huấn luyện viên hiện không đủ điều kiện cho thao tác này.',
+  ACCESS_DENIED: 'Bạn không có quyền thực hiện thao tác này.',
   VALIDATION_FAILED: 'Thông tin kế hoạch chưa hợp lệ. Vui lòng kiểm tra lại.',
 };
 
@@ -36,3 +39,7 @@ export function workoutPlanErrorMessage(error: unknown): string {
 }
 export const isCurrentPlanMissing = (error: unknown) => error instanceof ApiError && error.status === 404;
 export const isWorkoutStaleConflict = (error: unknown) => error instanceof ApiError && error.status === 409 && ['WORKOUT_PLAN_VERSION_CONFLICT', 'WORKOUT_PLAN_LIFECYCLE_CONFLICT', 'WORKOUT_PLAN_EFFECTIVE_TIME_CONFLICT'].includes(error.errorResponse?.errorCode ?? '');
+
+export function isWorkoutAuthorityLoss(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 403 || error.status === 404);
+}

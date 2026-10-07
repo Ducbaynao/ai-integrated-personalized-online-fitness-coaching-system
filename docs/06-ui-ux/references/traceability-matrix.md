@@ -8,7 +8,7 @@
 | Data sharing permission | Permission summary và editor | Student/Trainer | Student flows |
 | Fitness Goal | Goal dashboard, detail, proposal, version history | Student/Trainer | Student screens |
 | Exercise Library | Browse/detail/picker; active, archived, unavailable and canonical mapping states | Student/Trainer/Admin | `screen-inventory.md`, `component-specifications.md`, `admin/admin-screens.md` |
-| Workout Plan | Student current/list/detail, SELF_DIRECTED draft builder, activation/lifecycle, immutable history/significant version and explicit Trainer-delivered successor | Student | `screen-inventory.md`, `navigation-architecture.md`, `student/student-screens.md` |
+| Workout Plan | Student current/list/detail, SELF_DIRECTED authoring and successor; TR-03 Program authority context; TR-05 Trainer-owned DRAFT builder, activation/lifecycle, immutable history and significant version publication | Student/Trainer | `screen-inventory.md`, `navigation-architecture.md`, `student/student-screens.md`, `trainer/trainer-screens.md` |
 | Planned vs Actual Workout | Calendar, session detail, execution result | Student/Trainer | Student flows |
 | Schedule change | Request, conflict, accept/reject | Student/Trainer | Student và Trainer flows |
 | Body measurement | Add measurement, history, provenance, quality | Student/Trainer | Student screens |
