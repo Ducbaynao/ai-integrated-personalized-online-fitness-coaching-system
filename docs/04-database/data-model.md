@@ -41,6 +41,10 @@ erDiagram
 
 Historical sessions reference the source plan version. Significant changes append versions. Actual facts are not rewritten to match a plan.
 
+V28 distinguishes aggregate `version` (optimistic concurrency) from a plan version's business `version_number`. A plan has an immutable decision owner (`STUDENT` or `TRAINER`) and may identify one locked source plan/version as explicit successor lineage. A Student continuing a delivered Trainer-authored plan creates a new Student-owned DRAFT successor; ownership of the historical aggregate is not transferred. At most one plan is `ACTIVE` for a Student.
+
+Publication closes the previous open version and opens the next version at one PostgreSQL timestamp. Materialized Planned Workouts keep their original session/version identity; only later materialization selects the newly effective version. One-occurrence changes are append-only `workout_session_adjustments`, including a separate replacement variation for an exercise swap. Plan lifecycle history and actor-scoped command receipts are retained with restrictive references.
+
 The Exercise catalog uses a nullable, governed movement-pattern reference. Active reference values are selectable for new Admin draft mutations; an inactive value remains attached to historical Exercise content until that draft is deliberately changed.
 
 ## Schedule
