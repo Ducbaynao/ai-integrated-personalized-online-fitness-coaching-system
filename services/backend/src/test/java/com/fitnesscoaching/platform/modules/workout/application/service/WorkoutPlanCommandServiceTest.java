@@ -6,9 +6,11 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.ActivateCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CreateStudentSuccessorCommand;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort.OpenVersion;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort.Receipt;
+import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort.Successor;
 import com.fitnesscoaching.platform.modules.workout.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -101,6 +103,56 @@ class WorkoutPlanCommandServiceTest {
                 .isInstanceOf(WorkoutPlanFailure.class)
                 .extracting(ex -> ((WorkoutPlanFailure) ex).error())
                 .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_IDEMPOTENCY_CONFLICT);
+        verify(store, never()).lockPlan(any());
+    }
+
+    @Test void studentCreatesSuccessorFromTrainerOwnedDeliveredPlan() {
+        UUID trainer = UUID.randomUUID();
+        UUID sourceVersion = UUID.randomUUID();
+        UUID successorPlan = UUID.randomUUID();
+        UUID successorVersion = UUID.randomUUID();
+        Instant at = Instant.parse("2026-10-07T10:00:00Z");
+        when(store.findPlanStudent(planId)).thenReturn(student);
+        when(store.lockReceipt(student, "successor-key")).thenReturn(Optional.empty());
+        when(contexts.findEffectiveContext(student, true)).thenReturn(Optional.of(selfContext()));
+        when(store.lockPlan(planId)).thenReturn(plan(DecisionOwnerType.TRAINER, trainer));
+        when(store.lockOpenVersion(planId)).thenReturn(new OpenVersion(sourceVersion, 1, at.minusSeconds(60)));
+        when(store.databaseNow()).thenReturn(at);
+        when(store.createStudentSuccessor(planId, sourceVersion, student, periodId, "Tiếp tục tự tập", at))
+                .thenReturn(new Successor(successorPlan, successorVersion));
+
+        var result = service.createStudentSuccessor(new CreateStudentSuccessorCommand(
+                planId, sourceVersion, student, "Tiếp tục tự tập", "successor-key"));
+
+        assertThat(result.planId()).isEqualTo(successorPlan);
+        assertThat(result.status()).isEqualTo(WorkoutPlanStatus.DRAFT);
+        verify(store).createStudentSuccessor(planId, sourceVersion, student, periodId, "Tiếp tục tự tập", at);
+    }
+
+    @Test void studentOwnedPlanCannotBeUsedAsSuccessorSource() {
+        UUID sourceVersion = UUID.randomUUID();
+        when(store.findPlanStudent(planId)).thenReturn(student);
+        when(store.lockReceipt(student, "successor-key")).thenReturn(Optional.empty());
+        when(contexts.findEffectiveContext(student, true)).thenReturn(Optional.of(selfContext()));
+        when(store.lockPlan(planId)).thenReturn(plan(DecisionOwnerType.STUDENT, student));
+
+        assertThatThrownBy(() -> service.createStudentSuccessor(new CreateStudentSuccessorCommand(
+                planId, sourceVersion, student, "Tiếp tục tự tập", "successor-key")))
+                .isInstanceOf(WorkoutPlanFailure.class)
+                .extracting(ex -> ((WorkoutPlanFailure) ex).error())
+                .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED);
+        verify(store, never()).createStudentSuccessor(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test void crossStudentSuccessorSourceIsDeniedBeforeSourceRead() {
+        UUID otherStudent = UUID.randomUUID();
+        when(store.findPlanStudent(planId)).thenReturn(otherStudent);
+
+        assertThatThrownBy(() -> service.createStudentSuccessor(new CreateStudentSuccessorCommand(
+                planId, UUID.randomUUID(), student, "Tiếp tục tự tập", "successor-key")))
+                .isInstanceOf(WorkoutPlanFailure.class)
+                .extracting(ex -> ((WorkoutPlanFailure) ex).error())
+                .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_ACCESS_DENIED);
         verify(store, never()).lockPlan(any());
     }
 

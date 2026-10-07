@@ -10,8 +10,19 @@ public record ExercisePrescription(
 ) {
     public ExercisePrescription {
         if (exerciseVariationId == null || sequenceNumber < 1)
-            throw new IllegalArgumentException("Invalid exercise prescription");
+            throw invalid();
+        if ((targetSets != null && targetSets <= 0)
+                || (targetRepsMin != null && targetRepsMin < 0)
+                || (targetRepsMax != null && targetRepsMax < 0)
+                || (targetLoad != null && targetLoad.signum() < 0)
+                || (restSeconds != null && restSeconds < 0)
+                || (durationSeconds != null && durationSeconds < 0))
+            throw invalid();
         if (targetRepsMin != null && targetRepsMax != null && targetRepsMax < targetRepsMin)
-            throw new IllegalArgumentException("Invalid repetition range");
+            throw invalid();
+    }
+
+    private static WorkoutPlanFailure invalid() {
+        return new WorkoutPlanFailure(WorkoutPlanError.VALIDATION_FAILED, "Invalid exercise prescription");
     }
 }

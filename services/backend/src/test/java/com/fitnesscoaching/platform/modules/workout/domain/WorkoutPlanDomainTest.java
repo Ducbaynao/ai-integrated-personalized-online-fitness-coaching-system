@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.workout.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.UUID;
 
@@ -54,6 +55,40 @@ class WorkoutPlanDomainTest {
                 .isInstanceOf(WorkoutPlanFailure.class);
         assertThatThrownBy(WorkoutChangeScope.MULTIPLE_OCCURRENCES::requireMinor)
                 .isInstanceOf(WorkoutPlanFailure.class);
+    }
+
+    @Test
+    void prescriptionRejectsValuesOutsideExecutableSchemaRanges() {
+        assertInvalidPrescription(0, null, null, null, null, null);
+        assertInvalidPrescription(-1, null, null, null, null, null);
+        assertInvalidPrescription(1, -1, null, null, null, null);
+        assertInvalidPrescription(1, null, -1, null, null, null);
+        assertInvalidPrescription(1, 2, 1, null, null, null);
+        assertInvalidPrescription(1, null, null, new BigDecimal("-0.01"), null, null);
+        assertInvalidPrescription(1, null, null, null, -1, null);
+        assertInvalidPrescription(1, null, null, null, null, -1);
+    }
+
+    @Test
+    void prescriptionAllowsZeroWhereExecutableSchemaAllowsZero() {
+        ExercisePrescription prescription = new ExercisePrescription(null, UUID.randomUUID(), 1,
+                1, 0, 0, BigDecimal.ZERO, 0, 0, null);
+
+        assertThat(prescription.targetSets()).isOne();
+        assertThat(prescription.targetRepsMin()).isZero();
+        assertThat(prescription.targetRepsMax()).isZero();
+        assertThat(prescription.targetLoad()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(prescription.restSeconds()).isZero();
+        assertThat(prescription.durationSeconds()).isZero();
+    }
+
+    private static void assertInvalidPrescription(Integer sets, Integer repsMin, Integer repsMax,
+                                                  BigDecimal load, Integer rest, Integer duration) {
+        assertThatThrownBy(() -> new ExercisePrescription(null, UUID.randomUUID(), 1,
+                sets, repsMin, repsMax, load, rest, duration, null))
+                .isInstanceOf(WorkoutPlanFailure.class)
+                .extracting(ex -> ((WorkoutPlanFailure) ex).error())
+                .isEqualTo(WorkoutPlanError.VALIDATION_FAILED);
     }
 
     private static EnumSet<WorkoutPlanStatus> allowed(WorkoutPlanStatus source) {

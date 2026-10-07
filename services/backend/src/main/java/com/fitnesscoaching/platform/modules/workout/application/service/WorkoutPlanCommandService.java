@@ -126,6 +126,8 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         if (context.mode() != CurrentCoachingContextQuery.Mode.SELF_DIRECTED)
             throw failure(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED);
         WorkoutPlan source = store.lockPlan(c.sourcePlanId());
+        if (source.decisionOwnerType() != DecisionOwnerType.TRAINER)
+            throw failure(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED);
         OpenVersion current = store.lockOpenVersion(source.id());
         if (!current.id().equals(c.sourceVersionId())) {
             // A historical locked version is still valid lineage; persistence validates it during copy.
