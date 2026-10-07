@@ -1,0 +1,192 @@
+{
+  "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+  "title": "International Society of Sports Nutrition Position Stand: protein and exercise",
+  "citation": "Jäger R, Kerksick CM, Campbell BI, et al. International Society of Sports Nutrition Position Stand: protein and exercise. Journal of the International Society of Sports Nutrition. 2017;14:20. DOI: 10.1186/s12970-017-0177-8.",
+  "doi": "10.1186/s12970-017-0177-8",
+  "year": 2017,
+  "source_url": "https://doi.org/10.1186/s12970-017-0177-8",
+  "input_filename": "s12970-017-0177-8.pdf",
+  "input_sha256": "7a97a81db0334c95ddd17a2009200e7f38945988b3e1dd5aa70f73a502fe8140",
+  "pdf_page_count": 25,
+  "license": "CC BY 4.0",
+  "normalization_version": "1.0.0",
+  "prepared_at": "2026-10-06",
+  "source_replaced": false,
+  "fulltext_translation": false,
+  "english_fulltext_preserved": true,
+  "review_status": "DRAFT",
+  "topics": [
+    {
+      "topic_id": "abstract",
+      "source_pdf_page_range": [
+        1,
+        2
+      ]
+    },
+    {
+      "topic_id": "background",
+      "source_pdf_page_range": [
+        2,
+        2
+      ]
+    },
+    {
+      "topic_id": "endurance-performance",
+      "source_pdf_page_range": [
+        2,
+        3
+      ]
+    },
+    {
+      "topic_id": "resistance-performance",
+      "source_pdf_page_range": [
+        3,
+        4
+      ]
+    },
+    {
+      "topic_id": "body-composition",
+      "source_pdf_page_range": [
+        4,
+        5
+      ]
+    },
+    {
+      "topic_id": "protein-timing",
+      "source_pdf_page_range": [
+        5,
+        8
+      ]
+    },
+    {
+      "topic_id": "pre-sleep",
+      "source_pdf_page_range": [
+        8,
+        9
+      ]
+    },
+    {
+      "topic_id": "meal-timing",
+      "source_pdf_page_range": [
+        9,
+        10
+      ]
+    },
+    {
+      "topic_id": "recommended-intake",
+      "source_pdf_page_range": [
+        10,
+        11
+      ]
+    },
+    {
+      "topic_id": "protein-quality",
+      "source_pdf_page_range": [
+        11,
+        12
+      ]
+    },
+    {
+      "topic_id": "milk-proteins",
+      "source_pdf_page_range": [
+        13,
+        14
+      ]
+    },
+    {
+      "topic_id": "egg-proteins",
+      "source_pdf_page_range": [
+        14,
+        14
+      ]
+    },
+    {
+      "topic_id": "meat-proteins",
+      "source_pdf_page_range": [
+        14,
+        15
+      ]
+    },
+    {
+      "topic_id": "plant-comparison",
+      "source_pdf_page_range": [
+        15,
+        15
+      ]
+    },
+    {
+      "topic_id": "protein-blends",
+      "source_pdf_page_range": [
+        15,
+        16
+      ]
+    },
+    {
+      "topic_id": "source-comparison-criteria",
+      "source_pdf_page_range": [
+        16,
+        17
+      ]
+    },
+    {
+      "topic_id": "preparation-filtration",
+      "source_pdf_page_range": [
+        17,
+        17
+      ]
+    },
+    {
+      "topic_id": "hydrolyzed-proteins",
+      "source_pdf_page_range": [
+        17,
+        18
+      ]
+    },
+    {
+      "topic_id": "digestive-enzymes",
+      "source_pdf_page_range": [
+        18,
+        18
+      ]
+    },
+    {
+      "topic_id": "safety",
+      "source_pdf_page_range": [
+        19,
+        19
+      ]
+    },
+    {
+      "topic_id": "conclusion",
+      "source_pdf_page_range": [
+        19,
+        20
+      ]
+    },
+    {
+      "topic_id": "declarations-author-details",
+      "source_pdf_page_range": [
+        20,
+        20
+      ]
+    },
+    {
+      "topic_id": "references",
+      "source_pdf_page_range": [
+        20,
+        25
+      ]
+    },
+    {
+      "topic_id": "publisher-promotion",
+      "source_pdf_page_range": [
+        25,
+        25
+      ]
+    }
+  ],
+  "topic_ranges_overlap_note": "Topics begin/end mid-page; these are semantic reference ranges, not duplicate page exports.",
+  "references_count": 224,
+  "references_fulltext_reviewed": false,
+  "position_statements_count": 13
+}

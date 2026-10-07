@@ -1,0 +1,738 @@
+{
+  "format_version": 1,
+  "review_record_id": "REV-PO-20261008-01",
+  "reviewed_at": "2026-10-08",
+  "received_at": "2026-10-07T20:33:37.994Z",
+  "reviewer_role": "PROJECT_OWNER",
+  "reviewer_identity": "Chủ dự án — xác nhận trực tiếp của người dùng",
+  "user_confirmation_text": "Những file kiến thức này ở dạng DRAFT chỉ là tạm thời, những nội dung trong đó đã được tôi review chuyên môn nên có thể đảm bảo, nếu được có thể sửa lại trạng thái DRAFT.",
+  "specialist_review_verdict": "APPROVED",
+  "scope_summary": {
+    "total_snapshot_articles": 73,
+    "total_derivative_articles": 11,
+    "total_evaluation_candidates": 114,
+    "snapshot_sources": 4
+  },
+  "lifecycle_status": {
+    "specialist_review": "APPROVED",
+    "technical_readiness": "PASSED",
+    "publication_status": "DRAFT",
+    "retrieval_enabled": false,
+    "publication_gate_reason": "Chưa kích hoạt qua Spring Content publishing workflow; phê duyệt chuyên môn độc lập với quy trình xuất bản kỹ thuật và kích hoạt retrieval."
+  },
+  "authority_and_safety_boundaries": {
+    "commercial_use_clearance": "NOT_CONFIRMED",
+    "mathematical_errors_in_sources": "RETAINED_AND_FLAGGED_AS_KNOWN_LIMITS",
+    "f01_output_type": "INFORMATION",
+    "domain_authority_invariants": "Không tự động suy ra Nutrition Target, Workout Plan, liều supplement cá nhân hoặc đơn thuốc."
+  },
+  "approved_snapshot_articles": [
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-01",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/01-scope.vi.md",
+      "content_sha256": "78f5c8cab39d2524bc9a309de18800280ae92ccd4f2f085180e4fd6e71d7f084",
+      "bytes": 2334
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-02",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/02-glossary.vi.md",
+      "content_sha256": "c1ecba811d1ea2fbe844ebb047f8bb639fdc894b24b0fd4f2497507114c97ecb",
+      "bytes": 4284
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/03-daily-protein.vi.md",
+      "content_sha256": "7b1ec84cf3163abfd2dbeaa5395b8fbd246ce5c5d6f8b8ff01c01bcca488e251",
+      "bytes": 4025
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+      "content_sha256": "d289f99bbd4b3850203d59647994dab9852889f2047f84ed9c6b57f5ab9a304e",
+      "bytes": 3362
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-05",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/05-timing.vi.md",
+      "content_sha256": "68475349754eff6f9334ba05226539b42b9bb25d1956a4b46a0eeb304bb5f7f1",
+      "bytes": 3462
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-06",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/06-pre-sleep.vi.md",
+      "content_sha256": "daa174d02d500915fb15d989632b09cb083d05192bd2c88485aff9179297f942",
+      "bytes": 2845
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-07",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/07-endurance.vi.md",
+      "content_sha256": "767ac43eabcf6108dbb00160f6e31cfe9dea8ff997bc8c4e69c57d4dcea7bef7",
+      "bytes": 2729
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-08",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/08-strength.vi.md",
+      "content_sha256": "7dfb17cffec691ac7f539718dfd18e9023100c0cec2ef72734609ac78b2c262f",
+      "bytes": 1875
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-09",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/09-body-composition.vi.md",
+      "content_sha256": "cf6a7e7136d9851ca75f3b0d9dcec6116b0131f35ae86f823343466f8942e65a",
+      "bytes": 1989
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-10",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/10-quality.vi.md",
+      "content_sha256": "43d0a1bed87f1d6b7f1fe29b5d6233c2fa5962b19c233411cee150007554683a",
+      "bytes": 2968
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-11",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/11-milk.vi.md",
+      "content_sha256": "d19d284966667d968db047d00369646ca67eb8c31283d7245e0b0e97a2bfa228",
+      "bytes": 2177
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-12",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/12-egg-meat.vi.md",
+      "content_sha256": "d0ed9629f7ec9cb51dad542dd34f0a1bdcdff8dddbfc6062655b601f2dcf257c",
+      "bytes": 2140
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-13",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/13-plant.vi.md",
+      "content_sha256": "afeb826107808cf4663d90de8a1eaec7db672b9a8d698deda888349e762e2cfc",
+      "bytes": 2306
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-14",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/14-blends.vi.md",
+      "content_sha256": "d299d7e1484c7c26483c4fb345a4910fd77b8e5649018156c9bbc8d31266f151",
+      "bytes": 1617
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-15",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/15-processing.vi.md",
+      "content_sha256": "3e62d33827e0e1716af98da502b261cb9626b6bb4530865cc07162b20b399161",
+      "bytes": 2178
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-16",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/16-safety.vi.md",
+      "content_sha256": "3c64f4b2557019be9508f32229404a1d443055153eed37af545904eb539607f7",
+      "bytes": 2310
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-17",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/17-conclusion-provenance.vi.md",
+      "content_sha256": "74f9ec1079c7291067fa00c8eab17acdcdd0a56390e98182838c0498aea6289c",
+      "bytes": 2637
+    },
+    {
+      "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-18",
+      "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/issn-protein-2017/18-project-usage.vi.md",
+      "content_sha256": "ac34014e209eb8969eb0315cc038f15ab7a16d31d8b08dfafa65cedeaa13bc29",
+      "bytes": 3217
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.md",
+      "content_sha256": "b75825137a19e142ea32c380c965afee91deb6f8307c7a7834bca0626855b523",
+      "bytes": 1475
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/02-lifestyle.vi.md",
+      "content_sha256": "70ebd4fcf742f8d07d8586608b67c13ed2960f56c196f0c64d74de7af4612ef1",
+      "bytes": 1749
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/03-environment.vi.md",
+      "content_sha256": "9f7d22bd11c213fd19b60ff848a5ab814f35c99b4489a2309015cc29680df96d",
+      "bytes": 1484
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/04-sleep.vi.md",
+      "content_sha256": "4ba66733c47e58fa077b34c7818ca79aefac149ba7167f20a75839e67fea535b",
+      "bytes": 1748
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-05",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/05-medicines.vi.md",
+      "content_sha256": "6b344cca9a7a69e055d6067b6cdf69ce6acf6ee90d0f404b5114fcbffb5241c0",
+      "bytes": 2303
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/06-health.vi.md",
+      "content_sha256": "28ea32f116a3e96714ee22ccb50d9d0d44353b8bd0bee366be93449540fffa7a",
+      "bytes": 2247
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-07",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/07-family-genes.vi.md",
+      "content_sha256": "d465b1f28206a79e71cd92f57850e7de3b5903ef859a2f6b3f8b265e4cac2022",
+      "bytes": 1458
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-08",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/niddk-weight-factors/08-project-usage.vi.md",
+      "content_sha256": "ef46e0e7614544dec48fd03d8295d55bf555836adf9c370a74f119f531e04e2c",
+      "bytes": 3269
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-01",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/01-overview.vi.md",
+      "content_sha256": "d94c6e92649603579ca2eb5d6c2249ee3ee84e43b6676f0fd1efcf10b18a925d",
+      "bytes": 2079
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-02",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/02-foundation.vi.md",
+      "content_sha256": "6045c4fd1428788321ebc6a9bce6d4a22e26b1295bbb6f75437896e7b3db119b",
+      "bytes": 1984
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-03",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/03-evidence-and-blends.vi.md",
+      "content_sha256": "f414964fbebda4b5f224595b658d899bbc5dcbe9b6001819284d89081e7a3ad6",
+      "bytes": 2109
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-04",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/04-antioxidants.vi.md",
+      "content_sha256": "105b49bf8757815ee54dbbe8291af92e07deef0cc566b1033620a24bb7d8101a",
+      "bytes": 2050
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-05",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/05-arginine.vi.md",
+      "content_sha256": "212f389cbee3ac8eb0d8cdf6271611fbd13ddc172e26c8e1143652c246d7924e",
+      "bytes": 1717
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-06",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/06-beetroot.vi.md",
+      "content_sha256": "84429f235f8de48b9f0fe8c36bbcd6f30abfb57cb264a02b9f2802ba535ae7f6",
+      "bytes": 2085
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-07",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/07-beta-alanine.vi.md",
+      "content_sha256": "b67ffc1a244499768da1db7e4a17a6a6f5748fefecb42b34b1fa4b9fe88d6057",
+      "bytes": 1856
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-08",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/08-hmb.vi.md",
+      "content_sha256": "c54975ae6d6ed7b3ae45ddfab246978d6960fa554a22f806ceeec9a03361fe4f",
+      "bytes": 1825
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-09",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/09-betaine.vi.md",
+      "content_sha256": "0d6ac73bfa68172835c9a3c24a61d0fccc89bb92765d6d7eb63815399242a77f",
+      "bytes": 1604
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-10",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/10-bcaa.vi.md",
+      "content_sha256": "d11eaac2c8ed2361c699f9b76835b2ff6e2d12e575d6955543784b98b9da10c4",
+      "bytes": 1740
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-11",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/11-caffeine.vi.md",
+      "content_sha256": "637968572f297d6c4d5ed22bf99ea438f3b9374990a66977a5407353b1b9eae7",
+      "bytes": 2241
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-12",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/12-citrulline.vi.md",
+      "content_sha256": "0473e40b85e3b4fbdd0a0bb4137ce6f0567f66d69873c17a68a9d3b0606c83d8",
+      "bytes": 1756
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-13",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/13-creatine.vi.md",
+      "content_sha256": "cea2e253fd51e85d90455a7cdf419ee8df0c49146e85aa8b2214a9c3e8a19502",
+      "bytes": 2033
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-14",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/14-deer-antler.vi.md",
+      "content_sha256": "4e0aa2816c3047f6fb2a65f620fc3b01371d30c46c666ba90329f05616d3bcf6",
+      "bytes": 1875
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-15",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/15-dhea.vi.md",
+      "content_sha256": "e7f6d057c437e2c26a7cb8d96f60f462b845b81b22091194f7f3ff5f41201b68",
+      "bytes": 1638
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-16",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/16-ginseng.vi.md",
+      "content_sha256": "050f321debdf314449a0ca577b391e2f9209d75849d2dddd9a02ac574fe809b2",
+      "bytes": 1509
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-17",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/17-glutamine.vi.md",
+      "content_sha256": "ba695fef398720a3155680058249258aba041e16dee5f0a240b68e424b418b41",
+      "bytes": 1695
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-18",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/18-iron.vi.md",
+      "content_sha256": "fe2f6889ed6c384b03d7c381c7523ff50458d0e33b474e43c2c9f8f5e551c962",
+      "bytes": 1983
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-19",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/19-protein.vi.md",
+      "content_sha256": "ee88109679a77385fed6e2b05eedc26174c83830ed75c4823eb001c62cbbd50e",
+      "bytes": 2289
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-20",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/20-quercetin.vi.md",
+      "content_sha256": "1cb97aeef992820c180cb9d801ec60c594aa98cb4b849f92b1a6f66b1dcb237d",
+      "bytes": 1606
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-21",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/21-ribose.vi.md",
+      "content_sha256": "b24ad722c6144fabc63adcb43e2d6abc48f6f3cf24db0d2126443603b92bd7f4",
+      "bytes": 1336
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-22",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/22-bicarbonate.vi.md",
+      "content_sha256": "51b5f825672060c23152fdc7c13275f8e55b9fc460f47d54d3d90a5186530c2c",
+      "bytes": 2026
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-23",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/23-tart-cherry.vi.md",
+      "content_sha256": "328face7b76a4ea0a734c5cc5fc40a7d087b8a2b4332073e4a33e6d1124cb224",
+      "bytes": 1651
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-24",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/24-tribulus.vi.md",
+      "content_sha256": "7425cae205970857d71282d7c32695a07cd59972231d4869c82f4eafbe8da2d8",
+      "bytes": 1810
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-25",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/25-androstenedione.vi.md",
+      "content_sha256": "74db0e8a94bd71f10affbc826a6858159a52677d9ca251f654518e881a132e95",
+      "bytes": 1417
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-26",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/26-dmaa-dmba.vi.md",
+      "content_sha256": "075c23a398146a7ea4db048bcb27df087a10b56312c5dd6d578ffdfdd7d6a405",
+      "bytes": 1669
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-27",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/27-ephedra.vi.md",
+      "content_sha256": "27418cc272b4d957cc05fc218eab40e59a9c43cc60b3a67c34d430f1f781e78b",
+      "bytes": 1572
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-28",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/28-regulation.vi.md",
+      "content_sha256": "b827e59ecb8545978299fd8408c5d3def7e32b86c361d4850b78575a49940a5a",
+      "bytes": 1568
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-29",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/29-safety-and-interactions.vi.md",
+      "content_sha256": "9207ae87bcceb3756590574e69ae29d5fedbe48bd2470fcea54d40c53cf1c4eb",
+      "bytes": 2495
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-30",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/30-sensible-approach.vi.md",
+      "content_sha256": "bf81f926304d3719e42e564a9089f1d0eeef9470f78651c38f5dee3d90b588d6",
+      "bytes": 1571
+    },
+    {
+      "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-31",
+      "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/ods-exercise-supplements/31-project-usage.vi.md",
+      "content_sha256": "fb40ca50985fae991677c449f6b3fc4d1eb9797935a5a192284779bc900f1b74",
+      "bytes": 3088
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-01",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/01-scope.vi.md",
+      "content_sha256": "83f7921e04986d1d3843ceb5d07d7911aac0c93dd81b87ab6f4659fae42277c1",
+      "bytes": 2893
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-02",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/02-glossary.vi.md",
+      "content_sha256": "e5ba0ac1da1d49d92d55897da537a17cd7cd34662841c8df75576af65b743ab3",
+      "bytes": 5038
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-03",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/03-intensity.vi.md",
+      "content_sha256": "105839965aba23a1a1c6bdc116eaae28be0e729fda870473a140c6144786e835",
+      "bytes": 2200
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-04",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/04-children.vi.md",
+      "content_sha256": "df6d40ff8fb90337c6afa2315fd8abbae08bb6226adad9f5a3a0813073e647e2",
+      "bytes": 2728
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-05",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/05-adults-activity.vi.md",
+      "content_sha256": "2a44bb5061ad3e28f761c3b6ef6e6f5f7b1c71b367e2431061e8da405dae3fc7",
+      "bytes": 3768
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-06",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/06-adults-sedentary.vi.md",
+      "content_sha256": "8dc3555454e284110c745cce526a3846e4d3575d471a5267c21ef1d1eddff999",
+      "bytes": 2552
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-07",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/07-older.vi.md",
+      "content_sha256": "144aa8edfea8a92228c854ba94daa15f3b74795f84c17b9244ee20c2b796f704",
+      "bytes": 3828
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-08",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/08-pregnancy.vi.md",
+      "content_sha256": "c2a6e02dcc051d1ae8191f7da7602d6e2a2645dafa42e81c81f5ddff231f2eb8",
+      "bytes": 4248
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-09",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/09-chronic.vi.md",
+      "content_sha256": "c5b859a1612194649c2bb603394baaacdbf6e59bdf9fad2e3654881eaf330699",
+      "bytes": 5944
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-10",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/10-children-disability.vi.md",
+      "content_sha256": "7f5c602e09ff9a317491564820d51bec4fdbd49c683fd49abd5cdc704e3359d1",
+      "bytes": 2783
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-11",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/11-adults-disability.vi.md",
+      "content_sha256": "251867d00d5d7e5f00b81b86144996abe78c3ae262b86d964080468e9060aaac",
+      "bytes": 4643
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-12",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/12-methods-evidence.vi.md",
+      "content_sha256": "dd02b185680651414f66eda55e72808f3fbba64edf5825775e55e11e45163601",
+      "bytes": 3742
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-13",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/13-research-gaps.vi.md",
+      "content_sha256": "8329175898fe2d7f939f7e0bce7b0f2168843ad6813ec55d64194dd99d9d40f0",
+      "bytes": 2997
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-14",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/14-implementation.vi.md",
+      "content_sha256": "24f689e086ea2ca327f789f07d413c6577676ff18b0738fbb18a8dd2551fe50d",
+      "bytes": 2821
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-15",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/15-appendices.vi.md",
+      "content_sha256": "201a237a6329bbcbb41a0f1eff2264099d7e97da830677f9ead7ac09631d7733",
+      "bytes": 2163
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-16",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.0.0",
+      "content_path": "data/knowledge/curated/who-2020/16-project-usage.vi.md",
+      "content_sha256": "dc7dbd57b006c1547d473f0f551efc2b34fa08627e298b799a1328333f4ff91b",
+      "bytes": 3489
+    }
+  ],
+  "approved_derivative_articles": [
+    {
+      "document_id": "WHO-PA-SB-2020-VI-01",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.1.0",
+      "content_path": "derivatives/who-2020/01-scope.vi.md",
+      "content_sha256": "5d191d97fbbc258aa38396cc23557fadc906c4958db106e2b40f956156339840",
+      "bytes": 3429,
+      "base_document_id": "WHO-PA-SB-2020-VI-01",
+      "base_version": "1.0.0",
+      "base_sha256": "83f7921e04986d1d3843ceb5d07d7911aac0c93dd81b87ab6f4659fae42277c1"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-02",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.1.0",
+      "content_path": "derivatives/who-2020/02-glossary.vi.md",
+      "content_sha256": "47393a0e6335c702fe4c69bb2c45b7a848bab39a265a1532d7a2e4a389a2ad51",
+      "bytes": 5472,
+      "base_document_id": "WHO-PA-SB-2020-VI-02",
+      "base_version": "1.0.0",
+      "base_sha256": "e5ba0ac1da1d49d92d55897da537a17cd7cd34662841c8df75576af65b743ab3"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-03",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.1.0",
+      "content_path": "derivatives/who-2020/03-intensity.vi.md",
+      "content_sha256": "d56ad3c4473e8648e2b158c20e9cfa311a9fd37f282a0b517f1a9494c2099ebc",
+      "bytes": 2685,
+      "base_document_id": "WHO-PA-SB-2020-VI-03",
+      "base_version": "1.0.0",
+      "base_sha256": "105839965aba23a1a1c6bdc116eaae28be0e729fda870473a140c6144786e835"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-05",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.1.0",
+      "content_path": "derivatives/who-2020/05-adults-activity.vi.md",
+      "content_sha256": "db6f9dc1140fd582487422cc23596224bfda2e711ff009335a7da07227b6fbe5",
+      "bytes": 4202,
+      "base_document_id": "WHO-PA-SB-2020-VI-05",
+      "base_version": "1.0.0",
+      "base_sha256": "2a44bb5061ad3e28f761c3b6ef6e6f5f7b1c71b367e2431061e8da405dae3fc7"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-06",
+      "source_id": "WHO-PA-SB-2020",
+      "version": "1.1.0",
+      "content_path": "derivatives/who-2020/06-adults-sedentary.vi.md",
+      "content_sha256": "630802d505124da0fa395cc939977ed4278ee2297dfcac9cdde7fce6eb49fdd0",
+      "bytes": 2986,
+      "base_document_id": "WHO-PA-SB-2020-VI-06",
+      "base_version": "1.0.0",
+      "base_sha256": "8dc3555454e284110c745cce526a3846e4d3575d471a5267c21ef1d1eddff999"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/01-overview.vi.md",
+      "content_sha256": "49a628a6f06a20c0f85599542e8a4592ec3087a7d44fb64bb940d93de760cd90",
+      "bytes": 1678,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "base_version": "1.0.0",
+      "base_sha256": "b75825137a19e142ea32c380c965afee91deb6f8307c7a7834bca0626855b523"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/02-lifestyle.vi.md",
+      "content_sha256": "cd5f102f182bfd2eea2a7ebf4f6b9aa91e6ecc894c8f9197756d2f9a4aa7c3d5",
+      "bytes": 1952,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "base_version": "1.0.0",
+      "base_sha256": "70ebd4fcf742f8d07d8586608b67c13ed2960f56c196f0c64d74de7af4612ef1"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/03-environment.vi.md",
+      "content_sha256": "cee3300127db2e339b2ceccf0e73a6c4e81172cb2db02942e332af3d0c9669ec",
+      "bytes": 1687,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "base_version": "1.0.0",
+      "base_sha256": "9f7d22bd11c213fd19b60ff848a5ab814f35c99b4489a2309015cc29680df96d"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/04-sleep.vi.md",
+      "content_sha256": "87e4a99998a3fcea44d96bcda218b27214cba3dabc18e008fb1cd8bc618ef82f",
+      "bytes": 1951,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "base_version": "1.0.0",
+      "base_sha256": "4ba66733c47e58fa077b34c7818ca79aefac149ba7167f20a75839e67fea535b"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-05",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/05-medicines.vi.md",
+      "content_sha256": "322a120ac8e5470fbd9c0ced6c0967b89b38cd758f37120e193a0812e4edac15",
+      "bytes": 2107,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-05",
+      "base_version": "1.0.0",
+      "base_sha256": "6b344cca9a7a69e055d6067b6cdf69ce6acf6ee90d0f404b5114fcbffb5241c0"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version": "1.1.0",
+      "content_path": "derivatives/niddk-weight-factors/06-health.vi.md",
+      "content_sha256": "40c179c3fe3a1b3c2d937d011f1f3c9b49c8c7c7648d87c2f45a54c31f63996c",
+      "bytes": 1854,
+      "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-06",
+      "base_version": "1.0.0",
+      "base_sha256": "28ea32f116a3e96714ee22ccb50d9d0d44353b8bd0bee366be93449540fffa7a"
+    }
+  ]
+}

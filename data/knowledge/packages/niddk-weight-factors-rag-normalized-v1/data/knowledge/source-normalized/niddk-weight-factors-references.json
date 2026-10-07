@@ -1,0 +1,31 @@
+{
+  "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+  "provenance": "Bibliography on NIDDK page, verified 2026-10-07; original studies not independently read",
+  "references": [
+    {
+      "id": 4,
+      "citation": "Hirshkowitz M, Whiton K, Albert SM, et al. National Sleep Foundation’s updated sleep duration recommendations: final report. Sleep Health. 2015;1(4):233–243.",
+      "doi": "10.1016/j.sleh.2015.10.004"
+    },
+    {
+      "id": 5,
+      "citation": "Hanson P, Weickert MO, Barber TM. Obesity: novel and unusual predisposing factors. Therapeutic Advances in Endocrinology and Metabolism. 2020;11:2042018820922018.",
+      "doi": "10.1177/2042018820922018"
+    },
+    {
+      "id": 6,
+      "citation": "van der Valk ES, van den Akker ELT, Savas M, et al. A comprehensive diagnostic approach to detect underlying causes of obesity in adults. Obesity Reviews. 2019;20(6):795–804.",
+      "doi": "10.1111/obr.12836"
+    },
+    {
+      "id": 7,
+      "citation": "Hieronimus B, Ensenauer R. Influence of maternal and paternal pre-conception overweight/obesity on offspring outcomes and strategies for prevention. European Journal of Clinical Nutrition. 2021;75(12):1735–1744.",
+      "doi": "10.1038/s41430-021-00920-7"
+    },
+    {
+      "id": 8,
+      "citation": "Drozdz D, Alvarez-Pitti J, Wójcik M, et al. Obesity and cardiometabolic risk factors: from childhood to adulthood. Nutrients. 2021;13(11):1–20.",
+      "doi": "10.3390/nu13114176"
+    }
+  ]
+}

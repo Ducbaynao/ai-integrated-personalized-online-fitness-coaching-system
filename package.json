@@ -16,6 +16,8 @@
     "validate:ux-docs": "node tools/validate-ux-docs.mjs",
     "validate:openapi": "redocly lint contracts/openapi/openapi.yaml",
     "validate:ai-schemas": "node tools/validate-ai-schemas.mjs",
+    "validate:knowledge": "node tools/validate-knowledge.mjs",
+    "test:knowledge": "node --test tools/validate-knowledge.test.mjs",
     "validate:contracts": "npm run validate:openapi && npm run validate:ai-schemas",
     "test:migrations": "node tools/test-migrations.mjs"
   },

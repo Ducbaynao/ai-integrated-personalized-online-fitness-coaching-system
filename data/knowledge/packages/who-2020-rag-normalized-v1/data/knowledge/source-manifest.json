@@ -1,0 +1,265 @@
+{
+  "source_id": "WHO-PA-SB-2020",
+  "title": "WHO guidelines on physical activity and sedentary behaviour",
+  "publisher": "World Health Organization",
+  "year": 2020,
+  "isbn_electronic": "9789240015128",
+  "isbn_print": "9789240015135",
+  "source_url": "https://www.who.int/publications/i/item/9789240015128",
+  "input_filename": "9789240015128-eng(1).pdf",
+  "input_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "pdf_page_count": 104,
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "normalization_version": "1.0.0",
+  "prepared_at": "2026-10-06",
+  "source_replaced": false,
+  "fulltext_translation": false,
+  "english_fulltext_preserved": true,
+  "web_annex_included": false,
+  "review_status": "DRAFT",
+  "sections": [
+    {
+      "section_id": "front-matter",
+      "title": "Bìa, bản quyền, mục lục, lời cảm ơn",
+      "pdf_pages": [
+        1,
+        6
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "abbreviations",
+      "title": "Chữ viết tắt",
+      "pdf_pages": [
+        7,
+        7
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "glossary",
+      "title": "Thuật ngữ",
+      "pdf_pages": [
+        8,
+        9
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "executive-summary",
+      "title": "Tóm tắt điều hành",
+      "pdf_pages": [
+        10,
+        24
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "background",
+      "title": "Bối cảnh và phạm vi",
+      "pdf_pages": [
+        25,
+        27
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "methods",
+      "title": "Phương pháp xây dựng",
+      "pdf_pages": [
+        28,
+        33
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "recommendation-introduction",
+      "title": "Cách đọc khuyến nghị",
+      "pdf_pages": [
+        34,
+        34
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "children-activity",
+      "title": "Vận động: 5–17 tuổi",
+      "pdf_pages": [
+        35,
+        38
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "children-sedentary",
+      "title": "Ít vận động: 5–17 tuổi",
+      "pdf_pages": [
+        39,
+        41
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "adults-activity",
+      "title": "Vận động: 18–64 tuổi",
+      "pdf_pages": [
+        42,
+        47
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "adults-sedentary",
+      "title": "Ít vận động: 18–64 tuổi",
+      "pdf_pages": [
+        48,
+        52
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "older-activity",
+      "title": "Vận động: từ 65 tuổi",
+      "pdf_pages": [
+        53,
+        55
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "older-sedentary",
+      "title": "Ít vận động: từ 65 tuổi",
+      "pdf_pages": [
+        56,
+        56
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "pregnancy-activity",
+      "title": "Vận động: mang thai và sau sinh",
+      "pdf_pages": [
+        57,
+        60
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "pregnancy-sedentary",
+      "title": "Ít vận động: mang thai và sau sinh",
+      "pdf_pages": [
+        61,
+        61
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "chronic-activity",
+      "title": "Vận động: bốn nhóm bệnh mạn tính",
+      "pdf_pages": [
+        62,
+        67
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "chronic-sedentary",
+      "title": "Ít vận động: bốn nhóm bệnh mạn tính",
+      "pdf_pages": [
+        68,
+        69
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "disability-activity",
+      "title": "Vận động: người khuyết tật",
+      "pdf_pages": [
+        70,
+        73
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "disability-sedentary",
+      "title": "Ít vận động: người khuyết tật",
+      "pdf_pages": [
+        74,
+        75
+      ],
+      "content_role": "knowledge_candidate"
+    },
+    {
+      "section_id": "evidence-to-recommendations",
+      "title": "Từ bằng chứng đến khuyến nghị",
+      "pdf_pages": [
+        76,
+        78
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "research-needs",
+      "title": "Nhu cầu nghiên cứu",
+      "pdf_pages": [
+        79,
+        79
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "implementation",
+      "title": "Áp dụng, truyền thông, triển khai, đánh giá",
+      "pdf_pages": [
+        80,
+        84
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "references",
+      "title": "Danh mục tham khảo",
+      "pdf_pages": [
+        85,
+        94
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "annex-1",
+      "title": "Phụ lục 1: quản lý quy trình",
+      "pdf_pages": [
+        95,
+        97
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "annex-2",
+      "title": "Phụ lục 2: thành viên, reviewer, WHO",
+      "pdf_pages": [
+        98,
+        101
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "annex-3",
+      "title": "Phụ lục 3: lợi ích liên quan",
+      "pdf_pages": [
+        102,
+        103
+      ],
+      "content_role": "reference_only"
+    },
+    {
+      "section_id": "back-cover",
+      "title": "Bìa sau",
+      "pdf_pages": [
+        104,
+        104
+      ],
+      "content_role": "reference_only"
+    }
+  ]
+}

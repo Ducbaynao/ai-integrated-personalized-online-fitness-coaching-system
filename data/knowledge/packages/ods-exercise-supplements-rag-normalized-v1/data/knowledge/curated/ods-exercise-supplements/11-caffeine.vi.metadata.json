@@ -1,0 +1,43 @@
+{
+  "document_id": "NIH-ODS-EXERCISE-SUPPLEMENTS-VI-11",
+  "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+  "title": "Caffeine",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-07",
+  "source_page_updated_at": "2024-04-01",
+  "input_version_confirmed": false,
+  "source_verified_at": "2026-10-07",
+  "source_url": "https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-HealthProfessional/",
+  "source_sha256": "0ec1dcad16e08bd79006875fe770583fb1e7014a1ef0bf67bf9d26fac0f207d9",
+  "source_raw": "../../raw/ods-exercise-supplements-user-text.en.txt",
+  "source_section_ids": [
+    "ODS-S10"
+  ],
+  "source_raw_line_ranges": [
+    [
+      256,
+      281
+    ]
+  ],
+  "content_role": "general_knowledge",
+  "claim_ids": [
+    "ODS-C11"
+  ],
+  "issue_ids": [
+    "ODS-Q01",
+    "ODS-Q06",
+    "ODS-Q11"
+  ],
+  "retrieval_enabled": false,
+  "official_translation": false,
+  "translation_review_status": "PENDING",
+  "license": "ODS Public Use Policy; no CC license assigned",
+  "reuse_clearance": "Original text preserved; Vietnamese editorial adaptation not asserted as official ODS content",
+  "evidence_grade": null,
+  "source_currentness": "Official page update observed 2024-04-01; uploaded text not certified as identical edition; legal/anti-doping currentness unverified",
+  "policy_approval": null
+}

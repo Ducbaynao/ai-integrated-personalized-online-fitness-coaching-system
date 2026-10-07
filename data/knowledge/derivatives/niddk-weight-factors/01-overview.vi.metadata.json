@@ -1,0 +1,47 @@
+{
+  "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+  "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+  "title": "Các yếu tố ảnh hưởng đến cân nặng",
+  "language": "vi",
+  "version": "1.1.0",
+  "status": "DRAFT",
+  "reviewer": "Chủ dự án — xác nhận trực tiếp của người dùng",
+  "reviewed_at": "2026-10-08",
+  "prepared_at": "2026-10-08",
+  "technical_review_status": "TECHNICAL_REVIEW_PASSED",
+  "specialist_review_readiness": "TECHNICAL_VERIFICATION_PASSED",
+  "lineage": {
+    "base_document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+    "base_version": "1.0.0",
+    "base_package": "niddk-weight-factors-rag-normalized-v1",
+    "base_content_path": "data/knowledge/curated/niddk-weight-factors/01-overview.vi.md",
+    "base_sha256": "b75825137a19e142ea32c380c965afee91deb6f8307c7a7834bca0626855b523",
+    "changelog": "Đối chiếu kỹ thuật với trang chính thức NIDDK (rà soát tháng 5/2023); xác nhận 6 nhóm yếu tố; gắn cờ sẵn sàng bàn giao reviewer chuyên môn. Cập nhật đường dẫn truy vết nguồn relative (../../packages/); ghi nhận phê duyệt chuyên môn trực tiếp của chủ dự án ngày 2026-10-08; giữ nguyên publication DRAFT và retrieval_enabled=false."
+  },
+  "source_last_reviewed": "2023-05",
+  "source_url": "https://www.niddk.nih.gov/health-information/weight-management/adult-overweight-obesity/factors-affecting-weight-health",
+  "source_sections": [
+    "Lifestyle habits",
+    "Where you live, work, play, and worship",
+    "How much sleep you get",
+    "Medicines",
+    "Health problems",
+    "Family history and genes"
+  ],
+  "source_sha256": "d880c41997e5eae1dd4c087ef7c1421c5ccc89b6141fe97463c0c6982c5020c8",
+  "population_tags": [
+    "adults"
+  ],
+  "content_role": "overview",
+  "claim_ids": [],
+  "retrieval_enabled": false,
+  "license_url": "https://www.niddk.nih.gov/copyright",
+  "translation_review_status": "PENDING",
+  "source_raw": "../../packages/niddk-weight-factors-rag-normalized-v1/data/knowledge/raw/niddk-weight-factors-user-excerpt.en.md",
+  "specialist_review_status": "APPROVED",
+  "specialist_review_scope": "Phê duyệt nội dung chuyên môn dựa trên xác nhận trực tiếp của chủ dự án ngày 2026-10-08",
+  "specialist_review_record": "data/knowledge/review-records/project-owner-specialist-review-2026-10-08.json",
+  "publication_lifecycle": "DRAFT",
+  "publication_status_reason": "Chưa xuất bản qua Spring Content publishing workflow; phê duyệt chuyên môn độc lập với vòng đời kích hoạt hệ thống",
+  "technical_readiness": "TECHNICAL_VERIFICATION_PASSED"
+}

@@ -1,0 +1,227 @@
+[
+  {
+    "pdf_page": 1,
+    "article_page": 1,
+    "anchor": "pdf-page-001",
+    "file": "source-normalized/issn-protein-2017/page-001.en.md",
+    "source_text_characters": 3394,
+    "layout_text_characters": 3861,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 2,
+    "article_page": 2,
+    "anchor": "pdf-page-002",
+    "file": "source-normalized/issn-protein-2017/page-002.en.md",
+    "source_text_characters": 4938,
+    "layout_text_characters": 6735,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 3,
+    "article_page": 3,
+    "anchor": "pdf-page-003",
+    "file": "source-normalized/issn-protein-2017/page-003.en.md",
+    "source_text_characters": 5380,
+    "layout_text_characters": 7164,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 4,
+    "article_page": 4,
+    "anchor": "pdf-page-004",
+    "file": "source-normalized/issn-protein-2017/page-004.en.md",
+    "source_text_characters": 5621,
+    "layout_text_characters": 7307,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 5,
+    "article_page": 5,
+    "anchor": "pdf-page-005",
+    "file": "source-normalized/issn-protein-2017/page-005.en.md",
+    "source_text_characters": 5528,
+    "layout_text_characters": 7212,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 6,
+    "article_page": 6,
+    "anchor": "pdf-page-006",
+    "file": "source-normalized/issn-protein-2017/page-006.en.md",
+    "source_text_characters": 5867,
+    "layout_text_characters": 7236,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 7,
+    "article_page": 7,
+    "anchor": "pdf-page-007",
+    "file": "source-normalized/issn-protein-2017/page-007.en.md",
+    "source_text_characters": 5757,
+    "layout_text_characters": 7140,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 8,
+    "article_page": 8,
+    "anchor": "pdf-page-008",
+    "file": "source-normalized/issn-protein-2017/page-008.en.md",
+    "source_text_characters": 5770,
+    "layout_text_characters": 7341,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 9,
+    "article_page": 9,
+    "anchor": "pdf-page-009",
+    "file": "source-normalized/issn-protein-2017/page-009.en.md",
+    "source_text_characters": 5845,
+    "layout_text_characters": 7167,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 10,
+    "article_page": 10,
+    "anchor": "pdf-page-010",
+    "file": "source-normalized/issn-protein-2017/page-010.en.md",
+    "source_text_characters": 5536,
+    "layout_text_characters": 7277,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 11,
+    "article_page": 11,
+    "anchor": "pdf-page-011",
+    "file": "source-normalized/issn-protein-2017/page-011.en.md",
+    "source_text_characters": 5269,
+    "layout_text_characters": 7026,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 12,
+    "article_page": 12,
+    "anchor": "pdf-page-012",
+    "file": "source-normalized/issn-protein-2017/page-012.en.md",
+    "source_text_characters": 5429,
+    "layout_text_characters": 6815,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 13,
+    "article_page": 13,
+    "anchor": "pdf-page-013",
+    "file": "source-normalized/issn-protein-2017/page-013.en.md",
+    "source_text_characters": 5728,
+    "layout_text_characters": 7132,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 14,
+    "article_page": 14,
+    "anchor": "pdf-page-014",
+    "file": "source-normalized/issn-protein-2017/page-014.en.md",
+    "source_text_characters": 5715,
+    "layout_text_characters": 7195,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 15,
+    "article_page": 15,
+    "anchor": "pdf-page-015",
+    "file": "source-normalized/issn-protein-2017/page-015.en.md",
+    "source_text_characters": 5823,
+    "layout_text_characters": 7210,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 16,
+    "article_page": 16,
+    "anchor": "pdf-page-016",
+    "file": "source-normalized/issn-protein-2017/page-016.en.md",
+    "source_text_characters": 5884,
+    "layout_text_characters": 7287,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 17,
+    "article_page": 17,
+    "anchor": "pdf-page-017",
+    "file": "source-normalized/issn-protein-2017/page-017.en.md",
+    "source_text_characters": 5468,
+    "layout_text_characters": 7209,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 18,
+    "article_page": 18,
+    "anchor": "pdf-page-018",
+    "file": "source-normalized/issn-protein-2017/page-018.en.md",
+    "source_text_characters": 5756,
+    "layout_text_characters": 7123,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 19,
+    "article_page": 19,
+    "anchor": "pdf-page-019",
+    "file": "source-normalized/issn-protein-2017/page-019.en.md",
+    "source_text_characters": 5604,
+    "layout_text_characters": 6935,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 20,
+    "article_page": 20,
+    "anchor": "pdf-page-020",
+    "file": "source-normalized/issn-protein-2017/page-020.en.md",
+    "source_text_characters": 8559,
+    "layout_text_characters": 10642,
+    "mixed_content": true
+  },
+  {
+    "pdf_page": 21,
+    "article_page": 21,
+    "anchor": "pdf-page-021",
+    "file": "source-normalized/issn-protein-2017/page-021.en.md",
+    "source_text_characters": 9234,
+    "layout_text_characters": 11042,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 22,
+    "article_page": 22,
+    "anchor": "pdf-page-022",
+    "file": "source-normalized/issn-protein-2017/page-022.en.md",
+    "source_text_characters": 9024,
+    "layout_text_characters": 11076,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 23,
+    "article_page": 23,
+    "anchor": "pdf-page-023",
+    "file": "source-normalized/issn-protein-2017/page-023.en.md",
+    "source_text_characters": 9044,
+    "layout_text_characters": 10970,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 24,
+    "article_page": 24,
+    "anchor": "pdf-page-024",
+    "file": "source-normalized/issn-protein-2017/page-024.en.md",
+    "source_text_characters": 9245,
+    "layout_text_characters": 11044,
+    "mixed_content": false
+  },
+  {
+    "pdf_page": 25,
+    "article_page": 25,
+    "anchor": "pdf-page-025",
+    "file": "source-normalized/issn-protein-2017/page-025.en.md",
+    "source_text_characters": 8362,
+    "layout_text_characters": 10621,
+    "mixed_content": true
+  }
+]

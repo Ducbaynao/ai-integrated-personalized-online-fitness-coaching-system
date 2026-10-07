@@ -1,0 +1,369 @@
+{
+  "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+  "source_sha256": "0ec1dcad16e08bd79006875fe770583fb1e7014a1ef0bf67bf9d26fac0f207d9",
+  "table_id": "Table 1",
+  "rows": [
+    {
+      "ingredient_id": "ODS-I01",
+      "ingredient_en": "Antioxidants (vitamin C, vitamin E, and coenzyme Q10[CoQ10])",
+      "proposed_mechanism_en": "Minimize free-radical damage to skeletal muscle, thereby reducing muscle fatigue, inflammation, and soreness",
+      "evidence_description_en": "Several small clinical trials",
+      "research_findings_en": "Do not directly improve performance; appear to hinder some physiological and physical exercise-induced adaptations",
+      "safety_evidence_en": "Safe at recommended intakes; some safety concerns reported with high doses",
+      "reported_adverse_effects_en": "Potential for diarrhea, nausea, abdominal cramps, and other gastrointestinal disturbances with vitamin C intakes of more than 2,000 mg/day in adults; increased risk of hemorrhagic effects with vitamin E intakes of more than 1,500 International Units (IU)/day (natural form) or 1,100 IU/day (synthetic form) in adults; nausea, heartburn, and other side effects with CoQ10",
+      "raw_line_range": [
+        33,
+        37
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I02",
+      "ingredient_en": "Arginine",
+      "proposed_mechanism_en": "Increases blood flow and delivery of oxygen and nutrients to skeletal muscle; serves as a substrate for creatine production; increases secretion of human growth hormone to stimulate muscle growth",
+      "evidence_description_en": "Limited clinical trials with conflicting results",
+      "research_findings_en": "Little to no effect on vasodilation, blood flow, or exercise metabolites; little evidence of increases in muscle creatine content",
+      "safety_evidence_en": "No safety concerns reported for use of up to 9 g/day for weeks; adverse effects possible with larger doses",
+      "reported_adverse_effects_en": "Gastrointestinal effects, such as diarrhea and nausea",
+      "raw_line_range": [
+        38,
+        42
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I03",
+      "ingredient_en": "Beetroot or beet juice",
+      "proposed_mechanism_en": "Dilates blood vessels in exercising muscle, reduces oxygen use, and improves energy production",
+      "evidence_description_en": "Limited clinical trials with conflicting results",
+      "research_findings_en": "Might improve performance and endurance to some degree in time trials and time-to-exhaustion tests among runners, swimmers, rowers, and cyclists; appears to be most effective in recreationally active nonathletes",
+      "safety_evidence_en": "No safety concerns reported for short-term use at commonly recommended amounts (approximately 2 cups)",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        43,
+        47
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I04",
+      "ingredient_en": "Beta-alanine",
+      "proposed_mechanism_en": "Increases synthesis of carnosine, a dipeptide that buffers changes in muscle pH, thereby reducing muscle fatigue and loss of force production; considerable individual variation in associated muscle carnosine synthesis",
+      "evidence_description_en": "Numerous clinical trials with conflicting results",
+      "research_findings_en": "Inconsistent effects on performance in competitive events requiring high-intensity effort over a short period, such as team sports; little or no performance benefit in activities lasting more than 10 minutes",
+      "safety_evidence_en": "No safety concerns reported for use of 1.6–6.4 g/day for up to 8 weeks",
+      "reported_adverse_effects_en": "Paresthesia (tingling) in face, neck, back of hands, and upper trunk with at least 800 mg or more than 10 mg/kg body mass; pruritus (itchy skin)",
+      "raw_line_range": [
+        48,
+        52
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I05",
+      "ingredient_en": "Beta-hydroxy-beta-methylbutyrate (HMB)",
+      "proposed_mechanism_en": "Helps stressed and damaged skeletal muscle cells restore their structure and function",
+      "evidence_description_en": "Numerous clinical trials with conflicting results",
+      "research_findings_en": "Might help speed up recovery from exercise of sufficient amount and intensity to induce skeletal muscle damage",
+      "safety_evidence_en": "No safety concerns reported for typical dose of 3 g/day for up to 2 months",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        53,
+        57
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I06",
+      "ingredient_en": "Betaine",
+      "proposed_mechanism_en": "Might increase creatine production, blood nitric oxide levels, or water retention in cells",
+      "evidence_description_en": "Limited clinical trials in men with conflicting results",
+      "research_findings_en": "Potential but modest strength and power-based performance improvements in bodybuilders and cyclists",
+      "safety_evidence_en": "No safety concerns reported for 2–5 g/day for up to 15 days",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        58,
+        62
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I07",
+      "ingredient_en": "Branched-chain amino acids (leucine, isoleucine, and valine)",
+      "proposed_mechanism_en": "Can be metabolized by mitochondria in skeletal muscle to provide energy during exercise",
+      "evidence_description_en": "Limited number of short-term clinical trials",
+      "research_findings_en": "Little evidence of improved performance in endurance-related aerobic events; possibility of greater gains in muscle mass and strength during training",
+      "safety_evidence_en": "No safety concerns reported for 20 g/day or less for up to 6 weeks",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        63,
+        67
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I08",
+      "ingredient_en": "Caffeine",
+      "proposed_mechanism_en": "Blocks activity of the neuromodulator adenosine; reduces perceived pain and exertion",
+      "evidence_description_en": "Numerous clinical trials with mostly consistent results",
+      "research_findings_en": "Might enhance performance in endurance-type activities (e.g., running) and intermittent, long-duration activities (e.g., soccer) when taken before activity",
+      "safety_evidence_en": "Reasonably safe at up to 400–500 mg/day for adults",
+      "reported_adverse_effects_en": "Insomnia, restlessness, nausea, vomiting, tachycardia, and arrhythmia; risk of death with acute oral dose of approximately 10–14 g pure caffeine (150–200 mg/kg)",
+      "raw_line_range": [
+        68,
+        72
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I09",
+      "ingredient_en": "Citrulline",
+      "proposed_mechanism_en": "Dilates blood vessels to increase delivery of oxygen and nutrients to skeletal muscle",
+      "evidence_description_en": "Few clinical trials with conflicting results",
+      "research_findings_en": "Little research support for use to enhance performance",
+      "safety_evidence_en": "Few safety concerns reported for up to 9 g for 1 day or 6 g/day for up to 16 days",
+      "reported_adverse_effects_en": "Gastrointestinal discomfort",
+      "raw_line_range": [
+        73,
+        77
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I10",
+      "ingredient_en": "Creatine",
+      "proposed_mechanism_en": "Helps supply muscles with energy for short-term, predominantly anaerobic activity",
+      "evidence_description_en": "Numerous clinical trials generally showing a benefit for high-intensity, intermittent activity; potential variation in individual responses",
+      "research_findings_en": "May increase strength, power, and work from maximal effort muscle contractions; over time helps body adapt to athlete-training regimens; of little value for endurance sports",
+      "safety_evidence_en": "Few safety concerns reported at typical dose (e.g., loading dose of 20 g/day for up to 7 days and 3–5 g/day for up to 12 weeks)",
+      "reported_adverse_effects_en": "Weight gain due to water retention; anecdotal reports of nausea, diarrhea, muscle cramps, muscle stiffness, heat intolerance",
+      "raw_line_range": [
+        78,
+        82
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I11",
+      "ingredient_en": "Deer antler velvet",
+      "proposed_mechanism_en": "Contains growth factors (such as insulin-like growth factor-1 [IGF-1]) that could promote muscle tissue growth",
+      "evidence_description_en": "Few short-term clinical trials that show no benefit for physical performance",
+      "research_findings_en": "No evidence for improving aerobic or anaerobic performance, muscular strength, or endurance",
+      "safety_evidence_en": "Safety not well studied",
+      "reported_adverse_effects_en": "Hypoglycemia, headache, edema, and joint pain (from prescription IGF-1); banned in professional athletic competition",
+      "raw_line_range": [
+        83,
+        87
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I12",
+      "ingredient_en": "Dehydroepiandrosterone (DHEA)",
+      "proposed_mechanism_en": "Steroid hormone that can be converted into testosterone and estradiol",
+      "evidence_description_en": "Small number of clinical trials that show no benefit for physical performance",
+      "research_findings_en": "No evidence of increases in strength, aerobic capacity, lean body mass, or testosterone levels in men",
+      "safety_evidence_en": "Safety not well studied; no safety concerns reported for up to 150 mg/day for 6–12 weeks",
+      "reported_adverse_effects_en": "Over several months, raises testosterone levels in women, which can cause acne and growth of facial hair",
+      "raw_line_range": [
+        88,
+        92
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I13",
+      "ingredient_en": "Ginseng",
+      "proposed_mechanism_en": "Unknown mechanism of action; Panax ginseng used in traditional Chinese medicine as a tonic for stamina and vitality; Siberian ginseng used to reduce fatigue",
+      "evidence_description_en": "Numerous small clinical trials, most showing no benefit for physical performance",
+      "research_findings_en": "In various doses and types of preparations, no effects on peak power output, time to exhaustion, perceived exertion, recovery from intense activity, oxygen consumption, or heart rate",
+      "safety_evidence_en": "Few safety concerns reported with short-term use",
+      "reported_adverse_effects_en": "For Panax ginseng: headache, sleep disturbances, and gastrointestinal disorders; for Siberian ginseng: none known",
+      "raw_line_range": [
+        93,
+        97
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I14",
+      "ingredient_en": "Glutamine",
+      "proposed_mechanism_en": "Involved in metabolism and energy production; contributes nitrogen for many critical biochemical reactions",
+      "evidence_description_en": "Few studies of use to enhance performance directly",
+      "research_findings_en": "In adult weightlifters, no effect on muscle performance, body composition, or muscle-protein degradation; may help with recovery of muscle strength and reduce muscle soreness after exercise",
+      "safety_evidence_en": "No safety concerns reported with about 45 g/day for 6 weeks; safe use of up to 0.42 g/kg body weight (e.g., 30 g/day in a person weighing 154 lb) by many patients with serious conditions (e.g., infections, intestinal diseases, and burns)",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        98,
+        102
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I15",
+      "ingredient_en": "Iron",
+      "proposed_mechanism_en": "Increases oxygen uptake, reduces heart rate, and decreases lactate concentrations during exercise",
+      "evidence_description_en": "Numerous clinical trials with conflicting results",
+      "research_findings_en": "Improved work capacity with correction of iron deficiency anemia; conflicting evidence on whether milder iron deficiency without anemia impairs exercise performance",
+      "safety_evidence_en": "No safety concerns reported for use at recommended intakes (8 mg/day for healthy men and postmenopausal women and 18 mg/day for healthy premenopausal women)",
+      "reported_adverse_effects_en": "Gastric upset, constipation, nausea, abdominal pain, vomiting, and fainting at intakes above 45 mg/day",
+      "raw_line_range": [
+        103,
+        107
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I16",
+      "ingredient_en": "Protein",
+      "proposed_mechanism_en": "Builds, maintains, and repairs muscle",
+      "evidence_description_en": "Numerous clinical trials",
+      "research_findings_en": "Optimizes muscle training response during exercise and subsequent recovery period",
+      "safety_evidence_en": "No safety concerns reported at daily recommended intakes for athletes of up to about 2.0 g/kg body weight (e.g., 136 g for a person weighing 150 lb)",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        108,
+        112
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I17",
+      "ingredient_en": "Quercetin",
+      "proposed_mechanism_en": "Increases mitochondria in muscle, reduces oxidative stress, decreases inflammation, and improves blood flow",
+      "evidence_description_en": "Numerous small, short-term clinical trials",
+      "research_findings_en": "Little to no effect on endurance performance or maximal oxygen consumption",
+      "safety_evidence_en": "No safety concerns reported for 1,000 mg/day or less for up to 8 weeks",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        113,
+        117
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I18",
+      "ingredient_en": "Ribose",
+      "proposed_mechanism_en": "Involved in production of adenosine triphosphate (ATP)",
+      "evidence_description_en": "A few small, short-term, clinical trials",
+      "research_findings_en": "Little to no effect on exercise capacity in both trained and untrained adults",
+      "safety_evidence_en": "Safety as a dietary supplement not well studied; no safety concerns reported for up to 10 g/day for 8 weeks",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        118,
+        122
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I19",
+      "ingredient_en": "Sodium bicarbonate",
+      "proposed_mechanism_en": "Enhances disposal of hydrogen ions generated from intense muscle activity, thereby reducing metabolic acidosis and resulting fatigue",
+      "evidence_description_en": "Many small, short-term clinical trials",
+      "research_findings_en": "Might provide minor to moderate performance benefit for short-term and intermittent high-intensity activity, especially in trained athletes",
+      "safety_evidence_en": "No safety concerns reported for short-term use of up to 300 mg/kg body weight",
+      "reported_adverse_effects_en": "Nausea, stomach pain, diarrhea, and vomiting",
+      "raw_line_range": [
+        123,
+        127
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I20",
+      "ingredient_en": "Tart or sour cherry",
+      "proposed_mechanism_en": "Phytochemicals in tart cherries may facilitate exercise recovery by reducing pain and inflammation",
+      "evidence_description_en": "A few clinical trials with conflicting results",
+      "research_findings_en": "Variable results for aiding muscle strength recovery, reducing soreness, or reducing inflammatory effects on lungs after exercise; insufficient research on ability to improve aerobic performance",
+      "safety_evidence_en": "No safety concerns reported for about 1/2 quart of juice or 480 mg freeze-dried Montmorency tart-cherry-skin powder per day for up to 2 weeks",
+      "reported_adverse_effects_en": "None known",
+      "raw_line_range": [
+        128,
+        132
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    },
+    {
+      "ingredient_id": "ODS-I21",
+      "ingredient_en": "Tribulus terrestris",
+      "proposed_mechanism_en": "Increases serum testosterone and luteinizing hormone concentrations, thereby promoting skeletal muscle hypertrophy",
+      "evidence_description_en": "A few small, short-term clinical trials",
+      "research_findings_en": "No effect on strength, lean body mass, or sex hormone levels",
+      "safety_evidence_en": "Safety not well studied; no safety concerns reported at up to 3.21 mg/kg/day for 8 weeks",
+      "reported_adverse_effects_en": "One case report of harm from product labeled but not confirmed to contain Tribulus terrestris",
+      "raw_line_range": [
+        133,
+        137
+      ],
+      "status": "DRAFT",
+      "retrieval_enabled": false,
+      "mechanism_is_proposed_not_proven_benefit": true,
+      "safety_statement_not_personal_dose_limit": true
+    }
+  ],
+  "footnotes": [
+    "* References to support statements in Table 1 are provided in subsequent text.",
+    "** The evidence of efficacy and safety is for the individual ingredients. The efficacy and safety of these ingredients might be different when they are combined with other ingredients in a product or training plan."
+  ],
+  "note": "Exact English fields reconstructed from pasted tab-separated text. No CSV from official website was downloaded. Scientific correctness not certified."
+}

@@ -1,0 +1,38 @@
+{
+  "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-01",
+  "source_id": "ISSN-PROTEIN-EXERCISE-2017",
+  "title": "Phạm vi, bối cảnh và cách đọc ISSN 2017",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-06",
+  "source_publication_year": 2017,
+  "source_pdf_page_ranges": [
+    [
+      1,
+      2
+    ],
+    [
+      19,
+      20
+    ]
+  ],
+  "source_url": "https://doi.org/10.1186/s12970-017-0177-8",
+  "source_sha256": "7a97a81db0334c95ddd17a2009200e7f38945988b3e1dd5aa70f73a502fe8140",
+  "population_tags": [
+    "healthy_exercising_individuals"
+  ],
+  "content_role": "general_knowledge",
+  "position_statement_ids": [],
+  "retrieval_enabled": false,
+  "license": "CC BY 4.0",
+  "official_translation": false,
+  "translation_review_status": "PENDING",
+  "source_currentness": "2017 edition; subsequent evidence not assessed",
+  "grade_strength": null,
+  "grade_certainty": null,
+  "not_a_nutrition_target_command": true,
+  "source_pdf": "../../raw/issn-protein-and-exercise-2017.pdf"
+}

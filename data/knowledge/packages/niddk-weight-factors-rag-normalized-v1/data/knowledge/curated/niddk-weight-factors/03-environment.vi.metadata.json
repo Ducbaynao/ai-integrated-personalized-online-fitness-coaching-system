@@ -1,0 +1,34 @@
+{
+  "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+  "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+  "title": "Môi trường và khả năng lựa chọn lối sống lành mạnh",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-07",
+  "source_last_reviewed": "2023-05",
+  "source_publication_year": null,
+  "source_verified_at": "2026-10-07",
+  "source_url": "https://www.niddk.nih.gov/health-information/weight-management/adult-overweight-obesity/factors-affecting-weight-health",
+  "source_sha256": "d880c41997e5eae1dd4c087ef7c1421c5ccc89b6141fe97463c0c6982c5020c8",
+  "source_sections": [
+    "Where you live, work, play, and worship"
+  ],
+  "source_raw": "../../raw/niddk-weight-factors-user-excerpt.en.md",
+  "source_pdf_page_ranges": null,
+  "content_role": "general_knowledge",
+  "claim_ids": [
+    "NW02"
+  ],
+  "population_tags": [
+    "adult_weight_information"
+  ],
+  "retrieval_enabled": false,
+  "official_translation": false,
+  "translation_review_status": "PENDING",
+  "license": "NIDDK website reproduction policy; no CC license asserted",
+  "source_currentness": "Page last reviewed May 2023; wording verified Oct 7 2026; underlying studies not independently updated",
+  "policy_separation_required": true
+}

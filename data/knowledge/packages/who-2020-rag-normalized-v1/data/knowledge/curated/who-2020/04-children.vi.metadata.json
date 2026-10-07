@@ -1,0 +1,43 @@
+{
+  "document_id": "WHO-PA-SB-2020-VI-04",
+  "source_id": "WHO-PA-SB-2020",
+  "title": "Vận động và ít vận động ở tuổi 5–17",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-06",
+  "source_publication_year": 2020,
+  "source_pdf_page_ranges": [
+    [
+      35,
+      41
+    ]
+  ],
+  "source_printed_page_ranges": [
+    [
+      "25",
+      "31"
+    ]
+  ],
+  "source_url": "https://www.who.int/publications/i/item/9789240015128",
+  "source_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "population_tags": [
+    "children_5_17"
+  ],
+  "content_role": "general_knowledge",
+  "recommendation_ids": [
+    "C01",
+    "C02",
+    "C03"
+  ],
+  "retrieval_enabled": false,
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "official_translation": false,
+  "commercial_use_clearance": "NOT_CONFIRMED",
+  "source_currentness": "2020 edition; later updates not assessed in this normalization",
+  "translation_review_status": "PENDING",
+  "technical_checks": "See review-report.md; not clinical approval",
+  "source_pdf": "../../raw/who-physical-activity-sedentary-behaviour-2020.pdf"
+}

@@ -1,0 +1,63 @@
+{
+  "document_id": "WHO-PA-SB-2020-VI-03",
+  "source_id": "WHO-PA-SB-2020",
+  "title": "MET và cường độ vận động",
+  "language": "vi",
+  "version": "1.1.0",
+  "status": "DRAFT",
+  "reviewer": "Chủ dự án — xác nhận trực tiếp của người dùng",
+  "reviewed_at": "2026-10-08",
+  "prepared_at": "2026-10-08",
+  "technical_review_status": "TECHNICAL_REVIEW_PASSED",
+  "specialist_review_readiness": "TECHNICAL_VERIFICATION_PASSED",
+  "lineage": {
+    "base_document_id": "WHO-PA-SB-2020-VI-03",
+    "base_version": "1.0.0",
+    "base_package": "who-2020-rag-normalized-v1",
+    "base_content_path": "data/knowledge/curated/who-2020/03-intensity.vi.md",
+    "base_sha256": "105839965aba23a1a1c6bdc116eaae28be0e729fda870473a140c6144786e835",
+    "changelog": "Đối chiếu kỹ thuật với PDF WHO 2020 trang 9 và 31-33; xác nhận ranh giới thang MET tuyệt đối (vừa: 3 đến <6 METs; mạnh: >=6 METs) và thang tương đối 0-10; không đồng nhất với RIR/%1RM; gắn cờ sẵn sàng bàn giao reviewer chuyên môn. Cập nhật đường dẫn truy vết nguồn relative (../../packages/); ghi nhận phê duyệt chuyên môn trực tiếp của chủ dự án ngày 2026-10-08; giữ nguyên publication DRAFT và retrieval_enabled=false."
+  },
+  "source_publication_year": 2020,
+  "source_pdf_page_ranges": [
+    [
+      9,
+      9
+    ],
+    [
+      31,
+      33
+    ]
+  ],
+  "source_printed_page_ranges": [
+    [
+      "vii",
+      "vii"
+    ],
+    [
+      "21",
+      "23"
+    ]
+  ],
+  "source_url": "https://www.who.int/publications/i/item/9789240015128",
+  "source_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "population_tags": [
+    "all_covered_populations"
+  ],
+  "content_role": "general_knowledge",
+  "recommendation_ids": [],
+  "retrieval_enabled": false,
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "official_translation": false,
+  "commercial_use_clearance": "NOT_CONFIRMED",
+  "source_currentness": "2020 edition; later updates not assessed in this normalization",
+  "translation_review_status": "PENDING",
+  "technical_checks": "Technical evidence verified against English source snapshot; not clinical approval",
+  "source_pdf": "../../packages/who-2020-rag-normalized-v1/data/knowledge/raw/who-physical-activity-sedentary-behaviour-2020.pdf",
+  "specialist_review_status": "APPROVED",
+  "specialist_review_scope": "Phê duyệt nội dung chuyên môn dựa trên xác nhận trực tiếp của chủ dự án ngày 2026-10-08",
+  "specialist_review_record": "data/knowledge/review-records/project-owner-specialist-review-2026-10-08.json",
+  "publication_lifecycle": "DRAFT",
+  "publication_status_reason": "Chưa xuất bản qua Spring Content publishing workflow; phê duyệt chuyên môn độc lập với vòng đời kích hoạt hệ thống",
+  "technical_readiness": "TECHNICAL_VERIFICATION_PASSED"
+}

@@ -1,0 +1,230 @@
+{
+  "source_id": "NIH-ODS-EXERCISE-SUPPLEMENTS",
+  "raw_line_count": 539,
+  "sections": [
+    {
+      "section_id": "ODS-S01",
+      "heading": "Introduction",
+      "raw_line_start": 1,
+      "raw_line_end": 25,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/01-section.en.md"
+    },
+    {
+      "section_id": "ODS-S02",
+      "heading": "Selected Ingredients in Dietary Supplements for Exercise and Athletic Performance",
+      "raw_line_start": 26,
+      "raw_line_end": 143,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/02-section.en.md"
+    },
+    {
+      "section_id": "ODS-S03",
+      "heading": "Antioxidants (vitamin C, vitamin E, and coenzyme Q10)",
+      "raw_line_start": 144,
+      "raw_line_end": 161,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/03-section.en.md"
+    },
+    {
+      "section_id": "ODS-S04",
+      "heading": "Arginine",
+      "raw_line_start": 162,
+      "raw_line_end": 177,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/04-section.en.md"
+    },
+    {
+      "section_id": "ODS-S05",
+      "heading": "Beetroot or beet juice",
+      "raw_line_start": 178,
+      "raw_line_end": 193,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/05-section.en.md"
+    },
+    {
+      "section_id": "ODS-S06",
+      "heading": "Beta-alanine",
+      "raw_line_start": 194,
+      "raw_line_end": 213,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/06-section.en.md"
+    },
+    {
+      "section_id": "ODS-S07",
+      "heading": "Beta-hydroxy-beta-methylbutyrate",
+      "raw_line_start": 214,
+      "raw_line_end": 231,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/07-section.en.md"
+    },
+    {
+      "section_id": "ODS-S08",
+      "heading": "Betaine",
+      "raw_line_start": 232,
+      "raw_line_end": 243,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/08-section.en.md"
+    },
+    {
+      "section_id": "ODS-S09",
+      "heading": "Branched-chain amino acids",
+      "raw_line_start": 244,
+      "raw_line_end": 255,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/09-section.en.md"
+    },
+    {
+      "section_id": "ODS-S10",
+      "heading": "Caffeine",
+      "raw_line_start": 256,
+      "raw_line_end": 281,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/10-section.en.md"
+    },
+    {
+      "section_id": "ODS-S11",
+      "heading": "Citrulline",
+      "raw_line_start": 282,
+      "raw_line_end": 297,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/11-section.en.md"
+    },
+    {
+      "section_id": "ODS-S12",
+      "heading": "Creatine",
+      "raw_line_start": 298,
+      "raw_line_end": 323,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/12-section.en.md"
+    },
+    {
+      "section_id": "ODS-S13",
+      "heading": "Deer antler velvet",
+      "raw_line_start": 324,
+      "raw_line_end": 335,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/13-section.en.md"
+    },
+    {
+      "section_id": "ODS-S14",
+      "heading": "Dehydroepiandrosterone",
+      "raw_line_start": 336,
+      "raw_line_end": 347,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/14-section.en.md"
+    },
+    {
+      "section_id": "ODS-S15",
+      "heading": "Ginseng",
+      "raw_line_start": 348,
+      "raw_line_end": 361,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/15-section.en.md"
+    },
+    {
+      "section_id": "ODS-S16",
+      "heading": "Glutamine",
+      "raw_line_start": 362,
+      "raw_line_end": 373,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/16-section.en.md"
+    },
+    {
+      "section_id": "ODS-S17",
+      "heading": "Iron",
+      "raw_line_start": 374,
+      "raw_line_end": 397,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/17-section.en.md"
+    },
+    {
+      "section_id": "ODS-S18",
+      "heading": "Protein",
+      "raw_line_start": 398,
+      "raw_line_end": 419,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/18-section.en.md"
+    },
+    {
+      "section_id": "ODS-S19",
+      "heading": "Quercetin",
+      "raw_line_start": 420,
+      "raw_line_end": 431,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/19-section.en.md"
+    },
+    {
+      "section_id": "ODS-S20",
+      "heading": "Ribose",
+      "raw_line_start": 432,
+      "raw_line_end": 443,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/20-section.en.md"
+    },
+    {
+      "section_id": "ODS-S21",
+      "heading": "Sodium bicarbonate",
+      "raw_line_start": 444,
+      "raw_line_end": 457,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/21-section.en.md"
+    },
+    {
+      "section_id": "ODS-S22",
+      "heading": "Tart or sour cherry",
+      "raw_line_start": 458,
+      "raw_line_end": 471,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/22-section.en.md"
+    },
+    {
+      "section_id": "ODS-S23",
+      "heading": "Tribulus terrestris",
+      "raw_line_start": 472,
+      "raw_line_end": 485,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/23-section.en.md"
+    },
+    {
+      "section_id": "ODS-S24",
+      "heading": "Ingredients Banned from Dietary Supplements",
+      "raw_line_start": 486,
+      "raw_line_end": 488,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/24-section.en.md"
+    },
+    {
+      "section_id": "ODS-S25",
+      "heading": "Androstenedione",
+      "raw_line_start": 489,
+      "raw_line_end": 493,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/25-section.en.md"
+    },
+    {
+      "section_id": "ODS-S26",
+      "heading": "Dimethylamylamine",
+      "raw_line_start": 494,
+      "raw_line_end": 498,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/26-section.en.md"
+    },
+    {
+      "section_id": "ODS-S27",
+      "heading": "Ephedra",
+      "raw_line_start": 499,
+      "raw_line_end": 505,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/27-section.en.md"
+    },
+    {
+      "section_id": "ODS-S28",
+      "heading": "Regulation of Dietary Supplements to Enhance Exercise and Athletic Performance",
+      "raw_line_start": 506,
+      "raw_line_end": 512,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/28-section.en.md"
+    },
+    {
+      "section_id": "ODS-S29",
+      "heading": "Safety Considerations",
+      "raw_line_start": 513,
+      "raw_line_end": 517,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/29-section.en.md"
+    },
+    {
+      "section_id": "ODS-S30",
+      "heading": "Fraudulent and adulterated products",
+      "raw_line_start": 518,
+      "raw_line_end": 522,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/30-section.en.md"
+    },
+    {
+      "section_id": "ODS-S31",
+      "heading": "Interactions with medications",
+      "raw_line_start": 523,
+      "raw_line_end": 527,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/31-section.en.md"
+    },
+    {
+      "section_id": "ODS-S32",
+      "heading": "Choosing a Sensible Approach to Enhance Exercise and Athletic Performance",
+      "raw_line_start": 528,
+      "raw_line_end": 539,
+      "source_normalized_file": "source-normalized/ods-exercise-supplements/32-section.en.md"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "document_id": "WHO-PA-SB-2020-VI-08",
+  "source_id": "WHO-PA-SB-2020",
+  "title": "Vận động trong thai kỳ và sau sinh",
+  "language": "vi",
+  "version": "1.0.0",
+  "status": "DRAFT",
+  "reviewer": null,
+  "reviewed_at": null,
+  "prepared_at": "2026-10-06",
+  "source_publication_year": 2020,
+  "source_pdf_page_ranges": [
+    [
+      57,
+      61
+    ]
+  ],
+  "source_printed_page_ranges": [
+    [
+      "47",
+      "51"
+    ]
+  ],
+  "source_url": "https://www.who.int/publications/i/item/9789240015128",
+  "source_sha256": "50b66c44e7083cc3752849f301ae1d60d9360d511e34c0c948b39bdf6e13dc88",
+  "population_tags": [
+    "pregnant_postpartum"
+  ],
+  "content_role": "general_knowledge",
+  "recommendation_ids": [
+    "P01",
+    "P02",
+    "P03",
+    "P04",
+    "P05"
+  ],
+  "retrieval_enabled": false,
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "official_translation": false,
+  "commercial_use_clearance": "NOT_CONFIRMED",
+  "source_currentness": "2020 edition; later updates not assessed in this normalization",
+  "translation_review_status": "PENDING",
+  "technical_checks": "See review-report.md; not clinical approval",
+  "source_pdf": "../../raw/who-physical-activity-sedentary-behaviour-2020.pdf"
+}

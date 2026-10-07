@@ -10,6 +10,14 @@ AI Assistance is a shared capability for `SELF_DIRECTED` Students and Trainers o
 
 The documents are APPROVED version 1.0 by the project owner on 2026-10-04 and distinguish inherited invariants from release decisions. DTO names, reason codes, expiry values and retry storage specify design intent, not implemented contracts. Flyway and executable schemas remain the evidence for current database/API structure. The detailed matrix owns the approved DB/API mapping and V1 transaction behavior; this overview summarizes the approved baseline without claiming implementation.
 
+## Corpus preparation for F01
+
+The [imported DRAFT corpus](../../data/knowledge/README.md) contains WHO, ISSN, NIDDK and
+NIH ODS snapshots. Read the [integration review](knowledge-corpus-review-2026-10-08.md),
+[detailed review and specialist readiness](f01-knowledge-corpus-detailed-review.md),
+and [staging-to-Knowledge mapping](knowledge-import-contract.md) before using it.
+File import and technical review do not publish Knowledge or complete F01/F09. Retrieval remains disabled.
+
 ## Supported capabilities
 
 - propose Workout Plans, splits, exercises, replacements, volume, or load changes;
