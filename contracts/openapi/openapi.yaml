@@ -36,6 +36,8 @@ tags:
     description: Permission-protected Exercise draft, lifecycle, and canonical replacement management.
   - name: Workout Plan
     description: Actor-scoped Workout Plan authoring, lifecycle, immutable versions, and occurrence adjustments.
+  - name: Workout Execution
+    description: Student-owned workout execution, actual set logging, terminal outcomes, and authority-scoped history.
 
 paths:
   /coaching/trainers:
@@ -2098,6 +2100,161 @@ paths:
         '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
         '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
 
+  /planned-workouts/{occurrenceId}/executions:
+    post:
+      tags: [Workout Execution]
+      operationId: startWorkoutExecution
+      summary: Start one Planned Workout execution from an immutable frozen snapshot
+      parameters: [{ $ref: '#/components/parameters/WorkoutExecutionOccurrenceId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StartWorkoutExecutionRequest' } } }
+      responses:
+        '201':
+          description: Workout execution started, or the same logical start replayed
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
+  /planned-workouts/{occurrenceId}/skip:
+    post:
+      tags: [Workout Execution]
+      operationId: skipPlannedWorkout
+      summary: Skip one not-yet-started Planned Workout occurrence
+      parameters: [{ $ref: '#/components/parameters/WorkoutExecutionOccurrenceId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SkipPlannedWorkoutRequest' } } }
+      responses:
+        '200':
+          description: Planned Workout skipped, or the same logical skip replayed
+          content: { application/json: { schema: { $ref: '#/components/schemas/SkipPlannedWorkoutResponse' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
+  /workout-executions/current:
+    get:
+      tags: [Workout Execution]
+      operationId: getCurrentWorkoutExecution
+      summary: Get the authenticated Student's in-progress Workout Execution
+      responses:
+        '200': { description: Current execution, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+
+  /workout-executions:
+    get:
+      tags: [Workout Execution]
+      operationId: listWorkoutExecutions
+      summary: List authority-scoped Workout Execution history
+      description: >-
+        Students receive their full own history. A Trainer requires current WORKOUT_HISTORY VIEW authority;
+        rows and totals are filtered by the half-open historical window before pagination. Unauthorized targets
+        return an empty page.
+      parameters:
+        - name: studentId
+          in: query
+          schema: { type: string, format: uuid }
+          description: Defaults to the authenticated actor; Trainers use it to select a Student.
+        - { $ref: '#/components/parameters/WorkoutExecutionPage' }
+        - { $ref: '#/components/parameters/WorkoutExecutionSize' }
+      responses:
+        '200': { description: Performed-start descending page with execution-ID tie-break, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /workout-executions/{executionId}:
+    get:
+      tags: [Workout Execution]
+      operationId: getWorkoutExecution
+      summary: Get one visible Workout Execution
+      parameters: [{ $ref: '#/components/parameters/WorkoutExecutionId' }]
+      responses:
+        '200': { description: Execution detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+
+  /workout-executions/{executionId}/exercises/{exerciseExecutionId}:
+    put:
+      tags: [Workout Execution]
+      operationId: substituteWorkoutExecutionExercise
+      summary: Substitute the actual Exercise Variation without changing the frozen prescription
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutExecutionId' }
+        - { $ref: '#/components/parameters/WorkoutExerciseExecutionId' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubstituteWorkoutExerciseRequest' } } }
+      responses:
+        '200': { description: Updated execution detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
+  /workout-executions/{executionId}/sets/{clientSetId}:
+    put:
+      tags: [Workout Execution]
+      operationId: upsertWorkoutExecutionSet
+      summary: Idempotently insert or update one actual set using its client identity
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutExecutionId' }
+        - { $ref: '#/components/parameters/WorkoutClientSetId' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpsertWorkoutSetRequest' } } }
+      responses:
+        '200': { description: Updated execution detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
+  /workout-executions/{executionId}/complete:
+    post:
+      tags: [Workout Execution]
+      operationId: completeWorkoutExecution
+      summary: Complete an execution with a backend-derived completed or partial outcome
+      parameters: [{ $ref: '#/components/parameters/WorkoutExecutionId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CompleteWorkoutExecutionRequest' } } }
+      responses:
+        '200': { description: Terminal execution detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
+  /workout-executions/{executionId}/abort:
+    post:
+      tags: [Workout Execution]
+      operationId: abortWorkoutExecution
+      summary: Abort an execution that has no completed baseline set
+      parameters: [{ $ref: '#/components/parameters/WorkoutExecutionId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AbortWorkoutExecutionRequest' } } }
+      responses:
+        '200': { description: Aborted execution detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutExecutionDetail' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutExecutionForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2129,6 +2286,34 @@ components:
       name: size
       in: query
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    WorkoutExecutionOccurrenceId:
+      name: occurrenceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutExecutionId:
+      name: executionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutExerciseExecutionId:
+      name: exerciseExecutionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutClientSetId:
+      name: clientSetId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkoutExecutionPage:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    WorkoutExecutionSize:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
     CoachingRelationshipId:
       name: relationshipId
       in: path
@@ -2149,6 +2334,22 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    WorkoutExecutionConcealed:
+      description: >-
+        Execution or Planned Workout occurrence is absent or concealed. Codes include
+        WORKOUT_EXECUTION_NOT_FOUND and PLANNED_WORKOUT_NOT_FOUND.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutExecutionForbidden:
+      description: Mutation authority or active Student capability is unavailable (WORKOUT_EXECUTION_ACCESS_DENIED).
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutExecutionConflict:
+      description: >-
+        Stable codes include WORKOUT_EXECUTION_LIFECYCLE_CONFLICT, ACTIVE_WORKOUT_EXECUTION_EXISTS,
+        WORKOUT_EXECUTION_VERSION_CONFLICT, WORKOUT_EXECUTION_IDEMPOTENCY_CONFLICT,
+        WORKOUT_SET_IDENTITY_CONFLICT, PLANNED_WORKOUT_ALREADY_STARTED, PLANNED_WORKOUT_NOT_STARTABLE,
+        PLANNED_WORKOUT_ADJUSTMENTS_SEALED, PLANNED_WORKOUT_SCHEDULE_LOCKED,
+        WORKOUT_EXECUTION_TERMINAL, and WORKOUT_EXECUTION_BASELINE_INVALID.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     WorkoutPlanConcealed:
       description: >-
         Plan, version, or occurrence is absent or concealed. Codes include WORKOUT_PLAN_NOT_FOUND,
@@ -2318,6 +2519,214 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    WorkoutExecutionStatus:
+      type: string
+      enum: [IN_PROGRESS, COMPLETED, PARTIALLY_COMPLETED, ABORTED]
+    WorkoutExecutionSnapshotMode:
+      type: string
+      enum: [FROZEN, LEGACY_REFERENCE_ONLY]
+    WorkoutExecutionSupervisionRequirement:
+      type: string
+      enum: [SELF_PERFORMABLE, COACH_OPTIONAL, COACH_REQUIRED]
+    WorkoutExecutionExercisePresentationState:
+      type: string
+      enum: [ACTIVE, ARCHIVED, UNAVAILABLE]
+    WorkoutExecutionSetType:
+      type: string
+      enum: [WARMUP, WORKING, DROP, FAILURE, AMRAP, COOLDOWN]
+    WorkoutExecutionSetCompletionStatus:
+      type: string
+      enum: [PLANNED, COMPLETED, SKIPPED, FAILED]
+    WorkoutExecutionCommandKey:
+      type: string
+      minLength: 1
+      maxLength: 120
+      description: Stable caller-generated key scoped to the authenticated actor and logical command.
+    WorkoutExecutionPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkoutExecutionSummary' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    WorkoutExecutionSummary:
+      type: object
+      additionalProperties: false
+      required: [executionId, studentId, snapshotMode, performedStartedAt, status, version]
+      properties:
+        executionId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        plannedWorkoutId: { type: [string, 'null'], format: uuid }
+        planId: { type: [string, 'null'], format: uuid }
+        planVersionId: { type: [string, 'null'], format: uuid }
+        planSessionId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
+        snapshotMode: { $ref: '#/components/schemas/WorkoutExecutionSnapshotMode' }
+        plannedStartAt: { type: [string, 'null'], format: date-time }
+        originalPlannedStartAt: { type: [string, 'null'], format: date-time }
+        plannedEndAt: { type: [string, 'null'], format: date-time }
+        supervisionRequirement:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutExecutionSupervisionRequirement' }
+            - { type: 'null' }
+        snapshotFrozenAt: { type: [string, 'null'], format: date-time }
+        sourceOccurrenceVersion: { type: [integer, 'null'], format: int64, minimum: 0 }
+        performedStartedAt: { type: string, format: date-time }
+        performedEndedAt: { type: [string, 'null'], format: date-time }
+        status: { $ref: '#/components/schemas/WorkoutExecutionStatus' }
+        overallRpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        sessionNote: { type: [string, 'null'] }
+        version: { type: integer, format: int64, minimum: 0 }
+    WorkoutExecutionDetail:
+      type: object
+      additionalProperties: false
+      required: [execution, exercises]
+      properties:
+        execution: { $ref: '#/components/schemas/WorkoutExecutionSummary' }
+        exercises: { type: array, items: { $ref: '#/components/schemas/WorkoutExerciseExecution' } }
+    WorkoutExerciseExecution:
+      type: object
+      additionalProperties: false
+      required: [exerciseExecutionId, sets]
+      properties:
+        exerciseExecutionId: { type: string, format: uuid }
+        sourcePrescriptionId: { type: [string, 'null'], format: uuid }
+        prescribedVariationId: { type: [string, 'null'], format: uuid }
+        prescribedVariationPresentation:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutExecutionExercisePresentation' }
+            - { type: 'null' }
+        actualVariationId: { type: [string, 'null'], format: uuid }
+        actualVariationPresentation:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutExecutionExercisePresentation' }
+            - { type: 'null' }
+        substitutionReason: { type: [string, 'null'] }
+        sequence: { type: [integer, 'null'], minimum: 1 }
+        baselineSetCount: { type: [integer, 'null'], minimum: 1 }
+        targetRepsMin: { type: [integer, 'null'], minimum: 0 }
+        targetRepsMax: { type: [integer, 'null'], minimum: 0 }
+        targetLoad: { type: [number, 'null'], minimum: 0 }
+        loadUnitId: { type: [integer, 'null'], format: int32 }
+        targetRpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        targetRir: { type: [number, 'null'], minimum: 0, maximum: 10 }
+        restSeconds: { type: [integer, 'null'], minimum: 0 }
+        tempo: { type: [string, 'null'] }
+        durationSeconds: { type: [integer, 'null'], minimum: 0 }
+        distanceValue: { type: [number, 'null'], minimum: 0 }
+        distanceUnitId: { type: [integer, 'null'], format: int32 }
+        instructions: { type: [string, 'null'] }
+        note: { type: [string, 'null'] }
+        sets: { type: array, items: { $ref: '#/components/schemas/WorkoutSetExecution' } }
+    WorkoutExecutionExercisePresentation:
+      type: object
+      additionalProperties: false
+      required: [variationId, state]
+      properties:
+        variationId: { type: string, format: uuid }
+        exerciseId: { type: [string, 'null'], format: uuid }
+        exerciseName: { type: [string, 'null'] }
+        variationName: { type: [string, 'null'] }
+        state: { $ref: '#/components/schemas/WorkoutExecutionExercisePresentationState' }
+        canonicalExerciseId: { type: [string, 'null'], format: uuid }
+        canonicalExerciseName: { type: [string, 'null'] }
+    WorkoutSetExecution:
+      type: object
+      additionalProperties: false
+      required: [clientSetId, setNumber, setType, completionStatus]
+      properties:
+        clientSetId: { type: string, format: uuid }
+        baselineSetNumber: { type: [integer, 'null'], minimum: 1 }
+        setNumber: { type: integer, minimum: 1 }
+        setType: { $ref: '#/components/schemas/WorkoutExecutionSetType' }
+        completionStatus: { $ref: '#/components/schemas/WorkoutExecutionSetCompletionStatus' }
+        repetitions: { type: [integer, 'null'], minimum: 0 }
+        loadValue: { type: [number, 'null'], minimum: 0 }
+        loadUnitId: { type: [integer, 'null'], format: int32 }
+        durationSeconds: { type: [integer, 'null'], minimum: 0 }
+        distanceValue: { type: [number, 'null'], minimum: 0 }
+        distanceUnitId: { type: [integer, 'null'], format: int32 }
+        rpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        rir: { type: [number, 'null'], minimum: 0, maximum: 10 }
+        tempo: { type: [string, 'null'] }
+        restAfterSeconds: { type: [integer, 'null'], minimum: 0 }
+        note: { type: [string, 'null'] }
+        completedAt: { type: [string, 'null'], format: date-time }
+    StartWorkoutExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedOccurrenceVersion, commandKey]
+      properties:
+        expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutExecutionCommandKey' }
+    SkipPlannedWorkoutRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedOccurrenceVersion, commandKey]
+      properties:
+        expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutExecutionCommandKey' }
+        reason: { type: [string, 'null'] }
+    UpsertWorkoutSetRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, exerciseExecutionId, setNumber, setType, completionStatus]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        exerciseExecutionId: { type: string, format: uuid }
+        baselineSetNumber: { type: [integer, 'null'], minimum: 1 }
+        setNumber: { type: integer, minimum: 1 }
+        setType: { $ref: '#/components/schemas/WorkoutExecutionSetType' }
+        completionStatus: { $ref: '#/components/schemas/WorkoutExecutionSetCompletionStatus' }
+        repetitions: { type: [integer, 'null'], minimum: 0 }
+        loadValue: { type: [number, 'null'], minimum: 0 }
+        loadUnitId: { type: [integer, 'null'], format: int32 }
+        durationSeconds: { type: [integer, 'null'], minimum: 0 }
+        distanceValue: { type: [number, 'null'], minimum: 0 }
+        distanceUnitId: { type: [integer, 'null'], format: int32 }
+        rpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        rir: { type: [number, 'null'], minimum: 0, maximum: 10 }
+        tempo: { type: [string, 'null'] }
+        restAfterSeconds: { type: [integer, 'null'], minimum: 0 }
+        note: { type: [string, 'null'] }
+    SubstituteWorkoutExerciseRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, actualExerciseVariationId]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        actualExerciseVariationId: { type: string, format: uuid }
+        substitutionReason: { type: [string, 'null'] }
+    CompleteWorkoutExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutExecutionCommandKey' }
+        overallRpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        sessionNote: { type: [string, 'null'] }
+    AbortWorkoutExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutExecutionCommandKey' }
+        overallRpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
+        sessionNote: { type: [string, 'null'] }
+    SkipPlannedWorkoutResponse:
+      type: object
+      additionalProperties: false
+      required: [occurrenceId, status, occurrenceVersion, replayed]
+      properties:
+        occurrenceId: { type: string, format: uuid }
+        status: { type: string, enum: [SKIPPED] }
+        occurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        replayed: { type: boolean }
     WorkoutPlanStatus:
       type: string
       enum: [DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED]

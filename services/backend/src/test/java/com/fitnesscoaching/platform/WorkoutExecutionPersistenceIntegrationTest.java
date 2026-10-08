@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase.*;
+import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort;
 import com.fitnesscoaching.platform.modules.workout.domain.SetExecution;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionStatus;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionError;
@@ -42,6 +43,7 @@ class WorkoutExecutionPersistenceIntegrationTest {
     }
 
     @Autowired WorkoutExecutionCommandUseCase commands;
+    @Autowired WorkoutExecutionReadPort reads;
     @Autowired JdbcTemplate jdbc;
 
     @Test
@@ -101,6 +103,52 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 Integer.class, f.occurrenceId())).isZero();
     }
 
+    @Test
+    void startPersistsFrozenReadMetadataAndLaterSourceSupervisionChangeCannotRewriteIt() {
+        Fixture f = fixture();
+        var expected = jdbc.queryForMap("""
+                SELECT planned_start_at,planned_end_at,original_planned_start_at,supervision_requirement::text
+                FROM fitness.planned_workouts WHERE id=?
+                """, f.occurrenceId());
+
+        var started = commands.start(new StartCommand(f.occurrenceId(), f.studentId(), 0,
+                "metadata-" + f.occurrenceId()));
+        jdbc.update("""
+                UPDATE fitness.planned_workouts SET supervision_requirement='COACH_PREFERRED',version=version+1
+                WHERE id=?
+                """, f.occurrenceId());
+
+        var read = reads.findDetail(started.id()).orElseThrow();
+        assertThat(read.planId()).isEqualTo(f.planId());
+        assertThat(read.planVersionId()).isEqualTo(f.planVersionId());
+        assertThat(read.planSessionId()).isEqualTo(f.planSessionId());
+        assertThat(read.coachingPeriodId()).isEqualTo(f.coachingPeriodId());
+        assertThat(java.sql.Timestamp.from(read.plannedStartAt()))
+                .isEqualTo(expected.get("planned_start_at"));
+        assertThat(java.sql.Timestamp.from(read.originalPlannedStartAt()))
+                .isEqualTo(expected.get("original_planned_start_at"));
+        assertThat(read.plannedEndAt()).isNull();
+        assertThat(read.supervisionRequirement()).isEqualTo(expected.get("supervision_requirement"));
+        assertThat(read.supervisionRequirement()).isEqualTo("SELF_ALLOWED");
+        assertThat(read.frozenAt()).isNotNull();
+        assertThat(read.sourceOccurrenceVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void commandKeyLengthMatchesDatabaseInvariantBeforePersistence() {
+        Fixture accepted = fixture();
+        assertThat(commands.start(new StartCommand(accepted.occurrenceId(), accepted.studentId(), 0,
+                "k".repeat(120))).id()).isNotNull();
+
+        Fixture rejected = fixture();
+        assertThatThrownBy(() -> commands.start(new StartCommand(rejected.occurrenceId(), rejected.studentId(), 0,
+                "k".repeat(121))))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.VALIDATION_FAILED));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                Integer.class, rejected.occurrenceId())).isZero();
+    }
+
     private Fixture fixture() {
         UUID student = person();
         UUID period = UUID.randomUUID();
@@ -138,7 +186,7 @@ class WorkoutExecutionPersistenceIntegrationTest {
                  original_planned_start_at,created_by)
                 VALUES (?,?,?, ?,clock_timestamp(),clock_timestamp(),?)
                 """, occurrence, student, session, period, student);
-        return new Fixture(student, occurrence);
+        return new Fixture(student, occurrence, plan, version, session, period);
     }
 
     private UUID person() {
@@ -160,5 +208,6 @@ class WorkoutExecutionPersistenceIntegrationTest {
         return variation;
     }
 
-    private record Fixture(UUID studentId, UUID occurrenceId) {}
+    private record Fixture(UUID studentId, UUID occurrenceId, UUID planId, UUID planVersionId,
+                           UUID planSessionId, UUID coachingPeriodId) {}
 }

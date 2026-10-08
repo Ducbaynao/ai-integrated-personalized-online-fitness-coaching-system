@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.HistoricalAuthorityRequest;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
@@ -12,6 +13,7 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionFailu
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -36,15 +38,43 @@ public class WorkoutExecutionAccessPolicy {
     }
 
     public void requireRead(UUID actorId, UUID studentId, Instant performedStartedAt) {
-        if (actorId != null && actorId.equals(studentId)) {
-            requireStudentMutation(actorId, studentId);
-            return;
-        }
-        if (actorId == null || performedStartedAt == null || !coaching.evaluateHistorical(
-                new HistoricalAuthorityRequest(actorId, studentId, DataScope.WORKOUT_HISTORY,
-                        DataAccessLevel.VIEW, performedStartedAt)).allowed()) {
+        if (!canRead(actorId, studentId, performedStartedAt)) {
             throw denied();
         }
+    }
+
+    public boolean canRead(UUID actorId, UUID studentId, Instant performedStartedAt) {
+        if (actorId != null && actorId.equals(studentId)) {
+            try {
+                requireStudentMutation(actorId, studentId);
+                return true;
+            } catch (WorkoutExecutionFailure denied) {
+                return false;
+            }
+        }
+        return actorId != null && studentId != null && performedStartedAt != null && coaching.evaluateHistorical(
+                new HistoricalAuthorityRequest(actorId, studentId, DataScope.WORKOUT_HISTORY,
+                        DataAccessLevel.VIEW, performedStartedAt)).allowed();
+    }
+
+    public Optional<HistoryWindow> historyWindow(UUID actorId, UUID studentId) {
+        if (actorId == null || studentId == null) return Optional.empty();
+        if (actorId.equals(studentId)) {
+            try {
+                requireStudentMutation(actorId, studentId);
+                return Optional.of(HistoryWindow.unbounded());
+            } catch (WorkoutExecutionFailure denied) {
+                return Optional.empty();
+            }
+        }
+        var decision = coaching.evaluateCurrent(new AuthorityRequest(actorId, studentId,
+                DataScope.WORKOUT_HISTORY, DataAccessLevel.VIEW));
+        if (!decision.allowed() || decision.historyFrom() == null) return Optional.empty();
+        return Optional.of(new HistoryWindow(decision.historyFrom(), decision.historyUntil()));
+    }
+
+    public record HistoryWindow(Instant from, Instant until) {
+        static HistoryWindow unbounded() { return new HistoryWindow(null, null); }
     }
 
     private static WorkoutExecutionFailure denied() {

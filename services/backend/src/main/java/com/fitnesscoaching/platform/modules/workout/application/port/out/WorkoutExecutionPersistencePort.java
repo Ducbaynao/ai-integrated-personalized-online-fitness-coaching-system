@@ -16,8 +16,6 @@ public interface WorkoutExecutionPersistencePort {
     WorkoutExecution create(FrozenExecutionSnapshot snapshot, UUID actorId);
     WorkoutExecution lockExecution(UUID executionId);
     Optional<WorkoutExecution> find(UUID executionId);
-    Optional<WorkoutExecution> findCurrent(UUID studentId);
-    List<WorkoutExecution> findHistory(UUID studentId, int limit, int offset);
     Optional<SetIdentity> findSet(UUID clientSetId);
     void insertSet(UUID executionId, UUID exerciseId, SetExecution set, long expectedVersion, Instant at);
     void updateSet(UUID executionId, UUID exerciseId, SetExecution set, long expectedVersion, Instant at);

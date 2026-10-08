@@ -223,7 +223,7 @@ public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUs
     }
 
     private static String key(String value) {
-        if (value == null || value.isBlank() || value.length() > 200) throw invalid();
+        if (value == null || value.isBlank() || value.length() > 120) throw invalid();
         return value.trim();
     }
 
