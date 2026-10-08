@@ -1,7 +1,8 @@
 package com.fitnesscoaching.platform.modules.workout;
 
-import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionSnapshotQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutSchedulingUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionSnapshotUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.service.WorkoutExecutionCommandService;
 import com.fitnesscoaching.platform.modules.workout.application.service.WorkoutPlanCommandService;
 import org.junit.jupiter.api.Test;
 
@@ -17,9 +18,17 @@ class WorkoutModuleBoundaryTest {
     }
 
     @Test void downstreamB05AndB06BoundariesAreWorkoutOwnedInterfaces() {
-        assertThat(WorkoutExecutionSnapshotQuery.class.isInterface()).isTrue();
+        assertThat(WorkoutExecutionSnapshotUseCase.class.isInterface()).isTrue();
         assertThat(WorkoutSchedulingUseCase.class.isInterface()).isTrue();
-        assertThat(WorkoutExecutionSnapshotQuery.class.getPackageName()).contains("modules.workout.application.port.in");
+        assertThat(WorkoutExecutionSnapshotUseCase.class.getPackageName()).contains("modules.workout.application.port.in");
         assertThat(WorkoutSchedulingUseCase.class.getPackageName()).contains("modules.workout.application.port.in");
+    }
+
+    @Test void b05UsesPublishedApplicationPortsRatherThanB04OrCoachingPersistence() {
+        assertThat(WorkoutExecutionSnapshotUseCase.class.isInterface()).isTrue();
+        assertThat(Arrays.stream(WorkoutExecutionCommandService.class.getDeclaredFields())
+                .map(field -> field.getType().getName()))
+                .noneMatch(name -> name.endsWith("WorkoutPlanPersistencePort")
+                        || name.contains("coaching.adapter") || name.endsWith("Repository"));
     }
 }
