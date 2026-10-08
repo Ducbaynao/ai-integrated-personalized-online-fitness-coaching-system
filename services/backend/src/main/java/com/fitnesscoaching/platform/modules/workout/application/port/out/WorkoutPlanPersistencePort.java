@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlan;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanStatus;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionAdjustment;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionTemplate;
+import com.fitnesscoaching.platform.modules.workout.domain.TypedWorkoutAdjustment;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,11 +37,13 @@ public interface WorkoutPlanPersistencePort {
     Occurrence lockOccurrence(UUID occurrenceId);
     UUID appendAdjustment(Occurrence occurrence, UUID actorId, WorkoutSessionAdjustment.Type type,
                           UUID plannedSessionExerciseId, UUID replacementVariationId,
-                          String beforeJson, String afterJson, String reason, long expectedVersion, Instant at);
+                          String beforeJson, String afterJson, TypedWorkoutAdjustment typed,
+                          String reason, long expectedVersion, Instant at);
     void saveReceipt(Receipt receipt);
 
     record OpenVersion(UUID id, int versionNumber, Instant effectiveFrom) {}
-    record Occurrence(UUID id, UUID studentId, UUID planId, UUID planVersionId, long version) {}
+    record Occurrence(UUID id, UUID studentId, UUID planId, UUID planVersionId, long version,
+                      Instant executionStartedAt) {}
     record Successor(UUID planId, UUID versionId) {}
     record Receipt(UUID actorId, String commandKey, String commandName, String payloadHash,
                    UUID planId, UUID planVersionId, UUID plannedWorkoutId, String status,

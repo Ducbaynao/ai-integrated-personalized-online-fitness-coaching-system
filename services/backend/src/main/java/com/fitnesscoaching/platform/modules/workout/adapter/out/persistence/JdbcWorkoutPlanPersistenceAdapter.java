@@ -273,14 +273,15 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
     @Override public Occurrence lockOccurrence(UUID id) {
         try {
             return jdbc.query("""
-                SELECT pw.id,pw.student_id,v.workout_plan_id,v.id plan_version_id,pw.version
+                SELECT pw.id,pw.student_id,v.workout_plan_id,v.id plan_version_id,pw.version,pw.execution_started_at
                 FROM fitness.planned_workouts pw
                 JOIN fitness.workout_plan_sessions s ON s.id=pw.workout_plan_session_id
                 JOIN fitness.workout_plan_versions v ON v.id=s.workout_plan_version_id
                 WHERE pw.id=? FOR UPDATE OF pw
                 """, (rs, n) -> new Occurrence(rs.getObject("id", UUID.class), rs.getObject("student_id", UUID.class),
                 rs.getObject("workout_plan_id", UUID.class), rs.getObject("plan_version_id", UUID.class),
-                rs.getLong("version")), id).stream().findFirst().orElseThrow(() -> new WorkoutPlanFailure(
+                rs.getLong("version"), Optional.ofNullable(rs.getTimestamp("execution_started_at"))
+                        .map(Timestamp::toInstant).orElse(null)), id).stream().findFirst().orElseThrow(() -> new WorkoutPlanFailure(
                     WorkoutPlanError.PLANNED_WORKOUT_NOT_FOUND, "Planned workout not found"));
         } catch (CannotAcquireLockException concurrent) {
             throw conflict(WorkoutPlanError.PLANNED_WORKOUT_VERSION_CONFLICT);
@@ -289,7 +290,7 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
 
     @Override public UUID appendAdjustment(Occurrence occurrence, UUID actorId, WorkoutSessionAdjustment.Type type,
                                            UUID prescriptionId, UUID replacementId, String beforeJson, String afterJson,
-                                           String reason, long expected, Instant at) {
+                                           TypedWorkoutAdjustment typed, String reason, long expected, Instant at) {
         if (prescriptionId != null && !Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS(
                     SELECT 1 FROM fitness.planned_workouts pw
@@ -305,10 +306,13 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
         jdbc.update("""
                 INSERT INTO fitness.workout_session_adjustments
                 (id,planned_workout_id,adjustment_type,planned_session_exercise_id,replacement_exercise_variation_id,
-                 before_value,after_value,reason,adjusted_by,created_at)
-                VALUES (?,?,?, ?,?, ?::jsonb,?::jsonb,?,?,?)
+                 before_value,after_value,reason,adjusted_by,created_at,adjustment_contract_version,resolution_state,
+                 typed_target_load,typed_load_unit_id,typed_reps_min,typed_reps_max,typed_target_sets,
+                 typed_duration_seconds,typed_sequence,typed_note)
+                VALUES (?,?,?, ?,?, ?::jsonb,?::jsonb,?,?,?,1,'TYPED', ?,?,?,?,?,?,?,?)
                 """, id, occurrence.id(), type.name(), prescriptionId, replacementId, beforeJson, afterJson,
-                reason, actorId, ts(at));
+                reason, actorId, ts(at), typed.targetLoad(), typed.loadUnitId(), typed.repsMin(), typed.repsMax(),
+                typed.targetSets(), typed.durationSeconds(), typed.sequence(), typed.note());
         int changed = jdbc.update("UPDATE fitness.planned_workouts SET version=version+1,updated_at=? WHERE id=? AND version=?",
                 ts(at), occurrence.id(), expected);
         if (changed != 1) throw conflict(WorkoutPlanError.PLANNED_WORKOUT_VERSION_CONFLICT);

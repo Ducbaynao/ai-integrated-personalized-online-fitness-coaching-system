@@ -212,19 +212,87 @@ public class WorkoutPlanCommandService implements WorkoutPlanCommandUseCase {
         requireContext(student);
         Occurrence occurrence = store.lockOccurrence(c.plannedWorkoutId());
         authorizeOccurrenceMutation(c.actorId(), student);
+        if (occurrence.executionStartedAt() != null)
+            throw failure(WorkoutPlanError.PLANNED_WORKOUT_ADJUSTMENTS_SEALED);
         if (occurrence.version() != c.expectedVersion()) throw failure(WorkoutPlanError.PLANNED_WORKOUT_VERSION_CONFLICT);
+        TypedWorkoutAdjustment typed = typedAdjustment(c);
         if (c.type() == WorkoutSessionAdjustment.Type.EXERCISE_SWAP) {
-            if (c.plannedSessionExerciseId() == null || c.replacementVariationId() == null)
-                throw failure(WorkoutPlanError.VALIDATION_FAILED);
             validateExercises(List.of(c.replacementVariationId()));
-        } else if (c.replacementVariationId() != null) throw failure(WorkoutPlanError.VALIDATION_FAILED);
+        }
         Instant at = store.databaseNow();
         UUID adjustment = store.appendAdjustment(occurrence, c.actorId(), c.type(), c.plannedSessionExerciseId(),
-                c.replacementVariationId(), c.beforeJson(), c.afterJson(), c.reason(), c.expectedVersion(), at);
+                c.replacementVariationId(), c.beforeJson(), c.afterJson(), typed, c.reason(), c.expectedVersion(), at);
         recordAudit(c.actorId(), "PLANNED_WORKOUT_ADJUSTED", occurrence.id(), at);
         store.saveReceipt(new Receipt(c.actorId(), c.commandKey(), "ADJUST", hash, occurrence.planId(),
                 occurrence.planVersionId(), occurrence.id(), null, c.expectedVersion() + 1, at, "{}", at));
         return new OccurrenceResult(occurrence.id(), adjustment, c.expectedVersion() + 1, false);
+    }
+
+    private TypedWorkoutAdjustment typedAdjustment(AdjustOccurrenceCommand c) {
+        try {
+            var node = objectMapper.readTree(c.afterJson());
+            if (node == null || !node.isObject()) throw failure(WorkoutPlanError.VALIDATION_FAILED);
+            UUID target = c.plannedSessionExerciseId();
+            if (c.type() != WorkoutSessionAdjustment.Type.NOTE
+                    && c.type() != WorkoutSessionAdjustment.Type.OTHER && target == null)
+                throw failure(WorkoutPlanError.VALIDATION_FAILED);
+            if (c.type() != WorkoutSessionAdjustment.Type.EXERCISE_SWAP && c.replacementVariationId() != null)
+                throw failure(WorkoutPlanError.VALIDATION_FAILED);
+            java.math.BigDecimal load = decimal(node, "targetLoad");
+            Short unit = shortValue(node, "loadUnitId");
+            Integer min = integer(node, "targetRepsMin");
+            Integer max = integer(node, "targetRepsMax");
+            Integer sets = integer(node, "targetSets");
+            Integer duration = integer(node, "durationSeconds");
+            Integer sequence = integer(node, "sequence");
+            String note = node.has("note") && node.get("note").isTextual() ? node.get("note").asText() : null;
+            switch (c.type()) {
+                case LOAD -> { if (load == null || load.signum() < 0 || min != null || max != null || sets != null
+                        || duration != null || sequence != null || note != null) invalidAdjustment(); }
+                case REPS -> { if (min == null && max == null || min != null && min < 0 || max != null && max < 0
+                        || min != null && max != null && max < min || load != null || unit != null || sets != null
+                        || duration != null || sequence != null || note != null) invalidAdjustment(); }
+                case SETS -> { if (sets == null || sets < 1 || load != null || unit != null || min != null
+                        || max != null || duration != null || sequence != null || note != null) invalidAdjustment(); }
+                case DURATION -> { if (duration == null || duration < 0 || load != null || unit != null || min != null
+                        || max != null || sets != null || sequence != null || note != null) invalidAdjustment(); }
+                case ORDER -> { if (sequence == null || sequence < 1 || load != null || unit != null || min != null
+                        || max != null || sets != null || duration != null || note != null) invalidAdjustment(); }
+                case NOTE -> { if (note == null || load != null || unit != null || min != null || max != null
+                        || sets != null || duration != null || sequence != null) invalidAdjustment(); }
+                case EXERCISE_SWAP -> { if (c.replacementVariationId() == null || load != null || unit != null
+                        || min != null || max != null || sets != null || duration != null || sequence != null
+                        || note != null) invalidAdjustment(); }
+                case OTHER -> { if (load != null || unit != null || min != null || max != null || sets != null
+                        || duration != null || sequence != null || note != null) invalidAdjustment(); }
+            }
+            return new TypedWorkoutAdjustment(c.type(), target, c.replacementVariationId(),
+                    c.type() == WorkoutSessionAdjustment.Type.LOAD ? load : null,
+                    c.type() == WorkoutSessionAdjustment.Type.LOAD ? unit : null,
+                    c.type() == WorkoutSessionAdjustment.Type.REPS ? min : null,
+                    c.type() == WorkoutSessionAdjustment.Type.REPS ? max : null,
+                    c.type() == WorkoutSessionAdjustment.Type.SETS ? sets : null,
+                    c.type() == WorkoutSessionAdjustment.Type.DURATION ? duration : null,
+                    c.type() == WorkoutSessionAdjustment.Type.ORDER ? sequence : null,
+                    c.type() == WorkoutSessionAdjustment.Type.NOTE ? note : null);
+        } catch (WorkoutPlanFailure failure) { throw failure; }
+        catch (Exception invalid) { throw failure(WorkoutPlanError.VALIDATION_FAILED); }
+    }
+
+    private static Integer integer(tools.jackson.databind.JsonNode n, String field) {
+        return n.has(field) && n.get(field).isIntegralNumber() ? n.get(field).intValue() : null;
+    }
+    private static Short shortValue(tools.jackson.databind.JsonNode n, String field) {
+        Integer value = integer(n, field);
+        if (value != null && (value < 0 || value > Short.MAX_VALUE)) invalidAdjustment();
+        return value == null ? null : value.shortValue();
+    }
+    private static java.math.BigDecimal decimal(tools.jackson.databind.JsonNode n, String field) {
+        return n.has(field) && n.get(field).isNumber() ? n.get(field).decimalValue() : null;
+    }
+
+    private static void invalidAdjustment() {
+        throw failure(WorkoutPlanError.VALIDATION_FAILED);
     }
 
     private CurrentCoachingContextQuery.CurrentCoachingContext requireContext(UUID student) {
