@@ -52,12 +52,15 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
                     INSERT INTO fitness.workout_session_logs
                     (id,student_id,planned_workout_id,workout_plan_version_id,workout_plan_session_id,
                      coaching_period_id,performed_start_at,status,logged_by,version,frozen_occurrence_version,
-                     snapshot_frozen_at,snapshot_mode,notes,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,'IN_PROGRESS',?,0,?,?,'FROZEN',?,?,?)
+                     snapshot_frozen_at,snapshot_mode,notes,created_at,updated_at,source_workout_plan_id,
+                     frozen_planned_start_at,frozen_planned_end_at,frozen_original_planned_start_at,
+                     frozen_supervision_requirement,snapshot_contract_version)
+                    VALUES (?,?,?,?,?,?,?,'IN_PROGRESS',?,0,?,?,'FROZEN',?,?,?,?,?,?,?,?::fitness.supervision_requirement,1)
                     """,executionId,snapshot.studentId(),snapshot.occurrenceId(),snapshot.planVersionId(),
                     snapshot.planSessionId(),snapshot.coachingPeriodId(),ts(snapshot.frozenAt()),actorId,
                     snapshot.sealedOccurrenceVersion(),ts(snapshot.frozenAt()),snapshot.sessionNote(),
-                    ts(snapshot.frozenAt()),ts(snapshot.frozenAt()));
+                    ts(snapshot.frozenAt()),ts(snapshot.frozenAt()),snapshot.planId(),ts(snapshot.plannedStartAt()),
+                    ts(snapshot.plannedEndAt()),ts(snapshot.originalPlannedStartAt()),snapshot.supervisionRequirement());
         } catch (DataIntegrityViolationException conflict) {
             String detail = Objects.toString(conflict.getMostSpecificCause().getMessage(), "");
             if (detail.contains("uq_workout_execution_one_in_progress_student"))
@@ -94,18 +97,6 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
         return load(id,true).orElseThrow(()->failure(WorkoutExecutionError.WORKOUT_EXECUTION_NOT_FOUND));
     }
     @Override public Optional<WorkoutExecution> find(UUID id) { return load(id,false); }
-    @Override public Optional<WorkoutExecution> findCurrent(UUID studentId) {
-        return jdbc.query("SELECT id FROM fitness.workout_session_logs WHERE student_id=? AND status='IN_PROGRESS'",
-                (rs,n)->rs.getObject(1,UUID.class),studentId).stream().findFirst().flatMap(this::find);
-    }
-    @Override public List<WorkoutExecution> findHistory(UUID studentId,int limit,int offset) {
-        return jdbc.query("""
-                SELECT id FROM fitness.workout_session_logs WHERE student_id=?
-                ORDER BY performed_start_at DESC,id LIMIT ? OFFSET ?
-                """,(rs,n)->rs.getObject(1,UUID.class),studentId,limit,offset).stream()
-                .map(this::find).flatMap(Optional::stream).toList();
-    }
-
     @Override public Optional<SetIdentity> findSet(UUID clientSetId) {
         return jdbc.query("""
                 SELECT el.workout_session_log_id,sl.exercise_log_id,sl.id,sl.client_set_id,sl.baseline_set_number,
@@ -185,7 +176,8 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
         Optional<WorkoutExecution> root=jdbc.query("""
                 SELECT id,student_id,planned_workout_id,workout_plan_version_id,workout_plan_session_id,
                        coaching_period_id,frozen_occurrence_version,snapshot_mode,performed_start_at,performed_end_at,status::text,
-                       overall_rpe,notes,version FROM fitness.workout_session_logs WHERE id=?
+                       overall_rpe,notes,version FROM fitness.workout_session_logs
+                WHERE id=? AND snapshot_mode='FROZEN'
                 """,(rs,n)->new WorkoutExecution(rs.getObject("id",UUID.class),rs.getObject("student_id",UUID.class),
                 rs.getObject("planned_workout_id",UUID.class),rs.getObject("workout_plan_version_id",UUID.class),
                 rs.getObject("workout_plan_session_id",UUID.class),rs.getObject("coaching_period_id",UUID.class),
