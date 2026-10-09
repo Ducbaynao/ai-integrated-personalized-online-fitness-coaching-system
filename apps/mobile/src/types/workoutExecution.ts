@@ -56,6 +56,13 @@ export interface WorkoutExecutionExercisePresentation {
   canonicalExerciseName: string | null;
 }
 
+export interface MeasurementUnitPresentation {
+  id: number;
+  code: string;
+  symbol: string;
+  dimension: string;
+}
+
 export interface WorkoutSetExecution {
   clientSetId: string;
   baselineSetNumber: number | null;
@@ -65,9 +72,11 @@ export interface WorkoutSetExecution {
   repetitions: number | null;
   loadValue: number | null;
   loadUnitId: number | null;
+  loadUnit?: MeasurementUnitPresentation | null;
   durationSeconds: number | null;
   distanceValue: number | null;
   distanceUnitId: number | null;
+  distanceUnit?: MeasurementUnitPresentation | null;
   rpe: number | null;
   rir: number | null;
   tempo: string | null;
@@ -90,6 +99,7 @@ export interface WorkoutExerciseExecution {
   targetRepsMax: number | null;
   targetLoad: number | null;
   loadUnitId: number | null;
+  loadUnit?: MeasurementUnitPresentation | null;
   targetRpe: number | null;
   targetRir: number | null;
   restSeconds: number | null;
@@ -97,6 +107,7 @@ export interface WorkoutExerciseExecution {
   durationSeconds: number | null;
   distanceValue: number | null;
   distanceUnitId: number | null;
+  distanceUnit?: MeasurementUnitPresentation | null;
   instructions: string | null;
   note: string | null;
   sets: WorkoutSetExecution[];
