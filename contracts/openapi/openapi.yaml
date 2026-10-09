@@ -2611,6 +2611,10 @@ components:
         targetRepsMax: { type: [integer, 'null'], minimum: 0 }
         targetLoad: { type: [number, 'null'], minimum: 0 }
         loadUnitId: { type: [integer, 'null'], format: int32 }
+        loadUnit:
+          oneOf:
+            - { $ref: '#/components/schemas/MeasurementUnitPresentation' }
+            - { type: 'null' }
         targetRpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
         targetRir: { type: [number, 'null'], minimum: 0, maximum: 10 }
         restSeconds: { type: [integer, 'null'], minimum: 0 }
@@ -2618,6 +2622,10 @@ components:
         durationSeconds: { type: [integer, 'null'], minimum: 0 }
         distanceValue: { type: [number, 'null'], minimum: 0 }
         distanceUnitId: { type: [integer, 'null'], format: int32 }
+        distanceUnit:
+          oneOf:
+            - { $ref: '#/components/schemas/MeasurementUnitPresentation' }
+            - { type: 'null' }
         instructions: { type: [string, 'null'] }
         note: { type: [string, 'null'] }
         sets: { type: array, items: { $ref: '#/components/schemas/WorkoutSetExecution' } }
@@ -2646,15 +2654,33 @@ components:
         repetitions: { type: [integer, 'null'], minimum: 0 }
         loadValue: { type: [number, 'null'], minimum: 0 }
         loadUnitId: { type: [integer, 'null'], format: int32 }
+        loadUnit:
+          oneOf:
+            - { $ref: '#/components/schemas/MeasurementUnitPresentation' }
+            - { type: 'null' }
         durationSeconds: { type: [integer, 'null'], minimum: 0 }
         distanceValue: { type: [number, 'null'], minimum: 0 }
         distanceUnitId: { type: [integer, 'null'], format: int32 }
+        distanceUnit:
+          oneOf:
+            - { $ref: '#/components/schemas/MeasurementUnitPresentation' }
+            - { type: 'null' }
         rpe: { type: [number, 'null'], minimum: 1, maximum: 10 }
         rir: { type: [number, 'null'], minimum: 0, maximum: 10 }
         tempo: { type: [string, 'null'] }
         restAfterSeconds: { type: [integer, 'null'], minimum: 0 }
         note: { type: [string, 'null'] }
         completedAt: { type: [string, 'null'], format: date-time }
+    MeasurementUnitPresentation:
+      type: object
+      additionalProperties: false
+      required: [id, code, symbol, dimension]
+      description: Current catalog presentation for the retained unit identity; not a point-in-time frozen label.
+      properties:
+        id: { type: integer, format: int32 }
+        code: { type: string }
+        symbol: { type: string }
+        dimension: { type: string }
     StartWorkoutExecutionRequest:
       type: object
       additionalProperties: false

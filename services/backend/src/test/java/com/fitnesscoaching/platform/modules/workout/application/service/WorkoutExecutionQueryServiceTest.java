@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
+import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort.ExecutionRecord;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort.ExerciseRecord;
@@ -10,8 +11,11 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionStatu
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +26,9 @@ class WorkoutExecutionQueryServiceTest {
     private final WorkoutExecutionReadPort store = mock(WorkoutExecutionReadPort.class);
     private final WorkoutExecutionAccessPolicy access = mock(WorkoutExecutionAccessPolicy.class);
     private final ExerciseReferenceQuery exercises = mock(ExerciseReferenceQuery.class);
-    private final WorkoutExecutionQueryService service = new WorkoutExecutionQueryService(store, access, exercises);
+    private final MeasurementUnitReferenceQuery units = mock(MeasurementUnitReferenceQuery.class);
+    private final WorkoutExecutionQueryService service = new WorkoutExecutionQueryService(store, access, exercises,
+            units);
 
     @Test
     void currentHasStableNotFoundSemantics() {
@@ -104,6 +110,57 @@ class WorkoutExecutionQueryServiceTest {
         assertThat(detail.exercises().getFirst().prescribedVariation()).isNull();
         assertThat(detail.exercises().getFirst().actualVariation()).isNull();
         verifyNoInteractions(exercises);
+        verifyNoInteractions(units);
+    }
+
+    @Test
+    void terminalHistoryResolvesExerciseAndSetUnitsByIdentityInOneBatch() {
+        UUID student = UUID.randomUUID();
+        short kilogramId = 41;
+        short poundId = 77;
+        var set = new WorkoutExecutionReadPort.SetRecord(UUID.randomUUID(), 1, 1, "WORKING", "COMPLETED",
+                8, new BigDecimal("100"), poundId, null, null, null, null, null, null, null, null,
+                Instant.parse("2026-01-15T01:00:00Z"));
+        var exercise = new ExerciseRecord(UUID.randomUUID(), UUID.randomUUID(), null, null, null, 1, 3,
+                8, 12, new BigDecimal("50"), kilogramId, null, null, 60, null,
+                null, null, null, null, null, List.of(set));
+        ExecutionRecord row = execution(UUID.randomUUID(), student, List.of(exercise));
+        when(access.historyWindow(student, student)).thenReturn(Optional.of(
+                WorkoutExecutionAccessPolicy.HistoryWindow.unbounded()));
+        when(store.findHistory(student, null, null, 0, 20)).thenReturn(
+                new WorkoutExecutionReadPort.PageRecord(List.of(row), 1));
+        when(units.resolveAll(Set.of(kilogramId, poundId))).thenReturn(Map.of(
+                kilogramId, new MeasurementUnitReferenceQuery.UnitReference(kilogramId, "KG", "kg", "MASS"),
+                poundId, new MeasurementUnitReferenceQuery.UnitReference(poundId, "LB", "lb", "MASS")));
+
+        var projected = service.history(student, student, 0, 20).items().getFirst().exercises().getFirst();
+
+        assertThat(projected.loadUnitId()).isEqualTo(kilogramId);
+        assertThat(projected.loadUnit().code()).isEqualTo("KG");
+        assertThat(projected.loadUnit().symbol()).isEqualTo("kg");
+        assertThat(projected.sets().getFirst().loadUnitId()).isEqualTo(poundId);
+        assertThat(projected.sets().getFirst().loadUnit().code()).isEqualTo("LB");
+        verify(units).resolveAll(Set.of(kilogramId, poundId));
+    }
+
+    @Test
+    void retainedLegacyUnitIdWithoutCatalogEntryKeepsIdAndReturnsNullPresentation() {
+        UUID student = UUID.randomUUID();
+        short unavailableUnitId = 91;
+        var exercise = new ExerciseRecord(UUID.randomUUID(), UUID.randomUUID(), null, null, null, 1, 3,
+                8, 12, new BigDecimal("50"), unavailableUnitId, null, null, 60, null,
+                null, null, null, null, null, List.of());
+        ExecutionRecord row = execution(UUID.randomUUID(), student, List.of(exercise));
+        when(access.historyWindow(student, student)).thenReturn(Optional.of(
+                WorkoutExecutionAccessPolicy.HistoryWindow.unbounded()));
+        when(store.findHistory(student, null, null, 0, 20)).thenReturn(
+                new WorkoutExecutionReadPort.PageRecord(List.of(row), 1));
+        when(units.resolveAll(Set.of(unavailableUnitId))).thenReturn(Map.of());
+
+        var projected = service.history(student, student, 0, 20).items().getFirst().exercises().getFirst();
+
+        assertThat(projected.loadUnitId()).isEqualTo(unavailableUnitId);
+        assertThat(projected.loadUnit()).isNull();
     }
 
     @Test

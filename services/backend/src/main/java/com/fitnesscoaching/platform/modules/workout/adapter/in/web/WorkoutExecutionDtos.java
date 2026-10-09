@@ -91,9 +91,11 @@ final class WorkoutExecutionDtos {
             ExercisePresentation prescribedVariationPresentation, UUID actualVariationId,
             ExercisePresentation actualVariationPresentation, String substitutionReason,
             Integer sequence, Integer baselineSetCount, Integer targetRepsMin, Integer targetRepsMax,
-            BigDecimal targetLoad, Short loadUnitId, BigDecimal targetRpe, BigDecimal targetRir,
+            BigDecimal targetLoad, Short loadUnitId, MeasurementUnitPresentation loadUnit,
+            BigDecimal targetRpe, BigDecimal targetRir,
             Integer restSeconds, String tempo, Integer durationSeconds, BigDecimal distanceValue,
-            Short distanceUnitId, String instructions, String note, List<WorkoutSetExecution> sets
+            Short distanceUnitId, MeasurementUnitPresentation distanceUnit, String instructions, String note,
+            List<WorkoutSetExecution> sets
     ) {}
 
     record ExercisePresentation(
@@ -101,10 +103,13 @@ final class WorkoutExecutionDtos {
             UUID canonicalExerciseId, String canonicalExerciseName
     ) {}
 
+    record MeasurementUnitPresentation(short id, String code, String symbol, String dimension) {}
+
     record WorkoutSetExecution(
             UUID clientSetId, Integer baselineSetNumber, int setNumber, String setType,
             String completionStatus, Integer repetitions, BigDecimal loadValue, Short loadUnitId,
-            Integer durationSeconds, BigDecimal distanceValue, Short distanceUnitId,
+            MeasurementUnitPresentation loadUnit, Integer durationSeconds, BigDecimal distanceValue,
+            Short distanceUnitId, MeasurementUnitPresentation distanceUnit,
             BigDecimal rpe, BigDecimal rir, String tempo, Integer restAfterSeconds, String note,
             Instant completedAt
     ) {}

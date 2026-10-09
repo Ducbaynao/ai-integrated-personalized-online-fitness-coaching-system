@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.workout;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutSchedulingUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionSnapshotUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.service.WorkoutExecutionCommandService;
+import com.fitnesscoaching.platform.modules.workout.application.service.WorkoutExecutionQueryService;
 import com.fitnesscoaching.platform.modules.workout.application.service.WorkoutPlanCommandService;
 import org.junit.jupiter.api.Test;
 
@@ -30,5 +31,14 @@ class WorkoutModuleBoundaryTest {
                 .map(field -> field.getType().getName()))
                 .noneMatch(name -> name.endsWith("WorkoutPlanPersistencePort")
                         || name.contains("coaching.adapter") || name.endsWith("Repository"));
+    }
+
+    @Test void b05UnitPresentationUsesMeasurementApplicationBoundary() {
+        assertThat(Arrays.stream(WorkoutExecutionQueryService.class.getDeclaredFields())
+                .map(field -> field.getType().getName()))
+                .noneMatch(name -> name.contains(".adapter.") || name.endsWith("Repository"));
+        assertThat(Arrays.stream(WorkoutExecutionQueryService.class.getDeclaredFields())
+                .map(field -> field.getType().getName()))
+                .anyMatch(name -> name.endsWith("MeasurementUnitReferenceQuery"));
     }
 }
