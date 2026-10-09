@@ -46,6 +46,11 @@ Workout Plan của Student dùng stack authenticated và yêu cầu Student Prof
 - `/(app)/workout-plans/[planId]`: ST-06 metadata, owner/read context, current version content, activation và lifecycle theo authority.
 - `/(app)/workout-plans/[planId]/history`: version list/detail bất biến và explicit Student successor từ Trainer-authored locked version.
 - `/(app)/workout-plans/[planId]/edit`: complete replacement DRAFT snapshot hoặc significant version publication; không dùng cho occurrence-scoped minor adjustment.
+- `/(app)/workouts/current`: ST-07, đọc authoritative execution đang `IN_PROGRESS`; ghi từng set, thay Exercise Variation cho actual execution và gửi lệnh complete/abort bằng version backend mới nhất.
+- `/(app)/workouts/history`: ST-08 history phân trang của Student; tách planned time và performed time.
+- `/(app)/workouts/[executionId]`: chi tiết execution visible; terminal record chỉ đọc, legacy record đánh dấu dữ liệu nguồn có thể thiếu.
+
+START/SKIP Planned Workout chỉ được nối vào Mobile khi read contract/calendar cung cấp đồng thời `occurrenceId` và `occurrenceVersion`; route plan/version/session không được dùng thay occurrence identity.
 
 Workout Plan query keys được scope theo Student identity và bị xóa cùng toàn bộ React Query cache khi logout/forced logout. Published history, archived Exercise và unavailable Exercise luôn read-only; canonical metadata chỉ để tham khảo, không remap historical reference.
 

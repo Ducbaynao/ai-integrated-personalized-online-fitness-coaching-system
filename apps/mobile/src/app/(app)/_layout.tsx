@@ -46,6 +46,9 @@ export default function AppLayout() {
       <Stack.Screen name="coaching/[relationshipId]/workout-plans/new" />
       <Stack.Screen name="students/[studentId]/workout-plans/[planId]/index" />
       <Stack.Screen name="students/[studentId]/workout-plans/[planId]/builder" />
+      <Stack.Screen name="workouts/current" />
+      <Stack.Screen name="workouts/history" />
+      <Stack.Screen name="workouts/[executionId]" />
     </Stack>
   );
 }

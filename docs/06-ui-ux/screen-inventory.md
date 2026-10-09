@@ -21,8 +21,8 @@
 | ST-04 | Goal History | Version, transition, previous goals |
 | ST-05 | Plan and Calendar | Route `/(app)/workout-plans`; authoritative current plan, draft/paused/history collection entry; Planned Workout calendar remains B06 |
 | ST-06 | Workout Plan Detail | Routes `/(app)/workout-plans/[planId]`, `/history`, `/edit`; owner/read context, sessions/prescriptions, immutable versions, SELF_DIRECTED authoring and explicit Trainer-delivered successor |
-| ST-07 | Workout Execution | Set, rep, weight, RPE, notes, performed date |
-| ST-08 | Workout Result | Actual vs planned, completion, reschedule context |
+| ST-07 | Workout Execution | Route `/(app)/workouts/current`; authoritative in-progress execution, set log, substitution, RPE/note và complete/abort. START/SKIP chờ Planned Workout read entry cung cấp occurrence identity/version. |
+| ST-08 | Workout Result | Routes `/(app)/workouts/history`, `/(app)/workouts/[executionId]`; planned/performed time, backend-derived terminal status và legacy missing-source state. |
 | ST-09 | Progress Dashboard | Current Goal/Lifetime, trend, continuity |
 | ST-10 | Measurements | Add/history/source/quality |
 | ST-11 | Progress Photos | Consent, visibility, comparison |
