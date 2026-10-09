@@ -38,8 +38,9 @@ public final class WorkoutExecutionViews {
             UUID actualVariationId, ExercisePresentation prescribedVariation,
             ExercisePresentation actualVariation, String substitutionReason, Integer sequenceNumber,
             Integer baselineSetCount, Integer targetRepsMin, Integer targetRepsMax, BigDecimal targetLoad,
-            Short loadUnitId, BigDecimal targetRpe, BigDecimal targetRir, Integer restSeconds, String tempo,
-            Integer durationSeconds, BigDecimal distanceValue, Short distanceUnitId, String instructions,
+            Short loadUnitId, UnitPresentation loadUnit, BigDecimal targetRpe, BigDecimal targetRir,
+            Integer restSeconds, String tempo, Integer durationSeconds, BigDecimal distanceValue,
+            Short distanceUnitId, UnitPresentation distanceUnit, String instructions,
             String note, List<SetView> sets
     ) {
         public Exercise {
@@ -52,10 +53,13 @@ public final class WorkoutExecutionViews {
             UUID canonicalExerciseId, String canonicalExerciseName
     ) {}
 
+    public record UnitPresentation(short id, String code, String symbol, String dimension) {}
+
     public record SetView(
             UUID clientSetId, Integer baselineSetNumber, int setNumber, String setType,
             String completionStatus, Integer repetitions, BigDecimal loadValue, Short loadUnitId,
-            Integer durationSeconds, BigDecimal distanceValue, Short distanceUnitId,
+            UnitPresentation loadUnit, Integer durationSeconds, BigDecimal distanceValue, Short distanceUnitId,
+            UnitPresentation distanceUnit,
             BigDecimal rpe, BigDecimal rir, String tempo, Integer restAfterSeconds, String note,
             Instant completedAt
     ) {}

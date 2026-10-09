@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase.*;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionQueryUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort;
 import com.fitnesscoaching.platform.modules.workout.domain.SetExecution;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionStatus;
@@ -18,6 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +46,7 @@ class WorkoutExecutionPersistenceIntegrationTest {
 
     @Autowired WorkoutExecutionCommandUseCase commands;
     @Autowired WorkoutExecutionReadPort reads;
+    @Autowired WorkoutExecutionQueryUseCase queries;
     @Autowired JdbcTemplate jdbc;
 
     @Test
@@ -149,7 +152,47 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 Integer.class, rejected.occurrenceId())).isZero();
     }
 
+    @Test
+    void terminalHistoryPresentsCurrentCatalogLabelsForRetainedExerciseAndSetUnitIds() {
+        short kilograms = unit("KG", "kg", "MASS");
+        short pounds = unit("LB", "lb", "MASS");
+        short metres = unit("M", "m", "LENGTH");
+        Fixture f = fixture(kilograms, metres);
+
+        var started = commands.start(new StartCommand(f.occurrenceId(), f.studentId(), 0,
+                "unit-start-" + f.occurrenceId()));
+        UUID clientSetId = UUID.randomUUID();
+        var set = new SetExecution(null, clientSetId, 1, 1, "WORKING", "COMPLETED", 8,
+                new BigDecimal("175"), pounds, 30, new BigDecimal("10"), metres,
+                null, null, null, null, null);
+        commands.upsertSet(new UpsertSetCommand(started.id(), started.exercises().getFirst().id(),
+                f.studentId(), 0, set));
+        commands.complete(new TerminalCommand(started.id(), f.studentId(), 1,
+                "unit-complete-" + started.id(), null, null));
+
+        jdbc.update("UPDATE fitness.measurement_units SET symbol='kg-current' WHERE id=?", kilograms);
+        var detail = queries.history(f.studentId(), f.studentId(), 0, 20).items().stream()
+                .filter(item -> item.executionId().equals(started.id())).findFirst().orElseThrow();
+        var exercise = detail.exercises().getFirst();
+
+        assertThat(detail.status()).isEqualTo(WorkoutExecutionStatus.COMPLETED);
+        assertThat(exercise.loadUnitId()).isEqualTo(kilograms);
+        assertThat(exercise.loadUnit().id()).isEqualTo(kilograms);
+        assertThat(exercise.loadUnit().code()).isEqualTo("KG");
+        assertThat(exercise.loadUnit().symbol()).isEqualTo("kg-current");
+        assertThat(exercise.distanceUnit().id()).isEqualTo(metres);
+        assertThat(exercise.distanceUnit().symbol()).isEqualTo("m");
+        assertThat(exercise.sets().getFirst().loadUnitId()).isEqualTo(pounds);
+        assertThat(exercise.sets().getFirst().loadUnit().code()).isEqualTo("LB");
+        assertThat(exercise.sets().getFirst().loadUnit().symbol()).isEqualTo("lb");
+        assertThat(exercise.sets().getFirst().distanceUnit().id()).isEqualTo(metres);
+    }
+
     private Fixture fixture() {
+        return fixture(null, null);
+    }
+
+    private Fixture fixture(Short loadUnitId, Short distanceUnitId) {
         UUID student = person();
         UUID period = UUID.randomUUID();
         jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',clock_timestamp()-interval '1 day',?)",
@@ -170,9 +213,11 @@ class WorkoutExecutionPersistenceIntegrationTest {
         UUID variation = variation(student);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_session_exercises
-                (id,workout_plan_session_id,exercise_variation_id,sequence_number,target_sets,target_reps_min,target_reps_max)
-                VALUES (?,?,?,1,1,8,12)
-                """, UUID.randomUUID(), session, variation);
+                (id,workout_plan_session_id,exercise_variation_id,sequence_number,target_sets,target_reps_min,
+                 target_reps_max,target_load,load_unit_id,distance_value,distance_unit_id)
+                VALUES (?,?,?,1,1,8,12,?,?,?,?)
+                """, UUID.randomUUID(), session, variation, loadUnitId == null ? null : new BigDecimal("80"),
+                loadUnitId, distanceUnitId == null ? null : new BigDecimal("100"), distanceUnitId);
         jdbc.update("""
                 UPDATE fitness.workout_plan_versions
                 SET effective_from=clock_timestamp()-interval '1 day',locked_at=clock_timestamp(),
@@ -206,6 +251,16 @@ class WorkoutExecutionPersistenceIntegrationTest {
         jdbc.update("INSERT INTO fitness.exercise_variations(id,exercise_id,code,name,is_active) VALUES (?,?,?,?,true)",
                 variation, exercise, "variation-" + variation, "Biến thể");
         return variation;
+    }
+
+    private short unit(String code, String symbol, String dimension) {
+        return jdbc.queryForObject("""
+                INSERT INTO fitness.measurement_units(code,symbol,dimension,base_unit_code,multiplier_to_base,
+                    offset_to_base)
+                VALUES (?,?,?,?,1,0)
+                ON CONFLICT (code) DO UPDATE SET symbol=EXCLUDED.symbol,dimension=EXCLUDED.dimension
+                RETURNING id
+                """, Short.class, code, symbol, dimension, code);
     }
 
     private record Fixture(UUID studentId, UUID occurrenceId, UUID planId, UUID planVersionId,

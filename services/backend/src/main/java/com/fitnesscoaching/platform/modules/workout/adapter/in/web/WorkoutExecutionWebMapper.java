@@ -29,9 +29,10 @@ class WorkoutExecutionWebMapper {
                 source.prescribedVariationId(), presentation(source.prescribedVariation()),
                 source.actualVariationId(), presentation(source.actualVariation()), source.substitutionReason(),
                 source.sequenceNumber(), source.baselineSetCount(), source.targetRepsMin(), source.targetRepsMax(),
-                source.targetLoad(), source.loadUnitId(), source.targetRpe(), source.targetRir(), source.restSeconds(),
-                source.tempo(), source.durationSeconds(), source.distanceValue(), source.distanceUnitId(),
-                source.instructions(), source.note(), source.sets().stream().map(this::set).toList());
+                source.targetLoad(), source.loadUnitId(), unit(source.loadUnit()), source.targetRpe(),
+                source.targetRir(), source.restSeconds(), source.tempo(), source.durationSeconds(),
+                source.distanceValue(), source.distanceUnitId(), unit(source.distanceUnit()), source.instructions(),
+                source.note(), source.sets().stream().map(this::set).toList());
     }
 
     private ExercisePresentation presentation(WorkoutExecutionViews.ExercisePresentation source) {
@@ -40,11 +41,17 @@ class WorkoutExecutionWebMapper {
                 source.canonicalExerciseName());
     }
 
+    private MeasurementUnitPresentation unit(WorkoutExecutionViews.UnitPresentation source) {
+        return source == null ? null : new MeasurementUnitPresentation(source.id(), source.code(), source.symbol(),
+                source.dimension());
+    }
+
     private WorkoutSetExecution set(WorkoutExecutionViews.SetView source) {
         return new WorkoutSetExecution(source.clientSetId(), source.baselineSetNumber(), source.setNumber(),
                 source.setType(), source.completionStatus(), source.repetitions(), source.loadValue(),
-                source.loadUnitId(), source.durationSeconds(), source.distanceValue(), source.distanceUnitId(),
-                source.rpe(), source.rir(), source.tempo(), source.restAfterSeconds(), source.note(),
+                source.loadUnitId(), unit(source.loadUnit()), source.durationSeconds(), source.distanceValue(),
+                source.distanceUnitId(), unit(source.distanceUnit()), source.rpe(), source.rir(), source.tempo(),
+                source.restAfterSeconds(), source.note(),
                 source.completedAt());
     }
 }

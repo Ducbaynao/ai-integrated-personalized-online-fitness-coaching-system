@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
@@ -199,10 +201,10 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
                 rs.getObject("actual_exercise_variation_id",UUID.class),rs.getString("substitution_reason"),
                 rs.getInt("frozen_sequence_number"),rs.getInt("baseline_set_count"),
                 (Integer)rs.getObject("target_reps_min"),(Integer)rs.getObject("target_reps_max"),
-                rs.getBigDecimal("target_load"),(Short)rs.getObject("target_load_unit_id"),rs.getBigDecimal("target_rpe"),
+                rs.getBigDecimal("target_load"),shortValue(rs,"target_load_unit_id"),rs.getBigDecimal("target_rpe"),
                 rs.getBigDecimal("target_rir"),(Integer)rs.getObject("target_rest_seconds"),rs.getString("target_tempo"),
                 (Integer)rs.getObject("target_duration_seconds"),rs.getBigDecimal("target_distance_value"),
-                (Short)rs.getObject("target_distance_unit_id"),rs.getString("frozen_instructions"),
+                shortValue(rs,"target_distance_unit_id"),rs.getString("frozen_instructions"),
                 rs.getString("frozen_prescription_note"),sets(rs.getObject("id",UUID.class),lockChildren)),id);
         WorkoutExecution r=root.get();
         return Optional.of(new WorkoutExecution(r.id(),r.studentId(),r.plannedWorkoutId(),r.planVersionId(),
@@ -217,11 +219,11 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
                        rpe,rir,tempo,rest_after_seconds,notes FROM fitness.set_logs WHERE exercise_log_id=?
                 ORDER BY set_number,id"""+(lock?" FOR UPDATE":""),(rs,n)->mapSet(rs),exerciseId);
     }
-    private static SetExecution mapSet(java.sql.ResultSet rs)throws java.sql.SQLException{return new SetExecution(
+    private static SetExecution mapSet(ResultSet rs)throws SQLException{return new SetExecution(
             rs.getObject("id",UUID.class),rs.getObject("client_set_id",UUID.class),(Integer)rs.getObject("baseline_set_number"),
             rs.getInt("set_number"),rs.getString("set_type"),rs.getString("completion_status"),
-            (Integer)rs.getObject("repetitions"),rs.getBigDecimal("load_value"),(Short)rs.getObject("load_unit_id"),
-            (Integer)rs.getObject("duration_seconds"),rs.getBigDecimal("distance_value"),(Short)rs.getObject("distance_unit_id"),
+            (Integer)rs.getObject("repetitions"),rs.getBigDecimal("load_value"),shortValue(rs,"load_unit_id"),
+            (Integer)rs.getObject("duration_seconds"),rs.getBigDecimal("distance_value"),shortValue(rs,"distance_unit_id"),
             rs.getBigDecimal("rpe"),rs.getBigDecimal("rir"),rs.getString("tempo"),(Integer)rs.getObject("rest_after_seconds"),
             rs.getString("notes"));}
     private void verifyExercise(UUID executionId,UUID exerciseId,Integer baseline){
@@ -239,5 +241,9 @@ public class JdbcWorkoutExecutionPersistenceAdapter implements WorkoutExecutionP
                 (workout_execution_id,from_status,to_status,changed_by,reason,execution_version,changed_at)
                 VALUES (?,?::fitness.actual_workout_status,?::fitness.actual_workout_status,?,?,?,?)""",
                 id,from==null?null:from.name(),to.name(),actor,reason,version,ts(at));}
+    private static Short shortValue(ResultSet rs,String column)throws SQLException{
+        Number value=(Number)rs.getObject(column);
+        return value==null?null:value.shortValue();
+    }
     private static WorkoutExecutionFailure failure(WorkoutExecutionError error){return new WorkoutExecutionFailure(error,error.name());}
 }

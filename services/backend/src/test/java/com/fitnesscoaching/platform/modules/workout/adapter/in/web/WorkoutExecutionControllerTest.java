@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -209,6 +210,34 @@ class WorkoutExecutionControllerTest {
                 .andExpect(jsonPath("$.execution.planId").doesNotExist())
                 .andExpect(jsonPath("$.execution.snapshotFrozenAt").doesNotExist())
                 .andExpect(jsonPath("$.exercises").isArray());
+    }
+
+    @Test
+    void detailSerializesExerciseAndSetUnitPresentationsWithoutReplacingIds() throws Exception {
+        UUID actor = UUID.randomUUID(), execution = UUID.randomUUID();
+        var kilograms = new WorkoutExecutionViews.UnitPresentation((short) 41, "KG", "kg", "MASS");
+        var pounds = new WorkoutExecutionViews.UnitPresentation((short) 77, "LB", "lb", "MASS");
+        var set = new WorkoutExecutionViews.SetView(UUID.randomUUID(), 1, 1, "WORKING", "COMPLETED",
+                8, new BigDecimal("100"), (short) 77, pounds, null, null, null, null,
+                null, null, null, null, null, null);
+        var exercise = new WorkoutExecutionViews.Exercise(UUID.randomUUID(), UUID.randomUUID(), null, null,
+                null, null, null, 1, 3, 8, 12, new BigDecimal("50"), (short) 41, kilograms,
+                null, null, 60, null, null, null, null, null, null, null, List.of(set));
+        var response = new WorkoutExecutionViews.Detail(execution, actor, UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(), null, "FROZEN", Instant.EPOCH,
+                Instant.EPOCH.plusSeconds(3600), WorkoutExecutionStatus.COMPLETED, null, null, 2,
+                Instant.EPOCH, 1L, Instant.EPOCH, Instant.EPOCH, null, "SELF_ALLOWED", List.of(exercise));
+        when(queries.detail(actor, execution)).thenReturn(response);
+
+        mvc.perform(get("/api/v1/workout-executions/{id}", execution)
+                        .with(jwt().jwt(j -> j.subject(actor.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exercises[0].loadUnitId").value(41))
+                .andExpect(jsonPath("$.exercises[0].loadUnit.code").value("KG"))
+                .andExpect(jsonPath("$.exercises[0].loadUnit.symbol").value("kg"))
+                .andExpect(jsonPath("$.exercises[0].loadUnit.dimension").value("MASS"))
+                .andExpect(jsonPath("$.exercises[0].sets[0].loadUnitId").value(77))
+                .andExpect(jsonPath("$.exercises[0].sets[0].loadUnit.code").value("LB"));
     }
 
     @Test

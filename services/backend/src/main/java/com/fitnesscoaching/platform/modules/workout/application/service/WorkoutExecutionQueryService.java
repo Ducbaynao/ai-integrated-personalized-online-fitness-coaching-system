@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionQueryUseCase;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
+import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutExecutionViews.*;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionReadPort.ExecutionRecord;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -18,12 +22,14 @@ public class WorkoutExecutionQueryService implements WorkoutExecutionQueryUseCas
     private final WorkoutExecutionReadPort store;
     private final WorkoutExecutionAccessPolicy access;
     private final ExerciseReferenceQuery exercises;
+    private final MeasurementUnitReferenceQuery units;
 
     public WorkoutExecutionQueryService(WorkoutExecutionReadPort store, WorkoutExecutionAccessPolicy access,
-                                        ExerciseReferenceQuery exercises) {
+                                        ExerciseReferenceQuery exercises, MeasurementUnitReferenceQuery units) {
         this.store = store;
         this.access = access;
         this.exercises = exercises;
+        this.units = units;
     }
 
     @Override
@@ -48,10 +54,17 @@ public class WorkoutExecutionQueryService implements WorkoutExecutionQueryUseCas
         if (window.isEmpty()) return Page.empty(page, size);
         var raw = store.findHistory(studentId, window.get().from(), window.get().until(), page, size);
         int pages = raw.totalItems() == 0 ? 0 : (int) ((raw.totalItems() + size - 1) / size);
-        return new Page(raw.items().stream().map(this::project).toList(), page, size, raw.totalItems(), pages);
+        Map<Short, MeasurementUnitReferenceQuery.UnitReference> unitReferences = resolveUnits(raw.items());
+        return new Page(raw.items().stream().map(value -> project(value, unitReferences)).toList(),
+                page, size, raw.totalItems(), pages);
     }
 
     private Detail project(ExecutionRecord value) {
+        return project(value, resolveUnits(java.util.List.of(value)));
+    }
+
+    private Detail project(ExecutionRecord value,
+                           Map<Short, MeasurementUnitReferenceQuery.UnitReference> unitReferences) {
         return new Detail(value.executionId(), value.studentId(), value.plannedWorkoutId(), value.planId(),
                 value.planVersionId(), value.planSessionId(), value.coachingPeriodId(), value.snapshotMode(),
                 value.performedStartedAt(), value.performedEndedAt(), value.status(), value.overallRpe(),
@@ -62,13 +75,41 @@ public class WorkoutExecutionQueryService implements WorkoutExecutionQueryUseCas
                 raw.actualVariationId(), presentation(raw.prescribedVariationId()),
                 presentation(raw.actualVariationId()), raw.substitutionReason(), raw.sequenceNumber(),
                 raw.baselineSetCount(), raw.targetRepsMin(), raw.targetRepsMax(), raw.targetLoad(), raw.loadUnitId(),
-                raw.targetRpe(), raw.targetRir(), raw.restSeconds(), raw.tempo(), raw.durationSeconds(),
-                raw.distanceValue(), raw.distanceUnitId(), raw.instructions(), raw.note(), raw.sets().stream()
+                unit(raw.loadUnitId(), unitReferences), raw.targetRpe(), raw.targetRir(), raw.restSeconds(),
+                raw.tempo(), raw.durationSeconds(), raw.distanceValue(), raw.distanceUnitId(),
+                unit(raw.distanceUnitId(), unitReferences), raw.instructions(), raw.note(), raw.sets().stream()
                 .map(set -> new SetView(set.clientSetId(), set.baselineSetNumber(), set.setNumber(), set.setType(),
                         set.completionStatus(), set.repetitions(), set.loadValue(), set.loadUnitId(),
-                        set.durationSeconds(), set.distanceValue(), set.distanceUnitId(), set.rpe(), set.rir(),
+                        unit(set.loadUnitId(), unitReferences), set.durationSeconds(), set.distanceValue(),
+                        set.distanceUnitId(), unit(set.distanceUnitId(), unitReferences), set.rpe(), set.rir(),
                         set.tempo(), set.restAfterSeconds(), set.note(), set.completedAt()))
                 .toList())).toList());
+    }
+
+    private Map<Short, MeasurementUnitReferenceQuery.UnitReference> resolveUnits(
+            java.util.List<ExecutionRecord> executions) {
+        Set<Short> ids = new LinkedHashSet<>();
+        executions.forEach(execution -> execution.exercises().forEach(exercise -> {
+            add(ids, exercise.loadUnitId());
+            add(ids, exercise.distanceUnitId());
+            exercise.sets().forEach(set -> {
+                add(ids, set.loadUnitId());
+                add(ids, set.distanceUnitId());
+            });
+        }));
+        return ids.isEmpty() ? Map.of() : units.resolveAll(ids);
+    }
+
+    private static void add(Set<Short> ids, Short id) {
+        if (id != null) ids.add(id);
+    }
+
+    private static UnitPresentation unit(Short id,
+                                         Map<Short, MeasurementUnitReferenceQuery.UnitReference> references) {
+        if (id == null) return null;
+        var reference = references.get(id);
+        return reference == null ? null : new UnitPresentation(reference.id(), reference.code(),
+                reference.symbol(), reference.dimension());
     }
 
     private ExercisePresentation presentation(UUID variationId) {
