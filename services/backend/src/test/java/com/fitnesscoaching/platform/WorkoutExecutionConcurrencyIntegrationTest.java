@@ -298,10 +298,11 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         jdbc.update("UPDATE fitness.workout_plans SET status='ACTIVE',version=version+1 WHERE id=?", plan);
         UUID occurrence = UUID.randomUUID();
         jdbc.update("""
+                WITH boundary AS MATERIALIZED (SELECT clock_timestamp() AS planned_at)
                 INSERT INTO fitness.planned_workouts
                 (id,student_id,workout_plan_session_id,coaching_period_id,planned_start_at,
                  original_planned_start_at,created_by)
-                VALUES (?,?,?,?,clock_timestamp(),clock_timestamp(),?)
+                SELECT ?,?,?,?,planned_at,planned_at,? FROM boundary
                 """, occurrence, student, session, period, student);
         return new Fixture(student, occurrence, prescription);
     }
