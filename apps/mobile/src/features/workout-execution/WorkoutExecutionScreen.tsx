@@ -24,6 +24,7 @@ import { workoutExecutionApi } from '@/services/workoutExecutionApi';
 import { ExerciseSummary } from '@/types/exercise';
 import {
   FinishWorkoutExecutionInput,
+  MeasurementUnitPresentation,
   UpsertWorkoutSetInput,
   WorkoutExecutionDetail,
   WorkoutExerciseExecution,
@@ -77,6 +78,64 @@ function formatDate(value: string | null, timezone?: string): string {
   return new Date(value).toLocaleString('vi-VN', timezone ? { timeZone: timezone } : undefined);
 }
 
+interface ResolvedUnit {
+  id: number | null;
+  presentation: MeasurementUnitPresentation | null;
+  label: string;
+  unavailableMessage: string | null;
+}
+
+function unitLabel(unit: MeasurementUnitPresentation | null): string | null {
+  const symbol = unit?.symbol.trim();
+  if (symbol) return symbol;
+  const code = unit?.code.trim();
+  return code || null;
+}
+
+function matchingUnit(
+  id: number | null,
+  ...presentations: (MeasurementUnitPresentation | null | undefined)[]
+): MeasurementUnitPresentation | null {
+  if (id === null) return null;
+  return presentations.find((unit) => unit?.id === id) ?? null;
+}
+
+function resolveSetUnit(
+  kind: 'tải' | 'quãng đường',
+  setUnitId: number | null,
+  setUnit: MeasurementUnitPresentation | null | undefined,
+  exerciseUnitId: number | null,
+  exerciseUnit: MeasurementUnitPresentation | null | undefined
+): ResolvedUnit {
+  const id = setUnitId ?? exerciseUnitId;
+  const presentation = matchingUnit(id, setUnit, exerciseUnit);
+  const label = unitLabel(presentation);
+  if (label) return { id, presentation, label, unavailableMessage: null };
+  if (id === null) {
+    return {
+      id,
+      presentation,
+      label: 'Chưa có đơn vị',
+      unavailableMessage: `Chưa có đơn vị ${kind} từ kế hoạch. Không thể nhập giá trị này.`,
+    };
+  }
+  return {
+    id,
+    presentation,
+    label: 'Đơn vị không xác định',
+    unavailableMessage: `Không xác định được đơn vị ${kind} từ danh mục. Giá trị hiện có được giữ nguyên; không thể nhập giá trị mới.`,
+  };
+}
+
+function measurementText(
+  value: number,
+  unitId: number | null,
+  unit: MeasurementUnitPresentation | null | undefined
+): string {
+  const label = unitLabel(matchingUnit(unitId, unit));
+  return label ? `${value} ${label}` : `${value} · đơn vị không xác định`;
+}
+
 function targetText(exercise: WorkoutExerciseExecution): string {
   const pieces: string[] = [];
   if (exercise.baselineSetCount !== null) pieces.push(`${exercise.baselineSetCount} hiệp`);
@@ -85,8 +144,19 @@ function targetText(exercise: WorkoutExerciseExecution): string {
       `${exercise.targetRepsMin ?? '—'}–${exercise.targetRepsMax ?? '—'} lần`
     );
   }
-  if (exercise.targetLoad !== null) pieces.push(`mức tải ${exercise.targetLoad}`);
+  if (exercise.targetLoad !== null) {
+    pieces.push(`mức tải ${measurementText(exercise.targetLoad, exercise.loadUnitId, exercise.loadUnit)}`);
+  }
   if (exercise.durationSeconds !== null) pieces.push(`${exercise.durationSeconds} giây`);
+  if (exercise.distanceValue !== null) {
+    pieces.push(
+      `quãng đường ${measurementText(
+        exercise.distanceValue,
+        exercise.distanceUnitId,
+        exercise.distanceUnit
+      )}`
+    );
+  }
   return pieces.length ? pieces.join(' · ') : 'Không có chỉ tiêu định lượng';
 }
 
@@ -105,26 +175,49 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
   const [repetitions, setRepetitions] = useState(set.repetitions?.toString() ?? '');
   const [load, setLoad] = useState(set.loadValue?.toString() ?? '');
   const [duration, setDuration] = useState(set.durationSeconds?.toString() ?? '');
+  const [distance, setDistance] = useState(set.distanceValue?.toString() ?? '');
   const [rpe, setRpe] = useState(set.rpe?.toString() ?? '');
   const [note, setNote] = useState(set.note ?? '');
   const [validation, setValidation] = useState<string | null>(null);
+  const loadUnit = resolveSetUnit(
+    'tải',
+    set.loadUnitId,
+    set.loadUnit,
+    exercise.loadUnitId,
+    exercise.loadUnit
+  );
+  const distanceUnit = resolveSetUnit(
+    'quãng đường',
+    set.distanceUnitId,
+    set.distanceUnit,
+    exercise.distanceUnitId,
+    exercise.distanceUnit
+  );
+  const canEditLoad = loadUnit.presentation !== null;
+  const canEditDistance = distanceUnit.presentation !== null;
+  const showsLoad = loadUnit.id !== null || set.loadValue !== null || exercise.targetLoad !== null;
+  const showsDistance =
+    distanceUnit.id !== null || set.distanceValue !== null || exercise.distanceValue !== null;
 
   const save = () => {
     const parsedRepetitions = optionalNumber(repetitions);
-    const parsedLoad = optionalNumber(load);
+    const parsedLoad = canEditLoad ? optionalNumber(load) : set.loadValue;
     const parsedDuration = optionalNumber(duration);
+    const parsedDistance = canEditDistance ? optionalNumber(distance) : set.distanceValue;
     const parsedRpe = optionalNumber(rpe);
     if (
       parsedRepetitions === undefined ||
       parsedLoad === undefined ||
       parsedDuration === undefined ||
+      parsedDistance === undefined ||
       parsedRpe === undefined ||
       (parsedRepetitions !== null && (!Number.isInteger(parsedRepetitions) || parsedRepetitions < 0)) ||
       (parsedLoad !== null && parsedLoad < 0) ||
       (parsedDuration !== null && (!Number.isInteger(parsedDuration) || parsedDuration < 0)) ||
+      (parsedDistance !== null && parsedDistance < 0) ||
       (parsedRpe !== null && (parsedRpe < 1 || parsedRpe > 10))
     ) {
-      setValidation('Số lần và thời lượng phải là số nguyên không âm; mức tải không âm; RPE từ 1 đến 10.');
+      setValidation('Số lần và thời lượng phải là số nguyên không âm; mức tải và quãng đường không âm; RPE từ 1 đến 10.');
       return;
     }
     setValidation(null);
@@ -136,10 +229,10 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
       completionStatus: status,
       repetitions: parsedRepetitions,
       loadValue: parsedLoad,
-      loadUnitId: set.loadUnitId ?? exercise.loadUnitId,
+      loadUnitId: loadUnit.id,
       durationSeconds: parsedDuration,
-      distanceValue: set.distanceValue,
-      distanceUnitId: set.distanceUnitId ?? exercise.distanceUnitId,
+      distanceValue: parsedDistance,
+      distanceUnitId: distanceUnit.id,
       rpe: parsedRpe,
       rir: set.rir,
       tempo: set.tempo,
@@ -182,8 +275,29 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
       </View>
       <View style={local.fieldGrid}>
         <LabeledInput label="Số lần" value={repetitions} onChangeText={setRepetitions} keyboardType="numeric" />
-        <LabeledInput label="Mức tải" value={load} onChangeText={setLoad} keyboardType="decimal-pad" />
+        {showsLoad ? (
+          <LabeledInput
+            label="Mức tải"
+            value={load}
+            onChangeText={setLoad}
+            keyboardType="decimal-pad"
+            unitLabel={loadUnit.label}
+            disabled={!canEditLoad}
+            helperText={loadUnit.unavailableMessage}
+          />
+        ) : null}
         <LabeledInput label="Thời lượng (giây)" value={duration} onChangeText={setDuration} keyboardType="numeric" />
+        {showsDistance ? (
+          <LabeledInput
+            label="Quãng đường"
+            value={distance}
+            onChangeText={setDistance}
+            keyboardType="decimal-pad"
+            unitLabel={distanceUnit.label}
+            disabled={!canEditDistance}
+            helperText={distanceUnit.unavailableMessage}
+          />
+        ) : null}
         <LabeledInput label="RPE (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
       </View>
       <LabeledInput label="Ghi chú hiệp" value={note} onChangeText={setNote} multiline />
@@ -236,29 +350,69 @@ function LabeledInput({
   onChangeText,
   keyboardType,
   multiline = false,
+  unitLabel: trailingUnit,
+  disabled = false,
+  helperText,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   keyboardType?: 'numeric' | 'decimal-pad';
   multiline?: boolean;
+  unitLabel?: string;
+  disabled?: boolean;
+  helperText?: string | null;
 }) {
   const theme = getSemanticColors(useColorScheme() === 'dark');
+  const accessibilityLabel = trailingUnit ? `${label}, ${trailingUnit}` : label;
+  const input = (
+    <TextInput
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={helperText ?? undefined}
+      accessibilityState={{ disabled }}
+      editable={!disabled}
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType={keyboardType}
+      multiline={multiline}
+      style={[
+        styles.input,
+        trailingUnit ? local.inputWithUnitControl : null,
+        multiline ? local.multiline : null,
+        {
+          color: theme.textPrimary,
+          borderColor: theme.border,
+          backgroundColor: disabled ? theme.surfaceSubtle : theme.surface,
+        },
+      ]}
+    />
+  );
   return (
     <View style={local.field}>
       <Text style={[styles.caption, { color: theme.textSecondary }]}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        style={[
-          styles.input,
-          multiline ? local.multiline : null,
-          { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surface },
-        ]}
-      />
+      {trailingUnit ? (
+        <View
+          style={[
+            local.inputWithUnit,
+            {
+              borderColor: theme.border,
+              backgroundColor: disabled ? theme.surfaceSubtle : theme.surface,
+            },
+          ]}>
+          {input}
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={[styles.caption, local.unitSuffix, { color: theme.textSecondary }]}>
+            {trailingUnit}
+          </Text>
+        </View>
+      ) : input}
+      {helperText ? (
+        <Text accessibilityRole="alert" style={[styles.caption, { color: theme.warningText }]}>
+          {helperText}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -450,9 +604,11 @@ function WorkoutExecutionContent({
           repetitions: null,
           loadValue: null,
           loadUnitId: exercise.loadUnitId,
+          loadUnit: exercise.loadUnit ?? null,
           durationSeconds: null,
           distanceValue: null,
           distanceUnitId: exercise.distanceUnitId,
+          distanceUnit: exercise.distanceUnit ?? null,
           rpe: null,
           rir: null,
           tempo: null,
@@ -689,6 +845,15 @@ const local = StyleSheet.create({
   },
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   field: { minWidth: 132, flexGrow: 1, flexBasis: 132, gap: spacing.xs },
+  inputWithUnit: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputWithUnitControl: { flex: 1, minWidth: 72, borderWidth: 0, backgroundColor: 'transparent' },
+  unitSuffix: { paddingRight: spacing.md },
   multiline: { minHeight: 88, paddingVertical: spacing.md, textAlignVertical: 'top' },
   modalScreen: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg },

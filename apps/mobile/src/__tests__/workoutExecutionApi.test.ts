@@ -41,6 +41,32 @@ describe('workoutExecutionApi', () => {
     expect(request).toHaveBeenNthCalledWith(3, '/workout-executions/execution-1', { method: 'GET' });
   });
 
+  it('keeps nullable unit presentation from execution reads without replacing unit identity', async () => {
+    const response = {
+      execution: { executionId: 'execution-1' },
+      exercises: [
+        {
+          exerciseExecutionId: 'exercise-execution-1',
+          loadUnitId: 41,
+          loadUnit: { id: 41, code: 'KG', symbol: 'kg', dimension: 'MASS' },
+          distanceUnitId: 92,
+          distanceUnit: null,
+          sets: [
+            {
+              clientSetId: 'set-1',
+              loadUnitId: 77,
+              loadUnit: { id: 77, code: 'LB', symbol: 'lb', dimension: 'MASS' },
+            },
+          ],
+        },
+      ],
+    };
+    (request as jest.Mock).mockResolvedValueOnce(response);
+
+    await expect(workoutExecutionApi.current()).resolves.toEqual(response);
+    expect(request).toHaveBeenCalledWith('/workout-executions/current', { method: 'GET' });
+  });
+
   it('serializes set and substitution writes with the supplied authoritative version', async () => {
     await workoutExecutionApi.upsertSet('execution-1', 'set-1', 7, setInput);
     await workoutExecutionApi.substitute('execution-1', 'exercise-execution-1', 8, {

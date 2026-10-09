@@ -76,6 +76,10 @@ const presentation = {
   canonicalExerciseId: null,
   canonicalExerciseName: null,
 };
+const kilograms = { id: 1, code: 'KG', symbol: 'kg', dimension: 'MASS' };
+const pounds = { id: 2, code: 'LB', symbol: 'lb', dimension: 'MASS' };
+const kilometres = { id: 3, code: 'KM', symbol: 'km', dimension: 'LENGTH' };
+const metres = { id: 4, code: 'M', symbol: 'm', dimension: 'LENGTH' };
 const set = {
   clientSetId: '10000000-0000-4000-8000-000000000001',
   baselineSetNumber: 1,
@@ -84,10 +88,12 @@ const set = {
   completionStatus: 'PLANNED' as const,
   repetitions: null,
   loadValue: null,
-  loadUnitId: 1,
+  loadUnitId: 2,
+  loadUnit: pounds,
   durationSeconds: null,
   distanceValue: null,
-  distanceUnitId: null,
+  distanceUnitId: 4,
+  distanceUnit: metres,
   rpe: null,
   rir: null,
   tempo: null,
@@ -133,13 +139,15 @@ const detail = {
       targetRepsMax: 10,
       targetLoad: 60,
       loadUnitId: 1,
+      loadUnit: kilograms,
       targetRpe: null,
       targetRir: null,
       restSeconds: 90,
       tempo: null,
       durationSeconds: null,
-      distanceValue: null,
-      distanceUnitId: null,
+      distanceValue: 5,
+      distanceUnitId: 3,
+      distanceUnit: kilometres,
       instructions: 'Giữ lưng trung lập.',
       note: null,
       sets: [set],
@@ -230,6 +238,10 @@ describe('B05 Workout Execution screens', () => {
   it('logs a set with the latest backend version', async () => {
     (workoutExecutionApi.upsertSet as jest.Mock).mockResolvedValue(detail);
     const tree = render(<CurrentWorkoutExecutionScreen />);
+    renderer.act(() => {
+      tree.root.findByProps({ accessibilityLabel: 'Mức tải, lb' }).props.onChangeText('42.5');
+      tree.root.findByProps({ accessibilityLabel: 'Quãng đường, m' }).props.onChangeText('100');
+    });
     const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` });
     await renderer.act(async () => {
       save.props.onPress();
@@ -239,7 +251,77 @@ describe('B05 Workout Execution screens', () => {
       detail.execution.executionId,
       set.clientSetId,
       7,
-      expect.objectContaining({ exerciseExecutionId: 'exercise-execution-1', setNumber: 1 })
+      expect.objectContaining({
+        exerciseExecutionId: 'exercise-execution-1',
+        setNumber: 1,
+        loadValue: 42.5,
+        loadUnitId: 2,
+        distanceValue: 100,
+        distanceUnitId: 4,
+      })
+    );
+    renderer.act(() => tree.unmount());
+  });
+
+  it('shows exercise targets and set inputs with their distinct backend units', () => {
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const json = JSON.stringify(tree.toJSON());
+
+    expect(json).toContain('mức tải 60 kg');
+    expect(json).toContain('quãng đường 5 km');
+    expect(tree.root.findByProps({ accessibilityLabel: 'Mức tải, lb' }).props.editable).toBe(true);
+    expect(tree.root.findByProps({ accessibilityLabel: 'Quãng đường, m' }).props.editable).toBe(true);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('blocks unknown-unit measurement edits while preserving IDs and existing values', async () => {
+    const unknownSet = {
+      ...set,
+      loadValue: 75,
+      loadUnitId: 91,
+      loadUnit: null,
+      distanceValue: 250,
+      distanceUnitId: 92,
+      distanceUnit: null,
+    };
+    const unknownDetail = {
+      ...detail,
+      exercises: [{ ...detail.exercises[0], sets: [unknownSet] }],
+    };
+    (useCurrentWorkoutExecution as jest.Mock).mockReturnValue({
+      data: unknownDetail,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    (workoutExecutionApi.upsertSet as jest.Mock).mockResolvedValue(unknownDetail);
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+
+    const loadInput = tree.root.findByProps({
+      accessibilityLabel: 'Mức tải, Đơn vị không xác định',
+    });
+    const distanceInput = tree.root.findByProps({
+      accessibilityLabel: 'Quãng đường, Đơn vị không xác định',
+    });
+    expect(loadInput.props.editable).toBe(false);
+    expect(distanceInput.props.editable).toBe(false);
+    expect(JSON.stringify(tree.toJSON())).toContain('Giá trị hiện có được giữ nguyên');
+
+    await renderer.act(async () => {
+      tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(workoutExecutionApi.upsertSet).toHaveBeenCalledWith(
+      detail.execution.executionId,
+      set.clientSetId,
+      7,
+      expect.objectContaining({
+        loadValue: 75,
+        loadUnitId: 91,
+        distanceValue: 250,
+        distanceUnitId: 92,
+      })
     );
     renderer.act(() => tree.unmount());
   });
@@ -355,6 +437,8 @@ describe('B05 Workout Execution screens', () => {
     expect(JSON.stringify(tree.toJSON())).toContain('Hoàn thành một phần');
     expect(JSON.stringify(tree.toJSON())).toContain('Bắt đầu thực tế');
     expect(JSON.stringify(tree.toJSON())).toContain('Thời gian dự kiến');
+    expect(JSON.stringify(tree.toJSON())).toContain('mức tải 60 kg');
+    expect(tree.root.findByProps({ accessibilityLabel: 'Mức tải, lb' })).toBeTruthy();
     expect(tree.root.findAllByProps({ testID: 'complete-workout-button' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
   });
