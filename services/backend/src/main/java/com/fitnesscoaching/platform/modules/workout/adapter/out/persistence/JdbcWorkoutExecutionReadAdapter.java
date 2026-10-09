@@ -78,11 +78,11 @@ public class JdbcWorkoutExecutionReadAdapter implements WorkoutExecutionReadPort
                 rs.getObject("actual_exercise_variation_id", UUID.class), rs.getString("substitution_reason"),
                 (Integer) rs.getObject("frozen_sequence_number"), (Integer) rs.getObject("baseline_set_count"),
                 (Integer) rs.getObject("target_reps_min"), (Integer) rs.getObject("target_reps_max"),
-                rs.getBigDecimal("target_load"), (Short) rs.getObject("target_load_unit_id"),
+                rs.getBigDecimal("target_load"), shortValue(rs, "target_load_unit_id"),
                 rs.getBigDecimal("target_rpe"), rs.getBigDecimal("target_rir"),
                 (Integer) rs.getObject("target_rest_seconds"), rs.getString("target_tempo"),
                 (Integer) rs.getObject("target_duration_seconds"), rs.getBigDecimal("target_distance_value"),
-                (Short) rs.getObject("target_distance_unit_id"), rs.getString("frozen_instructions"),
+                shortValue(rs, "target_distance_unit_id"), rs.getString("frozen_instructions"),
                 rs.getString("frozen_prescription_note"), sets(rs.getObject("id", UUID.class))), executionId);
     }
 
@@ -128,9 +128,9 @@ public class JdbcWorkoutExecutionReadAdapter implements WorkoutExecutionReadPort
         return new SetRecord(rs.getObject("client_set_id", UUID.class),
                 (Integer) rs.getObject("baseline_set_number"), rs.getInt("set_number"), rs.getString("set_type"),
                 rs.getString("completion_status"), (Integer) rs.getObject("repetitions"),
-                rs.getBigDecimal("load_value"), (Short) rs.getObject("load_unit_id"),
+                rs.getBigDecimal("load_value"), shortValue(rs, "load_unit_id"),
                 (Integer) rs.getObject("duration_seconds"), rs.getBigDecimal("distance_value"),
-                (Short) rs.getObject("distance_unit_id"), rs.getBigDecimal("rpe"), rs.getBigDecimal("rir"),
+                shortValue(rs, "distance_unit_id"), rs.getBigDecimal("rpe"), rs.getBigDecimal("rir"),
                 rs.getString("tempo"), (Integer) rs.getObject("rest_after_seconds"), rs.getString("notes"),
                 instant(rs.getTimestamp("completed_at")));
     }
@@ -141,5 +141,10 @@ public class JdbcWorkoutExecutionReadAdapter implements WorkoutExecutionReadPort
 
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
+    }
+
+    private static Short shortValue(ResultSet rs, String column) throws SQLException {
+        Number value = (Number) rs.getObject(column);
+        return value == null ? null : value.shortValue();
     }
 }

@@ -8,6 +8,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -51,10 +53,10 @@ public class JdbcWorkoutExecutionSnapshotAdapter implements WorkoutExecutionSnap
                 rs.getObject("exercise_variation_id", UUID.class), rs.getInt("sequence_number"),
                 (Integer) rs.getObject("target_sets"), (Integer) rs.getObject("target_reps_min"),
                 (Integer) rs.getObject("target_reps_max"), rs.getBigDecimal("target_load"),
-                (Short) rs.getObject("load_unit_id"), rs.getBigDecimal("target_rpe"), rs.getBigDecimal("target_rir"),
+                shortValue(rs, "load_unit_id"), rs.getBigDecimal("target_rpe"), rs.getBigDecimal("target_rir"),
                 (Integer) rs.getObject("rest_seconds"), rs.getString("tempo"),
                 (Integer) rs.getObject("duration_seconds"), rs.getBigDecimal("distance_value"),
-                (Short) rs.getObject("distance_unit_id"), rs.getString("instructions")), sessionId);
+                shortValue(rs, "distance_unit_id"), rs.getString("instructions")), sessionId);
     }
 
     @Override public List<StoredAdjustment> adjustments(UUID occurrenceId) {
@@ -68,7 +70,7 @@ public class JdbcWorkoutExecutionSnapshotAdapter implements WorkoutExecutionSnap
                 WorkoutSessionAdjustment.Type.valueOf(rs.getString("adjustment_type")),
                 rs.getObject("planned_session_exercise_id", UUID.class),
                 rs.getObject("replacement_exercise_variation_id", UUID.class), rs.getString("resolution_state"),
-                rs.getBigDecimal("typed_target_load"), (Short) rs.getObject("typed_load_unit_id"),
+                rs.getBigDecimal("typed_target_load"), shortValue(rs, "typed_load_unit_id"),
                 (Integer) rs.getObject("typed_reps_min"), (Integer) rs.getObject("typed_reps_max"),
                 (Integer) rs.getObject("typed_target_sets"), (Integer) rs.getObject("typed_duration_seconds"),
                 (Integer) rs.getObject("typed_sequence"), rs.getString("typed_note")), occurrenceId);
@@ -110,5 +112,10 @@ public class JdbcWorkoutExecutionSnapshotAdapter implements WorkoutExecutionSnap
 
     private static WorkoutExecutionFailure conflict(WorkoutExecutionError error) {
         return new WorkoutExecutionFailure(error, error.name());
+    }
+
+    private static Short shortValue(ResultSet rs, String column) throws SQLException {
+        Number value = (Number) rs.getObject(column);
+        return value == null ? null : value.shortValue();
     }
 }
