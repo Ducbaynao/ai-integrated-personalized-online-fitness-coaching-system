@@ -154,3 +154,9 @@ The following implementation details remain for the materializer design/persiste
 - whether reschedule retains one occurrence row with append-only history or creates linked replacement occurrence identity, subject to existing B04/B05 invariants.
 
 These details must implement the approved decisions above. They are not permission to add automatic materialization, Trainer confirmation, partial proposal acceptance, implicit remapping, or coupled Appointment/Workout lifecycle behavior.
+
+## 12. Student direct-batch implementation checkpoint
+
+The `B06-STUDENT-BATCH-MATERIALIZER` implementation checkpoint adds only Student direct confirmation at `POST /planned-workout-batches`. V31 stores confirmed batches/items, local-time intent, source identity, actor-scoped receipts, and nullable batch links on occurrences. New batch rows have database-backed duplicate and `SCHEDULED` known-range exclusion; existing rows are not rewritten or enrolled in those constraints. The Workout transaction holds the Student lock while it checks legacy source duplicates, known-range overlap, and the approved unknown-end guard. Migration reports legacy anomalies without inferring or changing their end times. Local wall-time text retains the input's nanosecond value; authoritative planned instants use PostgreSQL microsecond precision.
+
+This checkpoint does not implement Trainer proposals/acceptance, Student or Trainer calendar reads, reschedule/cancel, `COACH_REQUIRED` scheduling, automatic materialization, or Mobile START/SKIP entry. Those declared contracts remain implementation work.
