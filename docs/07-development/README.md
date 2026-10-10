@@ -8,6 +8,7 @@ This section explains how to run, understand, plan, change, and verify the monor
 - [Phase 2 implementation plan — APPROVED](phase-2-implementation-plan.md)
 - [Testing guide](testing-guide.md)
 - [B03 Coaching Relationship and Coaching Period decisions](features/03-coaching.md)
+- [B06 Planned Workout occurrence decisions — APPROVED](features/06-schedule.md)
 
 Before changing code, read the repository `AGENTS.md` and any component-specific instructions. A feature change is incomplete when it changes a business rule but leaves the corresponding documentation, contract, migration, or test outdated.
 
