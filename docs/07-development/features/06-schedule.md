@@ -182,3 +182,13 @@ This checkpoint does not implement Trainer proposals/acceptance, Student or Trai
 ## 15. Trainer calendar read implementation checkpoint
 
 `B06-TRAINER-CALENDAR-READ` implements the declared Trainer `GET /students/{studentId}/planned-workouts` using the Student calendar's Workout-owned projection, window validation, ordering, and pagination. Every request evaluates current `WORKOUT_PLAN VIEW` authority through the Coaching port and conceals denied Student schedules. The Trainer response has an empty `availableActions` list: schedule visibility does not confer Student START/SKIP or Workout Execution access. This is implementation scope, not evidence of independent review or CI success; Appointment mutation, reschedule/cancel, Mobile proposal UI, and automatic materialization remain deferred.
+
+## 16. Proposal read and presentation decisions approved 2026-10-11
+
+Person B approved these additional product decisions. They do not change the proposal mutation, Student decision, or former-Trainer authority rules above:
+
+1. In the TR-03 Student workspace, a Trainer lists only proposals they created for that Student. The list requires a current effective Coaching Period and current `WORKOUT_PLAN VIEW` or higher; the authorization check precedes count and pagination. It does not expose proposals from another Trainer.
+2. The Trainer list includes `PENDING` and terminal proposals with an optional status filter. `VIEW` suffices for reading; withdrawal of a `PENDING` proposal still requires `CONTRIBUTE` and all existing command guards.
+3. The Student sees the proposing Trainer's **current** User display name when available. This nullable read-time presentation is not a name frozen at proposal creation and is not audit evidence. The Student keeps their own proposal read access after the Coaching Period ends; ACCEPT still rechecks current authority and may fail, while REJECT remains available under the existing lifecycle.
+
+The `B06-PROPOSAL-READ-PRESENTATION` runtime checkpoint adds a Trainer-scoped read endpoint and nullable presentation fields to the shared proposal response. Workout supplies the plan/session names and optional session focus from the exact referenced source version through a Workout-owned query port; User supplies current Trainer display name through a User-owned query port. Schedule does not read either module's persistence directly. Original IDs, proposal versions, and stored command receipts remain authoritative; presentation is resolved for each authorized HTTP response, including command replay. This section records implementation scope, not independent review or CI success. Mobile Trainer proposal creation/list/withdraw remains a separate checkpoint.

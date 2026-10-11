@@ -80,12 +80,21 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
     @Override @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Page listMine(UUID studentId, String status, int page, int size) {
         requireStudent(studentId);
-        if (page < 0 || size < 1 || size > 100 || (status != null && !List.of(
-                "PENDING", "ACCEPTED", "REJECTED", "WITHDRAWN").contains(status)))
-            throw fail("WORKOUT_SCHEDULE_VALIDATION_FAILED", 400);
+        validateList(status, page, size);
         long count = store.countStudent(studentId, status);
         return new Page(store.listStudent(studentId, status, size, (long) page * size), page, size,
                 count, (int) ((count + size - 1) / size));
+    }
+
+    // The authority check precedes both count and page queries so denied resources cannot leak through totals.
+    @Override @Transactional(isolation = Isolation.READ_COMMITTED)
+    public Page listForTrainer(UUID trainerId, UUID studentId, String status, int page, int size) {
+        if (trainerId == null || studentId == null) throw notFound();
+        trainerAuthority(trainerId, studentId, DataAccessLevel.VIEW, true);
+        validateList(status, page, size);
+        long count = store.countTrainer(trainerId, studentId, status);
+        return new Page(store.listTrainer(trainerId, studentId, status, size, (long) page * size),
+                page, size, count, (int) ((count + size - 1) / size));
     }
 
     // Coaching's current-authority query locks the grant/period boundary even for reads.
@@ -180,6 +189,12 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
     private void requireStudent(UUID studentId) {
         if (studentId == null || accounts.getAccountStatus(studentId).orElse(null) != AccountStatus.ACTIVE
                 || !students.hasProfile(studentId)) throw fail("WORKOUT_SCHEDULE_ACCESS_DENIED", 403);
+    }
+
+    private static void validateList(String status, int page, int size) {
+        if (page < 0 || size < 1 || size > 100 || (status != null && !List.of(
+                "PENDING", "ACCEPTED", "REJECTED", "WITHDRAWN").contains(status)))
+            throw fail("WORKOUT_SCHEDULE_VALIDATION_FAILED", 400);
     }
 
     private static void checkPendingVersion(Proposal p, long expected) {

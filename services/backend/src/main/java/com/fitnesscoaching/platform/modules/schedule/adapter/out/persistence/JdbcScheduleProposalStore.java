@@ -71,6 +71,20 @@ public class JdbcScheduleProposalStore implements ScheduleProposalStore {
                 WHERE student_id=? AND (CAST(? AS text) IS NULL OR status=?)
                 """, Long.class, studentId, status, status);
     }
+    @Override public List<Proposal> listTrainer(UUID trainerId, UUID studentId, String status,
+                                                int limit, long offset) {
+        return jdbc.query("""
+                SELECT * FROM fitness.workout_schedule_proposals
+                WHERE trainer_id=? AND student_id=? AND (CAST(? AS text) IS NULL OR status=?)
+                ORDER BY proposed_at DESC,id DESC LIMIT ? OFFSET ?
+                """, mapper(), trainerId, studentId, status, status, limit, offset);
+    }
+    @Override public long countTrainer(UUID trainerId, UUID studentId, String status) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.workout_schedule_proposals
+                WHERE trainer_id=? AND student_id=? AND (CAST(? AS text) IS NULL OR status=?)
+                """, Long.class, trainerId, studentId, status, status);
+    }
     @Override public Optional<Receipt> lockReceipt(UUID actorId, String commandKey) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {
             while (rs.next()) { /* hold until transaction completes */ }

@@ -66,6 +66,166 @@ class ScheduleProposalIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
 
+    @Test void trainerProposalListRequiresCurrentViewAndScopesOwnStudentAndStatus() throws Exception {
+        Fixture f = fixture(), other = fixture();
+        UUID first = proposals.create(command(f, "read-own-first", at(10))).proposal().proposalId();
+        UUID second = proposals.create(command(f, "read-own-second", at(12))).proposal().proposalId();
+        UUID otherProposal = proposals.create(command(other, "read-other", at(10))).proposal().proposalId();
+        proposals.decide(new Decide(f.student(), first, 0, "REJECT", null, "read-reject"));
+        sharing.grantOrReplace(f.student(), f.relationship(), DataScope.WORKOUT_PLAN,
+                SharingDecision.ALLOW, DataAccessLevel.VIEW, null, null, null, 0L, UUID.randomUUID());
+
+        mvc.perform(trainerProposals(f.trainer(), f.student()).param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.items[0].proposalId").value(second.toString()))
+                .andExpect(jsonPath("$.items[0].trainerDisplayName").value("Person"))
+                .andExpect(jsonPath("$.items[0].sourcePlanName").value("Trainer plan"))
+                .andExpect(jsonPath("$.items[0].items[0].sourceSessionName").value("Session"))
+                .andExpect(jsonPath("$.items[0].items[0].sourceSessionFocus").value(nullValue()));
+        mvc.perform(trainerProposals(f.trainer(), f.student()).param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].proposalId").value(first.toString()));
+        mvc.perform(trainerProposals(f.trainer(), f.student()).param("status", "PENDING"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].proposalId").value(second.toString()));
+        mvc.perform(trainerProposals(f.trainer(), f.student()).param("status", "REJECTED"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].proposalId").value(first.toString()));
+        mvc.perform(trainerProposals(f.trainer(), other.student()))
+                .andExpect(status().isNotFound())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(not(containsString(otherProposal.toString()))));
+        mvc.perform(get("/api/v1/planned-workout-schedule-proposals/{id}", second)
+                .with(jwt().jwt(token -> token.subject(f.trainer().toString()))))
+                .andExpect(status().isOk());
+        assertFailure("WORKOUT_SCHEDULE_PROPOSAL_NOT_FOUND", () ->
+                proposals.withdraw(new Withdraw(f.trainer(), second, 0, "view-cannot-withdraw")));
+    }
+
+    @Test void trainerListConcealsRevokedPausedEndedAndRejectsInvalidPaging() throws Exception {
+        Fixture revoked = fixture(), paused = fixture(), ended = fixture();
+        UUID secret = proposals.create(command(revoked, "secret-proposal", at(10))).proposal().proposalId();
+        proposals.create(command(paused, "paused-proposal", at(10)));
+        proposals.create(command(ended, "ended-proposal", at(10)));
+        mvc.perform(trainerProposals(revoked.trainer(), revoked.student()).param("status", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("WORKOUT_SCHEDULE_VALIDATION_FAILED"));
+        mvc.perform(trainerProposals(revoked.trainer(), revoked.student()).param("page", "-1"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(trainerProposals(revoked.trainer(), revoked.student()).param("size", "101"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(trainerProposals(revoked.trainer(), revoked.student()).param("page", "bad"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("WORKOUT_SCHEDULE_VALIDATION_FAILED"));
+
+        sharing.revoke(revoked.student(), revoked.relationship(), revoked.permission(), 0,
+                "Revoked schedule access", UUID.randomUUID());
+        lifecycle.relationshipAction(paused.student(), paused.relationship(), "PAUSE", 1,
+                null, UUID.randomUUID());
+        lifecycle.relationshipAction(ended.student(), ended.relationship(), "END", 1,
+                "Coaching ended", UUID.randomUUID());
+        for (Fixture f : List.of(revoked, paused, ended)) {
+            mvc.perform(trainerProposals(f.trainer(), f.student()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("WORKOUT_SCHEDULE_PROPOSAL_NOT_FOUND"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                            .string(not(containsString(secret.toString()))));
+        }
+        mvc.perform(trainerProposals(ended.student(), ended.student()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test void studentKeepsProposalAndSeesCurrentTrainerNameWithExactSourceAfterEnd() throws Exception {
+        Fixture f = fixture();
+        UUID id = proposals.create(command(f, "old-version-proposal", at(10))).proposal().proposalId();
+        jdbc.update("UPDATE fitness.users SET display_name='Updated Trainer' WHERE id=?", f.trainer());
+        Timestamp boundary = jdbc.queryForObject("SELECT clock_timestamp() + interval '1 second'", Timestamp.class);
+        jdbc.update("UPDATE fitness.workout_plan_versions SET effective_until=? WHERE id=?", boundary, f.version());
+        UUID nextVersion = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.workout_plan_versions
+                (id,workout_plan_id,version_number,effective_from,effective_until,change_level,created_by)
+                VALUES (?,?,2,?,?,'MAJOR',?)
+                """, nextVersion, f.plan(), boundary,
+                Timestamp.from(boundary.toInstant().plusSeconds(1)), f.trainer());
+        jdbc.update("""
+                INSERT INTO fitness.workout_plan_sessions
+                (id,workout_plan_version_id,week_number,day_number,sequence_number,name,session_focus,supervision_requirement)
+                VALUES (?,?,1,1,1,'New version session','New focus','SELF_ALLOWED')
+                """, UUID.randomUUID(), nextVersion);
+        jdbc.update("""
+                UPDATE fitness.workout_plan_versions
+                SET effective_until=NULL,locked_at=?,locked_by=?,lock_reason='ACTIVATED'
+                WHERE id=?
+                """, boundary, f.trainer(), nextVersion);
+        lifecycle.relationshipAction(f.student(), f.relationship(), "END", 1,
+                "Coaching ended", UUID.randomUUID());
+        mvc.perform(get("/api/v1/planned-workout-schedule-proposals/me")
+                .with(jwt().jwt(token -> token.subject(f.student().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].proposalId").value(id.toString()))
+                .andExpect(jsonPath("$.items[0].trainerDisplayName").value("Updated Trainer"))
+                .andExpect(jsonPath("$.items[0].sourcePlanName").value("Trainer plan"))
+                .andExpect(jsonPath("$.items[0].sourcePlanVersionId").value(f.version().toString()))
+                .andExpect(jsonPath("$.items[0].items[0].sourceSessionName").value("Session"));
+        mvc.perform(get("/api/v1/planned-workout-schedule-proposals/{id}", id)
+                .with(jwt().jwt(token -> token.subject(f.student().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trainerDisplayName").value("Updated Trainer"));
+        mvc.perform(trainerProposals(f.trainer(), f.student())).andExpect(status().isNotFound());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder trainerProposals(
+            UUID trainer, UUID student) {
+        return get("/api/v1/students/{studentId}/planned-workout-schedule-proposals", student)
+                .with(jwt().jwt(token -> token.subject(trainer.toString())));
+    }
+
+    @Test void newTrainerCannotListFormerTrainersProposalForSameStudent() throws Exception {
+        Fixture former = fixture();
+        proposals.create(command(former, "former-proposal", at(10)));
+        lifecycle.relationshipAction(former.student(), former.relationship(), "END", 1,
+                "Coaching ended", UUID.randomUUID());
+        UUID nextTrainer = person("TRAINER");
+        Outcome pending = lifecycle.initiate(former.student(), former.student(), nextTrainer, UUID.randomUUID());
+        Outcome active = lifecycle.relationshipAction(nextTrainer, pending.relationship().id(), "ACCEPT",
+                0, null, UUID.randomUUID());
+        sharing.grantOrReplace(former.student(), active.relationship().id(), DataScope.WORKOUT_PLAN,
+                SharingDecision.ALLOW, DataAccessLevel.VIEW, null, null, null, null, UUID.randomUUID());
+
+        mvc.perform(trainerProposals(nextTrainer, former.student()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(0))
+                .andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(trainerProposals(former.trainer(), former.student()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test void createListWithdrawAndReplayExposeOneTerminalProposal() throws Exception {
+        Fixture f = fixture();
+        UUID id = proposals.create(command(f, "list-withdraw-create", at(10))).proposal().proposalId();
+        mvc.perform(trainerProposals(f.trainer(), f.student()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].proposalId").value(id.toString()))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING"));
+        String body = "{\"expectedProposalVersion\":0,\"commandKey\":\"list-withdraw-key\"}";
+        for (boolean replayed : List.of(false, true)) {
+            mvc.perform(post("/api/v1/planned-workout-schedule-proposals/{id}/withdraw", id)
+                    .with(jwt().jwt(token -> token.subject(f.trainer().toString())))
+                    .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.proposal.status").value("WITHDRAWN"))
+                    .andExpect(jsonPath("$.proposal.proposalVersion").value(1))
+                    .andExpect(jsonPath("$.proposal.trainerDisplayName").value("Person"))
+                    .andExpect(jsonPath("$.replayed").value(replayed));
+        }
+        mvc.perform(trainerProposals(f.trainer(), f.student()).param("status", "WITHDRAWN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].proposalId").value(id.toString()));
+    }
+
     @Test void trainerCalendarPresentsConfirmedBatchIntentButNeverStudentActions() throws Exception {
         Fixture f = fixture();
         var pending = proposals.create(command(f, "trainer-calendar-source", at(10))).proposal();

@@ -2110,6 +2110,34 @@ paths:
         '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
 
   /students/{studentId}/planned-workout-schedule-proposals:
+    get:
+      tags: [Workout Schedule]
+      operationId: listMyProposedWorkoutScheduleForStudent
+      summary: List the authenticated Trainer's own proposals for one Student
+      description: >-
+        Returns only proposals created by the authenticated Trainer for this Student, including pending and
+        terminal proposals. Before counting or paging, the backend requires a current effective Coaching Period
+        and current WORKOUT_PLAN VIEW, CONTRIBUTE, or MANAGE authority. A former Trainer, an unrelated actor,
+        or a Trainer whose grant was revoked cannot infer proposals through totals, filters, or pages.
+        VIEW permits this read but not withdrawal; withdrawing a pending proposal still requires CONTRIBUTE.
+        Presentation names are resolved at read time; trainerDisplayName is the current User display name,
+        not a historical audit snapshot.
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
+        - name: status
+          in: query
+          description: Optional exact status filter; omitted returns pending and terminal proposals.
+          schema: { $ref: '#/components/schemas/PlannedWorkoutScheduleProposalStatus' }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200':
+          description: Proposed-at descending page with proposal-ID descending tie-break; empty only after authorization
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutScheduleProposalPage' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
     post:
       tags: [Workout Schedule]
       operationId: proposePlannedWorkoutBatch
@@ -3471,6 +3499,8 @@ components:
         - localEnd
         - startUtcOffset
         - endUtcOffset
+        - sourceSessionName
+        - sourceSessionFocus
       properties:
         clientItemId: { type: string, format: uuid }
         planSessionId: { type: string, format: uuid }
@@ -3481,6 +3511,12 @@ components:
         localEnd: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
         startUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
         endUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+        sourceSessionName:
+          type: [string, 'null']
+          description: Name from this item's exact source plan version/session; null if unavailable.
+        sourceSessionFocus:
+          type: [string, 'null']
+          description: Optional focus from this item's exact source session; null if absent or unavailable.
     PlannedWorkoutScheduleProposal:
       type: object
       additionalProperties: false
@@ -3490,8 +3526,10 @@ components:
         - status
         - studentId
         - trainerId
+        - trainerDisplayName
         - coachingPeriodId
         - planId
+        - sourcePlanName
         - sourcePlanVersionId
         - sourcePlanVersionNumber
         - observedPlanAggregateVersion
@@ -3505,8 +3543,14 @@ components:
         status: { $ref: '#/components/schemas/PlannedWorkoutScheduleProposalStatus' }
         studentId: { type: string, format: uuid }
         trainerId: { type: string, format: uuid }
+        trainerDisplayName:
+          type: [string, 'null']
+          description: Current User display name resolved at response time, not a name frozen at proposal creation.
         coachingPeriodId: { type: string, format: uuid }
         planId: { type: string, format: uuid }
+        sourcePlanName:
+          type: [string, 'null']
+          description: Published source plan name; null if the exact source cannot be presented.
         sourcePlanVersionId: { type: string, format: uuid }
         sourcePlanVersionNumber: { type: integer, minimum: 1 }
         observedPlanAggregateVersion: { type: integer, format: int64, minimum: 0 }
