@@ -53,6 +53,8 @@ AI không tự activate plan.
 
 ## 5. Planned workout và actual workout
 
+Student mở đề xuất lịch từ Plan hub, xem từng buổi theo local time, múi giờ và UTC offset mà backend trả về, rồi xác nhận ACCEPT hoặc REJECT toàn bộ. ACCEPT chỉ tạo lịch khi backend xác nhận batch thành công; REJECT không tạo buổi tập. Khi phiên bản đề xuất/quyền/lịch thay đổi, Student tải lại và quyết định lại trên dữ liệu mới; lỗi mạng có thể gửi lại đúng lệnh với cùng commandKey. DTO proposal hiện chỉ có Trainer/plan/session ID và session coordinates, không có tên Trainer hay tên Exercise để Mobile tự suy diễn.
+
 1. Student mở Plan/Calendar.
 2. Chọn Planned Workout theo planned date.
 3. Start workout và ghi set, rep, load, duration, RPE, note.

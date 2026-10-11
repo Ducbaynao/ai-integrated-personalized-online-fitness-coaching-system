@@ -57,10 +57,12 @@ describe('B04 Student Workout Plan screens', () => {
     renderer.act(() => tree.unmount());
   });
 
-  it('opens the Student Planned Workout calendar from the Plan hub', () => {
+  it('opens the Student calendar and Trainer schedule proposals from the Plan hub', () => {
     const tree = render(<StudentWorkoutPlansScreen />);
     renderer.act(() => tree.root.findByProps({ testID: 'open-workout-schedule-button' }).props.onPress());
     expect(mockPush).toHaveBeenCalledWith('/workouts/schedule');
+    renderer.act(() => tree.root.findByProps({ testID: 'open-schedule-proposals-button' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/workout-schedule-proposals');
     renderer.act(() => tree.unmount());
   });
 

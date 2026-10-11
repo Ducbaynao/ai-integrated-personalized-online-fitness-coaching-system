@@ -19,7 +19,7 @@
 | ST-02 | Current Goal | Target, timeline, active training time, progress |
 | ST-03 | Goal Proposal Detail | Current vs proposed, reason, accept/reject |
 | ST-04 | Goal History | Version, transition, previous goals |
-| ST-05 | Plan and Calendar | Route `/(app)/workout-plans` là Plan hub; `/(app)/workouts/schedule` là Student Planned Workout calendar với backend-derived START/SKIP và occurrence ID/version thật |
+| ST-05 | Plan and Calendar | Route `/(app)/workout-plans` là Plan hub; `/(app)/workouts/schedule` là Student Planned Workout calendar với backend-derived START/SKIP và occurrence ID/version thật; `/(app)/workout-schedule-proposals` và detail là danh sách/quyết định toàn bộ đề xuất lịch từ Trainer |
 | ST-06 | Workout Plan Detail | Routes `/(app)/workout-plans/[planId]`, `/history`, `/edit`; owner/read context, sessions/prescriptions, immutable versions, SELF_DIRECTED authoring and explicit Trainer-delivered successor |
 | ST-07 | Workout Execution | Route `/(app)/workouts/current`; authoritative in-progress execution, set log, substitution, RPE/note và complete/abort. START/SKIP được mở từ ST-05 calendar bằng occurrence identity/version. |
 | ST-08 | Workout Result | Routes `/(app)/workouts/history`, `/(app)/workouts/[executionId]`; planned/performed time, backend-derived terminal status và legacy missing-source state. |
