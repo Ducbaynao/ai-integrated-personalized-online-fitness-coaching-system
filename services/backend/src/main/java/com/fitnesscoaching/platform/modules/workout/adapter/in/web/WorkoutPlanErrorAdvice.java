@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.Clock;
 import java.time.Instant;
 
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @RestControllerAdvice(basePackages = "com.fitnesscoaching.platform.modules.workout.adapter.in.web")
 public class WorkoutPlanErrorAdvice {
     private final Clock clock;

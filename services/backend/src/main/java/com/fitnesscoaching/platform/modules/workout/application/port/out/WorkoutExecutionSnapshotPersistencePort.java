@@ -19,7 +19,7 @@ public interface WorkoutExecutionSnapshotPersistencePort {
     record SnapshotOccurrence(UUID id, UUID studentId, UUID planId, UUID planVersionId, UUID planSessionId,
                               UUID coachingPeriodId, Instant plannedStartAt, Instant plannedEndAt,
                               Instant originalPlannedStartAt, String status, String supervisionRequirement,
-                              Instant executionStartedAt, long version) {}
+                              Instant executionStartedAt, long version, boolean hasValidSupervisionOverride) {}
     record SnapshotPrescription(UUID id, UUID variationId, int sequence, Integer targetSets,
                                 Integer repsMin, Integer repsMax, BigDecimal load, Short loadUnitId,
                                 BigDecimal targetRpe, BigDecimal targetRir, Integer restSeconds, String tempo,

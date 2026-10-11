@@ -26,7 +26,9 @@ public class JdbcWorkoutExecutionSnapshotAdapter implements WorkoutExecutionSnap
         return jdbc.query("""
                 SELECT pw.id,pw.student_id,v.workout_plan_id,v.id plan_version_id,pw.workout_plan_session_id,
                        pw.coaching_period_id,pw.planned_start_at,pw.planned_end_at,pw.original_planned_start_at,
-                       pw.status::text,pw.supervision_requirement::text,pw.execution_started_at,pw.version
+                       pw.status::text,pw.supervision_requirement::text,pw.execution_started_at,pw.version,
+                       (pw.supervision_override_by IS NOT NULL AND pw.supervision_override_reason IS NOT NULL)
+                           AS has_valid_supervision_override
                 FROM fitness.planned_workouts pw
                 JOIN fitness.workout_plan_sessions s ON s.id=pw.workout_plan_session_id
                 JOIN fitness.workout_plan_versions v ON v.id=s.workout_plan_version_id
@@ -37,7 +39,8 @@ public class JdbcWorkoutExecutionSnapshotAdapter implements WorkoutExecutionSnap
                 rs.getObject("coaching_period_id", UUID.class), instant(rs.getTimestamp("planned_start_at")),
                 instant(rs.getTimestamp("planned_end_at")), instant(rs.getTimestamp("original_planned_start_at")),
                 rs.getString("status"), rs.getString("supervision_requirement"),
-                instant(rs.getTimestamp("execution_started_at")), rs.getLong("version")), id)
+                instant(rs.getTimestamp("execution_started_at")), rs.getLong("version"),
+                rs.getBoolean("has_valid_supervision_override")), id)
                 .stream().findFirst().orElseThrow(() -> new WorkoutExecutionFailure(
                         WorkoutExecutionError.WORKOUT_EXECUTION_NOT_FOUND, "Planned workout not found"));
     }
