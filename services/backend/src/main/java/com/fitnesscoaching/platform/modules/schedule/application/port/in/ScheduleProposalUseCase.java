@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface ScheduleProposalUseCase {
     CommandResult create(Create command);
     Page listMine(UUID studentId, String status, int page, int size);
+    Page listForTrainer(UUID trainerId, UUID studentId, String status, int page, int size);
     Proposal detail(UUID actorId, UUID proposalId);
     CommandResult withdraw(Withdraw command);
     DecisionResult decide(Decide command);

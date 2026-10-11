@@ -11,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -57,6 +58,12 @@ public class ScheduleProposalErrorAdvice {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ScheduleError> malformedBody(HttpMessageNotReadableException failure) {
+        return ResponseEntity.badRequest().body(new ScheduleError("WORKOUT_SCHEDULE_VALIDATION_FAILED",
+                "Request validation failed", Instant.now(clock), RequestIdHolder.get(), List.of(), List.of()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ScheduleError> invalidParameter(MethodArgumentTypeMismatchException failure) {
         return ResponseEntity.badRequest().body(new ScheduleError("WORKOUT_SCHEDULE_VALIDATION_FAILED",
                 "Request validation failed", Instant.now(clock), RequestIdHolder.get(), List.of(), List.of()));
     }

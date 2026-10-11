@@ -13,6 +13,8 @@ public interface ScheduleProposalStore {
     Optional<Proposal> lock(UUID proposalId);
     List<Proposal> listStudent(UUID studentId, String status, int limit, long offset);
     long countStudent(UUID studentId, String status);
+    List<Proposal> listTrainer(UUID trainerId, UUID studentId, String status, int limit, long offset);
+    long countTrainer(UUID trainerId, UUID studentId, String status);
     Optional<Receipt> lockReceipt(UUID actorId, String commandKey);
     void save(Proposal proposal, String commandKey);
     void transition(Proposal proposal, String fromStatus, UUID actorId, String commandKey, Instant at,

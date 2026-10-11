@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.schedule.adapter.in.web;
 
 import com.fitnesscoaching.platform.modules.schedule.application.port.in.ScheduleProposalUseCase;
+import com.fitnesscoaching.platform.modules.schedule.application.service.ScheduleProposalPresentationService;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleBatchUseCase.Item;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -19,46 +20,60 @@ import java.util.UUID;
 @RestController
 public class ScheduleProposalController {
     private final ScheduleProposalUseCase proposals;
-    public ScheduleProposalController(ScheduleProposalUseCase proposals) { this.proposals = proposals; }
+    private final ScheduleProposalPresentationService presentation;
+    public ScheduleProposalController(ScheduleProposalUseCase proposals,
+                                      ScheduleProposalPresentationService presentation) {
+        this.proposals = proposals;
+        this.presentation = presentation;
+    }
 
     @PostMapping("/api/v1/students/{studentId}/planned-workout-schedule-proposals")
-    public ResponseEntity<ScheduleProposalUseCase.CommandResult> create(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<ScheduleProposalPresentationService.CommandView> create(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID studentId, @Valid @RequestBody CreateRequest request) {
         var result = proposals.create(new ScheduleProposalUseCase.Create(UUID.fromString(jwt.getSubject()),
                 studentId, request.planId(), request.sourcePlanVersionId(),
                 request.expectedPlanAggregateVersion() == null ? -1 : request.expectedPlanAggregateVersion(),
                 request.weekAnchorDate(), request.timezone(),
                 request.items().stream().map(ProposalItemInput::toCommand).toList(), request.commandKey()));
-        return ResponseEntity.status(201).body(result);
+        return ResponseEntity.status(201).body(presentation.present(result));
+    }
+
+    @GetMapping("/api/v1/students/{studentId}/planned-workout-schedule-proposals")
+    public ScheduleProposalPresentationService.PageView listForTrainer(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID studentId, @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return presentation.present(proposals.listForTrainer(
+                UUID.fromString(jwt.getSubject()), studentId, status, page, size));
     }
 
     @GetMapping("/api/v1/planned-workout-schedule-proposals/me")
-    public ScheduleProposalUseCase.Page listMine(@AuthenticationPrincipal Jwt jwt,
+    public ScheduleProposalPresentationService.PageView listMine(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String status, @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return proposals.listMine(UUID.fromString(jwt.getSubject()), status, page, size);
+        return presentation.present(proposals.listMine(UUID.fromString(jwt.getSubject()), status, page, size));
     }
 
     @GetMapping("/api/v1/planned-workout-schedule-proposals/{proposalId}")
-    public ScheduleProposalUseCase.Proposal detail(@AuthenticationPrincipal Jwt jwt,
+    public ScheduleProposalPresentationService.ProposalView detail(@AuthenticationPrincipal Jwt jwt,
                                                    @PathVariable UUID proposalId) {
-        return proposals.detail(UUID.fromString(jwt.getSubject()), proposalId);
+        return presentation.present(proposals.detail(UUID.fromString(jwt.getSubject()), proposalId));
     }
 
     @PostMapping("/api/v1/planned-workout-schedule-proposals/{proposalId}/withdraw")
-    public ScheduleProposalUseCase.CommandResult withdraw(@AuthenticationPrincipal Jwt jwt,
+    public ScheduleProposalPresentationService.CommandView withdraw(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID proposalId, @Valid @RequestBody WithdrawRequest request) {
-        return proposals.withdraw(new ScheduleProposalUseCase.Withdraw(UUID.fromString(jwt.getSubject()),
-                proposalId, request.expectedProposalVersion() == null ? -1 : request.expectedProposalVersion(),
-                request.commandKey()));
+        return presentation.present(proposals.withdraw(new ScheduleProposalUseCase.Withdraw(
+                UUID.fromString(jwt.getSubject()), proposalId,
+                request.expectedProposalVersion() == null ? -1 : request.expectedProposalVersion(),
+                request.commandKey())));
     }
 
     @PostMapping("/api/v1/planned-workout-schedule-proposals/{proposalId}/decisions")
-    public ScheduleProposalUseCase.DecisionResult decide(@AuthenticationPrincipal Jwt jwt,
+    public ScheduleProposalPresentationService.DecisionView decide(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID proposalId, @Valid @RequestBody DecisionRequest request) {
-        return proposals.decide(new ScheduleProposalUseCase.Decide(UUID.fromString(jwt.getSubject()), proposalId,
+        return presentation.present(proposals.decide(new ScheduleProposalUseCase.Decide(UUID.fromString(jwt.getSubject()), proposalId,
                 request.expectedProposalVersion() == null ? -1 : request.expectedProposalVersion(),
-                request.decision(), request.decisionNote(), request.commandKey()));
+                request.decision(), request.decisionNote(), request.commandKey())));
     }
 
     public record CreateRequest(@NotNull UUID planId, @NotNull UUID sourcePlanVersionId,
