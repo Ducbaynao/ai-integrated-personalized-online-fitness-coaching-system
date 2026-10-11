@@ -37,7 +37,6 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
         validateBase(c);
         UUID student = plans.findPlanStudent(c.planId());
         if (!student.equals(c.actorId())) throw fail("WORKOUT_PLAN_NOT_FOUND", 404);
-        // Shared lock order with B04/B05: Student, actor, receipt, plan, open version.
         plans.lockStudentAndActor(student, c.actorId());
         String hash = hash(c);
         var prior = batches.lockReceipt(c.actorId(), c.commandKey());
@@ -46,54 +45,53 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
                 throw fail("WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT", 409);
             return fromJson(prior.get().responseJson()).asReplay();
         }
+        ConfirmedBatch result = materialize(c, student, "STUDENT_DIRECT", null, null);
+        batches.saveReceipt(c.actorId(), c.commandKey(), hash, result.batchId(), json(result), result.confirmedAt());
+        return result;
+    }
+
+    @Override public UUID studentForPlan(UUID planId) {
+        if (planId == null) throw fail("WORKOUT_PLAN_NOT_FOUND", 404);
+        return plans.findPlanStudent(planId);
+    }
+
+    @Override public void lockStudentAndActor(UUID studentId, UUID actorId) {
+        plans.lockStudentAndActor(studentId, actorId);
+    }
+
+    @Override @Transactional(isolation = Isolation.READ_COMMITTED)
+    public Source inspectProposalSource(ConfirmBatch c) {
+        validateBase(c);
+        UUID student = plans.findPlanStudent(c.planId());
+        plans.lockStudentAndActor(student, c.actorId());
         var plan = plans.lockPlan(c.planId());
-        if (plan.status() != WorkoutPlanStatus.ACTIVE)
-            throw fail("WORKOUT_SCHEDULE_SOURCE_MISMATCH", 409);
-        if (plan.version() != c.expectedPlanAggregateVersion())
-            throw fail("WORKOUT_SCHEDULE_PLAN_VERSION_STALE", 409);
         var open = plans.lockOpenVersion(c.planId());
         Instant at = plans.databaseNow();
-        if (!open.id().equals(c.sourcePlanVersionId())
-                || !batches.isPublishedEffective(open.id(), c.planId(), at))
-            throw fail("WORKOUT_SCHEDULE_PLAN_VERSION_STALE", 409);
+        checkedVersion(c, plan, open, at);
+        validateInternalOverlap(resolveItems(c, open.id(), at, false));
+        return new Source(open.id(), open.versionNumber());
+    }
+
+    @Override @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ConfirmedBatch confirmProposal(ConfirmBatch c, UUID proposalId, UUID trainerId) {
+        validateBase(c);
+        if (proposalId == null || trainerId == null) throw fail("VALIDATION_FAILED", 400);
+        UUID student = plans.findPlanStudent(c.planId());
+        if (!student.equals(c.actorId())) throw fail("WORKOUT_PLAN_NOT_FOUND", 404);
+        plans.lockStudentAndActor(student, c.actorId());
+        return materialize(c, student, "TRAINER_PROPOSAL", proposalId, trainerId);
+    }
+
+    private ConfirmedBatch materialize(ConfirmBatch c, UUID student, String source,
+                                       UUID proposalId, UUID trainerId) {
+        var plan = plans.lockPlan(c.planId());
+        var open = plans.lockOpenVersion(c.planId());
+        Instant at = plans.databaseNow();
+        checkedVersion(c, plan, open, at);
         if (batches.hasScheduledUnknownEnd(student))
             throw fail("WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN", 409);
-
-        ZoneId zone = zone(c.timezone());
-        if (c.weekAnchorDate().getYear() < 1 || c.weekAnchorDate().getYear() > 9999
-                || c.weekAnchorDate().getDayOfWeek() != DayOfWeek.MONDAY)
-            throw fail("VALIDATION_FAILED", 400);
-        Set<UUID> itemIds = new HashSet<>();
-        Set<UUID> sessions = new HashSet<>();
-        List<ConfirmedItem> created = new ArrayList<>();
-        for (Item item : c.items()) {
-            validateItem(item);
-            if (!itemIds.add(item.clientItemId()) || !sessions.add(item.planSessionId()))
-                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
-            var session = batches.findSession(open.id(), item.planSessionId());
-            if (session == null || session.weekNumber() != item.weekNumber()
-                    || session.dayNumber() != item.dayNumber() || session.sequenceNumber() != item.sequenceNumber())
-                throw fail("WORKOUT_SCHEDULE_SOURCE_MISMATCH", 409, item.clientItemId());
-            if ("COACH_REQUIRED".equals(session.supervision()))
-                throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409, item.clientItemId());
-            LocalDate weekStart;
-            try { weekStart = c.weekAnchorDate().plusWeeks(item.weekNumber() - 1L); }
-            catch (DateTimeException overflow) { throw fail("VALIDATION_FAILED", 400, item.clientItemId()); }
-            LocalDate date = item.localStart().toLocalDate();
-            if (date.isBefore(weekStart) || date.isAfter(weekStart.plusDays(6)))
-                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
-            Instant start = resolveInstant(item.localStart(), item.startUtcOffset(), zone, item.clientItemId());
-            Instant end = resolveInstant(item.localEnd(), item.endUtcOffset(), zone, item.clientItemId());
-            if (!end.isAfter(start) || !start.isAfter(at) || start.isAfter(at.plus(90, ChronoUnit.DAYS)))
-                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
-            created.add(new ConfirmedItem(item.clientItemId(), UUID.randomUUID(), 0, item.planSessionId(),
-                    item.weekNumber(), item.dayNumber(), item.sequenceNumber(), item.localStart(), item.localEnd(),
-                    item.startUtcOffset(), item.endUtcOffset(), start, end, session.supervision()));
-        }
-        List<ConfirmedItem> ordered = created.stream().sorted(Comparator.comparing(ConfirmedItem::plannedStartAt)).toList();
-        for (int i = 1; i < ordered.size(); i++)
-            if (ordered.get(i).plannedStartAt().isBefore(ordered.get(i - 1).plannedEndAt()))
-                throw fail("WORKOUT_SCHEDULE_OVERLAP", 409, ordered.get(i).clientItemId());
+        List<ConfirmedItem> created = resolveItems(c, open.id(), at, true);
+        validateInternalOverlap(created);
         for (ConfirmedItem item : created) {
             if (batches.hasSourceInstant(student, item.planSessionId(), item.plannedStartAt()))
                 throw fail("WORKOUT_SCHEDULE_DUPLICATE", 409, item.clientItemId());
@@ -101,7 +99,7 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
                 throw fail("WORKOUT_SCHEDULE_OVERLAP", 409, item.clientItemId());
         }
         ConfirmedBatch result = new ConfirmedBatch(UUID.randomUUID(), student, c.planId(), open.id(),
-                open.versionNumber(), c.weekAnchorDate(), c.timezone(), "STUDENT_DIRECT", null, c.actorId(),
+                open.versionNumber(), c.weekAnchorDate(), c.timezone(), source, proposalId, c.actorId(),
                 at, List.copyOf(created), false);
         batches.saveBatch(result);
         for (ConfirmedItem item : created) {
@@ -117,10 +115,65 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
         }
         audit.recordAudit(AuditRecord.builder().actorUserId(c.actorId()).actorRole("STUDENT")
                 .action("WORKOUT_SCHEDULE_BATCH_CONFIRMED").targetType("WORKOUT_SCHEDULE_BATCH")
-                .targetId(result.batchId()).beforeDataJson("{}").afterDataJson("{}")
+                .targetId(result.batchId()).beforeDataJson("{}")
+                .afterDataJson(trainerId == null ? "{}" : json(Map.of("proposalId", proposalId, "trainerId", trainerId)))
                 .occurredAt(at).build());
-        batches.saveReceipt(c.actorId(), c.commandKey(), hash, result.batchId(), json(result), at);
         return result;
+    }
+
+    private static void validateInternalOverlap(List<ConfirmedItem> created) {
+        List<ConfirmedItem> ordered = created.stream().sorted(Comparator.comparing(ConfirmedItem::plannedStartAt)).toList();
+        for (int i = 1; i < ordered.size(); i++)
+            if (ordered.get(i).plannedStartAt().isBefore(ordered.get(i - 1).plannedEndAt()))
+                throw fail("WORKOUT_SCHEDULE_OVERLAP", 409, ordered.get(i).clientItemId());
+    }
+
+    private void checkedVersion(ConfirmBatch c,
+            com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlan plan,
+            WorkoutPlanPersistencePort.OpenVersion open, Instant at) {
+        if (plan.status() != WorkoutPlanStatus.ACTIVE)
+            throw fail("WORKOUT_SCHEDULE_SOURCE_MISMATCH", 409);
+        if (plan.version() != c.expectedPlanAggregateVersion())
+            throw fail("WORKOUT_SCHEDULE_PLAN_VERSION_STALE", 409);
+        if (!open.id().equals(c.sourcePlanVersionId())
+                || !batches.isPublishedEffective(open.id(), c.planId(), at))
+            throw fail("WORKOUT_SCHEDULE_PLAN_VERSION_STALE", 409);
+    }
+
+    private List<ConfirmedItem> resolveItems(ConfirmBatch c, UUID versionId, Instant at, boolean enforceFuture) {
+        ZoneId zone = zone(c.timezone());
+        if (c.weekAnchorDate().getYear() < 1 || c.weekAnchorDate().getYear() > 9999
+                || c.weekAnchorDate().getDayOfWeek() != DayOfWeek.MONDAY)
+            throw fail("VALIDATION_FAILED", 400);
+        Set<UUID> itemIds = new HashSet<>();
+        Set<UUID> sessions = new HashSet<>();
+        List<ConfirmedItem> created = new ArrayList<>();
+        for (Item item : c.items()) {
+            validateItem(item);
+            if (!itemIds.add(item.clientItemId()) || !sessions.add(item.planSessionId()))
+                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
+            var session = batches.findSession(versionId, item.planSessionId());
+            if (session == null || session.weekNumber() != item.weekNumber()
+                    || session.dayNumber() != item.dayNumber() || session.sequenceNumber() != item.sequenceNumber())
+                throw fail("WORKOUT_SCHEDULE_SOURCE_MISMATCH", 409, item.clientItemId());
+            if ("COACH_REQUIRED".equals(session.supervision()))
+                throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409, item.clientItemId());
+            LocalDate weekStart;
+            try { weekStart = c.weekAnchorDate().plusWeeks(item.weekNumber() - 1L); }
+            catch (DateTimeException overflow) { throw fail("VALIDATION_FAILED", 400, item.clientItemId()); }
+            LocalDate date = item.localStart().toLocalDate();
+            if (date.isBefore(weekStart) || date.isAfter(weekStart.plusDays(6)))
+                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
+            Instant start = resolveInstant(item.localStart(), item.startUtcOffset(), zone, item.clientItemId());
+            Instant end = resolveInstant(item.localEnd(), item.endUtcOffset(), zone, item.clientItemId());
+            if (!end.isAfter(start) || (enforceFuture && (!start.isAfter(at)
+                    || start.isAfter(at.plus(90, ChronoUnit.DAYS)))))
+                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
+            created.add(new ConfirmedItem(item.clientItemId(), UUID.randomUUID(), 0, item.planSessionId(),
+                    item.weekNumber(), item.dayNumber(), item.sequenceNumber(), item.localStart(), item.localEnd(),
+                    item.startUtcOffset(), item.endUtcOffset(), start, end, session.supervision()));
+        }
+        return created;
     }
 
     private static void validateBase(ConfirmBatch c) {

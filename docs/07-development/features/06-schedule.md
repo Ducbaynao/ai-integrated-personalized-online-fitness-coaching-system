@@ -174,3 +174,7 @@ This checkpoint does not implement Trainer proposals/acceptance, Student or Trai
 ## 13. Student calendar read implementation checkpoint
 
 `B06-STUDENT-CALENDAR-READ` implements the Student-owned `GET /planned-workouts` projection and reconciles B05 START with the qualifying Appointment/override predicate. This implementation is distinct from the approved policy above. Trainer calendar reads, proposals, reschedule/cancel, `COACH_REQUIRED` scheduling, automatic materialization, and the Mobile START/SKIP entry remain outside this checkpoint.
+
+## 14. Trainer proposal implementation checkpoint
+
+`B06-TRAINER-SCHEDULE-PROPOSALS` adds V32 and the backend create/list/detail/withdraw/ACCEPT/REJECT proposal workflow. A pending proposal stores immutable source/local-time intent but no occurrence. The Student alone decides it; ACCEPT rechecks current Trainer authority and the original Coaching Period, then invokes the Workout-owned batch materializer inside the same transaction. REJECT bypasses materialization guards. V32 stores proposal status history, actor-scoped command receipts, and confirmed-batch lineage. Existing B05 execution seal and Student calendar behavior are unchanged. Trainer calendar, Appointment mutation, reschedule/cancel, Mobile proposal UI, and automatic materialization remain deferred. This section describes implementation scope, not independent review or CI status.
