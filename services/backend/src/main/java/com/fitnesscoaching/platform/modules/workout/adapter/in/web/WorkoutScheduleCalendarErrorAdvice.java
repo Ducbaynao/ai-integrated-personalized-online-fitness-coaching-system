@@ -26,6 +26,9 @@ public class WorkoutScheduleCalendarErrorAdvice {
         if (failure.status() == 403)
             return ResponseEntity.status(403).body(ErrorResponse.of(failure.code(),
                     "Workout schedule is not available", Instant.now(clock), RequestIdHolder.get()));
+        if (failure.status() == 404)
+            return ResponseEntity.status(404).body(ErrorResponse.of(failure.code(),
+                    "Workout schedule is not available", Instant.now(clock), RequestIdHolder.get()));
         return invalid();
     }
 

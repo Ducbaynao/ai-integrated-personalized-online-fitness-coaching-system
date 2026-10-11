@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public interface WorkoutScheduleCalendarQuery {
     Page listMine(UUID actorId, Instant from, Instant until, int page, int size);
+    Page listForTrainer(UUID actorId, UUID studentId, Instant from, Instant until, int page, int size);
 
     record Occurrence(UUID occurrenceId, long occurrenceVersion, UUID studentId, String status,
                       Instant plannedStartAt, Instant originalPlannedStartAt, Instant plannedEndAt,

@@ -32,6 +32,9 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -62,6 +65,120 @@ class ScheduleProposalIntegrationTest {
     @Autowired CoachingSharingUseCase sharing;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+
+    @Test void trainerCalendarPresentsConfirmedBatchIntentButNeverStudentActions() throws Exception {
+        Fixture f = fixture();
+        var pending = proposals.create(command(f, "trainer-calendar-source", at(10))).proposal();
+        var accepted = proposals.decide(new Decide(f.student(), pending.proposalId(), 0,
+                "ACCEPT", null, "trainer-calendar-accept"));
+        UUID occurrence = accepted.confirmedBatch().items().getFirst().occurrenceId();
+        sharing.grantOrReplace(f.student(), f.relationship(), DataScope.WORKOUT_PLAN,
+                SharingDecision.ALLOW, DataAccessLevel.VIEW, null, null, null, 0L, UUID.randomUUID());
+        Instant at = at(10).toInstant(ZoneOffset.UTC);
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), at.minusSeconds(1).toString(),
+                        at.plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].occurrenceId").value(occurrence.toString()))
+                .andExpect(jsonPath("$.items[0].occurrenceVersion").value(0))
+                .andExpect(jsonPath("$.items[0].timezone").value("Etc/UTC"))
+                .andExpect(jsonPath("$.items[0].localStart").value(at(10).toString()))
+                .andExpect(jsonPath("$.items[0].sessionSummary.planSessionId").value(f.session().toString()))
+                .andExpect(jsonPath("$.items[0].availableActions").isEmpty());
+    }
+
+    @Test void trainerCalendarUsesCurrentViewGrantAndStudentProjectionWithoutExecutionActions() throws Exception {
+        Fixture f = fixture();
+        sharing.grantOrReplace(f.student(), f.relationship(), DataScope.WORKOUT_PLAN,
+                SharingDecision.ALLOW, DataAccessLevel.VIEW, null, null, null, 0L, UUID.randomUUID());
+        Instant at = at(10).toInstant(ZoneOffset.UTC);
+        UUID first = legacyCalendarRow(f.student(), f.session(), at);
+        UUID second = legacyCalendarRow(f.student(), f.session(), at);
+        UUID before = first.toString().compareTo(second.toString()) < 0 ? first : second;
+        UUID after = before.equals(first) ? second : first;
+        UUID orphan = legacyCalendarRow(f.student(), null, at.plusSeconds(3600));
+        String from = at.minusSeconds(1).atOffset(ZoneOffset.ofHours(7)).toString();
+        String until = at.plusSeconds(3601).atOffset(ZoneOffset.ofHours(7)).toString();
+
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), from, until).param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.items[0].occurrenceId").value(before.toString()))
+                .andExpect(jsonPath("$.items[0].occurrenceVersion").value(0))
+                .andExpect(jsonPath("$.items[0].planSummary.planId").value(f.plan().toString()))
+                .andExpect(jsonPath("$.items[0].sessionSummary.planSessionId").value(f.session().toString()))
+                .andExpect(jsonPath("$.items[0].availableActions").isEmpty())
+                .andExpect(jsonPath("$.items[0].plannedEndAt").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].timezone").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].localStart").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].localEnd").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].startUtcOffset").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].endUtcOffset").value(nullValue()));
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), from, until)
+                        .param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].occurrenceId").value(after.toString()));
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), from, until)
+                        .param("page", "2").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].occurrenceId").value(orphan.toString()))
+                .andExpect(jsonPath("$.items[0].planSummary").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].sessionSummary").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].availableActions").isEmpty());
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), at.toString(),
+                        at.plus(93, java.time.temporal.ChronoUnit.DAYS).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(3));
+        mvc.perform(trainerCalendar(f.trainer(), f.student(), at.toString(),
+                        at.plus(93, java.time.temporal.ChronoUnit.DAYS).plusNanos(1).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("WORKOUT_SCHEDULE_WINDOW_INVALID"));
+    }
+
+    @Test void trainerCalendarConcealsUnrelatedRevokedAndFormerTrainer() throws Exception {
+        Fixture f = fixture(), other = fixture(), revoked = fixture(), former = fixture(), expired = fixture();
+        Instant at = at(10).toInstant(ZoneOffset.UTC);
+        UUID secret = legacyCalendarRow(f.student(), f.session(), at);
+        String from = at.minusSeconds(1).toString(), until = at.plusSeconds(1).toString();
+        mvc.perform(trainerCalendar(other.trainer(), f.student(), from, until))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("PLANNED_WORKOUT_NOT_FOUND"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(not(containsString(secret.toString()))));
+        mvc.perform(trainerCalendar(f.trainer(), other.student(), from, until))
+                .andExpect(status().isNotFound());
+        sharing.revoke(revoked.student(), revoked.relationship(), revoked.permission(), 0,
+                "Student revoked calendar access", UUID.randomUUID());
+        mvc.perform(trainerCalendar(revoked.trainer(), revoked.student(), from, until))
+                .andExpect(status().isNotFound());
+        lifecycle.relationshipAction(former.student(), former.relationship(), "PAUSE", 1,
+                null, UUID.randomUUID());
+        mvc.perform(trainerCalendar(former.trainer(), former.student(), from, until))
+                .andExpect(status().isNotFound());
+        lifecycle.relationshipAction(expired.student(), expired.relationship(), "END", 1,
+                "Coaching ended", UUID.randomUUID());
+        mvc.perform(trainerCalendar(expired.trainer(), expired.student(), from, until))
+                .andExpect(status().isNotFound());
+        mvc.perform(trainerCalendar(f.student(), f.student(), from, until))
+                .andExpect(status().isNotFound());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder trainerCalendar(
+            UUID trainer, UUID student, String from, String until) {
+        return get("/api/v1/students/{studentId}/planned-workouts", student)
+                .param("from", from).param("until", until)
+                .with(jwt().jwt(token -> token.subject(trainer.toString())));
+    }
+
+    private UUID legacyCalendarRow(UUID student, UUID session, Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,workout_plan_session_id,planned_start_at,original_planned_start_at,created_by)
+                VALUES (?,?,?,?,?,?)
+                """, id, student, session, Timestamp.from(at), Timestamp.from(at), student);
+        return id;
+    }
 
     @Test void httpCreateListDetailAndDecisionUseContractShapes() throws Exception {
         Fixture f = fixture();
