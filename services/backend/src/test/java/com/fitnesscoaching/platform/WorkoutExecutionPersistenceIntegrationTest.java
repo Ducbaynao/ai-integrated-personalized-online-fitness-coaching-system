@@ -153,6 +153,51 @@ class WorkoutExecutionPersistenceIntegrationTest {
     }
 
     @Test
+    void coachRequiredStartUsesV16AppointmentOrOverrideWhileSkipNeedsNeither() {
+        Fixture noAppointment = fixture("COACH_REQUIRED");
+        requireCoach(noAppointment);
+        assertThatThrownBy(() -> commands.start(new StartCommand(noAppointment.occurrenceId(),
+                noAppointment.studentId(), 1, "coach-no-appointment")))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE));
+        assertThat(jdbc.queryForObject("SELECT execution_started_at FROM fitness.planned_workouts WHERE id=?",
+                java.sql.Timestamp.class, noAppointment.occurrenceId())).isNull();
+        assertThat(commands.skip(new SkipCommand(noAppointment.occurrenceId(), noAppointment.studentId(), 1,
+                "Skip without coached appointment", "coach-skip")).status()).isEqualTo("SKIPPED");
+
+        Fixture withAppointment = fixture("COACH_REQUIRED");
+        requireCoach(withAppointment);
+        UUID trainer = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
+                trainer, trainer + "@example.com");
+        jdbc.update("INSERT INTO fitness.trainer_profiles(user_id) VALUES (?)", trainer);
+        jdbc.update("""
+                INSERT INTO fitness.appointments
+                (id,trainer_id,student_id,planned_workout_id,start_at,end_at,display_timezone,status,created_by)
+                VALUES (?,?,?,?,clock_timestamp(),clock_timestamp()+interval '1 hour','Etc/UTC','CONFIRMED',?)
+                """, UUID.randomUUID(), trainer, withAppointment.studentId(), withAppointment.occurrenceId(),
+                withAppointment.studentId());
+        assertThat(commands.start(new StartCommand(withAppointment.occurrenceId(), withAppointment.studentId(),
+                1, "coach-with-appointment")).id()).isNotNull();
+
+        Fixture withOverride = fixture("COACH_REQUIRED");
+        requireCoach(withOverride);
+        jdbc.update("""
+                UPDATE fitness.planned_workouts SET supervision_override_by=?,
+                    supervision_override_reason='Approved override',version=version+1 WHERE id=?
+                """, withOverride.studentId(), withOverride.occurrenceId());
+        assertThat(commands.start(new StartCommand(withOverride.occurrenceId(), withOverride.studentId(),
+                2, "coach-with-override")).id()).isNotNull();
+    }
+
+    private void requireCoach(Fixture fixture) {
+        jdbc.update("""
+                UPDATE fitness.planned_workouts SET supervision_requirement='COACH_REQUIRED',version=version+1
+                WHERE id=?
+                """, fixture.occurrenceId());
+    }
+
+    @Test
     void terminalHistoryPresentsCurrentCatalogLabelsForRetainedExerciseAndSetUnitIds() {
         short kilograms = unit("KG", "kg", "MASS");
         short pounds = unit("LB", "lb", "MASS");
@@ -189,10 +234,18 @@ class WorkoutExecutionPersistenceIntegrationTest {
     }
 
     private Fixture fixture() {
-        return fixture(null, null);
+        return fixture(null, null, "SELF_ALLOWED");
     }
 
     private Fixture fixture(Short loadUnitId, Short distanceUnitId) {
+        return fixture(loadUnitId, distanceUnitId, "SELF_ALLOWED");
+    }
+
+    private Fixture fixture(String supervision) {
+        return fixture(null, null, supervision);
+    }
+
+    private Fixture fixture(Short loadUnitId, Short distanceUnitId, String supervision) {
         UUID student = person();
         UUID period = UUID.randomUUID();
         jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',clock_timestamp()-interval '1 day',?)",
@@ -208,8 +261,11 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 (id,workout_plan_id,version_number,change_level,created_by)
                 VALUES (?,?,1,'INITIAL',?)
                 """, version, plan, student);
-        jdbc.update("INSERT INTO fitness.workout_plan_sessions(id,workout_plan_version_id,week_number,day_number,sequence_number,name) VALUES (?,?,1,1,1,'Buổi 1')",
-                session, version);
+        jdbc.update("""
+                INSERT INTO fitness.workout_plan_sessions
+                (id,workout_plan_version_id,week_number,day_number,sequence_number,name,supervision_requirement)
+                VALUES (?,?,1,1,1,'Buổi 1',?::fitness.supervision_requirement)
+                """, session, version, supervision);
         UUID variation = variation(student);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_session_exercises
@@ -228,9 +284,9 @@ class WorkoutExecutionPersistenceIntegrationTest {
         jdbc.update("""
                 INSERT INTO fitness.planned_workouts
                 (id,student_id,workout_plan_session_id,coaching_period_id,planned_start_at,
-                 original_planned_start_at,created_by)
-                VALUES (?,?,?, ?,clock_timestamp(),clock_timestamp(),?)
-                """, occurrence, student, session, period, student);
+                 original_planned_start_at,supervision_requirement,created_by)
+                VALUES (?,?,?, ?,clock_timestamp(),clock_timestamp(),?::fitness.supervision_requirement,?)
+                """, occurrence, student, session, period, supervision, student);
         return new Fixture(student, occurrence, plan, version, session, period);
     }
 

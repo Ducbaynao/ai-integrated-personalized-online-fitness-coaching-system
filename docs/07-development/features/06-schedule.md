@@ -85,7 +85,17 @@ This approval does not define a broader Appointment conflict matrix. The contrac
 4. Publishing a plan version does not change an existing occurrence. Pausing or archiving a plan does not delete occurrence or execution history.
 5. The backend derives `availableActions` from actual occurrence state, execution seal, supervision, authority, and applicable B04/B05 policy. Mobile must not infer actions from one status field.
 
-The exact action matrix after plan pause/archive is intentionally not added by this record. The first-flow contract therefore exposes backend-derived `availableActions` without defining new pause/archive policy. The materializer implementation checkpoint must reconcile the result with approved B04/B05 lifecycle rules and surface any confirmed policy gap instead of silently creating one.
+The original decision record did not define the action matrix after plan pause/archive. The Student-calendar addendum below resolves START/SKIP for confirmed occurrences; it does not define future schedule or Appointment actions.
+
+### Student calendar action policy approved 2026-10-10
+
+Person B approved the following additional product decisions for the Student calendar read and B05 command reconciliation. This approval is policy, not evidence that a read API or command guard already implements it:
+
+1. A confirmed `SCHEDULED` occurrence survives a source plan transition to `PAUSED`, `COMPLETED`, or `ARCHIVED`. That transition alone does not remove Student START/SKIP eligibility; occurrence-level guards still decide.
+2. Once execution has started, the occurrence remains sealed even while `SCHEDULED`. Neither START nor SKIP is offered again; COMPLETE/ABORT belongs to the existing execution flow.
+3. For a legacy unstarted `COACH_REQUIRED` occurrence, SKIP needs no Appointment. START requires the qualifying Appointment or accountable override already defined by the executable V16 database predicate. Calendar actions and the B05 START guard must use the same condition; neither invents another Appointment/override rule.
+
+The calendar read is a snapshot. START/SKIP continue to recheck actor, occurrence version, and all command guards at mutation time. Other `COACH_REQUIRED` scheduling and Appointment creation remain deferred.
 
 ## 7. Approved read and execution entry
 
@@ -149,7 +159,7 @@ The following implementation details remain for the materializer design/persiste
 - exact proposal/batch/item table layout and optimistic tokens;
 - exact lock ordering and database constraint strategy;
 - reconciliation of future reschedule/cancel lifecycle semantics with the current `SCHEDULED` schedule-occupancy predicate;
-- the precise `availableActions` matrix after plan pause/archive and for every terminal occurrence state;
+- action eligibility for future commands beyond B05 START/SKIP;
 - the exact qualifying Appointment states/link required before future `COACH_REQUIRED` scheduling is enabled;
 - whether reschedule retains one occurrence row with append-only history or creates linked replacement occurrence identity, subject to existing B04/B05 invariants.
 
@@ -160,3 +170,7 @@ These details must implement the approved decisions above. They are not permissi
 The `B06-STUDENT-BATCH-MATERIALIZER` implementation checkpoint adds only Student direct confirmation at `POST /planned-workout-batches`. V31 stores confirmed batches/items, local-time intent, source identity, actor-scoped receipts, and nullable batch links on occurrences. New batch rows have database-backed duplicate and `SCHEDULED` known-range exclusion; existing rows are not rewritten or enrolled in those constraints. The Workout transaction holds the Student lock while it checks legacy source duplicates, known-range overlap, and the approved unknown-end guard. Migration reports legacy anomalies without inferring or changing their end times. Local wall-time text retains the input's nanosecond value; authoritative planned instants use PostgreSQL microsecond precision.
 
 This checkpoint does not implement Trainer proposals/acceptance, Student or Trainer calendar reads, reschedule/cancel, `COACH_REQUIRED` scheduling, automatic materialization, or Mobile START/SKIP entry. Those declared contracts remain implementation work.
+
+## 13. Student calendar read implementation checkpoint
+
+`B06-STUDENT-CALENDAR-READ` implements the Student-owned `GET /planned-workouts` projection and reconciles B05 START with the qualifying Appointment/override predicate. This implementation is distinct from the approved policy above. Trainer calendar reads, proposals, reschedule/cancel, `COACH_REQUIRED` scheduling, automatic materialization, and the Mobile START/SKIP entry remain outside this checkpoint.

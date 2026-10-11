@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionSnapshotUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionBaselineQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutOccurrenceExecutionStateUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionSnapshotPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionSnapshotPersistencePort.*;
@@ -16,13 +17,15 @@ import java.util.*;
 @Service
 @Transactional(propagation = Propagation.MANDATORY)
 public class WorkoutExecutionSnapshotService implements WorkoutExecutionSnapshotUseCase,
-        WorkoutOccurrenceExecutionStateUseCase {
+        WorkoutOccurrenceExecutionStateUseCase, WorkoutExecutionBaselineQuery {
     private final WorkoutExecutionSnapshotPersistencePort store;
     private final WorkoutPlanPersistencePort planStore;
+    private final WorkoutOccurrenceActionPolicy actions;
 
     public WorkoutExecutionSnapshotService(WorkoutExecutionSnapshotPersistencePort store,
-                                           WorkoutPlanPersistencePort planStore) {
-        this.store = store; this.planStore = planStore;
+                                           WorkoutPlanPersistencePort planStore,
+                                           WorkoutOccurrenceActionPolicy actions) {
+        this.store = store; this.planStore = planStore; this.actions = actions;
     }
 
     @Override
@@ -55,12 +58,32 @@ public class WorkoutExecutionSnapshotService implements WorkoutExecutionSnapshot
         if (occurrence.executionStartedAt() != null) throw failure(WorkoutExecutionError.PLANNED_WORKOUT_ALREADY_STARTED);
         if (occurrence.version() != command.expectedOccurrenceVersion())
             throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_VERSION_CONFLICT);
+        if (!actions.canStartForMutation(occurrence.id(), occurrence.status(), occurrence.executionStartedAt(),
+                occurrence.supervisionRequirement(), occurrence.hasValidSupervisionOverride()))
+            throw failure(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE);
 
+        Baseline baseline = resolveBaseline(occurrence.id(), occurrence.planSessionId());
+        Instant at = store.databaseNow();
+        store.seal(occurrence.id(), occurrence.version(), at);
+        return new FrozenExecutionSnapshot(occurrence.id(), occurrence.studentId(), occurrence.planId(),
+                occurrence.planVersionId(), occurrence.planSessionId(), occurrence.coachingPeriodId(),
+                occurrence.plannedStartAt(), occurrence.plannedEndAt(), occurrence.originalPlannedStartAt(),
+                occurrence.supervisionRequirement(), at, occurrence.version() + 1, baseline.sessionNote(),
+                baseline.prescriptions(), baseline.adjustmentIds());
+    }
+
+    @Override public boolean isReady(UUID occurrenceId, UUID planSessionId) {
+        if (occurrenceId == null || planSessionId == null) return false;
+        try { resolveBaseline(occurrenceId, planSessionId); return true; }
+        catch (WorkoutExecutionFailure invalid) { return false; }
+    }
+
+    private Baseline resolveBaseline(UUID occurrenceId, UUID planSessionId) {
         LinkedHashMap<UUID, Resolved> resolved = new LinkedHashMap<>();
-        for (SnapshotPrescription p : store.prescriptions(occurrence.planSessionId())) resolved.put(p.id(), new Resolved(p));
+        for (SnapshotPrescription p : store.prescriptions(planSessionId)) resolved.put(p.id(), new Resolved(p));
         String sessionNote = null;
         List<UUID> adjustmentIds = new ArrayList<>();
-        for (StoredAdjustment a : store.adjustments(occurrence.id())) {
+        for (StoredAdjustment a : store.adjustments(occurrenceId)) {
             if (!"TYPED".equals(a.resolutionState())) throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_BASELINE_INVALID);
             Resolved target = a.prescriptionId() == null ? null : resolved.get(a.prescriptionId());
             if (a.prescriptionId() != null && target == null) throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_BASELINE_INVALID);
@@ -86,14 +109,10 @@ public class WorkoutExecutionSnapshotService implements WorkoutExecutionSnapshot
         }).sorted(Comparator.comparingInt(FrozenPrescription::sequenceNumber)
                 .thenComparing(FrozenPrescription::prescriptionId)).toList();
         if (prescriptions.isEmpty()) throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_BASELINE_INVALID);
-        Instant at = store.databaseNow();
-        store.seal(occurrence.id(), occurrence.version(), at);
-        return new FrozenExecutionSnapshot(occurrence.id(), occurrence.studentId(), occurrence.planId(),
-                occurrence.planVersionId(), occurrence.planSessionId(), occurrence.coachingPeriodId(),
-                occurrence.plannedStartAt(), occurrence.plannedEndAt(), occurrence.originalPlannedStartAt(),
-                occurrence.supervisionRequirement(), at, occurrence.version() + 1, sessionNote,
-                prescriptions, List.copyOf(adjustmentIds));
+        return new Baseline(sessionNote, prescriptions, List.copyOf(adjustmentIds));
     }
+
+    private record Baseline(String sessionNote, List<FrozenPrescription> prescriptions, List<UUID> adjustmentIds) {}
 
     @Override public PlannedWorkoutOutcome skip(UUID occurrenceId, UUID actorId, long expected, String reason) {
         UUID student = planStore.findOccurrenceStudent(occurrenceId);
