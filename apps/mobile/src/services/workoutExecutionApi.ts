@@ -6,6 +6,7 @@ import {
   WorkoutExecutionDetail,
   WorkoutExecutionPage,
 } from '@/types/workoutExecution';
+import type { SkipPlannedWorkoutResponse } from '@/types/workoutSchedule';
 
 export const WORKOUT_EXECUTION_PAGE_SIZE = 20;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,6 +20,16 @@ export function normalizeWorkoutExecutionId(value: unknown): string | null {
 const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
 
 export const workoutExecutionApi = {
+  start(occurrenceId: string, expectedOccurrenceVersion: number, commandKey: string) {
+    return request<WorkoutExecutionDetail>(`/planned-workouts/${occurrenceId}/executions`, {
+      method: 'POST', body: { expectedOccurrenceVersion, commandKey },
+    });
+  },
+  skip(occurrenceId: string, expectedOccurrenceVersion: number, commandKey: string) {
+    return request<SkipPlannedWorkoutResponse>(`/planned-workouts/${occurrenceId}/skip`, {
+      method: 'POST', body: { expectedOccurrenceVersion, commandKey },
+    });
+  },
   current() {
     return request<WorkoutExecutionDetail>('/workout-executions/current', { method: 'GET' });
   },

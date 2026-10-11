@@ -57,6 +57,13 @@ describe('B04 Student Workout Plan screens', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('opens the Student Planned Workout calendar from the Plan hub', () => {
+    const tree = render(<StudentWorkoutPlansScreen />);
+    renderer.act(() => tree.root.findByProps({ testID: 'open-workout-schedule-button' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/workouts/schedule');
+    renderer.act(() => tree.unmount());
+  });
+
   it('separates current 404 empty from retryable server errors', () => {
     (useCurrentWorkoutPlan as jest.Mock).mockReturnValue({ data: undefined, isPending: false, isError: true, error: new ApiError(404, 'missing'), refetch: jest.fn() });
     let tree = render(<StudentWorkoutPlansScreen />); expect(tree.root.findByProps({ testID: 'current-plan-empty' })).toBeTruthy(); renderer.act(() => tree.unmount());

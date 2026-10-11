@@ -25,7 +25,8 @@ export function StudentWorkoutPlansScreen() {
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Kế hoạch tập luyện</Text>
     <WorkoutCard testID="workout-execution-entry">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Buổi tập của tôi</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Tiếp tục buổi đang tập hoặc xem lại kết quả trước đây.</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Xem lịch dự kiến, tiếp tục buổi đang tập hoặc xem lại kết quả trước đây.</Text>
+      <WorkoutButton testID="open-workout-schedule-button" label="Xem lịch tập dự kiến" onPress={() => router.push('/workouts/schedule' as never)} />
       <WorkoutButton testID="open-current-workout-button" label="Mở buổi tập đang diễn ra" onPress={() => router.push('/workouts/current' as never)} />
       <WorkoutButton testID="open-workout-history-button" label="Xem lịch sử tập luyện" secondary onPress={() => router.push('/workouts/history' as never)} />
     </WorkoutCard>
