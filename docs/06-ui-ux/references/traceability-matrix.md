@@ -10,6 +10,7 @@
 | Exercise Library | Browse/detail/picker; active, archived, unavailable and canonical mapping states | Student/Trainer/Admin | `screen-inventory.md`, `component-specifications.md`, `admin/admin-screens.md` |
 | Workout Plan | Student current/list/detail, SELF_DIRECTED authoring and successor; TR-03 Program authority context; TR-05 Trainer-owned DRAFT builder, activation/lifecycle, immutable history and significant version publication | Student/Trainer | `screen-inventory.md`, `navigation-architecture.md`, `student/student-screens.md`, `trainer/trainer-screens.md` |
 | Planned vs Actual Workout | Student Planned Workout calendar tại `/(app)/workouts/schedule` mở B05 START/SKIP theo `availableActions`; Current và history/detail là Actual Workout riêng | Student/Trainer | Student flows, `navigation-architecture.md` |
+| Trainer schedule proposal decision | Student xem danh sách và detail tại `/(app)/workout-schedule-proposals`, xác nhận ACCEPT/REJECT toàn bộ; Trainer proposal mutation không thuộc Mobile checkpoint này | Student | `screen-inventory.md`, `navigation-architecture.md`, Student flows |
 | Schedule change | Request, conflict, accept/reject | Student/Trainer | Student và Trainer flows |
 | Body measurement | Add measurement, history, provenance, quality | Student/Trainer | Student screens |
 | Progress | Current Goal và Lifetime tabs | Student/Trainer | Student screens |

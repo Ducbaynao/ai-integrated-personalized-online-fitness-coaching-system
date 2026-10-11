@@ -48,6 +48,8 @@ export default function AppLayout() {
       <Stack.Screen name="students/[studentId]/workout-plans/[planId]/builder" />
       <Stack.Screen name="workouts/current" />
       <Stack.Screen name="workouts/schedule" />
+      <Stack.Screen name="workout-schedule-proposals/index" />
+      <Stack.Screen name="workout-schedule-proposals/[proposalId]" />
       <Stack.Screen name="workouts/history" />
       <Stack.Screen name="workouts/[executionId]" />
     </Stack>

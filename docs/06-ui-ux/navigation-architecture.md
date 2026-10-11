@@ -48,6 +48,8 @@ Workout Plan của Student dùng stack authenticated và yêu cầu Student Prof
 - `/(app)/workout-plans/[planId]/edit`: complete replacement DRAFT snapshot hoặc significant version publication; không dùng cho occurrence-scoped minor adjustment.
 - `/(app)/workouts/current`: ST-07, đọc authoritative execution đang `IN_PROGRESS`; ghi từng set, thay Exercise Variation cho actual execution và gửi lệnh complete/abort bằng version backend mới nhất.
 - `/(app)/workouts/schedule`: ST-05 Student Planned Workout calendar, mở từ Plan hub; dùng occurrence ID/version thật và chỉ hiện START/SKIP khi backend trả `availableActions`.
+- `/(app)/workout-schedule-proposals`: ST-05 danh sách đề xuất lịch của Student, mở từ Plan hub; dữ liệu từ endpoint Student-owned, không phải danh sách Trainer.
+- `/(app)/workout-schedule-proposals/[proposalId]`: ST-05 chi tiết đề xuất lịch, Student xác nhận ACCEPT/REJECT toàn bộ với proposal version và command key thật; lịch chỉ được tạo sau khi backend xác nhận ACCEPT.
 - `/(app)/workouts/history`: ST-08 history phân trang của Student; tách planned time và performed time.
 - `/(app)/workouts/[executionId]`: chi tiết execution visible; terminal record chỉ đọc, legacy record đánh dấu dữ liệu nguồn có thể thiếu.
 
