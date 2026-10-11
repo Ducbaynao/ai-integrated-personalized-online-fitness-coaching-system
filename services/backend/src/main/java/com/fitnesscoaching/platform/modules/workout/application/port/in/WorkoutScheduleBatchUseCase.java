@@ -10,6 +10,14 @@ import java.util.UUID;
 public interface WorkoutScheduleBatchUseCase {
     ConfirmedBatch confirmDirect(ConfirmBatch command);
 
+    /** Schedule collaboration uses this boundary; it never reads Workout persistence itself. */
+    UUID studentForPlan(UUID planId);
+    void lockStudentAndActor(UUID studentId, UUID actorId);
+    Source inspectProposalSource(ConfirmBatch proposed);
+    ConfirmedBatch confirmProposal(ConfirmBatch proposed, UUID proposalId, UUID trainerId);
+
+    record Source(UUID planVersionId, int planVersionNumber) {}
+
     record ConfirmBatch(UUID actorId, UUID planId, UUID sourcePlanVersionId,
                         long expectedPlanAggregateVersion, LocalDate weekAnchorDate,
                         String timezone, List<Item> items, String commandKey) {}

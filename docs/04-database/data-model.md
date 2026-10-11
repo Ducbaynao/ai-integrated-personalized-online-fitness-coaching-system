@@ -51,6 +51,8 @@ The Exercise catalog uses a nullable, governed movement-pattern reference. Activ
 
 ## Schedule
 
+V32 adds Trainer-authored Planned Workout schedule proposals as a collaboration aggregate, separate from confirmed batches and occurrences. Proposal items preserve the submitted source session coordinates, local wall-time intent, IANA timezone and selected offsets; proposal version/status history and actor-scoped receipts make withdrawal and Student ACCEPT/REJECT auditable. ACCEPT links the confirmed Workout-owned batch back to the proposal and materializes all occurrences transactionally through the same Workout boundary as direct Student confirmation. A pending or rejected proposal reserves no calendar slot and never creates an occurrence.
+
 Appointment identifies Trainer, Student, start/end, timezone, location/type, status, and optional related Planned Workout. Recurrence/series metadata is separate from occurrence state. Change Request stores initiator, original/proposed times, recurrence scope, reason, status, creation/response time, and final change reference. Change History retains each accepted transition.
 
 ## Measurement and progress

@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class WorkoutScheduleBatchWebTest {
     @Test void controllerPassesActorAndTokensAndReturnsDeclaredCreatedPayload() {
@@ -24,7 +27,11 @@ class WorkoutScheduleBatchWebTest {
                         local.plusHours(1), "+07:00", "+07:00", local.toInstant(ZoneOffset.ofHours(7)),
                         local.plusHours(1).toInstant(ZoneOffset.ofHours(7)), "SELF_ALLOWED")), false);
         final ConfirmBatch[] received = new ConfirmBatch[1];
-        WorkoutScheduleBatchUseCase command = input -> { received[0] = input; return expected; };
+        WorkoutScheduleBatchUseCase command = mock(WorkoutScheduleBatchUseCase.class);
+        when(command.confirmDirect(any())).thenAnswer(call -> {
+            received[0] = call.getArgument(0);
+            return expected;
+        });
         var controller = new WorkoutScheduleBatchController(command);
         var request = new WorkoutScheduleBatchController.Request(plan, version, 7L, monday,
                 "Asia/Ho_Chi_Minh", List.of(new WorkoutScheduleBatchController.InputItem(itemId, session,
