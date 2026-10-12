@@ -39,6 +39,49 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         this.appointments = appointments; this.audit = audit; this.mapper = mapper;
     }
 
+    @Override public void lockStudentAndActor(UUID studentId, UUID actorId) {
+        plans.lockStudentAndActor(studentId, actorId);
+    }
+
+    // Schedule must acquire the Student boundary and authorize the Trainer before calling this Workout-owned inspection.
+    @Override @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ProposalSource inspectProposalCreation(UUID studentId, UUID occurrenceId,
+                                                  long expectedOccurrenceVersion, String changeType,
+                                                  Destination destination) {
+        if (studentId == null || occurrenceId == null || expectedOccurrenceVersion < 0
+                || !"RESCHEDULE".equals(changeType) && !"CANCEL".equals(changeType))
+            throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
+        if (!studentId.equals(plans.findOccurrenceStudent(occurrenceId)))
+            throw fail("PLANNED_WORKOUT_NOT_FOUND", 404);
+        Occurrence old = changes.lockOccurrence(occurrenceId);
+        Instant at = changes.databaseNow();
+        checkMutable(old, expectedOccurrenceVersion);
+        if (!old.plannedStartAt().isAfter(at)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
+        if (appointments.hasAnyLinkedForMutation(old.id())) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if (changes.hasSuccessor(old.id())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
+        if ("RESCHEDULE".equals(changeType)) {
+            if (old.sessionId() == null || old.planVersionId() == null || old.localStart() == null
+                    || old.localEnd() == null || old.timezone() == null || old.startUtcOffset() == null
+                    || old.endUtcOffset() == null)
+                throw fail("WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE", 409);
+            try { LocalDateTime.parse(old.localStart()); LocalDateTime.parse(old.localEnd()); }
+            catch (DateTimeException malformed) { throw fail("WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE", 409); }
+            if ("COACH_REQUIRED".equals(old.supervisionRequirement()))
+                throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED", 409);
+            if (destination == null || destination.localStart() == null || destination.localEnd() == null)
+                throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
+            ZoneId zone = zone(destination.timezone());
+            Instant start = instant(destination.localStart(), destination.startUtcOffset(), zone);
+            Instant end = instant(destination.localEnd(), destination.endUtcOffset(), zone);
+            if (!end.isAfter(start)) throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
+            if (!start.isAfter(at) || start.isAfter(at.plus(90, ChronoUnit.DAYS)))
+                throw fail("WORKOUT_SCHEDULE_WINDOW_INVALID", 400);
+        } else if (destination != null) throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
+        return new ProposalSource(old.id(), old.studentId(), old.version(), old.planVersionId(), old.sessionId(),
+                old.plannedStartAt(), old.plannedEndAt(), old.originalPlannedStartAt(), old.timezone(),
+                old.localStart(), old.localEnd(), old.startUtcOffset(), old.endUtcOffset());
+    }
+
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public ChangeResult reschedule(Reschedule c) {
         if (c == null || c.occurrenceId() == null || c.actorId() == null || c.expectedOccurrenceVersion() < 0

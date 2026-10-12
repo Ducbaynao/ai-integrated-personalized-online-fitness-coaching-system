@@ -7,6 +7,9 @@ import java.util.UUID;
 public interface WorkoutScheduleChangeUseCase {
     ChangeResult reschedule(Reschedule command);
     ChangeResult cancel(Cancel command);
+    void lockStudentAndActor(UUID studentId, UUID actorId);
+    ProposalSource inspectProposalCreation(UUID studentId, UUID occurrenceId, long expectedOccurrenceVersion,
+                                           String changeType, Destination destination);
 
     record Destination(LocalDateTime localStart, LocalDateTime localEnd, String timezone,
                        String startUtcOffset, String endUtcOffset) {}
@@ -14,6 +17,10 @@ public interface WorkoutScheduleChangeUseCase {
                       Destination destination, String reason, String commandKey) {}
     record Cancel(UUID occurrenceId, UUID actorId, long expectedOccurrenceVersion,
                   String reason, String commandKey) {}
+    record ProposalSource(UUID occurrenceId, UUID studentId, long occurrenceVersion,
+                          UUID planVersionId, UUID planSessionId, Instant plannedStartAt,
+                          Instant plannedEndAt, Instant originalPlannedStartAt, String timezone,
+                          String localStart, String localEnd, String startUtcOffset, String endUtcOffset) {}
     record ChangeResult(String changeType, UUID previousOccurrenceId, long previousOccurrenceVersion,
                         String previousStatus, Instant originalPlannedStartAt, Instant oldPlannedStartAt,
                         Instant oldPlannedEndAt, UUID replacementOccurrenceId, Long replacementOccurrenceVersion,
