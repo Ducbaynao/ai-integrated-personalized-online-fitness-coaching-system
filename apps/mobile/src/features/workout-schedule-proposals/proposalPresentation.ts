@@ -8,6 +8,12 @@ export const proposalStatusLabels: Record<WorkoutScheduleProposalStatus, string>
   WITHDRAWN: 'Huấn luyện viên đã rút đề xuất',
 };
 
+export const trainerProposalStatusLabels: Record<WorkoutScheduleProposalStatus, string> = {
+  ...proposalStatusLabels,
+  PENDING: 'Đang chờ học viên quyết định',
+  WITHDRAWN: 'Đã rút đề xuất',
+};
+
 export function formatProposalLocal(value: string, offset: string, timezone: string): string {
   return `${value.replace('T', ' ')} (UTC${offset}) · ${timezone}`;
 }

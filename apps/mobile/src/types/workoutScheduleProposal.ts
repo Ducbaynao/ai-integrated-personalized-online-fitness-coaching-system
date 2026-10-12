@@ -11,6 +11,8 @@ export interface WorkoutScheduleProposalItem {
   localEnd: string;
   startUtcOffset: string;
   endUtcOffset: string;
+  sourceSessionName: string | null;
+  sourceSessionFocus: string | null;
 }
 
 export interface WorkoutScheduleProposal {
@@ -19,8 +21,10 @@ export interface WorkoutScheduleProposal {
   status: WorkoutScheduleProposalStatus;
   studentId: string;
   trainerId: string;
+  trainerDisplayName: string | null;
   coachingPeriodId: string;
   planId: string;
+  sourcePlanName: string | null;
   sourcePlanVersionId: string;
   sourcePlanVersionNumber: number;
   observedPlanAggregateVersion: number;
@@ -33,6 +37,16 @@ export interface WorkoutScheduleProposal {
   decisionNote?: string | null;
   withdrawnAt?: string | null;
   withdrawnBy?: string | null;
+}
+
+export interface WithdrawWorkoutScheduleProposalRequest {
+  expectedProposalVersion: number;
+  commandKey: string;
+}
+
+export interface WorkoutScheduleProposalCommandResult {
+  proposal: WorkoutScheduleProposal;
+  replayed: boolean;
 }
 
 export interface WorkoutScheduleProposalPage {
@@ -64,7 +78,7 @@ export interface WorkoutScheduleProposalDecisionResult {
     sourceProposalId: string | null;
     confirmedBy: string;
     confirmedAt: string;
-    items: (WorkoutScheduleProposalItem & {
+    items: (Omit<WorkoutScheduleProposalItem, 'sourceSessionName' | 'sourceSessionFocus'> & {
       occurrenceId: string;
       occurrenceVersion: number;
       plannedStartAt: string;

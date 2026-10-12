@@ -33,6 +33,7 @@ Coaching relationship dùng stack authenticated chung, với nội dung và muta
 - `/(app)/coaching/[relationshipId]`: trạng thái quan hệ, kỳ hiện tại được phép xem, accept/reject/cancel/pause/resume/end.
 - `/(app)/coaching/[relationshipId]/sharing`: authoritative sharing summary; Student owner chỉnh quyền khi relationship active/paused, Trainer chỉ đọc trạng thái backend trả về.
 - `/(app)/coaching/[relationshipId]/program`: Trainer-only TR-03 Program context. Route tải Workout Plan khi relationship đang ACTIVE và backend summary cho phép VIEW; PAUSED/ended/authority-loss không preload dữ liệu riêng tư.
+- `/(app)/coaching/[relationshipId]/schedule-proposals` và detail: Trainer xem đề xuất lịch do chính mình tạo cho Student trong TR-03 khi còn Coaching Period và WORKOUT_PLAN VIEW hiện hành. VIEW là chỉ đọc; CONTRIBUTE trở lên mới có thể rút đề xuất PENDING. Tạo đề xuất trên Mobile còn chờ read contract cho supervision requirement của từng source session; không hiện CTA gửi giả.
 - `/(app)/coaching/[relationshipId]/workout-plans/new`: Trainer tạo complete DRAFT snapshot cho Student trong relationship hiện tại khi backend cho phép MANAGE.
 - `/(app)/students/[studentId]/workout-plans/[planId]`: plan summary, immutable version history, archived/unavailable Exercise presentation và lifecycle commands. `studentId` là cache scope; backend vẫn xác minh plan ownership/visibility.
 - `/(app)/students/[studentId]/workout-plans/[planId]/builder`: edit DRAFT hoặc publish significant replacement version. Route không hỗ trợ occurrence-scoped minor adjustments.

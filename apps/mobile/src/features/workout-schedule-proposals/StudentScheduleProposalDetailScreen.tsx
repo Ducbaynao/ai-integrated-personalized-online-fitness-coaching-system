@@ -95,9 +95,9 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
     {proposal && !query.isError && !permissionLost ? <>
       <WorkoutCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{proposalStatusLabels[proposal.status]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Huấn luyện viên đề xuất · Mã: {proposal.trainerId}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch nguồn: {proposal.planId}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản nguồn: {proposal.sourcePlanVersionNumber} · {proposal.sourcePlanVersionId}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Huấn luyện viên đề xuất: {proposal.trainerDisplayName?.trim() || 'Chưa có tên huấn luyện viên'}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch nguồn: {proposal.sourcePlanName?.trim() || 'Chưa có tên kế hoạch'}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản nguồn: {proposal.sourcePlanVersionNumber}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Tuần bắt đầu: {proposal.weekAnchorDate} · Múi giờ: {proposal.timezone}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất lúc: {formatProposalInstant(proposal.proposedAt, user?.timezone || 'UTC')}</Text>
         {proposal.decidedAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đã quyết định lúc: {formatProposalInstant(proposal.decidedAt, user?.timezone || 'UTC')}</Text> : null}
@@ -106,10 +106,10 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
       </WorkoutCard>
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Các buổi trong đề xuất ({proposal.items.length})</Text>
       {proposal.items.map((item) => <WorkoutCard key={item.clientItemId} testID={`proposal-item-${item.clientItemId}`}>
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Tuần {item.weekNumber} · Ngày {item.dayNumber} · Buổi {item.sequenceNumber}</Text>
+        <Text style={[styles.label, { color: theme.textPrimary }]}>{item.sourceSessionName?.trim() || `Buổi ${item.sequenceNumber}`} · Tuần {item.weekNumber} · Ngày {item.dayNumber}</Text>
+        {item.sourceSessionFocus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {item.sourceSessionFocus}</Text> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc: {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Mã buổi trong kế hoạch: {item.planSessionId}</Text>
       </WorkoutCard>)}
       {proposal.status === 'PENDING' ? <WorkoutCard>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bạn chỉ có thể chấp nhận hoặc từ chối toàn bộ đề xuất. Lịch tập chỉ được tạo sau khi máy chủ xác nhận thành công.</Text>

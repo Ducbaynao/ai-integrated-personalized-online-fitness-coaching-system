@@ -25,10 +25,9 @@ export function StudentScheduleProposalsScreen() {
     {query.isError ? <WorkoutState testID="proposals-error" title="Không thể tải đề xuất" message={proposalErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
     {!query.isPending && !query.isError && items.length === 0 ? <WorkoutState testID="proposals-empty" title="Chưa có đề xuất lịch tập" message="Khi huấn luyện viên gửi đề xuất, bạn sẽ thấy tại đây." /> : null}
     {items.map((proposal) => <WorkoutCard key={proposal.proposalId} testID={`proposal-${proposal.proposalId}`}>
-      <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Đề xuất từ huấn luyện viên</Text>
+      <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Đề xuất từ {proposal.trainerDisplayName?.trim() || 'huấn luyện viên'}</Text>
       <Text style={[styles.label, { color: theme.textPrimary }]}>{proposalStatusLabels[proposal.status]}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Mã huấn luyện viên: {proposal.trainerId}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {proposal.planId} · Phiên bản {proposal.sourcePlanVersionNumber}</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {proposal.sourcePlanName?.trim() || 'Chưa có tên kế hoạch'} · Phiên bản {proposal.sourcePlanVersionNumber}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{proposal.items.length} buổi được đề xuất · {proposal.timezone}</Text>
       {proposal.items[0] ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đầu: {formatProposalLocal(proposal.items[0].localStart, proposal.items[0].startUtcOffset, proposal.timezone)}</Text> : null}
       <WorkoutButton testID={`open-proposal-${proposal.proposalId}`} label="Xem chi tiết đề xuất" onPress={() => router.push(`/workout-schedule-proposals/${proposal.proposalId}` as never)} />
