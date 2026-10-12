@@ -103,6 +103,7 @@ export interface ErrorResponse {
   timestamp: string;
   requestId: string;
   fieldErrors: FieldError[];
+  itemErrors?: { clientItemId: string; field: string | null; code: string; message: string }[];
 }
 
 export class ApiError extends Error {

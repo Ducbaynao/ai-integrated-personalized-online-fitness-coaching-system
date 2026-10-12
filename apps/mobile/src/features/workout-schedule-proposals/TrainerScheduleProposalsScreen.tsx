@@ -31,6 +31,7 @@ export function TrainerScheduleProposalsScreen({ relationshipId }: { relationshi
   const permission = sharingQuery.data?.items.find((item) => item.dataScope === 'WORKOUT_PLAN');
   const canView = activeCapability === 'TRAINER' && relationship?.trainerId === trainerId && relationship.status === 'ACTIVE'
     && permission?.state === 'ALLOWED' && ['VIEW', 'CONTRIBUTE', 'MANAGE'].includes(permission.accessLevel ?? '');
+  const canCreate = canView && ['CONTRIBUTE', 'MANAGE'].includes(permission?.accessLevel ?? '');
   const query = useTrainerWorkoutScheduleProposals(trainerId, studentId, status, canView && !permissionLost);
   const items = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
   const denied = query.error instanceof ApiError && [403, 404].includes(query.error.status);
@@ -49,6 +50,7 @@ export function TrainerScheduleProposalsScreen({ relationshipId }: { relationshi
   return <ScrollView testID="trainer-schedule-proposals" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Đề xuất lịch tập</Text>
     <WorkoutButton label="Quay lại học viên" secondary onPress={() => router.back()} />
+    {canCreate ? <WorkoutButton testID="open-create-proposal" label="Tạo đề xuất lịch tập" onPress={() => router.push(`/coaching/${relationshipId}/schedule-proposals/new` as never)} /> : null}
     <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ hiển thị đề xuất bạn đã tạo cho {relationship.counterparty.displayName}.</Text>
     <ScrollView horizontal accessibilityLabel="Lọc trạng thái đề xuất" contentContainerStyle={styles.row}>
       {filters.map((filter) => <WorkoutButton key={filter.label} label={filter.label} secondary={status !== filter.status}

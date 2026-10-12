@@ -117,6 +117,8 @@ describe('Student schedule proposal screens', () => {
     const { tree, invalidate } = render(<StudentScheduleProposalDetailScreen proposalId="proposal-1" />);
     renderer.act(() => tree.root.findByProps({ testID: 'proposal-accept' }).props.onPress());
     expect(workoutScheduleProposalApi.decide).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh');
+    expect(JSON.stringify(tree.toJSON())).toContain('UTC+07:00');
     expect(JSON.stringify(tree.toJSON())).toContain('không buổi nào được tạo');
     await renderer.act(async () => {
       const confirm = tree.root.findByProps({ testID: 'proposal-confirm-decision' });

@@ -1,6 +1,16 @@
 export type WorkoutScheduleProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
 export type WorkoutScheduleDecision = 'ACCEPT' | 'REJECT';
 
+export interface CreateWorkoutScheduleProposalRequest {
+  planId: string;
+  sourcePlanVersionId: string;
+  expectedPlanAggregateVersion: number;
+  weekAnchorDate: string;
+  timezone: string;
+  items: Pick<WorkoutScheduleProposalItem, 'clientItemId' | 'planSessionId' | 'weekNumber' | 'dayNumber' | 'sequenceNumber' | 'localStart' | 'localEnd' | 'startUtcOffset' | 'endUtcOffset'>[];
+  commandKey: string;
+}
+
 export interface WorkoutScheduleProposalItem {
   clientItemId: string;
   planSessionId: string;
