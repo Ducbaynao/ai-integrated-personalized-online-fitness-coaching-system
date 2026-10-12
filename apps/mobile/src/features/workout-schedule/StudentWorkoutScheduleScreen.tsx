@@ -12,33 +12,13 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { ApiError } from '@/types/auth';
-import type { PlannedWorkoutOccurrence, PlannedWorkoutStatus, SkipPlannedWorkoutResponse } from '@/types/workoutSchedule';
+import type { PlannedWorkoutOccurrence, SkipPlannedWorkoutResponse } from '@/types/workoutSchedule';
 import type { WorkoutExecutionDetail } from '@/types/workoutExecution';
+import { calendarWindow, formatScheduleTime, plannedWorkoutStatusLabels } from './scheduleDisplay';
+export { calendarWindow, formatScheduleTime } from './scheduleDisplay';
 
 const DAY = 24 * 60 * 60 * 1000;
-const WINDOW_DAYS = 30;
 type Command = { action: 'START' | 'SKIP'; occurrenceId: string; expectedOccurrenceVersion: number; commandKey: string };
-
-const statusLabels: Record<PlannedWorkoutStatus, string> = {
-  SCHEDULED: 'Đã lên lịch', COMPLETED: 'Đã hoàn thành', ATTEMPTED: 'Đã thực hiện một phần',
-  MISSED: 'Đã lỡ', SKIPPED: 'Đã bỏ qua', RESCHEDULED: 'Đã đổi lịch', CANCELLED: 'Đã hủy',
-};
-
-export function calendarWindow(anchor: number, offset: number) {
-  const from = anchor + offset * WINDOW_DAYS * DAY;
-  return { from: new Date(from).toISOString(), until: new Date(from + WINDOW_DAYS * DAY).toISOString() };
-}
-
-export function formatScheduleTime(instant: string, timezone: string | null, profileTimezone?: string | null) {
-  const preferred = timezone || profileTimezone || 'UTC';
-  try {
-    const value = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: preferred }).format(new Date(instant));
-    return `${value} · ${preferred}${timezone ? '' : profileTimezone ? ' (múi giờ hồ sơ)' : ' (không có múi giờ hồ sơ)'}`;
-  } catch {
-    const value = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(instant));
-    return `${value} · UTC (không xác định được múi giờ)`;
-  }
-}
 
 function scheduleErrorMessage(error: unknown) {
   if (error instanceof ApiError && error.status === 403) return 'Bạn không có quyền xem lịch tập này.';
@@ -146,7 +126,7 @@ export function StudentWorkoutScheduleScreen() {
     {actionError ? <WorkoutState testID="schedule-action-error" title="Chưa thể cập nhật buổi tập" message={actionError} onRetry={failedCommand ? () => send(failedCommand) : undefined} /> : null}
     {items.map((item) => <WorkoutCard key={item.occurrenceId} testID={`schedule-occurrence-${item.occurrenceId}`}>
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{item.sessionSummary?.name || 'Buổi tập theo lịch'}</Text>
-      <Text style={[styles.label, { color: theme.textPrimary }]}>{statusLabels[item.status]}</Text>
+      <Text style={[styles.label, { color: theme.textPrimary }]}>{plannedWorkoutStatusLabels[item.status]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Dự kiến: {formatScheduleTime(item.plannedStartAt, item.timezone, user?.timezone)}</Text>
       {item.plannedEndAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc dự kiến: {formatScheduleTime(item.plannedEndAt, item.timezone, user?.timezone)}</Text> : null}
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.planSummary?.planName || 'Không có tên kế hoạch trong bản ghi cũ'}{item.sessionSummary ? ` · Tuần ${item.sessionSummary.weekNumber}, ngày ${item.sessionSummary.dayNumber}` : ' · Không có tóm tắt buổi tập'}</Text>

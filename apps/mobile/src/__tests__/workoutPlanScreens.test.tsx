@@ -54,6 +54,8 @@ describe('Trainer workout plan screens', () => {
     expect(mockPush).toHaveBeenCalledWith('/coaching/relationship-1/workout-plans/new');
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Xem kế hoạch' }).props.onPress());
     expect(mockPush).toHaveBeenCalledWith('/students/student-1/workout-plans/plan-1?relationshipId=relationship-1');
+    renderer.act(() => tree.root.findByProps({ testID: 'open-trainer-workout-schedule' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/coaching/relationship-1/workout-schedule');
     renderer.act(() => tree.unmount());
   });
 
