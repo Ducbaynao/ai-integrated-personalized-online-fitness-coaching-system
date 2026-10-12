@@ -3160,7 +3160,7 @@ components:
     WorkoutPlanSession:
       type: object
       additionalProperties: false
-      required: [id, weekNumber, dayNumber, sequenceNumber, name, prescriptions]
+      required: [id, weekNumber, dayNumber, sequenceNumber, name, supervisionRequirement, prescriptions]
       properties:
         id: { type: string, format: uuid }
         weekNumber: { type: integer, minimum: 1 }
@@ -3170,6 +3170,10 @@ components:
         focus: { type: [string, 'null'] }
         estimatedDurationMinutes: { type: [integer, 'null'], minimum: 1 }
         notes: { type: [string, 'null'] }
+        supervisionRequirement:
+          type: string
+          enum: [SELF_ALLOWED, COACH_PREFERRED, COACH_REQUIRED]
+          description: Stored requirement of this exact plan session/version. V13 supplies SELF_ALLOWED for pre-existing rows.
         prescriptions: { type: array, items: { $ref: '#/components/schemas/WorkoutPlanPrescription' } }
     WorkoutPlanPrescription:
       type: object

@@ -18,11 +18,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -40,8 +42,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class WorkoutPlanPersistenceIntegrationTest {
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
@@ -64,11 +71,83 @@ class WorkoutPlanPersistenceIntegrationTest {
     @Autowired WorkoutPlanCommandUseCase commands;
     @Autowired WorkoutPlanQueryUseCase queries;
     @Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mvc;
     @MockitoSpyBean AuditService audit;
     @MockitoSpyBean WorkoutPlanPersistencePort store;
     @Autowired ExerciseReferenceQuery exerciseReferences;
 
     @BeforeEach void resetSpies() { reset(audit, store); }
+
+    @Test
+    void versionHttpReadsStoredSupervisionForAllThreeValuesAndLegacyDefault() throws Exception {
+        Fixture legacy = fixture();
+        assertThat(jdbc.queryForObject("SELECT supervision_requirement::text FROM fitness.workout_plan_sessions WHERE id=?",
+                String.class, legacy.sessionId())).isEqualTo("SELF_ALLOWED");
+        assertThat(jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema='fitness' AND table_name='workout_plan_sessions'
+                  AND column_name='supervision_requirement'
+                """, String.class)).isEqualTo("NO");
+        assertSessionHttp(legacy, legacy.studentId(), "SELF_ALLOWED");
+
+        Fixture preferred = fixture();
+        jdbc.update("UPDATE fitness.workout_plan_sessions SET supervision_requirement='COACH_PREFERRED' WHERE id=?",
+                preferred.sessionId());
+        assertSessionHttp(preferred, preferred.studentId(), "COACH_PREFERRED");
+
+        Fixture required = fixture();
+        jdbc.update("UPDATE fitness.workout_plan_sessions SET supervision_requirement='COACH_REQUIRED' WHERE id=?",
+                required.sessionId());
+        assertSessionHttp(required, required.studentId(), "COACH_REQUIRED");
+    }
+
+    @Test
+    void versionHttpKeepsHistoricalSessionRequirementAndEnforcesReadAuthority() throws Exception {
+        Fixture plan = fixture();
+        jdbc.update("UPDATE fitness.workout_plan_sessions SET supervision_requirement='COACH_PREFERRED' WHERE id=?",
+                plan.sessionId());
+        commands.activate(new ActivateCommand(plan.planId(), plan.studentId(), 0, "activate-supervision"));
+        CommandResult published = commands.publishVersion(new PublishVersionCommand(
+                plan.planId(), plan.studentId(), 1, "publish-supervision", "PROGRESSION", "Next phase",
+                blueprint(plan.variationId())));
+        assertSessionHttp(plan, plan.studentId(), "COACH_PREFERRED");
+        mvc.perform(get("/api/v1/workout-plans/{planId}/versions/{versionId}",
+                        plan.planId(), published.planVersionId())
+                        .with(jwt().jwt(token -> token.subject(plan.studentId().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.id").value(published.planVersionId().toString()))
+                .andExpect(jsonPath("$.sessions[0].supervisionRequirement").value("SELF_ALLOWED"));
+
+        TrainerFixture trainer = trainerFixture("VIEW");
+        mvc.perform(get("/api/v1/workout-plans").param("studentId", trainer.plan().studentId().toString())
+                        .with(jwt().jwt(token -> token.subject(trainer.trainerId().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(trainer.plan().planId().toString()));
+        mvc.perform(get("/api/v1/workout-plans/{planId}", trainer.plan().planId())
+                        .with(jwt().jwt(token -> token.subject(trainer.trainerId().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plan.aggregateVersion").value(0));
+        assertSessionHttp(trainer.plan(), trainer.trainerId(), "SELF_ALLOWED");
+        UUID unrelated = person("TRAINER");
+        mvc.perform(get("/api/v1/workout-plans/{planId}/versions/{versionId}",
+                        trainer.plan().planId(), trainer.plan().versionId())
+                        .with(jwt().jwt(token -> token.subject(unrelated.toString()))))
+                .andExpect(status().isNotFound());
+    }
+
+    private void assertSessionHttp(Fixture plan, UUID actor, String requirement) throws Exception {
+        mvc.perform(get("/api/v1/workout-plans/{planId}/versions/{versionId}",
+                        plan.planId(), plan.versionId())
+                        .with(jwt().jwt(token -> token.subject(actor.toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.id").value(plan.versionId().toString()))
+                .andExpect(jsonPath("$.sessions[0].id").value(plan.sessionId().toString()))
+                .andExpect(jsonPath("$.sessions[0].weekNumber").value(1))
+                .andExpect(jsonPath("$.sessions[0].dayNumber").value(1))
+                .andExpect(jsonPath("$.sessions[0].sequenceNumber").value(1))
+                .andExpect(jsonPath("$.sessions[0].supervisionRequirement").value(requirement))
+                .andExpect(jsonPath("$.sessions[0].prescriptions[0].id").value(plan.prescriptionId().toString()));
+    }
 
     @Test
     void draftAuthoringPersistsReplacementSnapshotAndReadProjection() {
