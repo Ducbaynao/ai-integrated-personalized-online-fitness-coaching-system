@@ -29,4 +29,13 @@ describe('Student schedule proposal API', () => {
       method: 'POST', body: { expectedProposalVersion: 3, commandKey: 'retry-key' },
     });
   });
+
+  it('POSTs the exact Student-scoped batch payload for Trainer create', async () => {
+    const body = { planId: 'plan-id', sourcePlanVersionId: 'version-id', expectedPlanAggregateVersion: 4,
+      weekAnchorDate: '2026-10-12', timezone: 'Asia/Ho_Chi_Minh', commandKey: 'stable-key',
+      items: [{ clientItemId: 'item-id', planSessionId: 'session-id', weekNumber: 1, dayNumber: 1, sequenceNumber: 1,
+        localStart: '2026-10-12T18:30', localEnd: '2026-10-12T19:30', startUtcOffset: '+07:00', endUtcOffset: '+07:00' }] };
+    await workoutScheduleProposalApi.create('student-id', body);
+    expect(request).toHaveBeenCalledWith('/students/student-id/planned-workout-schedule-proposals', { method: 'POST', body });
+  });
 });

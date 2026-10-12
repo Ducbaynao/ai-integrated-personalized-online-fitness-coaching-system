@@ -1,5 +1,6 @@
 import { request } from '@/services/apiClient';
 import type {
+  CreateWorkoutScheduleProposalRequest,
   DecideWorkoutScheduleProposalRequest,
   WorkoutScheduleProposal,
   WorkoutScheduleProposalDecisionResult,
@@ -12,6 +13,9 @@ import type {
 export const WORKOUT_SCHEDULE_PROPOSAL_PAGE_SIZE = 20;
 
 export const workoutScheduleProposalApi = {
+  create(studentId: string, body: CreateWorkoutScheduleProposalRequest) {
+    return request<WorkoutScheduleProposalCommandResult>(`/students/${encodeURIComponent(studentId)}/planned-workout-schedule-proposals`, { method: 'POST', body });
+  },
   listMine(page = 0, size = WORKOUT_SCHEDULE_PROPOSAL_PAGE_SIZE) {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     return request<WorkoutScheduleProposalPage>(`/planned-workout-schedule-proposals/me?${params}`, { method: 'GET' });

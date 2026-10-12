@@ -121,6 +121,10 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
       {proposal.status === 'ACCEPTED' ? <WorkoutButton testID="proposal-open-calendar" label="Xem lịch tập đã xác nhận" onPress={() => router.push('/workouts/schedule' as never)} /> : null}
       {confirmation && proposal.status === 'PENDING' ? <WorkoutCard testID="proposal-confirmation">
         <Text accessibilityRole="alert" style={[styles.h2, { color: theme.textPrimary }]}>{confirmation === 'ACCEPT' ? 'Xác nhận chấp nhận toàn bộ lịch?' : 'Xác nhận từ chối toàn bộ đề xuất?'}</Text>
+        {confirmation === 'ACCEPT' ? <>
+          <Text style={[styles.body, { color: theme.textPrimary }]}>Múi giờ huấn luyện viên đã chọn cho đề xuất: {proposal.timezone}. Đây không phải múi giờ hồ sơ của bạn.</Text>
+          {proposal.items.map((item) => <Text key={item.clientItemId} style={[styles.body, { color: theme.textPrimary }]}>{item.sourceSessionName?.trim() || `Buổi ${item.sequenceNumber}`}: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)} → {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}</Text>)}
+        </> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{confirmation === 'ACCEPT'
           ? `Nếu hợp lệ, cả ${proposal.items.length} buổi sẽ được tạo cùng lúc; nếu có xung đột, không buổi nào được tạo.`
           : 'Không buổi tập nào được tạo từ đề xuất này.'}</Text>

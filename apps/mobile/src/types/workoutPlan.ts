@@ -76,6 +76,7 @@ export interface WorkoutSession {
   focus: string | null;
   estimatedDurationMinutes: number | null;
   notes: string | null;
+  supervisionRequirement: 'SELF_ALLOWED' | 'COACH_PREFERRED' | 'COACH_REQUIRED';
   prescriptions: WorkoutPrescription[];
 }
 
