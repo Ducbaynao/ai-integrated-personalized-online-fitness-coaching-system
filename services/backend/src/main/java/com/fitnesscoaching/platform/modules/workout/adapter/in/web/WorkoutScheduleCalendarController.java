@@ -36,4 +36,10 @@ public class WorkoutScheduleCalendarController {
             @RequestParam(defaultValue = "20") int size) {
         return calendar.listForTrainer(UUID.fromString(jwt.getSubject()), studentId, from, until, page, size);
     }
+
+    @GetMapping("/api/v1/planned-workouts/{occurrenceId}")
+    public WorkoutScheduleCalendarQuery.Occurrence detail(@AuthenticationPrincipal Jwt jwt,
+                                                           @PathVariable UUID occurrenceId) {
+        return calendar.detail(UUID.fromString(jwt.getSubject()), occurrenceId);
+    }
 }

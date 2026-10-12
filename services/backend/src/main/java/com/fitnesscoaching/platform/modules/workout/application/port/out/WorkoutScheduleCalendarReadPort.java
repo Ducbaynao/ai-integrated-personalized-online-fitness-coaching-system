@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public interface WorkoutScheduleCalendarReadPort {
     Page findStudentWindow(UUID studentId, Instant from, Instant until, int page, int size);
+    Row findOccurrence(UUID occurrenceId);
     boolean hasInProgressExecution(UUID studentId);
 
     record PlanSummary(UUID planId, UUID planVersionId, int planVersionNumber, String planName) {}
@@ -13,7 +14,8 @@ public interface WorkoutScheduleCalendarReadPort {
                           String name, String focus, Integer estimatedDurationMinutes,
                           String supervisionRequirement) {}
     record Row(UUID occurrenceId, long occurrenceVersion, UUID studentId, String status,
-               Instant plannedStartAt, Instant originalPlannedStartAt, Instant plannedEndAt,
+               Instant plannedStartAt, Instant originalPlannedStartAt, UUID rescheduledFromOccurrenceId,
+               UUID replacementOccurrenceId, Instant plannedEndAt,
                String timezone, String localStart, String localEnd, String startUtcOffset,
                String endUtcOffset, PlanSummary planSummary, SessionSummary sessionSummary,
                Instant executionStartedAt, String supervisionRequirement, boolean hasValidSupervisionOverride) {}

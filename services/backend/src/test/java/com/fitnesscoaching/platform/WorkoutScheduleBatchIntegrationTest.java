@@ -344,7 +344,7 @@ class WorkoutScheduleBatchIntegrationTest {
                 .andExpect(jsonPath("$.items[0].occurrenceId").value(orphan.toString()))
                 .andExpect(jsonPath("$.items[0].planSummary").value(nullValue()))
                 .andExpect(jsonPath("$.items[0].sessionSummary").value(nullValue()))
-                .andExpect(jsonPath("$.items[0].availableActions").isEmpty());
+                .andExpect(jsonPath("$.items[0].availableActions[0]").value("CANCEL"));
     }
 
     @Test void calendarHttpRejectsInvalidQueryWithContractErrorEnvelope() throws Exception {
@@ -409,7 +409,8 @@ class WorkoutScheduleBatchIntegrationTest {
             jdbc.update("UPDATE fitness.workout_plans SET status=?::fitness.plan_status,version=version+1 WHERE id=?",
                     status, f.plan());
             var open = calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20);
-            assertThat(open.items().getFirst().availableActions()).containsExactly("START", "SKIP");
+            // B06 cancel remains available for an unsealed occurrence even after source-plan transition.
+            assertThat(open.items().getFirst().availableActions()).containsExactly("START", "SKIP", "CANCEL");
             jdbc.update("UPDATE fitness.planned_workouts SET execution_started_at=clock_timestamp(),version=version+1 WHERE id=?",
                     occurrence);
             var sealed = calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20);
@@ -423,7 +424,7 @@ class WorkoutScheduleBatchIntegrationTest {
         Instant start = startAtNextWeek().toInstant(ZoneOffset.UTC);
         UUID occurrence = legacyAt(f, start, "COACH_REQUIRED");
         var without = calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20);
-        assertThat(without.items().getFirst().availableActions()).containsExactly("SKIP");
+        assertThat(without.items().getFirst().availableActions()).containsExactly("SKIP", "CANCEL");
         UUID trainer = UUID.randomUUID();
         jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
                 trainer, trainer + "@example.com");
@@ -461,7 +462,7 @@ class WorkoutScheduleBatchIntegrationTest {
         assertThat(page.items().stream().filter(item -> item.occurrenceId().equals(first)).findFirst()
                 .orElseThrow().availableActions()).isEmpty();
         assertThat(page.items().stream().filter(item -> item.occurrenceId().equals(second)).findFirst()
-                .orElseThrow().availableActions()).containsExactly("SKIP");
+                .orElseThrow().availableActions()).containsExactly("SKIP", "CANCEL");
     }
 
     @Test void legacyNullIntentStableSortPaginationAndNinetyThreeDayBoundary() {
@@ -497,7 +498,8 @@ class WorkoutScheduleBatchIntegrationTest {
         var legacy = calendar.listMine(orphanOwner.student(), start, start.plusSeconds(1), 0, 20).items().getFirst();
         assertThat(legacy.planSummary()).isNull();
         assertThat(legacy.sessionSummary()).isNull();
-        assertThat(legacy.availableActions()).isEmpty();
+        // Missing source/local intent blocks reschedule, but Student may cancel an unsealed legacy row.
+        assertThat(legacy.availableActions()).containsExactly("CANCEL");
 
         Fixture optional = fixture("COACH_PREFERRED");
         legacyAt(optional, start, "COACH_PREFERRED");

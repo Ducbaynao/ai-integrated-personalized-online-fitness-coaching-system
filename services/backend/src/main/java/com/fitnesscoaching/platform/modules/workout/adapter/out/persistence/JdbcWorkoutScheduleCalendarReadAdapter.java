@@ -22,7 +22,10 @@ public class JdbcWorkoutScheduleCalendarReadAdapter implements WorkoutScheduleCa
                 """, Long.class, studentId, Timestamp.from(from), Timestamp.from(until));
         var rows = jdbc.query("""
                 SELECT pw.id,pw.version,pw.student_id,pw.status::text,pw.planned_start_at,
-                       pw.original_planned_start_at,pw.planned_end_at,pw.schedule_timezone,
+                       pw.original_planned_start_at,pw.rescheduled_from_id,
+                       (SELECT child.id FROM fitness.planned_workouts child
+                        WHERE child.rescheduled_from_id=pw.id) AS replacement_occurrence_id,
+                       pw.planned_end_at,pw.schedule_timezone,
                        pw.schedule_local_start,pw.schedule_local_end,pw.schedule_start_utc_offset,
                        pw.schedule_end_utc_offset,pw.execution_started_at,pw.supervision_requirement::text,
                        (pw.supervision_override_by IS NOT NULL AND pw.supervision_override_reason IS NOT NULL)
@@ -48,6 +51,28 @@ public class JdbcWorkoutScheduleCalendarReadAdapter implements WorkoutScheduleCa
                 """, Boolean.class, studentId));
     }
 
+    @Override public Row findOccurrence(UUID id) {
+        return jdbc.query("""
+                SELECT pw.id,pw.version,pw.student_id,pw.status::text,pw.planned_start_at,
+                       pw.original_planned_start_at,pw.rescheduled_from_id,
+                       (SELECT child.id FROM fitness.planned_workouts child
+                        WHERE child.rescheduled_from_id=pw.id) AS replacement_occurrence_id,
+                       pw.planned_end_at,pw.schedule_timezone,pw.schedule_local_start,pw.schedule_local_end,
+                       pw.schedule_start_utc_offset,pw.schedule_end_utc_offset,pw.execution_started_at,
+                       pw.supervision_requirement::text,
+                       (pw.supervision_override_by IS NOT NULL AND pw.supervision_override_reason IS NOT NULL)
+                           AS has_valid_supervision_override,
+                       s.id AS session_id,s.week_number,s.day_number,s.sequence_number,s.name AS session_name,
+                       s.session_focus,s.estimated_duration_minutes,s.supervision_requirement::text AS session_supervision,
+                       v.id AS version_id,v.version_number,p.id AS plan_id,p.name AS plan_name
+                FROM fitness.planned_workouts pw
+                LEFT JOIN fitness.workout_plan_sessions s ON s.id=pw.workout_plan_session_id
+                LEFT JOIN fitness.workout_plan_versions v ON v.id=s.workout_plan_version_id
+                LEFT JOIN fitness.workout_plans p ON p.id=v.workout_plan_id
+                WHERE pw.id=?
+                """, (rs, n) -> map(rs), id).stream().findFirst().orElse(null);
+    }
+
     private static Row map(ResultSet rs) throws SQLException {
         UUID sessionId = rs.getObject("session_id", UUID.class);
         UUID planId = rs.getObject("plan_id", UUID.class);
@@ -60,7 +85,9 @@ public class JdbcWorkoutScheduleCalendarReadAdapter implements WorkoutScheduleCa
         return new Row(rs.getObject("id", UUID.class), rs.getLong("version"),
                 rs.getObject("student_id", UUID.class), rs.getString("status"),
                 instant(rs, "planned_start_at"), instant(rs, "original_planned_start_at"),
-                instant(rs, "planned_end_at"), rs.getString("schedule_timezone"),
+                rs.getObject("rescheduled_from_id", UUID.class),
+                rs.getObject("replacement_occurrence_id", UUID.class), instant(rs, "planned_end_at"),
+                rs.getString("schedule_timezone"),
                 rs.getString("schedule_local_start"), rs.getString("schedule_local_end"),
                 rs.getString("schedule_start_utc_offset"), rs.getString("schedule_end_utc_offset"),
                 plan, session, instant(rs, "execution_started_at"),

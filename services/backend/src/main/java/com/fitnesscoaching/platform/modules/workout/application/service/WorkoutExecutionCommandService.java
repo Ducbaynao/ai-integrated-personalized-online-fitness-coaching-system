@@ -9,6 +9,7 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutO
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionPersistencePort.Receipt;
 import com.fitnesscoaching.platform.modules.workout.domain.*;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -57,8 +59,14 @@ public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUs
         var replay = replay(key, command.actorId(), "START", payload);
         if (replay != null) return requiredExecution(replay.executionId());
         if (store.hasInProgress(studentId)) throw failure(WorkoutExecutionError.ACTIVE_WORKOUT_EXECUTION_EXISTS);
-        var frozen = snapshots.freezeForExecution(new WorkoutExecutionSnapshotUseCase.FreezeExecutionCommand(
-                command.occurrenceId(), command.actorId(), command.expectedOccurrenceVersion()));
+        WorkoutExecutionSnapshotUseCase.FrozenExecutionSnapshot frozen;
+        try {
+            frozen = snapshots.freezeForExecution(new WorkoutExecutionSnapshotUseCase.FreezeExecutionCommand(
+                    command.occurrenceId(), command.actorId(), command.expectedOccurrenceVersion()));
+        } catch (CannotAcquireLockException concurrentUpdate) {
+            if (!isSerializationFailure(concurrentUpdate)) throw concurrentUpdate;
+            throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_VERSION_CONFLICT);
+        }
         WorkoutExecution execution = store.create(frozen, command.actorId());
         saveReceipt(command.actorId(), key, "START", payload, command.occurrenceId(), execution,
                 "SCHEDULED", frozen.frozenAt());
@@ -240,6 +248,13 @@ public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUs
         } catch (java.security.NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
+    }
+
+    private static boolean isSerializationFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
+        }
+        return false;
     }
 
     private static WorkoutExecutionFailure invalid() {
