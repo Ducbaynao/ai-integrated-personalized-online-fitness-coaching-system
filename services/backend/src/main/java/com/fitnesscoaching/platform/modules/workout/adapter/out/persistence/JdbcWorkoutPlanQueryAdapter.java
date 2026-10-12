@@ -62,13 +62,14 @@ public class JdbcWorkoutPlanQueryAdapter implements WorkoutPlanQueryPort {
         if (version.isEmpty()) return Optional.empty();
         List<SessionView> sessions = jdbc.query("""
                 SELECT id,week_number,day_number,sequence_number,name,session_focus,
-                       estimated_duration_minutes,notes
+                       estimated_duration_minutes,notes,supervision_requirement::text AS supervision_requirement
                 FROM fitness.workout_plan_sessions WHERE workout_plan_version_id=?
                 ORDER BY week_number,day_number,sequence_number,id
                 """, (rs, row) -> new SessionView(rs.getObject("id", UUID.class), rs.getInt("week_number"),
                 rs.getInt("day_number"), rs.getInt("sequence_number"), rs.getString("name"),
                 rs.getString("session_focus"), (Integer) rs.getObject("estimated_duration_minutes"),
-                rs.getString("notes"), prescriptions(rs.getObject("id", UUID.class))), versionId);
+                rs.getString("notes"), rs.getString("supervision_requirement"),
+                prescriptions(rs.getObject("id", UUID.class))), versionId);
         return Optional.of(new VersionDetail(version.get(), sessions));
     }
 

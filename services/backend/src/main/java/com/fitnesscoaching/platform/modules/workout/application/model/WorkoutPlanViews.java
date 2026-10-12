@@ -38,7 +38,7 @@ public final class WorkoutPlanViews {
 
     public record SessionView(
             UUID id, int weekNumber, int dayNumber, int sequenceNumber, String name,
-            String focus, Integer estimatedDurationMinutes, String notes,
+            String focus, Integer estimatedDurationMinutes, String notes, String supervisionRequirement,
             List<PrescriptionView> prescriptions
     ) {}
 

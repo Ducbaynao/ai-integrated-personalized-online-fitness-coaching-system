@@ -20,7 +20,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@Transactional(readOnly = true)
+// Current Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction.
+@Transactional
 public class WorkoutPlanQueryService implements WorkoutPlanQueryUseCase {
     private final WorkoutPlanQueryPort store;
     private final CurrentCoachingContextQuery contexts;
@@ -142,7 +143,8 @@ public class WorkoutPlanQueryService implements WorkoutPlanQueryUseCase {
                     value.restSeconds(), value.durationSeconds(), value.instructions(), presentation);
         }).toList();
         return new SessionView(session.id(), session.weekNumber(), session.dayNumber(), session.sequenceNumber(),
-                session.name(), session.focus(), session.estimatedDurationMinutes(), session.notes(), prescriptions);
+                session.name(), session.focus(), session.estimatedDurationMinutes(), session.notes(),
+                session.supervisionRequirement(), prescriptions);
     }
 
     private ReadContext context(PlanSummary plan, UUID actor, boolean student,
