@@ -26,12 +26,12 @@ jest.mock('@/features/workout-schedule-proposals/workoutScheduleProposalQueries'
 
 const proposal: WorkoutScheduleProposal = {
   proposalId: 'proposal-1', proposalVersion: 4, status: 'PENDING', studentId: 'student-1',
-  trainerId: 'trainer-1', coachingPeriodId: 'period-1', planId: 'plan-1',
+  trainerId: 'trainer-1', trainerDisplayName: 'Huấn luyện viên An', coachingPeriodId: 'period-1', planId: 'plan-1', sourcePlanName: 'Sức mạnh',
   sourcePlanVersionId: 'version-1', sourcePlanVersionNumber: 3, observedPlanAggregateVersion: 8,
   weekAnchorDate: '2026-10-12', timezone: 'Asia/Ho_Chi_Minh', proposedAt: '2026-10-11T01:00:00Z',
   items: [{ clientItemId: 'item-1', planSessionId: 'session-1', weekNumber: 1, dayNumber: 1,
     sequenceNumber: 1, localStart: '2026-10-12T08:00:00', localEnd: '2026-10-12T09:00:00',
-    startUtcOffset: '+07:00', endUtcOffset: '+07:00' }],
+    startUtcOffset: '+07:00', endUtcOffset: '+07:00', sourceSessionName: 'Ngày thân trên', sourceSessionFocus: 'Vai' }],
   decidedAt: null, decidedBy: null, decisionNote: null, withdrawnAt: null, withdrawnBy: null,
 };
 
@@ -66,10 +66,11 @@ describe('Student schedule proposal screens', () => {
   });
   afterEach(() => clients.splice(0).forEach((client) => client.clear()));
 
-  it('lists server proposals with Trainer/source identifiers and opens detail; handles empty and paging', () => {
+  it('lists server proposal names without raw identifiers and opens detail; handles empty and paging', () => {
     let view = render(<StudentScheduleProposalsScreen />);
-    expect(JSON.stringify(view.tree.toJSON())).toContain('trainer-1');
-    expect(JSON.stringify(view.tree.toJSON())).toContain('plan-1');
+    expect(JSON.stringify(view.tree.toJSON())).toContain('Huấn luyện viên An');
+    expect(JSON.stringify(view.tree.toJSON())).toContain('Sức mạnh');
+    expect(JSON.stringify(view.tree.toJSON())).not.toContain('trainer-1');
     renderer.act(() => view.tree.root.findByProps({ testID: 'open-proposal-proposal-1' }).props.onPress());
     expect(mockPush).toHaveBeenCalledWith('/workout-schedule-proposals/proposal-1');
     renderer.act(() => view.tree.unmount());
@@ -91,8 +92,22 @@ describe('Student schedule proposal screens', () => {
     const output = JSON.stringify(tree.toJSON());
     expect(output).toContain('2026-10-12 08:00:00');
     expect(output).toContain('UTC+07:00');
-    expect(output).toContain('session-1');
+    expect(output).toContain('Ngày thân trên');
+    expect(output).not.toContain('session-1');
     expect(tree.root.findAllByProps({ testID: 'proposal-accept' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('keeps legacy nullable names explicit without exposing raw IDs after coaching ends', () => {
+    const legacy = { ...proposal, trainerDisplayName: null, sourcePlanName: null,
+      items: [{ ...proposal.items[0], sourceSessionName: null, sourceSessionFocus: null }] };
+    detail(legacy);
+    const { tree } = render(<StudentScheduleProposalDetailScreen proposalId="proposal-1" />);
+    const output = JSON.stringify(tree.toJSON());
+    expect(output).toContain('Chưa có tên huấn luyện viên');
+    expect(output).toContain('Chưa có tên kế hoạch');
+    expect(output).not.toContain('trainer-1');
+    expect(output).not.toContain('session-1');
     renderer.act(() => tree.unmount());
   });
 
@@ -172,7 +187,7 @@ describe('Student schedule proposal screens', () => {
     renderer.act(() => tree.root.findByProps({ testID: 'proposal-accept' }).props.onPress());
     await renderer.act(async () => { tree.root.findByProps({ testID: 'proposal-confirm-decision' }).props.onPress(); await Promise.resolve(); });
     expect(tree.root.findByProps({ testID: 'proposal-permission-lost' })).toBeTruthy();
-    expect(JSON.stringify(tree.toJSON())).not.toContain('trainer-1');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Huấn luyện viên An');
     expect(tree.root.findAllByProps({ testID: 'proposal-accept' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
   });
@@ -185,11 +200,11 @@ describe('Student schedule proposal screens', () => {
     detail(proposal, { isError: true, error: new ApiError(404, 'hidden') });
     view = render(<StudentScheduleProposalDetailScreen proposalId="proposal-1" />);
     expect(view.tree.root.findByProps({ testID: 'proposal-detail-error' })).toBeTruthy();
-    expect(JSON.stringify(view.tree.toJSON())).not.toContain('trainer-1');
+    expect(JSON.stringify(view.tree.toJSON())).not.toContain('Huấn luyện viên An');
     renderer.act(() => view.tree.unmount());
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1', capabilities: { hasStudentProfile: false } }, activeCapability: 'TRAINER' });
     view = render(<StudentScheduleProposalDetailScreen proposalId="proposal-1" />);
-    expect(JSON.stringify(view.tree.toJSON())).not.toContain('plan-1');
+    expect(JSON.stringify(view.tree.toJSON())).not.toContain('Sức mạnh');
     renderer.act(() => view.tree.unmount());
   });
 });

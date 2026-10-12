@@ -56,6 +56,7 @@ export function TrainerProgramScreen({ relationshipId }: { relationshipId: strin
       {relationship.status === 'PAUSED' ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Quan hệ đang tạm dừng. Backend sẽ xác minh lại quyền hiện tại trước mọi thao tác.</Text> : null}
     </CoachingCard>
     {!canView ? <CoachingState testID="program-denied" title="Chưa có quyền xem kế hoạch" message="Học viên cần cấp ít nhất quyền Xem cho Kế hoạch tập luyện." /> : null}
+    {canView && relationshipCurrent ? <CoachingButton testID="open-trainer-schedule-proposals" label="Đề xuất lịch tập" secondary onPress={() => router.push(`/coaching/${relationshipId}/schedule-proposals` as never)} /> : null}
     {relationship.status === 'PAUSED' ? <CoachingState testID="program-paused" title="Quan hệ đang tạm dừng" message="Quyền hiện tại không có hiệu lực khi quan hệ tạm dừng. Kế hoạch không được tải trước." /> : null}
     {canView && relationshipCurrent && plansQuery.isPending ? <CoachingState busy title="Đang tải kế hoạch" message="Vui lòng chờ trong giây lát." /> : null}
     {canView && relationshipCurrent && plansQuery.isError ? <CoachingState testID="program-error" title="Không thể tải kế hoạch" message={workoutPlanErrorMessage(plansQuery.error)} onRetry={() => plansQuery.refetch()} /> : null}
