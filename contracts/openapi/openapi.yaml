@@ -2259,6 +2259,151 @@ paths:
         '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
         '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
 
+  /students/{studentId}/planned-workout-change-proposals:
+    get:
+      tags: [Workout Schedule]
+      operationId: listMyPlannedWorkoutChangeProposalsForStudent
+      summary: List this Trainer's own occurrence-change proposals for one Student
+      description: >-
+        Requires a current effective Coaching Period and current WORKOUT_PLAN VIEW or higher before count,
+        status filtering, or pagination. Only proposals created by the authenticated Trainer for this Student
+        are returned. Former Trainers and unrelated actors cannot infer proposal existence or totals.
+        Results sort by proposedAt DESC, then proposalId DESC.
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
+        - name: status
+          in: query
+          description: Optional exact status; omitted includes pending and terminal proposals.
+          schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalStatus' }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200':
+          description: Authorized page of this Trainer's own proposals
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalPage' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+    post:
+      tags: [Workout Schedule]
+      operationId: proposePlannedWorkoutChange
+      summary: Propose rescheduling or cancelling one occurrence
+      description: >-
+        Only a Trainer with a current effective Coaching Period and current WORKOUT_PLAN CONTRIBUTE or MANAGE
+        may propose a change to this Student's SCHEDULED, unsealed occurrence before its old planned start.
+        RESCHEDULE also requires preserved source version/session and local-time intent; COACH_REQUIRED
+        reschedule is deferred. Any linked Appointment blocks either change. Creation stores an immutable
+        proposal snapshot but does not mutate an occurrence or reserve the target time. Student decision is final.
+        Actor authority and resource visibility are checked before idempotent command replay.
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreatePlannedWorkoutChangeProposalRequest' } } }
+      responses:
+        '201':
+          description: Pending proposal created, or the same authorized logical command replayed
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalCommandResult' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleChangeConflict' }
+
+  /planned-workout-change-proposals/me:
+    get:
+      tags: [Workout Schedule]
+      operationId: listMyPlannedWorkoutChangeProposals
+      summary: List occurrence-change proposals for the authenticated Student
+      description: >-
+        Returns only this Student's proposals, including stale PENDING proposals that may be read or REJECTed
+        after Trainer authority is lost. Results sort by proposedAt DESC, then proposalId DESC.
+      parameters:
+        - name: status
+          in: query
+          description: Optional exact status; omitted includes pending and terminal proposals.
+          schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalStatus' }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200':
+          description: Student-owned proposal page
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalPage' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+
+  /planned-workout-change-proposals/{proposalId}:
+    get:
+      tags: [Workout Schedule]
+      operationId: getPlannedWorkoutChangeProposal
+      summary: Read one visible occurrence-change proposal
+      description: >-
+        The owning Student may read it. The proposing Trainer needs a current effective Coaching Period and
+        current WORKOUT_PLAN VIEW or higher; former Trainers and unrelated actors receive concealed 404.
+      parameters: [{ $ref: '#/components/parameters/WorkoutScheduleProposalId' }]
+      responses:
+        '200':
+          description: Visible immutable proposal intent and current nullable presentation names
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposal' } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+
+  /planned-workout-change-proposals/{proposalId}/decisions:
+    post:
+      tags: [Workout Schedule]
+      operationId: decidePlannedWorkoutChangeProposal
+      summary: Student accepts or rejects one occurrence-change proposal
+      description: >-
+        Only the owning Student decides a PENDING proposal. REJECT needs no materialization or current Trainer
+        grant. ACCEPT rechecks the proposing Trainer's current CONTRIBUTE authority and original Coaching Period,
+        occurrence version/state/seal, old-start timing, Appointment linkage, source eligibility, destination
+        time/DST, duplicate, overlap, and other SCHEDULED unknown-end guards within one transaction. An ACCEPT
+        either changes the entire occurrence lineage or changes nothing. A stale proposal remains PENDING with
+        409, never remaps or auto-expires. If a CANCEL proposal is accepted after the old planned start,
+        decisionReason from the Student is required. The original confirmed batch/proposal is never rewritten.
+        Verify the Student's current access to the proposal before receipt replay; a committed authorized replay
+        returns the original effect without performing a second mutation.
+      parameters: [{ $ref: '#/components/parameters/WorkoutScheduleProposalId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DecidePlannedWorkoutChangeProposalRequest' } } }
+      responses:
+        '200':
+          description: Decided proposal or authorized replay; REJECT has no applied change
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalDecisionResult' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleChangeConflict' }
+
+  /planned-workout-change-proposals/{proposalId}/withdraw:
+    post:
+      tags: [Workout Schedule]
+      operationId: withdrawPlannedWorkoutChangeProposal
+      summary: Proposing Trainer withdraws a pending occurrence-change proposal
+      description: >-
+        Requires the same proposing Trainer, current effective Coaching Period, and WORKOUT_PLAN CONTRIBUTE or
+        MANAGE before replay. Only PENDING may transition to WITHDRAWN; no occurrence or Appointment changes.
+      parameters: [{ $ref: '#/components/parameters/WorkoutScheduleProposalId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WithdrawPlannedWorkoutChangeProposalRequest' } } }
+      responses:
+        '200':
+          description: Withdrawn proposal or authorized replay
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalCommandResult' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleChangeConflict' }
+
   /planned-workouts:
     get:
       tags: [Workout Schedule]
@@ -2267,8 +2412,10 @@ paths:
       description: >-
         Uses the required half-open [from, until) instant window, which may span at most 93 days. Results are ordered
         by plannedStartAt ASC and occurrenceId ASC before pagination. availableActions is derived by the backend from
-        current authority, occurrence state, supervision, execution seal, and reconciled B04/B05 policy; clients must
-        not infer actions from status. This endpoint grants no Workout Execution history access.
+        current authority, occurrence state, supervision, execution seal, and reconciled B04/B05 policy. The
+        declared change-flow extension may add RESCHEDULE/CANCEL only for Student-eligible occurrences; clients
+        must not infer actions from status. Terminal rows stay in their planned-start window and carry nullable
+        predecessor/replacement links. This endpoint grants no Workout Execution history access.
       parameters:
         - { $ref: '#/components/parameters/WorkoutScheduleFrom' }
         - { $ref: '#/components/parameters/WorkoutScheduleUntil' }
@@ -2291,7 +2438,8 @@ paths:
         Requires a current effective Coaching Period and current WORKOUT_PLAN VIEW, CONTRIBUTE, or MANAGE authority.
         Visibility ends with that current authority and grants neither Workout Execution history nor other live Student
         data. The required half-open [from, until) instant window may span at most 93 days; ordering is plannedStartAt
-        ASC then occurrenceId ASC before pagination.
+        ASC then occurrenceId ASC before pagination. Trainer availableActions is always empty, including after
+        the Student change-flow extension; this read never grants execution or mutation authority.
       parameters:
         - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
         - { $ref: '#/components/parameters/WorkoutScheduleFrom' }
@@ -2306,6 +2454,88 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/WorkoutScheduleForbidden' }
         '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+
+  /planned-workouts/{occurrenceId}:
+    get:
+      tags: [Workout Schedule]
+      operationId: getVisiblePlannedWorkoutOccurrence
+      summary: Read one occurrence across calendar windows using its real identity
+      description: >-
+        The owning Student may read the occurrence, including terminal history. A Trainer requires a current
+        effective Coaching Period and current WORKOUT_PLAN VIEW or higher for that Student; a former Trainer or
+        unrelated actor gets concealed 404. Predecessor and replacement links are nullable/empty for legacy
+        rows and let authorized clients trace the one-to-one reschedule chain across calendar windows. Trainer
+        availableActions is always empty. No Workout Execution or other live data is exposed.
+      parameters: [{ $ref: '#/components/parameters/PlannedWorkoutOccurrenceId' }]
+      responses:
+        '200':
+          description: Visible occurrence, with nullable legacy-safe lineage and source summaries
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutOccurrence' } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+
+  /planned-workouts/{occurrenceId}/reschedule:
+    post:
+      tags: [Workout Schedule]
+      operationId: rescheduleMyPlannedWorkoutOccurrence
+      summary: Student replaces one unstarted Planned Workout occurrence
+      description: >-
+        Only its Student may replace a SCHEDULED, unsealed occurrence whose old plannedStartAt is still in the
+        future, including when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
+        version/session/prescription and plan-week coordinates are retained even if the target moves to another
+        day or week; no current plan publication is selected. Missing legacy source version/session or local
+        intent, any linked Appointment, and COACH_REQUIRED supervision block this first flow. The backend
+        resolves explicit local intent/offsets in the selected IANA timezone, requires target start strictly
+        after PostgreSQL time and at most 90 days later, and rechecks unknown-end on other SCHEDULED rows, historical
+        source-instant duplicate, and SCHEDULED-range overlap. V31 database constraints cover only batch-linked
+        rows; the transaction must also guard conflicts with legacy rows, without assuming V31 protects them. The old
+        row becomes RESCHEDULED and one new SCHEDULED occurrence points to it through rescheduledFromOccurrenceId;
+        originalPlannedStartAt stays anchored across the chain. Source batch and accepted proposal stay unchanged.
+        Authority and ownership are checked before receipt replay. Same actor, command type, key, and logical
+        payload replay exactly one committed effect; key reuse with a different payload conflicts.
+      parameters: [{ $ref: '#/components/parameters/PlannedWorkoutOccurrenceId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReschedulePlannedWorkoutRequest' } } }
+      responses:
+        '201':
+          description: New occurrence created atomically with old RESCHEDULED transition, or authorized replay
+          headers:
+            Location: { schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeResult' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleChangeConflict' }
+
+  /planned-workouts/{occurrenceId}/cancel:
+    post:
+      tags: [Workout Schedule]
+      operationId: cancelMyPlannedWorkoutOccurrence
+      summary: Student cancels one unstarted Planned Workout occurrence
+      description: >-
+        Only its Student may cancel a SCHEDULED, unsealed occurrence, even when the source plan is PAUSED,
+        COMPLETED, or ARCHIVED. No replacement is created and no Appointment is changed. Any linked Appointment,
+        regardless of status, blocks cancellation. A late cancellation (old plannedStartAt at or before
+        authoritative PostgreSQL time) requires the Student's nonblank reason. A legacy occurrence may be
+        cancelled despite null plannedEndAt or missing source/local-time intent; its unknown end is never
+        inferred. COACH_REQUIRED without a linked Appointment follows these same cancellation guards.
+        Ownership/current Student authority is checked before receipt replay.
+      parameters: [{ $ref: '#/components/parameters/PlannedWorkoutOccurrenceId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CancelPlannedWorkoutRequest' } } }
+      responses:
+        '200':
+          description: Existing occurrence transitioned to CANCELLED with no replacement, or authorized replay
+          content: { application/json: { schema: { $ref: '#/components/schemas/PlannedWorkoutChangeResult' } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleChangeValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleChangeForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleChangeConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleChangeConflict' }
 
   /planned-workouts/{occurrenceId}/adjustments:
     post:
@@ -2677,6 +2907,47 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/WorkoutScheduleErrorResponse' }
+    WorkoutScheduleChangeValidationError:
+      description: >-
+        Invalid change command, destination, or query. Stable codes include
+        WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED, WORKOUT_SCHEDULE_CHANGE_REASON_REQUIRED,
+        WORKOUT_SCHEDULE_TIMEZONE_INVALID, WORKOUT_SCHEDULE_DST_TIME_NONEXISTENT,
+        WORKOUT_SCHEDULE_DST_OFFSET_REQUIRED, WORKOUT_SCHEDULE_DST_OFFSET_INVALID, and
+        WORKOUT_SCHEDULE_WINDOW_INVALID. The Student's reason is required for a late cancellation.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutScheduleChangeForbidden:
+      description: >-
+        Current Student capability or Trainer WORKOUT_PLAN authority is insufficient. Codes include
+        WORKOUT_SCHEDULE_ACCESS_DENIED, STUDENT_CAPABILITY_UNAVAILABLE, COACHING_PERIOD_REQUIRED,
+        DATA_SHARING_PERMISSION_REQUIRED, and DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutScheduleChangeConcealed:
+      description: >-
+        The occurrence, proposal, or Student is absent or concealed. Codes include
+        PLANNED_WORKOUT_NOT_FOUND, WORKOUT_SCHEDULE_CHANGE_PROPOSAL_NOT_FOUND, and
+        STUDENT_PROFILE_NOT_FOUND. Do not expose another Student's occurrence or former-Trainer live data.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    WorkoutScheduleChangeConflict:
+      description: >-
+        No partial occurrence or proposal change. Codes include WORKOUT_SCHEDULE_OCCURRENCE_VERSION_CONFLICT,
+        WORKOUT_SCHEDULE_CHANGE_PROPOSAL_VERSION_CONFLICT, WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STATE_CONFLICT,
+        WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STALE, WORKOUT_SCHEDULE_OCCURRENCE_SEALED,
+        WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE, WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED,
+        WORKOUT_SCHEDULE_APPOINTMENT_LINKED, WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE,
+        WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED, WORKOUT_SCHEDULE_DUPLICATE,
+        WORKOUT_SCHEDULE_OVERLAP, WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN, and
+        WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT. An unknown end on another SCHEDULED occurrence blocks
+        replacement creation, without disclosing that row's ID or timing.
+        WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED compares the occurrence being changed's current
+        plannedStartAt with authoritative PostgreSQL time, not its chain-wide originalPlannedStartAt.
+        Same actor, command type,
+        commandKey, and logical payload replay one committed effect after current visibility/authority
+        checks; a different payload conflicts. A committed authorized replay does not reapply mutation
+        guards or create another replacement. Different keys remain subject to duplicate/overlap protection;
+        V31 constraints apply to batch-linked rows only, so legacy conflicts also require a transactional guard.
+        Stale proposal ACCEPT leaves the proposal PENDING. Conflict details never reveal a
+        concealed occurrence's identity or timing.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     CoachingOutcome:
       description: Current lifecycle outcome; null fields mean no current relationship, resume request, or period
       content:
@@ -3617,15 +3888,257 @@ components:
       properties:
         expectedProposalVersion: { type: integer, format: int64, minimum: 0 }
         commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    PlannedWorkoutChangeType:
+      type: string
+      enum: [RESCHEDULE, CANCEL]
+    WorkoutScheduleChangeDestination:
+      type: object
+      additionalProperties: false
+      required: [localStart, localEnd, timezone, startUtcOffset, endUtcOffset]
+      description: >-
+        Explicit replacement time. Local values contain no offset; the chosen offsets must be valid for
+        this IANA timezone at each local time. A DST gap or invalid offset is rejected. Moving across
+        plan weeks/days never changes the frozen source plan version, session, or plan-week coordinates.
+      properties:
+        localStart: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+        localEnd: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+        timezone: { type: string, minLength: 1, maxLength: 64, example: Asia/Ho_Chi_Minh }
+        startUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+        endUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+    ReschedulePlannedWorkoutRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedOccurrenceVersion, destination, commandKey]
+      properties:
+        expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        destination: { $ref: '#/components/schemas/WorkoutScheduleChangeDestination' }
+        reason: { type: [string, 'null'], maxLength: 1000 }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    CancelPlannedWorkoutRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedOccurrenceVersion, commandKey]
+      description: >-
+        A nonblank reason is required if the old planned start is at or before authoritative PostgreSQL
+        command time; it is otherwise optional. The existing occurrence becomes CANCELLED with no successor.
+      properties:
+        expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: [string, 'null'], maxLength: 1000 }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    PlannedWorkoutChangeResult:
+      type: object
+      additionalProperties: false
+      required:
+        - changeType
+        - previousOccurrenceId
+        - previousOccurrenceVersion
+        - previousStatus
+        - originalPlannedStartAt
+        - oldPlannedStartAt
+        - oldPlannedEndAt
+        - replacementOccurrenceId
+        - replacementOccurrenceVersion
+        - newPlannedStartAt
+        - newPlannedEndAt
+        - rescheduledFromOccurrenceId
+        - effectiveAt
+        - replayed
+      description: >-
+        For RESCHEDULE, previousStatus is RESCHEDULED, replacement fields are populated, and
+        rescheduledFromOccurrenceId equals previousOccurrenceId. For CANCEL, previousStatus is
+        CANCELLED and replacement, new time, and rescheduledFromOccurrenceId fields are null.
+        Old planned end can be null on a cancellable legacy occurrence. This is an occurrence-version
+        result, not a plan aggregate or proposal version; audit retains the before/after times.
+      properties:
+        changeType: { $ref: '#/components/schemas/PlannedWorkoutChangeType' }
+        previousOccurrenceId: { type: string, format: uuid }
+        previousOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        previousStatus: { type: string, enum: [RESCHEDULED, CANCELLED] }
+        originalPlannedStartAt: { type: string, format: date-time }
+        oldPlannedStartAt: { type: string, format: date-time }
+        oldPlannedEndAt: { type: [string, 'null'], format: date-time }
+        replacementOccurrenceId: { type: [string, 'null'], format: uuid }
+        replacementOccurrenceVersion: { type: [integer, 'null'], format: int64, minimum: 0 }
+        newPlannedStartAt: { type: [string, 'null'], format: date-time }
+        newPlannedEndAt: { type: [string, 'null'], format: date-time }
+        rescheduledFromOccurrenceId: { type: [string, 'null'], format: uuid }
+        effectiveAt: { type: string, format: date-time }
+        replayed: { type: boolean }
+    PlannedWorkoutChangeProposalStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN]
+    CreatePlannedWorkoutChangeProposalRequest:
+      type: object
+      additionalProperties: false
+      required: [occurrenceId, expectedOccurrenceVersion, changeType, commandKey]
+      allOf:
+        - if: { properties: { changeType: { const: RESCHEDULE } } }
+          then:
+            required: [destination]
+            properties:
+              destination: { $ref: '#/components/schemas/WorkoutScheduleChangeDestination' }
+        - if: { properties: { changeType: { const: CANCEL } } }
+          then:
+            properties:
+              destination: { type: 'null' }
+      description: >-
+        Proposes one occurrence change, without reserving time or changing the occurrence. destination
+        must be supplied for RESCHEDULE and omitted/null for CANCEL. The Trainer must submit before the
+        old planned start and may not propose a change for a sealed or Appointment-linked occurrence.
+      properties:
+        occurrenceId: { type: string, format: uuid }
+        expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        changeType: { $ref: '#/components/schemas/PlannedWorkoutChangeType' }
+        destination:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleChangeDestination' }
+            - { type: 'null' }
+        reason: { type: [string, 'null'], maxLength: 1000 }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    PlannedWorkoutChangeProposal:
+      type: object
+      additionalProperties: false
+      required:
+        - proposalId
+        - proposalVersion
+        - status
+        - changeType
+        - studentId
+        - trainerId
+        - trainerDisplayName
+        - coachingPeriodId
+        - occurrenceId
+        - observedOccurrenceVersion
+        - oldPlannedStartAt
+        - oldPlannedEndAt
+        - oldTimezone
+        - oldLocalStart
+        - oldLocalEnd
+        - oldStartUtcOffset
+        - oldEndUtcOffset
+        - originalPlannedStartAt
+        - sourcePlanId
+        - sourcePlanVersionId
+        - sourcePlanSessionId
+        - sourcePlanName
+        - sourceSessionName
+        - destination
+        - reason
+        - proposedAt
+        - decidedAt
+        - decidedBy
+        - withdrawnAt
+        - withdrawnBy
+      description: >-
+        Stored occurrence/source identity and proposal intent do not remap when the plan or occurrence
+        changes. Display names are nullable read-time presentation, never audit snapshots. The owning
+        Student may still read or REJECT a stale PENDING proposal. A former Trainer cannot read it.
+      properties:
+        proposalId: { type: string, format: uuid }
+        proposalVersion: { type: integer, format: int64, minimum: 0 }
+        status: { $ref: '#/components/schemas/PlannedWorkoutChangeProposalStatus' }
+        changeType: { $ref: '#/components/schemas/PlannedWorkoutChangeType' }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        trainerDisplayName: { type: [string, 'null'] }
+        coachingPeriodId: { type: string, format: uuid }
+        occurrenceId: { type: string, format: uuid }
+        observedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
+        oldPlannedStartAt: { type: string, format: date-time }
+        oldPlannedEndAt: { type: [string, 'null'], format: date-time }
+        oldTimezone: { type: [string, 'null'], description: Preserved timezone from the source occurrence, null for legacy data. }
+        oldLocalStart:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+            - { type: 'null' }
+        oldLocalEnd:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+            - { type: 'null' }
+        oldStartUtcOffset:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+            - { type: 'null' }
+        oldEndUtcOffset:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+            - { type: 'null' }
+        originalPlannedStartAt: { type: string, format: date-time }
+        sourcePlanId: { type: [string, 'null'], format: uuid }
+        sourcePlanVersionId: { type: [string, 'null'], format: uuid }
+        sourcePlanSessionId: { type: [string, 'null'], format: uuid }
+        sourcePlanName: { type: [string, 'null'] }
+        sourceSessionName: { type: [string, 'null'] }
+        destination:
+          description: Non-null for RESCHEDULE and null for CANCEL.
+          oneOf:
+            - { $ref: '#/components/schemas/WorkoutScheduleChangeDestination' }
+            - { type: 'null' }
+        reason: { type: [string, 'null'], maxLength: 1000 }
+        proposedAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decidedBy: { type: [string, 'null'], format: uuid }
+        withdrawnAt: { type: [string, 'null'], format: date-time }
+        withdrawnBy: { type: [string, 'null'], format: uuid }
+    PlannedWorkoutChangeProposalPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PlannedWorkoutChangeProposal' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    PlannedWorkoutChangeProposalCommandResult:
+      type: object
+      additionalProperties: false
+      required: [proposal, replayed]
+      properties:
+        proposal: { $ref: '#/components/schemas/PlannedWorkoutChangeProposal' }
+        replayed: { type: boolean }
+    DecidePlannedWorkoutChangeProposalRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedProposalVersion, decision, commandKey]
+      properties:
+        expectedProposalVersion: { type: integer, format: int64, minimum: 0 }
+        decision: { type: string, enum: [ACCEPT, REJECT] }
+        decisionReason:
+          type: [string, 'null']
+          maxLength: 1000
+          description: Student reason, required when ACCEPTing a CANCEL proposal after old planned start.
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    PlannedWorkoutChangeProposalDecisionResult:
+      type: object
+      additionalProperties: false
+      required: [proposal, appliedChange, replayed]
+      properties:
+        proposal: { $ref: '#/components/schemas/PlannedWorkoutChangeProposal' }
+        appliedChange:
+          description: Non-null only for ACCEPT; REJECT does not change the occurrence.
+          oneOf:
+            - { $ref: '#/components/schemas/PlannedWorkoutChangeResult' }
+            - { type: 'null' }
+        replayed: { type: boolean }
+    WithdrawPlannedWorkoutChangeProposalRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedProposalVersion, commandKey]
+      properties:
+        expectedProposalVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
     PlannedWorkoutOccurrenceStatus:
       type: string
       enum: [SCHEDULED, COMPLETED, ATTEMPTED, MISSED, SKIPPED, RESCHEDULED, CANCELLED]
     PlannedWorkoutAvailableAction:
       type: string
       description: >-
-        Backend-derived action. The first flow exposes only executable B05 START or SKIP actions;
-        an empty list means neither is currently available. Clients must not infer actions from status.
-      enum: [START, SKIP]
+        Backend-derived Student action. START/SKIP retain their B05 guards; RESCHEDULE/CANCEL are
+        declared for the later change implementation only when their current command guards allow them.
+        Trainer calendar and Trainer occurrence detail always return an empty list. Clients must not
+        infer actions from status or treat a read snapshot as authority at command time.
+      enum: [START, SKIP, RESCHEDULE, CANCEL]
     PlannedWorkoutPlanSummary:
       type: object
       additionalProperties: false
@@ -3661,6 +4174,8 @@ components:
         - status
         - plannedStartAt
         - originalPlannedStartAt
+        - rescheduledFromOccurrenceId
+        - replacementOccurrenceId
         - plannedEndAt
         - timezone
         - localStart
@@ -3681,6 +4196,18 @@ components:
         status: { $ref: '#/components/schemas/PlannedWorkoutOccurrenceStatus' }
         plannedStartAt: { type: string, format: date-time }
         originalPlannedStartAt: { type: string, format: date-time }
+        rescheduledFromOccurrenceId:
+          type: [string, 'null']
+          format: uuid
+          description: Immediate predecessor; null for original or legacy rows without a preserved link.
+        replacementOccurrenceId:
+          type: [string, 'null']
+          format: uuid
+          description: >-
+            The one immediate successor in the approved reschedule chain; null when there is no known
+            successor. New writes must enforce at most one successor per predecessor. V5 did not enforce
+            this uniqueness for legacy rows; the implementation must audit any ambiguous legacy lineage
+            instead of arbitrarily selecting or hiding one of multiple existing successors.
         plannedEndAt: { type: [string, 'null'], format: date-time }
         timezone: { type: [string, 'null'], description: Null for legacy rows without frozen timezone identity. }
         localStart:
