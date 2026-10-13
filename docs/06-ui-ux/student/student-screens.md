@@ -63,6 +63,8 @@ Màn hình chi tiết và so sánh đề xuất Fitness Goal (`/(app)/goal-propo
 
 Calendar marker tách appointment, planned workout, completed, missed và rescheduled. Day detail hiển thị hai lifecycle riêng. Filter theo planned/completed/missed.
 
+Student có đường vào `/(app)/workout-change-proposals` từ Plan hub và lịch tập. Danh sách chỉ dùng GET `/planned-workout-change-proposals/me`, có trạng thái PENDING/terminal, lọc và phân trang. Detail trình bày giờ cũ, đề xuất RESCHEDULE với IANA timezone/local start-end/UTC offsets hoặc đề xuất CANCEL, tên Trainer/plan/session nullable và lý do Trainer. PENDING mới cho Student ACCEPT/REJECT sau bước xác nhận; ACCEPT CANCEL quá giờ yêu cầu lý do riêng của Student, không dùng lý do Trainer thay thế. REJECT không thay đổi occurrence và vẫn khả dụng sau khi quan hệ kết thúc. Sau 409 tải lại proposal/lịch, yêu cầu quyết định mới; lỗi mạng chưa rõ kết quả chỉ retry cùng body/commandKey. 403/404 ẩn cache Student. Terminal chỉ đọc; ACCEPT thành công có đường tới occurrence thay thế thật hoặc lịch hiện tại.
+
 ## ST-06 Workout Plan Detail
 
 Header có owner/creator, status, duration, current version và source. Danh sách day/session/exercise. Badge `Trainer assigned`, `Student created`, `Template` hoặc `AI proposal accepted`. Minor change không tạo version mới; significant change hiển thị version event.
