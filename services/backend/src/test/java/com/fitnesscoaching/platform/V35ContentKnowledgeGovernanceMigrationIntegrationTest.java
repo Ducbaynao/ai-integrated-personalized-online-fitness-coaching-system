@@ -13,17 +13,17 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
+class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
-    void cleanInstallReachesV32WithGovernanceConstraintsAndPermissions() {
-        try (var db = database("content_v32_clean")) {
+    void cleanInstallReachesV35WithGovernanceConstraintsAndPermissions() {
+        try (var db = database("content_v35_clean")) {
             db.start();
             var source = source(db);
-            migrate(source, "32");
+            migrate(source, "35");
             var jdbc = new JdbcTemplate(source);
 
-            assertThat(version(jdbc)).isEqualTo("32");
+            assertThat(version(jdbc)).isEqualTo("35");
 
             // Verify knowledge_documents new columns
             Integer docCols = jdbc.queryForObject("""
@@ -78,10 +78,10 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
     void legacyMigrationWithMultipleVersionsPerDocumentSucceeds() {
-        try (var db = database("content_v32_legacy")) {
+        try (var db = database("content_v35_legacy")) {
             db.start();
             var source = source(db);
-            // 1. Migrate up to V31 only (simulating pre-existing database before V32)
+            // 1. Migrate up to V31 only (simulating pre-existing database before V35)
             migrate(source, "31");
             var jdbc = new JdbcTemplate(source);
 
@@ -111,11 +111,11 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
                     VALUES (?, ?, 2, 'ACTIVE', 'hash2', ?)
                     """, v2Id, docId, adminId);
 
-            // 2. Now run forward migration V32:
+            // 2. Now run forward migration V35:
             // Must NOT fail with duplicate key violation on (knowledge_document_id, version_label)
-            migrate(source, "32");
+            migrate(source, "35");
 
-            assertThat(version(jdbc)).isEqualTo("32");
+            assertThat(version(jdbc)).isEqualTo("35");
 
             // Verify backfilled version_label uses version_number string
             String v1Label = jdbc.queryForObject("SELECT version_label FROM fitness.knowledge_versions WHERE id = ?", String.class, v1Id);
@@ -127,10 +127,10 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
     void publishTriggerBlocksHeldAsDraftAndDraftStagedFromActivation() {
-        try (var db = database("content_v32_guard")) {
+        try (var db = database("content_v35_guard")) {
             db.start();
             var source = source(db);
-            migrate(source, "32");
+            migrate(source, "35");
             var jdbc = new JdbcTemplate(source);
 
             UUID adminId = UUID.randomUUID();
@@ -195,10 +195,10 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
     void publishTriggerBlocksWhenReviewHashIsNullBlankOrMismatched() {
-        try (var db = database("content_v32_hash_guard")) {
+        try (var db = database("content_v35_hash_guard")) {
             db.start();
             var source = source(db);
-            migrate(source, "32");
+            migrate(source, "35");
             var jdbc = new JdbcTemplate(source);
 
             UUID adminId = UUID.randomUUID();
@@ -265,10 +265,10 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
     void publishTriggerRespectsMonotonicSequenceWhenTimestampsEqual() {
-        try (var db = database("content_v32_review_seq")) {
+        try (var db = database("content_v35_review_seq")) {
             db.start();
             var source = source(db);
-            migrate(source, "32");
+            migrate(source, "35");
             var jdbc = new JdbcTemplate(source);
 
             UUID adminId = UUID.randomUUID();
@@ -324,10 +324,10 @@ class V32ContentKnowledgeGovernanceMigrationIntegrationTest {
 
     @Test
     void activeContentIsImmutableOnceActive() {
-        try (var db = database("content_v32_immutability")) {
+        try (var db = database("content_v35_immutability")) {
             db.start();
             var source = source(db);
-            migrate(source, "32");
+            migrate(source, "35");
             var jdbc = new JdbcTemplate(source);
 
             UUID adminId = UUID.randomUUID();
