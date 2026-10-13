@@ -79,7 +79,10 @@ Sau đợt tự review trước đó, các vấn đề của F01 contract đã �
   - Toàn bộ read endpoint của Admin Content Controller kiểm tra tài khoản ACTIVE và quyền `KNOWLEDGE_IMPORT` / `KNOWLEDGE_REVIEW` / `KNOWLEDGE_PUBLISH`.
   - `KnowledgeQueryService` dùng regex whitelist sanitize `allowedSourceIds` (chặn SQL injection và path traversal), nghiêm ngặt chỉ trả về các phiên bản `ACTIVE`.
 - **Flyway forward migration:**
-  - `V35__content_knowledge_governance_and_provenance.sql` bổ sung các cột governance, trigger `validate_knowledge_publish()`, bảng `knowledge_processing_runs` index, và quyền Admin.
+  - `V35__content_knowledge_governance_and_provenance.sql` bổ sung các cột governance, trigger `validate_knowledge_publish()`, bảng `knowledge_processing_runs` index, và permission seed.
+  - `V36__outbox_claim_fencing_and_attempt_guards.sql` bổ sung fencing token và attempt count check constraints.
+  - `V37__outbox_full_lifecycle_operation_identity.sql` siết chặt `operation_key` NOT NULL và UNIQUE toàn bộ lifecycle run.
+  - `V38__content_admin_role_and_permission_separation.sql` tách biệt 4 quyền Content (`KNOWLEDGE_IMPORT`, `KNOWLEDGE_REVIEW`, `KNOWLEDGE_PUBLISH`, `KNOWLEDGE_ARCHIVE`) khỏi role `ADMIN` cơ bản, đưa vào role chuyên biệt `CONTENT_ADMIN`.
 
 ---
 
@@ -95,9 +98,9 @@ Sau đợt tự review trước đó, các vấn đề của F01 contract đã �
 | `npm run validate:ux-docs` | **PASS** | 18/18 files tài liệu UX hợp lệ |
 | `git diff --check` | **PASS** | Không có conflict markers hay whitespace errors |
 | `mvn test` (Content Unit Tests) | **35/35 PASS** | `ContentImportServiceUnitTest` (6), `ContentLifecycleServiceUnitTest` (6), `KnowledgeIndexingOutboxConsumerTest` (5), `KnowledgeQueryServiceUnitTest` (5), `SpecialistReviewEvidenceRegistryTest` (13) |
-| `mvn test` (Flyway V35-V37 Migration Test) | **9/9 PASS** | `V35ContentKnowledgeGovernanceMigrationIntegrationTest` kiểm tra clean migration lên V35-V37, legacy multi-version backfill an toàn với immutability trigger, sequence review đơn điệu, trigger publish guard (HELD_AS_DRAFT, DRAFT_STAGED, review hash mismatch/blank/null), DB immutability, outbox claim fencing token & attempt guards (V36), full-lifecycle operation identity uniqueness constraint (V37), và reconciliation legacy nulls/diagnostic fail duplicates (V37) |
+| `mvn test` (Flyway V35-V38 Migration Test) | **11/11 PASS** | `V35ContentKnowledgeGovernanceMigrationIntegrationTest` kiểm tra clean migration lên V35-V38, legacy multi-version backfill an toàn với immutability trigger, sequence review đơn điệu, trigger publish guard (HELD_AS_DRAFT, DRAFT_STAGED, review hash mismatch/blank/null), DB immutability, outbox claim fencing token & attempt guards (V36), full-lifecycle operation identity uniqueness constraint (V37), reconciliation legacy nulls/diagnostic fail duplicates (V37), và tách biệt quyền Content sang `CONTENT_ADMIN` sạch sẽ (V38 clean & upgrade) |
 | `mvn test` (Outbox Integration Test) | **16/16 PASS** | `KnowledgeIndexingOutboxIntegrationTest` kiểm chứng PostgreSQL Testcontainers: full-lifecycle operation identity uniqueness, idempotency return existing run cùng intent, conflict 409 khi mismatch intent, validate blank operation key (400), attempt limits cho cả QUEUED và RUNNING, caller transaction suspension (`PROPAGATION_NOT_SUPPORTED` - suspend transaction caller, worker không tham gia caller tx, suspend không tự giải phóng lock/connection caller đã giữ), fixed delay retry 30s (không phải exponential), strict claim token fencing, chỉ log completion khi update thành công (không log khi bị fencing từ chối, không ghi đè job worker khác), reap terminal FAILED |
-| `mvn test` (Content Integration Test) | **3/3 PASS** | `ContentManagementIntegrationTest` kiểm tra trọn vẹn: Fake evidence rejection (400), Provenance conflict (409), Snapshot unverified draft publish guard (409), Authentic review evidence import (200), Publish guardrail, DB immutability, Durable outbox atomic claim & stats (`real_embeddings: false`, `mode: BOUNDARY_VERIFICATION_ONLY`), Concurrent outbox claim (`SKIP LOCKED`), AI knowledge query authorization (401 unauth, 403 suspended, 200 student active), Archive eligibility, Concurrent publish idempotency (409) |
+| `mvn test` (Content Integration Test) | **5/5 PASS** | `ContentManagementIntegrationTest` kiểm tra trọn vẹn: Fake evidence rejection (400), Provenance conflict (409), Snapshot unverified draft publish guard (409), Authentic review evidence import (200), Publish guardrail, DB immutability, Durable outbox atomic claim & stats (`real_embeddings: false`, `mode: BOUNDARY_VERIFICATION_ONLY`), Concurrent outbox claim (`SKIP LOCKED`), AI knowledge query authorization (401 unauth, 403 suspended, 200 student active), Archive eligibility, Concurrent publish idempotency (409), từ chối mutation đối với ADMIN cơ bản thiếu CONTENT_ADMIN (403), và thu hồi CONTENT_ADMIN lập tức phản ánh trong effective permissions và API |
 
 ---
 
@@ -136,6 +139,7 @@ Sau đợt tự review trước đó, các vấn đề của F01 contract đã �
 - `services/backend/src/main/resources/db/migration/V35__content_knowledge_governance_and_provenance.sql` (Flyway migration V35)
 - `services/backend/src/main/resources/db/migration/V36__outbox_claim_fencing_and_attempt_guards.sql` (Flyway migration V36 - outbox claim fencing & attempt guards)
 - `services/backend/src/main/resources/db/migration/V37__outbox_full_lifecycle_operation_identity.sql` (Flyway migration V37 - outbox full-lifecycle operation identity uniqueness)
+- `services/backend/src/main/resources/db/migration/V38__content_admin_role_and_permission_separation.sql` (Flyway migration V38 - tách biệt quyền Content sang CONTENT_ADMIN)
 - `services/backend/src/main/java/com/fitnesscoaching/platform/modules/content/**` (Triển khai module Content Spring Boot & KnowledgeIndexingOutboxWorker)
 - `services/backend/src/main/java/com/fitnesscoaching/platform/common/exception/Content*.java` (Content domain exceptions)
 - `services/backend/src/test/java/com/fitnesscoaching/platform/ContentManagementIntegrationTest.java` (Integration test E2E)

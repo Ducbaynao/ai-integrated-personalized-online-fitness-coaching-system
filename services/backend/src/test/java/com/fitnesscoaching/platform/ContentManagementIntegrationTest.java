@@ -101,12 +101,12 @@ class ContentManagementIntegrationTest {
                 INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
                 SELECT ?, id, ?, clock_timestamp()
                 FROM fitness.roles
-                WHERE code = 'ADMIN'
+                WHERE code IN ('ADMIN', 'CONTENT_ADMIN')
                 ON CONFLICT (user_id, role_id) DO UPDATE SET revoked_at = NULL
                 """, ADMIN_ID, ADMIN_ID);
     }
 
-    private String bearer(UUID userId, String role) {
+    private String bearer(UUID userId, String... roles) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(jwtProperties.getIssuer())
@@ -114,7 +114,7 @@ class ContentManagementIntegrationTest {
                 .expiresAt(now.plus(1, ChronoUnit.HOURS))
                 .subject(userId.toString())
                 .claim("email", "admin@fitplatform.local")
-                .claim("roles", List.of(role))
+                .claim("roles", List.of(roles))
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return "Bearer " + jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
@@ -670,5 +670,196 @@ class ContentManagementIntegrationTest {
         String runStatus = jdbcTemplate.queryForObject(
                 "SELECT status FROM fitness.knowledge_processing_runs WHERE id = ?", String.class, runId);
         assertThat(runStatus).isEqualTo("SUCCEEDED");
+    }
+
+    @Test
+    void adminWithoutContentAdminRoleIsDeniedOnContentMutations() throws Exception {
+        UUID plainAdminId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users (
+                    id, email, password_hash, display_name, status, preferred_locale, timezone, created_at, updated_at
+                ) VALUES (
+                    ?, ?, '$2a$10$dummyHash', 'Plain Admin',
+                    'ACTIVE', 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now()
+                )
+                """, plainAdminId, "plain.admin." + plainAdminId + "@fitplatform.local");
+
+        // Assign ONLY the base ADMIN role (no CONTENT_ADMIN)
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
+                SELECT ?, id, ?, clock_timestamp()
+                FROM fitness.roles
+                WHERE code = 'ADMIN'
+                """, plainAdminId, ADMIN_ID);
+
+        String plainAdminToken = bearer(plainAdminId, "ADMIN");
+
+        // 1. Import mutation must be DENIED (HTTP 403)
+        String dummyBundle = """
+                {
+                    "formatVersion": 1,
+                    "purpose": "F01_GENERAL_KNOWLEDGE",
+                    "bundleName": "plain-admin-test",
+                    "items": [
+                        {
+                            "documentCode": "WHO-PA-TEST-PLAIN",
+                            "sourceId": "WHO-PA-SB-2020",
+                            "title": "Plain Test",
+                            "language": "vi",
+                            "versionLabel": "1.0.0",
+                            "content": "# Test",
+                            "contentHash": "%s",
+                            "contentPath": "derivatives/who-2020/01-scope.vi.md",
+                            "reviewEvidenceId": "REV-PO-20261008-01"
+                        }
+                    ]
+                }
+                """.formatted(sha256("# Test"));
+
+        mockMvc.perform(post("/api/v1/admin/content/knowledge/import")
+                        .header("Authorization", plainAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dummyBundle))
+                .andExpect(status().isForbidden());
+
+        // Prepare a test version in DRAFT
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents(id, document_code, title, source_id, language, created_by)
+                VALUES (?, ?, 'Plain Admin Doc', 'WHO-PA-SB-2020', 'vi', ?)
+                """, docId, "DOC-PLAIN-" + docId, ADMIN_ID);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions(
+                    id, knowledge_document_id, version_number, version_label,
+                    status, technical_readiness, content_hash, content, created_by
+                ) VALUES (
+                    ?, ?, 1, '1.0.0',
+                    'DRAFT', 'TECHNICAL_VERIFICATION_PASSED', 'dummyhash123', 'Content', ?
+                )
+                """, versionId, docId, ADMIN_ID);
+
+        // 2. Review mutation must be DENIED (HTTP 403)
+        mockMvc.perform(post("/api/v1/admin/content/knowledge/versions/" + versionId + "/review")
+                        .header("Authorization", plainAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "decision": "APPROVED",
+                                    "notes": "Attempt without Content authority"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        // 3. Publish mutation must be DENIED (HTTP 403)
+        mockMvc.perform(post("/api/v1/admin/content/knowledge/versions/" + versionId + "/publish")
+                        .header("Authorization", plainAdminToken))
+                .andExpect(status().isForbidden());
+
+        // 4. Archive mutation must be DENIED (HTTP 403)
+        mockMvc.perform(post("/api/v1/admin/content/knowledge/versions/" + versionId + "/archive")
+                        .header("Authorization", plainAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reason": "Attempt without Content authority"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void revokingContentAdminRoleImmediatelyDeniesApiAndRemovesEffectivePermissions() throws Exception {
+        UUID dualAdminId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users (
+                    id, email, password_hash, display_name, status, preferred_locale, timezone, created_at, updated_at
+                ) VALUES (
+                    ?, ?, '$2a$10$dummyHash', 'Dual Admin',
+                    'ACTIVE', 'vi-VN', 'Asia/Ho_Chi_Minh', now(), now()
+                )
+                """, dualAdminId, "dual.admin." + dualAdminId + "@fitplatform.local");
+
+        // Assign BOTH ADMIN and CONTENT_ADMIN roles
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles (user_id, role_id, assigned_by, assigned_at)
+                SELECT ?, id, ?, clock_timestamp()
+                FROM fitness.roles
+                WHERE code IN ('ADMIN', 'CONTENT_ADMIN')
+                """, dualAdminId, ADMIN_ID);
+
+        // Verify initial effective permissions include CATALOG_MANAGE and all 4 KNOWLEDGE_* permissions
+        List<String> permsBefore = jdbcTemplate.query(
+                """
+                SELECT DISTINCT p.code
+                FROM fitness.users u
+                JOIN fitness.user_roles ur ON ur.user_id = u.id
+                JOIN fitness.role_permissions rp ON rp.role_id = ur.role_id
+                JOIN fitness.permissions p ON p.id = rp.permission_id
+                WHERE u.id = ? AND u.status = 'ACTIVE'::fitness.account_status AND ur.revoked_at IS NULL
+                ORDER BY p.code ASC
+                """,
+                (rs, rowNum) -> rs.getString("code"),
+                dualAdminId
+        );
+        assertThat(permsBefore).contains(
+                "CATALOG_MANAGE", "KNOWLEDGE_ARCHIVE", "KNOWLEDGE_IMPORT", "KNOWLEDGE_PUBLISH", "KNOWLEDGE_REVIEW"
+        );
+
+        // Issue token while both roles active
+        String dualToken = bearer(dualAdminId, "ADMIN", "CONTENT_ADMIN");
+
+        // Revoke CONTENT_ADMIN role assignment
+        jdbcTemplate.update("""
+                UPDATE fitness.user_roles
+                SET revoked_at = clock_timestamp()
+                WHERE user_id = ?
+                  AND role_id = (SELECT id FROM fitness.roles WHERE code = 'CONTENT_ADMIN')
+                """, dualAdminId);
+
+        // Verify effective permissions immediately lose all KNOWLEDGE_* permissions while keeping CATALOG_MANAGE
+        List<String> permsAfter = jdbcTemplate.query(
+                """
+                SELECT DISTINCT p.code
+                FROM fitness.users u
+                JOIN fitness.user_roles ur ON ur.user_id = u.id
+                JOIN fitness.role_permissions rp ON rp.role_id = ur.role_id
+                JOIN fitness.permissions p ON p.id = rp.permission_id
+                WHERE u.id = ? AND u.status = 'ACTIVE'::fitness.account_status AND ur.revoked_at IS NULL
+                ORDER BY p.code ASC
+                """,
+                (rs, rowNum) -> rs.getString("code"),
+                dualAdminId
+        );
+        assertThat(permsAfter).containsExactly("CATALOG_MANAGE");
+
+        // API request with revoked CONTENT_ADMIN must be immediately rejected (HTTP 403)
+        String dummyBundle = """
+                {
+                    "formatVersion": 1,
+                    "purpose": "F01_GENERAL_KNOWLEDGE",
+                    "bundleName": "revoked-admin-test",
+                    "items": [
+                        {
+                            "documentCode": "WHO-PA-TEST-REVOKED",
+                            "sourceId": "WHO-PA-SB-2020",
+                            "title": "Revoked Test",
+                            "language": "vi",
+                            "versionLabel": "1.0.0",
+                            "content": "# Test",
+                            "contentHash": "%s",
+                            "contentPath": "derivatives/who-2020/01-scope.vi.md",
+                            "reviewEvidenceId": "REV-PO-20261008-01"
+                        }
+                    ]
+                }
+                """.formatted(sha256("# Test"));
+
+        mockMvc.perform(post("/api/v1/admin/content/knowledge/import")
+                        .header("Authorization", dualToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dummyBundle))
+                .andExpect(status().isForbidden());
     }
 }

@@ -533,6 +533,117 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
         }
     }
 
+    @Test
+    void cleanInstallReachesV38WithContentAdminRoleAndPermissionSeparation() {
+        try (var db = database("content_v38_clean")) {
+            db.start();
+            var source = source(db);
+            migrate(source, "38");
+            var jdbc = new JdbcTemplate(source);
+
+            assertThat(version(jdbc)).isEqualTo("38");
+
+            // Verify CONTENT_ADMIN role exists
+            Integer contentAdminRoleCount = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.roles
+                    WHERE code = 'CONTENT_ADMIN'
+                    """, Integer.class);
+            assertThat(contentAdminRoleCount).isEqualTo(1);
+
+            // Verify CONTENT_ADMIN role has the four Content permissions
+            Integer contentAdminPerms = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'CONTENT_ADMIN'
+                      AND p.code IN ('KNOWLEDGE_IMPORT', 'KNOWLEDGE_REVIEW', 'KNOWLEDGE_PUBLISH', 'KNOWLEDGE_ARCHIVE')
+                    """, Integer.class);
+            assertThat(contentAdminPerms).isEqualTo(4);
+
+            // Verify base ADMIN role NO LONGER has the four Content permissions
+            Integer adminContentPerms = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'ADMIN'
+                      AND p.code IN ('KNOWLEDGE_IMPORT', 'KNOWLEDGE_REVIEW', 'KNOWLEDGE_PUBLISH', 'KNOWLEDGE_ARCHIVE')
+                    """, Integer.class);
+            assertThat(adminContentPerms).isEqualTo(0);
+
+            // Verify base ADMIN role retains CATALOG_MANAGE
+            Integer adminCatalogManage = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'ADMIN' AND p.code = 'CATALOG_MANAGE'
+                    """, Integer.class);
+            assertThat(adminCatalogManage).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void v38UpgradeFromV37_separatesContentPermissionsFromAdminAndIsIdempotent() {
+        try (var db = database("content_v38_upgrade")) {
+            db.start();
+            var source = source(db);
+            // Migrate up to V37 first
+            migrate(source, "37");
+            var jdbc = new JdbcTemplate(source);
+
+            // In V37, base ADMIN still had the four Content permissions
+            Integer adminPermsBeforeV38 = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'ADMIN'
+                      AND p.code IN ('KNOWLEDGE_IMPORT', 'KNOWLEDGE_REVIEW', 'KNOWLEDGE_PUBLISH', 'KNOWLEDGE_ARCHIVE')
+                    """, Integer.class);
+            assertThat(adminPermsBeforeV38).isEqualTo(4);
+
+            // Now apply V38 migration
+            migrate(source, "38");
+            assertThat(version(jdbc)).isEqualTo("38");
+
+            // Base ADMIN has 0 Content permissions
+            Integer adminPermsAfterV38 = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'ADMIN'
+                      AND p.code IN ('KNOWLEDGE_IMPORT', 'KNOWLEDGE_REVIEW', 'KNOWLEDGE_PUBLISH', 'KNOWLEDGE_ARCHIVE')
+                    """, Integer.class);
+            assertThat(adminPermsAfterV38).isEqualTo(0);
+
+            // Base ADMIN retains CATALOG_MANAGE
+            Integer adminCatalogManage = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'ADMIN' AND p.code = 'CATALOG_MANAGE'
+                    """, Integer.class);
+            assertThat(adminCatalogManage).isEqualTo(1);
+
+            // CONTENT_ADMIN has all 4 Content permissions
+            Integer contentAdminPerms = jdbc.queryForObject("""
+                    SELECT count(*) FROM fitness.role_permissions rp
+                    JOIN fitness.roles r ON r.id = rp.role_id
+                    JOIN fitness.permissions p ON p.id = rp.permission_id
+                    WHERE r.code = 'CONTENT_ADMIN'
+                      AND p.code IN ('KNOWLEDGE_IMPORT', 'KNOWLEDGE_REVIEW', 'KNOWLEDGE_PUBLISH', 'KNOWLEDGE_ARCHIVE')
+                    """, Integer.class);
+            assertThat(contentAdminPerms).isEqualTo(4);
+
+            // Verify idempotency: no duplicate (role_id, permission_id) pairs
+            Integer duplicateGrants = jdbc.queryForObject("""
+                    SELECT count(*) FROM (
+                        SELECT role_id, permission_id FROM fitness.role_permissions
+                        GROUP BY role_id, permission_id HAVING count(*) > 1
+                    ) dups
+                    """, Integer.class);
+            assertThat(duplicateGrants).isEqualTo(0);
+        }
+    }
+
     private PostgreSQLContainer<?> database(String name) {
         return new PostgreSQLContainer<>(
                 DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))

@@ -66,6 +66,12 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN
 WHERE r.code = 'USER_ADMIN'
 ON CONFLICT DO NOTHING;
 
+INSERT INTO role_permissions(role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.code IN
+('CATALOG_MANAGE','KNOWLEDGE_IMPORT','KNOWLEDGE_REVIEW','KNOWLEDGE_PUBLISH','KNOWLEDGE_ARCHIVE')
+WHERE r.code = 'CONTENT_ADMIN'
+ON CONFLICT DO NOTHING;
+
 INSERT INTO measurement_units(code, symbol, dimension, base_unit_code, multiplier_to_base, offset_to_base) VALUES
 ('KG', 'kg', 'MASS', 'KG', 1, 0),
 ('G', 'g', 'MASS', 'KG', 0.001, 0),

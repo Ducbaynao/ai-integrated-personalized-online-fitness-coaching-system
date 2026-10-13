@@ -2520,7 +2520,8 @@ paths:
       operationId: importKnowledgeCorpusBundle
       summary: Import a bundle of normalized knowledge documents and versions
       description: >-
-        Requires ADMIN role and KNOWLEDGE_IMPORT permission. Ingests normalized corpus items as DRAFT versions,
+        Requires platform ADMIN role and explicit KNOWLEDGE_IMPORT permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Ingests normalized corpus items as DRAFT versions,
         verifies SHA-256 content hashes, enforces idempotency, links review evidence, and records immutable audit.
       security:
         - bearerAuth: []
@@ -2550,7 +2551,8 @@ paths:
       operationId: reviewKnowledgeVersion
       summary: Record specialist/expert review for a draft knowledge version
       description: >-
-        Requires ADMIN role and KNOWLEDGE_REVIEW permission. Records an approved, changes-requested,
+        Requires platform ADMIN role and explicit KNOWLEDGE_REVIEW permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Records an approved, changes-requested,
         or rejected review event for a DRAFT version.
       security:
         - bearerAuth: []
@@ -2587,7 +2589,8 @@ paths:
       operationId: publishKnowledgeVersion
       summary: Publish an approved knowledge version to ACTIVE status
       description: >-
-        Requires ADMIN role and KNOWLEDGE_PUBLISH permission. Enforces publish guardrails:
+        Requires platform ADMIN role and explicit KNOWLEDGE_PUBLISH permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Enforces publish guardrails:
         rejects if HELD_AS_DRAFT, requires an APPROVED review. Transitions status to ACTIVE
         and triggers decoupled AI indexing eligibility notification.
       security:
@@ -2619,7 +2622,8 @@ paths:
       operationId: archiveKnowledgeVersion
       summary: Archive an ACTIVE knowledge version
       description: >-
-        Requires ADMIN role and KNOWLEDGE_ARCHIVE permission. Transitions status from ACTIVE to ARCHIVED,
+        Requires platform ADMIN role and explicit KNOWLEDGE_ARCHIVE permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Transitions status from ACTIVE to ARCHIVED,
         preserving immutable version history and lineage.
       security:
         - bearerAuth: []
