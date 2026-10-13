@@ -65,6 +65,14 @@ describe('Student Planned Workout calendar', () => {
     expect(formatScheduleTime(occurrence.plannedStartAt, 'Etc/UTC', student.timezone)).toContain('Etc/UTC');
   });
 
+  it('opens the real occurrence detail even for terminal history', () => {
+    schedule([{ ...occurrence, status: 'RESCHEDULED', availableActions: [], replacementOccurrenceId: 'new-1' }]);
+    const { tree } = render();
+    renderer.act(() => tree.root.findByProps({ testID: 'schedule-detail-occurrence-1' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/workouts/schedule/occurrence-1');
+    renderer.act(() => tree.unmount());
+  });
+
   it('starts with the actual occurrence version, prevents double submit and opens B05 Current', async () => {
     let finish!: (value: unknown) => void;
     (workoutExecutionApi.start as jest.Mock).mockReturnValue(new Promise((resolve) => { finish = resolve; }));

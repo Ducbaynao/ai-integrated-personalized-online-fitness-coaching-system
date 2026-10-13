@@ -131,6 +131,7 @@ export function StudentWorkoutScheduleScreen() {
       {item.plannedEndAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc dự kiến: {formatScheduleTime(item.plannedEndAt, item.timezone, user?.timezone)}</Text> : null}
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.planSummary?.planName || 'Không có tên kế hoạch trong bản ghi cũ'}{item.sessionSummary ? ` · Tuần ${item.sessionSummary.weekNumber}, ngày ${item.sessionSummary.dayNumber}` : ' · Không có tóm tắt buổi tập'}</Text>
       <View style={styles.row}>
+        <WorkoutButton testID={`schedule-detail-${item.occurrenceId}`} label="Xem chi tiết lịch tập" secondary onPress={() => router.push(`/workouts/schedule/${item.occurrenceId}` as never)} />
         {item.availableActions.includes('START') ? <WorkoutButton testID={`schedule-start-${item.occurrenceId}`} label="Bắt đầu tập" busy={mutation.isPending} disabled={mutation.isPending} onPress={() => begin(item, 'START')} /> : null}
         {item.availableActions.includes('SKIP') ? <WorkoutButton testID={`schedule-skip-${item.occurrenceId}`} label="Bỏ qua buổi này" secondary busy={mutation.isPending} disabled={mutation.isPending} onPress={() => { setConfirmSkip(item); setActionError(null); }} /> : null}
       </View>
