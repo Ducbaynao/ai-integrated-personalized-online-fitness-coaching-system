@@ -1,4 +1,4 @@
--- Forward Migration V34: Full-lifecycle operation identity uniqueness and integrity checks
+-- Forward Migration V37: Full-lifecycle operation identity uniqueness and integrity checks
 SET search_path TO fitness, public;
 
 -- Step 1: Pre-check for duplicate legacy operation keys.
@@ -19,7 +19,7 @@ BEGIN
     ) dups;
 
     IF v_dup_count > 0 THEN
-        RAISE EXCEPTION 'Cannot apply V34: Found % duplicate operation_key entries in legacy data: %', v_dup_count, v_dup_keys;
+        RAISE EXCEPTION 'Cannot apply V37: Found % duplicate operation_key entries in legacy data: %', v_dup_count, v_dup_keys;
     END IF;
 END $$;
 

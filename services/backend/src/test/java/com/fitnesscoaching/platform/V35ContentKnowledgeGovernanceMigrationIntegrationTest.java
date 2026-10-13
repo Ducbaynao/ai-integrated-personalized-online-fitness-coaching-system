@@ -57,6 +57,14 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
                     """, Integer.class);
             assertThat(outboxCols).isEqualTo(7);
 
+            // Verify claim_token does NOT exist yet in V35 (added later in V36)
+            Integer claimTokenBeforeV36 = jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = 'fitness' AND table_name = 'knowledge_processing_runs'
+                      AND column_name = 'claim_token'
+                    """, Integer.class);
+            assertThat(claimTokenBeforeV36).isEqualTo(0);
+
             // Verify permissions seeded
             Integer permCount = jdbc.queryForObject("""
                     SELECT count(*) FROM fitness.permissions
@@ -84,6 +92,14 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
             // 1. Migrate up to V31 only (simulating pre-existing database before V35)
             migrate(source, "31");
             var jdbc = new JdbcTemplate(source);
+
+            // Verify schema before V35 governance does not have new Content columns
+            Integer preDocCols = jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = 'fitness' AND table_name = 'knowledge_documents'
+                      AND column_name IN ('document_code', 'source_id', 'language')
+                    """, Integer.class);
+            assertThat(preDocCols).isEqualTo(0);
 
             UUID adminId = UUID.randomUUID();
             UUID docId = UUID.randomUUID();
@@ -376,14 +392,50 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
     }
 
     @Test
-    void cleanInstallReachesV34WithFullLifecycleOperationUniqueness() {
-        try (var db = database("content_v34_clean")) {
+    void cleanInstallReachesV36WithClaimFencingAndAttemptGuards() {
+        try (var db = database("content_v36_clean")) {
             db.start();
             var source = source(db);
-            migrate(source, "34");
+            migrate(source, "36");
             var jdbc = new JdbcTemplate(source);
 
-            assertThat(version(jdbc)).isEqualTo("34");
+            assertThat(version(jdbc)).isEqualTo("36");
+
+            // Verify claim_token column exists in knowledge_processing_runs
+            Integer claimTokenCol = jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = 'fitness' AND table_name = 'knowledge_processing_runs'
+                      AND column_name = 'claim_token'
+                    """, Integer.class);
+            assertThat(claimTokenCol).isEqualTo(1);
+
+            // Verify attempt count constraints exist
+            Integer attemptConstraints = jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.table_constraints
+                    WHERE table_schema = 'fitness' AND table_name = 'knowledge_processing_runs'
+                      AND constraint_name IN ('chk_processing_runs_max_attempts', 'chk_processing_runs_attempt_count')
+                    """, Integer.class);
+            assertThat(attemptConstraints).isEqualTo(2);
+
+            // Verify claim fencing index exists
+            Integer fenceIndex = jdbc.queryForObject("""
+                    SELECT count(*) FROM pg_indexes
+                    WHERE schemaname = 'fitness' AND tablename = 'knowledge_processing_runs'
+                      AND indexname = 'idx_knowledge_processing_runs_claim_fence'
+                    """, Integer.class);
+            assertThat(fenceIndex).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void cleanInstallReachesV37WithFullLifecycleOperationUniqueness() {
+        try (var db = database("content_v37_clean")) {
+            db.start();
+            var source = source(db);
+            migrate(source, "37");
+            var jdbc = new JdbcTemplate(source);
+
+            assertThat(version(jdbc)).isEqualTo("37");
 
             // Verify operation_key is NOT NULL
             String isNullable = jdbc.queryForObject("""
@@ -401,16 +453,24 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
                       AND constraint_type = 'UNIQUE'
                     """, Integer.class);
             assertThat(uqConstraint).isEqualTo(1);
+
+            // Verify non-empty check constraint on operation_key exists
+            Integer notEmptyConstraint = jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.table_constraints
+                    WHERE table_schema = 'fitness' AND table_name = 'knowledge_processing_runs'
+                      AND constraint_name = 'chk_processing_runs_operation_key_not_empty'
+                    """, Integer.class);
+            assertThat(notEmptyConstraint).isEqualTo(1);
         }
     }
 
     @Test
-    void v34Migration_reconcilesLegacyNullKeysAndFailsOnLegacyDuplicates() {
-        try (var db = database("content_v34_legacy")) {
+    void v37Migration_reconcilesLegacyNullKeysAndFailsOnLegacyDuplicates() {
+        try (var db = database("content_v37_legacy")) {
             db.start();
             var source = source(db);
-            // Migrate up to V33 first
-            migrate(source, "33");
+            // Migrate up to V36 first
+            migrate(source, "36");
             var jdbc = new JdbcTemplate(source);
 
             UUID adminId = UUID.randomUUID();
@@ -436,7 +496,7 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
 
             UUID run1Id = UUID.randomUUID();
             UUID run2Id = UUID.randomUUID();
-            // Insert two duplicate operation keys in legacy V33
+            // Insert two duplicate operation keys in legacy V36
             jdbc.update("""
                     INSERT INTO fitness.knowledge_processing_runs (
                         id, knowledge_version_id, run_type, status, operation_key, created_at
@@ -449,8 +509,8 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
                     ) VALUES (?, ?, 'REINDEX', 'FAILED', 'DUP-KEY', now())
                     """, run2Id, versionId);
 
-            // Migrating to V34 MUST fail with diagnostic error because duplicate keys exist
-            assertThatThrownBy(() -> migrate(source, "34"))
+            // Migrating to V37 MUST fail with diagnostic error because duplicate keys exist
+            assertThatThrownBy(() -> migrate(source, "37"))
                     .hasMessageContaining("duplicate operation_key entries in legacy data");
 
             // Remove the duplicate and insert a row with null operation_key
@@ -462,9 +522,9 @@ class V35ContentKnowledgeGovernanceMigrationIntegrationTest {
                     ) VALUES (?, ?, 'REINDEX', 'SUCCEEDED', NULL, now())
                     """, nullKeyRunId, versionId);
 
-            // Migrating to V34 now succeeds
-            migrate(source, "34");
-            assertThat(version(jdbc)).isEqualTo("34");
+            // Migrating to V37 now succeeds
+            migrate(source, "37");
+            assertThat(version(jdbc)).isEqualTo("37");
 
             // Null row must have been reconciled to 'LEGACY:' || id
             String reconciledKey = jdbc.queryForObject(

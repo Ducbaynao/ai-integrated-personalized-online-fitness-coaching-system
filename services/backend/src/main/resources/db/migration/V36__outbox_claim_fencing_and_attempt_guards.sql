@@ -1,4 +1,4 @@
--- Migration V33: Outbox claim fencing token, attempt constraints, and lease recovery guards
+-- Migration V36: Outbox claim fencing token, attempt constraints, and lease recovery guards
 SET search_path TO fitness, public;
 
 ALTER TABLE knowledge_processing_runs
