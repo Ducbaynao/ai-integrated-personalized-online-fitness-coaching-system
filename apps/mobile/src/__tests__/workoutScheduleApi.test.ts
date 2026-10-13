@@ -50,4 +50,21 @@ describe('B06 calendar and B05 occurrence commands', () => {
       method: 'POST', body: { expectedOccurrenceVersion: 11, commandKey: 'skip-key' },
     });
   });
+
+  it('reads occurrence detail and sends exact reschedule/cancel JSON bodies', async () => {
+    const destination = {
+      localStart: '2026-10-20T18:30', localEnd: '2026-10-20T19:30',
+      timezone: 'Asia/Ho_Chi_Minh', startUtcOffset: '+07:00', endUtcOffset: '+07:00',
+    };
+    await workoutScheduleApi.detail('occurrence-1');
+    await workoutScheduleApi.reschedule('occurrence-1', { expectedOccurrenceVersion: 8, destination, commandKey: 'same-key' });
+    await workoutScheduleApi.cancel('occurrence-2', { expectedOccurrenceVersion: 4, reason: 'Không thể tham gia', commandKey: 'cancel-key' });
+    expect(request).toHaveBeenNthCalledWith(1, '/planned-workouts/occurrence-1', { method: 'GET' });
+    expect(request).toHaveBeenNthCalledWith(2, '/planned-workouts/occurrence-1/reschedule', {
+      method: 'POST', body: { expectedOccurrenceVersion: 8, destination, commandKey: 'same-key' },
+    });
+    expect(request).toHaveBeenNthCalledWith(3, '/planned-workouts/occurrence-2/cancel', {
+      method: 'POST', body: { expectedOccurrenceVersion: 4, reason: 'Không thể tham gia', commandKey: 'cancel-key' },
+    });
+  });
 });
