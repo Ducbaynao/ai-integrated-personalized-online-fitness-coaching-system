@@ -1,0 +1,19 @@
+{
+  "runId": "99999999-9999-4999-8999-999999999999",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "answer": "Giải thích câu hỏi.",
+  "citations": [
+    {
+      "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-01",
+      "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+      "locator": {
+        "sourcePath": "data/knowledge/curated/issn-protein-2017/01-scope.vi.md",
+        "heading": "Protein, leucine v? EAA trong t?ng l?n ?n"
+      }
+    }
+  ],
+  "limitations": [],
+  "missingData": [],
+  "asOf": "2026-10-10T12:00:00Z"
+}

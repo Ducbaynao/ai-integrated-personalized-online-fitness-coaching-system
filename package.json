@@ -19,6 +19,7 @@
     "validate:knowledge": "node tools/validate-knowledge.mjs",
     "test:knowledge": "node --test tools/validate-knowledge.test.mjs",
     "validate:contracts": "npm run validate:openapi && npm run validate:ai-schemas",
+    "test:contracts": "node --test tools/validate-contracts.test.mjs",
     "test:migrations": "node tools/test-migrations.mjs"
   },
   "devDependencies": {

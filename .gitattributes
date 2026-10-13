@@ -1,0 +1,13 @@
+# Git attributes configuration
+# Enforces exact byte preservation for knowledge corpus snapshots and normalized LF for metadata/manifests
+
+.gitattributes text eol=lf
+
+# Knowledge corpus snapshot artifacts with cryptographic hashes and review bindings (preserve verbatim bytes)
+data/knowledge/packages/** -text
+data/knowledge/derivatives/** -text
+
+# Knowledge corpus manifests, evaluation mappings, review records, and documentation (normalized LF)
+data/knowledge/*.json text eol=lf
+data/knowledge/*.md text eol=lf
+data/knowledge/review-records/** text eol=lf

@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f01-knowledge-query-result.schema.json",
+  "title": "F01 General Fitness Knowledge Information Result",
+  "description": "Structured INFORMATION result for general fitness knowledge inquiries. Does not create actionable proposals or mutations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId",
+    "runStatus",
+    "asOf"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the AI Run record in the database."
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation identifier for tracing."
+    },
+    "runStatus": {
+      "type": "string",
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "REJECTED_BY_VALIDATOR"
+      ],
+      "description": "Database-level lifecycle status of the AI Run."
+    },
+    "resultType": {
+      "type": "string",
+      "enum": [
+        "INFORMATION",
+        "INSUFFICIENT_DATA",
+        "BLOCKED"
+      ],
+      "description": "Contract-level result classification. Distinct from PROPOSAL and ESTIMATE."
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "MISSING_REQUIRED_CONTEXT",
+        "NO_RELEVANT_EVIDENCE",
+        "RULE_BLOCKED",
+        "VALIDATION_FAILED",
+        "MODEL_ERROR",
+        "PROVIDER_ERROR",
+        "TIMEOUT",
+        "PROCESSING_ERROR"
+      ],
+      "description": "Machine-readable reason or error code distinguishing domain outcome from system state."
+    },
+    "answer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000,
+      "description": "Synthesized explanatory answer with claim references grounded in cited knowledge."
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://fitness-coaching.local/schemas/ai/citation.schema.json"
+      },
+      "description": "Citations grounding the claims in the answer to governed ACTIVE knowledge documents."
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "Explicit boundaries or population limitations of the knowledge (e.g. healthy adults only, not clinical advice)."
+    },
+    "missingData": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "Clarifications or context missing from the question."
+    },
+    "asOf": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the result was generated."
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promptTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completionTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latencyMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "description": "Operational token counts and latency metadata."
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Sanitized diagnostics; no raw rejected output, provider payload, secrets or personal data."
+    },
+    "generationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "promptVersion",
+        "ruleVersion",
+        "provider",
+        "model"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promptVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "embeddingModelSpace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "indexVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Versioned provenance when generation was attempted; mock values are explicitly identified. Spring retains this with AI Run, citation references, validation outcome and usage."
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "resultType",
+        "answer",
+        "citations",
+        "limitations",
+        "missingData"
+      ],
+      "properties": {
+        "runStatus": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED"
+          ]
+        },
+        "resultType": {
+          "type": "string",
+          "enum": [
+            "INFORMATION"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "NONE"
+          ]
+        },
+        "citations": {
+          "minItems": 1
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "error"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "resultType",
+        "reasonCode",
+        "limitations",
+        "missingData"
+      ],
+      "properties": {
+        "runStatus": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED"
+          ]
+        },
+        "resultType": {
+          "type": "string",
+          "enum": [
+            "INSUFFICIENT_DATA"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "MISSING_REQUIRED_CONTEXT",
+            "NO_RELEVANT_EVIDENCE"
+          ]
+        },
+        "missingData": {
+          "minItems": 1
+        },
+        "citations": {
+          "maxItems": 0
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "error"
+            ]
+          },
+          {
+            "required": [
+              "answer"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "resultType",
+        "reasonCode",
+        "limitations",
+        "missingData"
+      ],
+      "properties": {
+        "runStatus": {
+          "type": "string",
+          "enum": [
+            "REJECTED_BY_VALIDATOR"
+          ]
+        },
+        "resultType": {
+          "type": "string",
+          "enum": [
+            "BLOCKED"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "RULE_BLOCKED"
+          ]
+        },
+        "citations": {
+          "maxItems": 0
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "answer"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "reasonCode",
+        "error"
+      ],
+      "properties": {
+        "runStatus": {
+          "type": "string",
+          "enum": [
+            "REJECTED_BY_VALIDATOR"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "VALIDATION_FAILED"
+          ]
+        },
+        "citations": {
+          "maxItems": 0
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "resultType"
+            ]
+          },
+          {
+            "required": [
+              "answer"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "reasonCode",
+        "error"
+      ],
+      "properties": {
+        "runStatus": {
+          "type": "string",
+          "enum": [
+            "FAILED"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "MODEL_ERROR",
+            "PROVIDER_ERROR",
+            "TIMEOUT",
+            "PROCESSING_ERROR"
+          ]
+        },
+        "citations": {
+          "maxItems": 0
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "resultType"
+            ]
+          },
+          {
+            "required": [
+              "answer"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

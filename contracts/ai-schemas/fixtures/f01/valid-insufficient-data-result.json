@@ -1,0 +1,13 @@
+{
+  "runId": "55555555-5555-4555-8555-555555555555",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INSUFFICIENT_DATA",
+  "reasonCode": "NO_RELEVANT_EVIDENCE",
+  "limitations": [
+    "Hệ thống chỉ giải thích dựa trên các nguồn tri thức đã được kiểm duyệt (ISSN, WHO, NIDDK, NIH ODS)."
+  ],
+  "missingData": [
+    "Không tìm thấy tài liệu khoa học nào trong kho tri thức ACTIVE đề cập đến phương pháp luyện tập này."
+  ],
+  "asOf": "2026-10-10T12:00:02Z"
+}

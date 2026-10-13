@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f01-knowledge-query-request.schema.json",
+  "title": "F01 General Fitness Knowledge Query Request",
+  "description": "Public Spring REST request payload for general fitness and exercise technique questions (F01). Personal coaching context is excluded in this iteration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question"
+  ],
+  "properties": {
+    "question": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 1000,
+      "description": "The general fitness, training technique, or exercise science question asked by the user.",
+      "pattern": "\\S"
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "default": "vi",
+      "description": "Target language for response synthesis (default vi)."
+    },
+    "exerciseId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional UUID of an ACTIVE exercise in the catalog if the question is specific to an exercise."
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional client tracing ID; never an idempotency key."
+    }
+  }
+}

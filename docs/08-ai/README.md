@@ -15,7 +15,8 @@ The documents are APPROVED version 1.0 by the project owner on 2026-10-04 and di
 The [imported DRAFT corpus](../../data/knowledge/README.md) contains WHO, ISSN, NIDDK and
 NIH ODS snapshots. Read the [integration review](knowledge-corpus-review-2026-10-08.md),
 [detailed review and specialist readiness](f01-knowledge-corpus-detailed-review.md),
-and [staging-to-Knowledge mapping](knowledge-import-contract.md) before using it.
+[staging-to-Knowledge mapping](knowledge-import-contract.md),
+and [F01 general knowledge executable contract](f01-general-knowledge-contract.md) before using it.
 File import and technical review do not publish Knowledge or complete F01/F09. Retrieval remains disabled.
 
 ## Supported capabilities

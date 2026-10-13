@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f01-internal-context-envelope.schema.json",
+  "title": "F01 Spring to FastAPI Internal Context Envelope",
+  "description": "Minimal authorized context envelope constructed by Spring Boot and dispatched to the internal FastAPI AI service for F01 general knowledge inquiries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requestId",
+    "requestType",
+    "schemaVersion",
+    "correlationId",
+    "actor",
+    "purpose",
+    "allowedActions",
+    "asOf",
+    "question",
+    "language",
+    "knowledgeScope"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Spring-owned AI Run ID; internal result runId must echo this identity."
+    },
+    "requestType": {
+      "type": "string",
+      "const": "F01_GENERAL_KNOWLEDGE",
+      "description": "Fixed feature identifier for general fitness knowledge."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Contract schema version."
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID for distributed tracing across Spring, FastAPI, and audit logs."
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Authenticated user identity requesting the inquiry."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STUDENT",
+            "TRAINER"
+          ],
+          "description": "Server-selected active capability, not a role name supplied by the client. Admin alone does not grant F01 access."
+        }
+      }
+    },
+    "purpose": {
+      "type": "string",
+      "const": "GENERAL_FITNESS_EXPLANATION",
+      "description": "Fixed purpose code; prevents scope expansion or unauthorized mutation."
+    },
+    "allowedActions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "READ_INFORMATION"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "description": "Whitelisted server-granted actions; F01 only permits READ_INFORMATION."
+    },
+    "asOf": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp at which context was constructed."
+    },
+    "question": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 1000,
+      "description": "User question.",
+      "pattern": "\\S"
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "vi",
+        "en"
+      ],
+      "description": "Requested synthesis language."
+    },
+    "exerciseContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exerciseId",
+        "exerciseName"
+      ],
+      "properties": {
+        "exerciseId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "exerciseName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "movementPattern": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "equipmentRequired": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "description": "Optional catalog-validated metadata if question is pinned to an active exercise."
+    },
+    "knowledgeScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "allowedSourceIds"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "ACTIVE",
+          "description": "RAG must strictly retrieve only ACTIVE knowledge versions."
+        },
+        "allowedSourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+$"
+          },
+          "minItems": 0,
+          "uniqueItems": true,
+          "description": "Whitelisted sources in scope (e.g. ISSN-PROTEIN-EXERCISE-2017, WHO-PA-SB-2020)."
+        }
+      },
+      "description": "Server-owned scope. Empty source set returns NO_RELEVANT_EVIDENCE; never broaden to DRAFT or another scope."
+    }
+  }
+}

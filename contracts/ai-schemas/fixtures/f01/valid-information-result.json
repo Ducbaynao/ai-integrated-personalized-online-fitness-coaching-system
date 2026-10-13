@@ -1,0 +1,38 @@
+{
+  "runId": "44444444-4444-4444-8444-444444444444",
+  "correlationId": "22222222-2222-4222-8222-222222222222",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "reasonCode": "NONE",
+  "answer": "Th?ng tin minh h?a c?u tr?c contract v? protein trong t?p luy?n; c?n ??c c?ng ph?m vi v? gi?i h?n c?a t?i li?u ISSN 2017. ??y kh?ng ph?i k?t qu? benchmark model.",
+  "citations": [
+    {
+      "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+      "version": "1.0.0",
+      "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+      "locator": {
+        "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+        "heading": "Protein, leucine v? EAA trong t?ng l?n ?n"
+      }
+    }
+  ],
+  "limitations": [
+    "Khuyến nghị áp dụng cho người trưởng thành khỏe mạnh tham gia tập luyện kháng lực.",
+    "Không thay thế tư vấn y khoa hoặc dinh dưỡng lâm sàng cho người có bệnh lý thận."
+  ],
+  "missingData": [],
+  "asOf": "2026-10-10T12:00:05Z",
+  "usage": {
+    "promptTokens": 520,
+    "completionTokens": 160,
+    "totalTokens": 680,
+    "latencyMs": 850
+  },
+  "generationMetadata": {
+    "schemaVersion": "1.0.0",
+    "promptVersion": "fixture-v1",
+    "ruleVersion": "fixture-v1",
+    "provider": "mock",
+    "model": "fixture-model"
+  }
+}

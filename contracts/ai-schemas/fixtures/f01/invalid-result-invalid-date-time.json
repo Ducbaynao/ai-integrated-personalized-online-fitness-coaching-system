@@ -1,0 +1,13 @@
+{
+  "runId": "44444444-4444-4444-8444-444444444444",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INSUFFICIENT_DATA",
+  "reasonCode": "NO_RELEVANT_EVIDENCE",
+  "asOf": "2026-99-99T99:99:99Z",
+  "limitations": [
+    "Không tìm thấy bằng chứng hợp lệ."
+  ],
+  "missingData": [
+    "Chưa có nguồn kiến thức ACTIVE về chủ đề này."
+  ]
+}
