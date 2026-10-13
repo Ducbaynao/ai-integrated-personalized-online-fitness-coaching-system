@@ -1,0 +1,10 @@
+{
+  "runId": "77777777-7777-4777-8777-777777777777",
+  "runStatus": "FAILED",
+  "reasonCode": "TIMEOUT",
+  "asOf": "2026-10-10T12:00:30Z",
+  "error": {
+    "code": "MODEL_TIMEOUT",
+    "message": "AI model invocation exceeded deadline of 10000ms."
+  }
+}

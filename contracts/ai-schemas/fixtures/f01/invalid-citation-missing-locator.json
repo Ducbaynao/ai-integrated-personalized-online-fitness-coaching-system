@@ -1,0 +1,16 @@
+{
+  "runId": "88888888-8888-4888-8888-888888888888",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "answer": "Giải thích câu hỏi.",
+  "citations": [
+    {
+      "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-01",
+      "version": "1.0.0",
+      "sourceId": "ISSN-PROTEIN-EXERCISE-2017"
+    }
+  ],
+  "limitations": [],
+  "missingData": [],
+  "asOf": "2026-10-10T12:00:00Z"
+}

@@ -40,6 +40,12 @@ tags:
     description: Student-confirmed Planned Workout batches, Trainer proposals, and authority-scoped occurrence calendars.
   - name: Workout Execution
     description: Student-owned workout execution, actual set logging, terminal outcomes, and authority-scoped history.
+  - name: AI General Knowledge (F01)
+    description: >-
+      [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
+      General fitness and exercise science knowledge inquiry grounded in governed ACTIVE knowledge sources (ISSN, WHO, NIDDK, NIH ODS).
+      Spring Boot validates actor capability, builds minimal authorized context, and orchestrates AI pipeline.
+      Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
   /coaching/trainers:
@@ -2717,6 +2723,306 @@ paths:
         '404': { $ref: '#/components/responses/WorkoutExecutionConcealed' }
         '409': { $ref: '#/components/responses/WorkoutExecutionConflict' }
 
+  /ai/knowledge/query:
+    post:
+      tags: [AI General Knowledge (F01)]
+      operationId: queryGeneralFitnessKnowledge
+      summary: Ask general fitness and exercise technique questions with citations (F01)
+      description: >-
+        [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
+        Phase 2 F01 executable contract baseline (P2-M0/P2-M2 preparation). Endpoint implementation pending P2-M2; currently contract-only.
+        Actor (Student or Trainer) submits a general fitness question. Spring Boot enforces authentication
+        and actor capability, builds the authorized minimal context, queries the internal AI Assistance service,
+        validates the output against schema and Active knowledge boundaries, audits the AI Run, and returns
+        an immutable INFORMATION projection with structured citations.
+        Does not accept personal coaching context in first iteration. Does not create recommendations or plan mutations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/F01KnowledgeQueryRequest' }
+      responses:
+        '200':
+          description: Completed query (INFORMATION, INSUFFICIENT_DATA or policy BLOCKED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F01KnowledgeQueryResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '404':
+          description: Exercise catalog reference is unavailable or not ACTIVE
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          description: Internal processing failure; sanitized FAILED AI Run projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F01KnowledgeQueryResponse' }
+        '502':
+          description: Provider or output validation failure; no generated answer is exposed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F01KnowledgeQueryResponse' }
+        '504':
+          description: Provider timeout; sanitized FAILED AI Run projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F01KnowledgeQueryResponse' }
+
+  /admin/content/knowledge/import:
+    post:
+      tags: [Admin Content Knowledge]
+      operationId: importKnowledgeCorpusBundle
+      summary: Import a bundle of normalized knowledge documents and versions
+      description: >-
+        Requires platform ADMIN role and explicit KNOWLEDGE_IMPORT permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Ingests normalized corpus items as DRAFT versions,
+        verifies SHA-256 content hashes, enforces idempotency, links review evidence, and records immutable audit.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportCorpusBundleRequest' }
+      responses:
+        '200':
+          description: Import completed successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportCorpusResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Conflict due to checksum mismatch for existing version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/content/knowledge/versions/{versionId}/review:
+    post:
+      tags: [Admin Content Knowledge]
+      operationId: reviewKnowledgeVersion
+      summary: Record specialist/expert review for a draft knowledge version
+      description: >-
+        Requires platform ADMIN role and explicit KNOWLEDGE_REVIEW permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Records an approved, changes-requested,
+        or rejected review event for a DRAFT version.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewKnowledgeVersionRequest' }
+      responses:
+        '200':
+          description: Review recorded successfully
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Knowledge version not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Version is not in DRAFT status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/content/knowledge/versions/{versionId}/publish:
+    post:
+      tags: [Admin Content Knowledge]
+      operationId: publishKnowledgeVersion
+      summary: Publish an approved knowledge version to ACTIVE status
+      description: >-
+        Requires platform ADMIN role and explicit KNOWLEDGE_PUBLISH permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Enforces publish guardrails:
+        rejects if HELD_AS_DRAFT, requires an APPROVED review. Transitions status to ACTIVE
+        and triggers decoupled AI indexing eligibility notification.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Version published successfully to ACTIVE
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Knowledge version not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Publish guardrail failed (held as draft, missing approval, or already published)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/content/knowledge/versions/{versionId}/archive:
+    post:
+      tags: [Admin Content Knowledge]
+      operationId: archiveKnowledgeVersion
+      summary: Archive an ACTIVE knowledge version
+      description: >-
+        Requires platform ADMIN role and explicit KNOWLEDGE_ARCHIVE permission (e.g. via CONTENT_ADMIN assignment).
+        Base ADMIN role does not grant Content permissions by default. Transitions status from ACTIVE to ARCHIVED,
+        preserving immutable version history and lineage.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArchiveKnowledgeVersionRequest' }
+      responses:
+        '200':
+          description: Version archived successfully
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Knowledge version not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Version is not ACTIVE
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/content/knowledge/documents:
+    get:
+      tags: [Admin Content Knowledge]
+      operationId: listKnowledgeDocuments
+      summary: List knowledge documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        '200':
+          description: List of knowledge documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/KnowledgeDocumentResponse' }
+
+  /admin/content/knowledge/documents/{documentId}:
+    get:
+      tags: [Admin Content Knowledge]
+      operationId: getKnowledgeDocument
+      summary: Get knowledge document detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Knowledge document details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnowledgeDocumentResponse' }
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/content/knowledge/documents/{documentId}/versions:
+    get:
+      tags: [Admin Content Knowledge]
+      operationId: listKnowledgeDocumentVersions
+      summary: List versions for a knowledge document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of versions for document
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/KnowledgeVersionResponse' }
+
+  /admin/content/knowledge/versions/{versionId}:
+    get:
+      tags: [Admin Content Knowledge]
+      operationId: getKnowledgeVersion
+      summary: Get knowledge version detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Knowledge version details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnowledgeVersionResponse' }
+        '404':
+          description: Version not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /content/knowledge/query:
+    post:
+      tags: [Content Knowledge Query]
+      operationId: queryActiveKnowledge
+      summary: Query active knowledge sources for AI retrieval (F01)
+      description: >-
+        Internal query API retrieving ONLY ACTIVE knowledge versions within allowed source IDs.
+        Returns empty citation list if allowedSourceIds is empty. Never returns DRAFT or ARCHIVED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KnowledgeQueryApiRequest' }
+      responses:
+        '200':
+          description: Matching citations from active knowledge sources
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnowledgeQueryApiResponse' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3036,6 +3342,16 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     Unauthenticated:
       description: Authentication is missing or invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AIForbidden:
+      description: User lacks capability or account access for AI general knowledge inquiries
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: Service unavailable (e.g. AI assistance feature disabled by admin configuration or maintenance)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -5797,6 +6113,638 @@ components:
         size: { type: integer }
         totalItems: { type: integer }
         totalPages: { type: integer }
+
+    F01KnowledgeQueryRequest: {
+        "title": "F01 General Fitness Knowledge Query Request",
+        "description": "Public Spring REST request payload for general fitness and exercise technique questions (F01). Personal coaching context is excluded in this iteration.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000,
+            "description": "The general fitness, training technique, or exercise science question asked by the user.",
+            "pattern": "\\S"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "vi",
+              "en"
+            ],
+            "default": "vi",
+            "description": "Target language for response synthesis (default vi)."
+          },
+          "exerciseId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional UUID of an ACTIVE exercise in the catalog if the question is specific to an exercise."
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional client tracing ID; never an idempotency key."
+          }
+        }
+      }
+
+    KnowledgeCitation: {
+        "title": "Knowledge Citation and Evidence Locator",
+        "description": "Structured citation binding model answers to governed ACTIVE knowledge corpus documents, versions, and source locators.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "version",
+          "sourceId",
+          "locator"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+-VI-[0-9]{2}$",
+            "description": "Canonical document ID matching the governed knowledge corpus registry (e.g. ISSN-PROTEIN-EXERCISE-2017-VI-01, WHO-PA-SB-2020-VI-03)."
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+            "description": "Semantic version of the cited knowledge document (e.g. 1.0.0 for snapshot, 1.1.0 for derivative)."
+          },
+          "sourceId": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+$",
+            "description": "Source package identifier (e.g. ISSN-PROTEIN-EXERCISE-2017, WHO-PA-SB-2020, NIDDK-WEIGHT-FACTORS-2023, NIH-ODS-EXERCISE-SUPPLEMENTS)."
+          },
+          "locator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourcePath"
+            ],
+            "properties": {
+              "sourcePath": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Relative source path of the cited content within the corpus (e.g. data/knowledge/curated/issn-protein-2017/01-scope.vi.md).",
+                "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+              },
+              "heading": {
+                "type": "string",
+                "description": "Optional section heading within the source document."
+              },
+              "pageRange": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Optional 1-based [startPage, endPage] range in the source PDF asset."
+              },
+              "sectionIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Optional 0-based chunk or section index."
+              }
+            }
+          },
+          "quoteOrExcerpt": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Optional brief verbatim excerpt from the source text supporting the claim."
+          }
+        }
+      }
+
+    F01KnowledgeQueryResponse: {
+        "title": "F01 General Fitness Knowledge Information Result",
+        "description": "Structured INFORMATION result for general fitness knowledge inquiries. Does not create actionable proposals or mutations.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "runStatus",
+          "asOf"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the AI Run record in the database."
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Correlation identifier for tracing."
+          },
+          "runStatus": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "REJECTED_BY_VALIDATOR"
+            ],
+            "description": "Database-level lifecycle status of the AI Run."
+          },
+          "resultType": {
+            "type": "string",
+            "enum": [
+              "INFORMATION",
+              "INSUFFICIENT_DATA",
+              "BLOCKED"
+            ],
+            "description": "Contract-level result classification. Distinct from PROPOSAL and ESTIMATE."
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "MISSING_REQUIRED_CONTEXT",
+              "NO_RELEVANT_EVIDENCE",
+              "RULE_BLOCKED",
+              "VALIDATION_FAILED",
+              "MODEL_ERROR",
+              "PROVIDER_ERROR",
+              "TIMEOUT",
+              "PROCESSING_ERROR"
+            ],
+            "description": "Machine-readable reason or error code distinguishing domain outcome from system state."
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Synthesized explanatory answer with claim references grounded in cited knowledge."
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitation"
+            },
+            "description": "Citations grounding the claims in the answer to governed ACTIVE knowledge documents."
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true,
+            "description": "Explicit boundaries or population limitations of the knowledge (e.g. healthy adults only, not clinical advice)."
+          },
+          "missingData": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true,
+            "description": "Clarifications or context missing from the question."
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the result was generated."
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "promptTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completionTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "totalTokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "latencyMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "description": "Operational token counts and latency metadata."
+          },
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": "Sanitized diagnostics; no raw rejected output, provider payload, secrets or personal data."
+          },
+          "generationMetadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schemaVersion",
+              "promptVersion",
+              "ruleVersion",
+              "provider",
+              "model"
+            ],
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "promptVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "embeddingModelSpace": {
+                "type": "string",
+                "minLength": 1
+              },
+              "indexVersion": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": "Versioned provenance when generation was attempted; mock values are explicitly identified. Spring retains this with AI Run, citation references, validation outcome and usage."
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "resultType",
+              "answer",
+              "citations",
+              "limitations",
+              "missingData"
+            ],
+            "properties": {
+              "runStatus": {
+                "type": "string",
+                "enum": [
+                  "SUCCEEDED"
+                ]
+              },
+              "resultType": {
+                "type": "string",
+                "enum": [
+                  "INFORMATION"
+                ]
+              },
+              "reasonCode": {
+                "type": "string",
+                "enum": [
+                  "NONE"
+                ]
+              },
+              "citations": {
+                "minItems": 1
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "error"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "resultType",
+              "reasonCode",
+              "limitations",
+              "missingData"
+            ],
+            "properties": {
+              "runStatus": {
+                "type": "string",
+                "enum": [
+                  "SUCCEEDED"
+                ]
+              },
+              "resultType": {
+                "type": "string",
+                "enum": [
+                  "INSUFFICIENT_DATA"
+                ]
+              },
+              "reasonCode": {
+                "enum": [
+                  "MISSING_REQUIRED_CONTEXT",
+                  "NO_RELEVANT_EVIDENCE"
+                ]
+              },
+              "missingData": {
+                "minItems": 1
+              },
+              "citations": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "error"
+                  ]
+                },
+                {
+                  "required": [
+                    "answer"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "resultType",
+              "reasonCode",
+              "limitations",
+              "missingData"
+            ],
+            "properties": {
+              "runStatus": {
+                "type": "string",
+                "enum": [
+                  "REJECTED_BY_VALIDATOR"
+                ]
+              },
+              "resultType": {
+                "type": "string",
+                "enum": [
+                  "BLOCKED"
+                ]
+              },
+              "reasonCode": {
+                "type": "string",
+                "enum": [
+                  "RULE_BLOCKED"
+                ]
+              },
+              "citations": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "answer"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "reasonCode",
+              "error"
+            ],
+            "properties": {
+              "runStatus": {
+                "type": "string",
+                "enum": [
+                  "REJECTED_BY_VALIDATOR"
+                ]
+              },
+              "reasonCode": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_FAILED"
+                ]
+              },
+              "citations": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "resultType"
+                  ]
+                },
+                {
+                  "required": [
+                    "answer"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "reasonCode",
+              "error"
+            ],
+            "properties": {
+              "runStatus": {
+                "type": "string",
+                "enum": [
+                  "FAILED"
+                ]
+              },
+              "reasonCode": {
+                "enum": [
+                  "MODEL_ERROR",
+                  "PROVIDER_ERROR",
+                  "TIMEOUT",
+                  "PROCESSING_ERROR"
+                ]
+              },
+              "citations": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "resultType"
+                  ]
+                },
+                {
+                  "required": [
+                    "answer"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+
+    ImportKnowledgeItemRequest:
+      type: object
+      required: [documentCode, sourceId, title, versionLabel, contentHash, content]
+      properties:
+        documentCode: { type: string }
+        sourceId: { type: string }
+        title: { type: string }
+        sourceName: { type: string }
+        sourceUrl: { type: string }
+        author: { type: string }
+        documentType: { type: string }
+        language: { type: string, default: "vi" }
+        versionLabel: { type: string }
+        versionNumber: { type: integer, default: 1 }
+        contentHash: { type: string }
+        contentPath: { type: string }
+        sourceBytes: { type: integer }
+        reviewEvidenceId: { type: string }
+        technicalReadiness: { type: string, enum: [DRAFT_STAGED, TECHNICAL_VERIFICATION_PASSED, HELD_AS_DRAFT] }
+        holdReason: { type: string }
+        lineageBaseDocumentId: { type: string }
+        lineageBaseVersion: { type: string }
+        lineageBaseHash: { type: string }
+        content: { type: string }
+
+    ImportCorpusBundleRequest:
+      type: object
+      required: [items]
+      properties:
+        formatVersion: { type: integer, default: 1 }
+        purpose: { type: string }
+        bundleName: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ImportKnowledgeItemRequest' }
+
+    ImportCorpusResponse:
+      type: object
+      required: [totalItems, importedCount, skippedCount, importedItems, skippedItems]
+      properties:
+        totalItems: { type: integer }
+        importedCount: { type: integer }
+        skippedCount: { type: integer }
+        importedItems:
+          type: array
+          items:
+            type: object
+            required: [documentId, versionId, documentCode, versionLabel, status, technicalReadiness]
+            properties:
+              documentId: { type: string, format: uuid }
+              versionId: { type: string, format: uuid }
+              documentCode: { type: string }
+              versionLabel: { type: string }
+              status: { type: string }
+              technicalReadiness: { type: string }
+        skippedItems:
+          type: array
+          items: { type: string }
+
+    ReviewKnowledgeVersionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, CHANGES_REQUESTED, REJECTED]
+        notes: { type: string }
+
+    ArchiveKnowledgeVersionRequest:
+      type: object
+      properties:
+        reason: { type: string }
+
+    KnowledgeDocumentResponse:
+      type: object
+      required: [id, documentCode, title, sourceId, language, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        documentCode: { type: string }
+        title: { type: string }
+        sourceId: { type: string }
+        sourceName: { type: string }
+        sourceUrl: { type: string }
+        author: { type: string }
+        documentType: { type: string }
+        language: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    KnowledgeVersionResponse:
+      type: object
+      required: [id, knowledgeDocumentId, versionNumber, versionLabel, status, contentHash, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        knowledgeDocumentId: { type: string, format: uuid }
+        versionNumber: { type: integer }
+        versionLabel: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, ARCHIVED] }
+        technicalReadiness: { type: string, enum: [DRAFT_STAGED, TECHNICAL_VERIFICATION_PASSED, HELD_AS_DRAFT] }
+        holdReason: { type: string }
+        contentHash: { type: string }
+        contentPath: { type: string }
+        sourceBytes: { type: integer }
+        reviewEvidenceId: { type: string }
+        lineageBaseDocumentId: { type: string }
+        lineageBaseVersion: { type: string }
+        content: { type: string }
+        reviewedBy: { type: string, format: uuid }
+        reviewedAt: { type: string, format: date-time }
+        publishedBy: { type: string, format: uuid }
+        publishedAt: { type: string, format: date-time }
+        activatedAt: { type: string, format: date-time }
+        archivedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    KnowledgeQueryApiRequest:
+      type: object
+      properties:
+        query: { type: string }
+        allowedSourceIds:
+          type: array
+          items: { type: string }
+        limit: { type: integer, default: 10 }
+
+    KnowledgeQueryApiResponse:
+      type: object
+      required: [citations]
+      properties:
+        citations:
+          type: array
+          items:
+            type: object
+            required: [documentId, documentCode, version, sourceId, title]
+            properties:
+              documentId: { type: string, format: uuid }
+              documentCode: { type: string }
+              version: { type: string }
+              sourceId: { type: string }
+              title: { type: string }
+              contentPath: { type: string }
+              snippet: { type: string }
+              content: { type: string }
 
 security:
   - bearerAuth: []

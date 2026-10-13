@@ -1,0 +1,11 @@
+{
+  "runId": "44444444-4444-4444-8444-444444444444",
+  "runStatus": "REJECTED_BY_VALIDATOR",
+  "reasonCode": "VALIDATION_FAILED",
+  "asOf": "2026-10-11T00:00:00Z",
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Output rejected"
+  },
+  "answer": "Unvalidated answer"
+}

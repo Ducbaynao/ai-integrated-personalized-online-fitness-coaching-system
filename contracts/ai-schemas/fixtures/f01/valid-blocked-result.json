@@ -1,0 +1,15 @@
+{
+  "runId": "66666666-6666-4666-8666-666666666666",
+  "runStatus": "REJECTED_BY_VALIDATOR",
+  "resultType": "BLOCKED",
+  "reasonCode": "RULE_BLOCKED",
+  "limitations": [
+    "Chính sách an toàn hệ thống cấm hướng dẫn sử dụng các chất kích thích nằm trong danh mục cấm WADA hoặc tư vấn điều trị y khoa."
+  ],
+  "missingData": [],
+  "asOf": "2026-10-10T12:00:01Z",
+  "error": {
+    "code": "POLICY_GUARDRAIL_TRIGGERED",
+    "message": "Câu hỏi chạm ngưỡng chính sách an toàn dược lý / doping."
+  }
+}

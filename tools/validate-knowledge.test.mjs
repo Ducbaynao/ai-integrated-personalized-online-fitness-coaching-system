@@ -4,10 +4,33 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateKnowledge } from './validate-knowledge.mjs';
 
 const corpus = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data/knowledge');
+
+test('Git checkout filters preserve hashed snapshot and derivative bytes with autocrlf enabled', () => {
+  const repository = path.resolve(corpus, '../..');
+  const index = JSON.parse(fs.readFileSync(path.join(corpus, 'package-index.json')));
+  const samples = new Map();
+  for (const pkg of index.packages) {
+    for (const entry of pkg.files.filter((f) => f.storage === 'REPOSITORY_TEXT')) {
+      const relative = `data/knowledge/${pkg.package_path}/${entry.path}`;
+      const bytes = fs.readFileSync(path.join(repository, relative));
+      const style = bytes.includes(Buffer.from('\r\n')) ? 'CRLF' : 'LF';
+      if (!samples.has(style)) samples.set(style, relative);
+    }
+  }
+  samples.set('derivative', 'data/knowledge/derivatives/who-2020/01-scope.vi.md');
+  for (const [style, relative] of samples) {
+    const raw = execFileSync('git', ['cat-file', 'blob', `HEAD:${relative}`], { cwd: repository });
+    // -c applies only to this read-only command; no Git configuration is changed.
+    const filtered = execFileSync('git', ['-c', 'core.autocrlf=true', 'cat-file', '--filters',
+      `--path=${relative}`, `HEAD:${relative}`], { cwd: repository });
+    assert.deepEqual(filtered, raw, `${style} artifact changed by checkout filters`);
+  }
+});
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fitness-knowledge-'));

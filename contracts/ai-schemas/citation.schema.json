@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/citation.schema.json",
+  "title": "Knowledge Citation and Evidence Locator",
+  "description": "Structured citation binding model answers to governed ACTIVE knowledge corpus documents, versions, and source locators.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "documentId",
+    "version",
+    "sourceId",
+    "locator"
+  ],
+  "properties": {
+    "documentId": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]+-VI-[0-9]{2}$",
+      "description": "Canonical document ID matching the governed knowledge corpus registry (e.g. ISSN-PROTEIN-EXERCISE-2017-VI-01, WHO-PA-SB-2020-VI-03)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the cited knowledge document (e.g. 1.0.0 for snapshot, 1.1.0 for derivative)."
+    },
+    "sourceId": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]+$",
+      "description": "Source package identifier (e.g. ISSN-PROTEIN-EXERCISE-2017, WHO-PA-SB-2020, NIDDK-WEIGHT-FACTORS-2023, NIH-ODS-EXERCISE-SUPPLEMENTS)."
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePath"
+      ],
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative source path of the cited content within the corpus (e.g. data/knowledge/curated/issn-protein-2017/01-scope.vi.md).",
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+        },
+        "heading": {
+          "type": "string",
+          "description": "Optional section heading within the source document."
+        },
+        "pageRange": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Optional 1-based [startPage, endPage] range in the source PDF asset."
+        },
+        "sectionIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional 0-based chunk or section index."
+        }
+      }
+    },
+    "quoteOrExcerpt": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional brief verbatim excerpt from the source text supporting the claim."
+    }
+  }
+}

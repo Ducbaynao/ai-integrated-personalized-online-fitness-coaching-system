@@ -1,0 +1,23 @@
+{
+  "requestId": "11111111-1111-4111-8111-111111111111",
+  "requestType": "F01_GENERAL_KNOWLEDGE",
+  "schemaVersion": "1.0.0",
+  "correlationId": "22222222-2222-4222-8222-222222222222",
+  "actor": {
+    "userId": "33333333-3333-4333-8333-333333333333",
+    "role": "STUDENT"
+  },
+  "purpose": "GENERAL_FITNESS_EXPLANATION",
+  "allowedActions": [
+    "READ_INFORMATION"
+  ],
+  "asOf": "2026-10-10T12:00:00Z",
+  "question": "Lượng protein tối ưu mỗi bữa ăn để tối đa hóa tổng hợp protein cơ bắp (MPS) là bao nhiêu?",
+  "language": "vi",
+  "knowledgeScope": {
+    "status": "ACTIVE",
+    "allowedSourceIds": [
+      ""
+    ]
+  }
+}
