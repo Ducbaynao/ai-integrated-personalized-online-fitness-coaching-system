@@ -32,6 +32,10 @@ Review period, progress summary, completion, RPE, nutrition completeness, measur
 
 Calendar theo timezone, appointment type, conflict và availability. Planned Workout marker tách khỏi appointment marker. Bulk recurring change yêu cầu chọn scope `this`, `this and future`, `series`.
 
+## TR-10 Planned Workout change proposal
+
+Trong TR-03, Trainer có WORKOUT_PLAN VIEW hiện hành xem danh sách/detail đề xuất đổi/hủy một Planned Workout do chính mình tạo cho đúng Student; lọc trạng thái, phân trang và không nhìn dữ liệu của Trainer khác. CONTRIBUTE/MANAGE mới được tạo/rút PENDING. Form tạo lấy occurrence ID/version thật từ lịch, yêu cầu chọn tường minh IANA timezone, local start/end và UTC offsets khi RESCHEDULE; CANCEL có thể nêu lý do. Preview nêu rõ đề xuất PENDING không đổi lịch, Student quyết định sau. Mất quyền/404 che dữ liệu và xóa cache theo Trainer–Student; 409 tải lại và yêu cầu xác nhận mới. Đây không phải luồng Appointment reschedule hàng loạt ở TR-09.
+
 ## TR-11 AI Insight Review
 
 Recommendation card không trộn trong deterministic alert queue. Detail gồm context, evidence, missing data, model/prompt metadata ở mức phù hợp, Accept/Modify/Reject và audit outcome.

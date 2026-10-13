@@ -64,6 +64,10 @@ Student mở đề xuất lịch từ Plan hub, xem từng buổi theo local tim
 
 Hoàn thành workout không đồng nghĩa đúng lịch.
 
+## 5a. Đề xuất đổi/hủy một Planned Workout
+
+Đề xuất Trainer đổi/hủy **một Planned Workout** là luồng riêng với Appointment: Student mở từ lịch tập hoặc Plan hub, xem giờ cũ và thay đổi được đề xuất, rồi ACCEPT/REJECT toàn bộ proposal PENDING. ACCEPT được backend kiểm lại quyền Trainer, Coaching Period, occurrence version/seal, Appointment và xung đột trước khi tạo replacement hoặc hủy; REJECT không đổi lịch. Proposal stale vẫn đọc và REJECT được, 409 không tự động phát lại ACCEPT. Lỗi mạng chưa rõ kết quả retry cùng commandKey/body. Đây không phải thay đổi Appointment hay cả batch.
+
 ## 6. Appointment reschedule
 
 1. Student hoặc Trainer tạo reschedule request.

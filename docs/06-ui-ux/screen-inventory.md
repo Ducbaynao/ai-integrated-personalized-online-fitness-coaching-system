@@ -19,7 +19,7 @@
 | ST-02 | Current Goal | Target, timeline, active training time, progress |
 | ST-03 | Goal Proposal Detail | Current vs proposed, reason, accept/reject |
 | ST-04 | Goal History | Version, transition, previous goals |
-| ST-05 | Plan and Calendar | Route `/(app)/workout-plans` là Plan hub; `/(app)/workouts/schedule` là Student Planned Workout calendar với backend-derived START/SKIP và occurrence ID/version thật. Detail `/(app)/workouts/schedule/[occurrenceId]` hiển thị lineage, RESCHEDULED/CANCELLED và Student Đổi lịch/Hủy trực tiếp chỉ theo backend `availableActions`; `/(app)/workout-schedule-proposals` và detail là danh sách/quyết định toàn bộ đề xuất lịch từ Trainer |
+| ST-05 | Plan and Calendar | Route `/(app)/workout-plans` là Plan hub; `/(app)/workouts/schedule` là Student Planned Workout calendar với backend-derived START/SKIP và occurrence ID/version thật. Detail `/(app)/workouts/schedule/[occurrenceId]` hiển thị lineage, RESCHEDULED/CANCELLED và Student Đổi lịch/Hủy trực tiếp chỉ theo backend `availableActions`; `/(app)/workout-schedule-proposals` là đề xuất xác nhận cả đợt lịch; `/(app)/workout-change-proposals` và detail là đề xuất Trainer đổi/hủy **một occurrence**, Student ACCEPT/REJECT PENDING với proposal version thật. |
 | ST-06 | Workout Plan Detail | Routes `/(app)/workout-plans/[planId]`, `/history`, `/edit`; owner/read context, sessions/prescriptions, immutable versions, SELF_DIRECTED authoring and explicit Trainer-delivered successor |
 | ST-07 | Workout Execution | Route `/(app)/workouts/current`; authoritative in-progress execution, set log, substitution, RPE/note và complete/abort. START/SKIP được mở từ ST-05 calendar bằng occurrence identity/version. |
 | ST-08 | Workout Result | Routes `/(app)/workouts/history`, `/(app)/workouts/[executionId]`; planned/performed time, backend-derived terminal status và legacy missing-source state. |
@@ -53,7 +53,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | TR-07 | Nutrition Proposal Builder | Strategic target proposal |
 | TR-08 | Coaching Review | Review data, request data, feedback, plan action |
 | TR-09 | Trainer Schedule | Appointment, availability, conflict |
-| TR-10 | Reschedule Request | Trainer-initiated flow and revalidation |
+| TR-10 | Reschedule Request | Từ TR-03/Trainer calendar mở `/(app)/coaching/[relationshipId]/change-proposals`: Trainer VIEW+ xem proposal đổi/hủy một occurrence do chính mình tạo, lọc/trang/detail; CONTRIBUTE+ chọn occurrence thật, gửi RESCHEDULE với IANA timezone/local start-end/UTC offsets rõ ràng hoặc CANCEL với lý do tùy chọn, và rút PENDING bằng proposalVersion thật. Backend recheck quyền, seal, Appointment, thời gian và xung đột; Student ACCEPT/REJECT trên Mobile thuộc checkpoint tiếp theo. |
 | TR-11 | AI Insight Review | Accept/modify/reject for Trainer workflow |
 | TR-12 | Student Data Permission | Route `/(app)/coaching/[relationshipId]/sharing`; authoritative allowed/denied/expired/revoked/not-configured states and VIEW/CONTRIBUTE/MANAGE levels |
 

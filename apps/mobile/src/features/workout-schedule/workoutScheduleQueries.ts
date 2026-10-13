@@ -8,6 +8,8 @@ export const workoutScheduleQueryKeys = {
   window: (studentId: string, from: string, until: string) =>
     [...workoutScheduleQueryKeys.student(studentId), from, until] as const,
   trainer: (trainerId: string, studentId: string) => [...workoutScheduleQueryKeys.all, 'trainer', trainerId, studentId] as const,
+  trainerDetail: (trainerId: string, studentId: string, occurrenceId: string) =>
+    [...workoutScheduleQueryKeys.trainer(trainerId, studentId), 'detail', occurrenceId] as const,
   trainerWindow: (trainerId: string, studentId: string, from: string, until: string) =>
     [...workoutScheduleQueryKeys.trainer(trainerId, studentId), from, until] as const,
 };
@@ -47,3 +49,12 @@ export const trainerWorkoutScheduleOptions = (trainerId: string, studentId: stri
 
 export const useTrainerWorkoutSchedule = (trainerId: string, studentId: string, from: string, until: string, enabled = true) =>
   useInfiniteQuery(trainerWorkoutScheduleOptions(trainerId, studentId, from, until, enabled));
+
+export const useTrainerWorkoutScheduleDetail = (trainerId: string, studentId: string, occurrenceId: string, enabled = true) =>
+  useQuery(queryOptions({
+    queryKey: workoutScheduleQueryKeys.trainerDetail(trainerId, studentId, occurrenceId),
+    queryFn: () => workoutScheduleApi.detail(occurrenceId),
+    enabled: Boolean(trainerId && studentId && occurrenceId) && enabled,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  }));

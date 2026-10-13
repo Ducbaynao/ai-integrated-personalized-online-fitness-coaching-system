@@ -9,8 +9,9 @@ import { TrainerWorkoutScheduleScreen } from '@/features/workout-schedule/Traine
 import { calendarWindow } from '@/features/workout-schedule/scheduleDisplay';
 
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
   useFocusEffect: (callback: () => void | (() => void)) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
 }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
@@ -124,5 +125,17 @@ describe('Trainer read-only Planned Workout calendar', () => {
     expect(JSON.stringify(tree.toJSON())).toContain('Chỉ dành cho huấn luyện viên');
     expect((useTrainerWorkoutSchedule as jest.Mock).mock.calls.at(-1)![4]).toBe(false);
     renderer.act(() => tree.unmount());
+  });
+
+  it('opens a real occurrence in proposal creation only with current CONTRIBUTE, not calendar availableActions', async () => {
+    setup('CONTRIBUTE');
+    const { tree } = await render();
+    renderer.act(() => tree.root.findByProps({ testID: 'trainer-propose-change-occurrence-new' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/coaching/relationship-1/change-proposals/new?occurrenceId=occurrence-new');
+    renderer.act(() => tree.unmount());
+    setup('VIEW');
+    const view = await render();
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-propose-change-occurrence-new' })).toHaveLength(0);
+    renderer.act(() => view.tree.unmount());
   });
 });

@@ -47,6 +47,9 @@ export default function AppLayout() {
       <Stack.Screen name="coaching/[relationshipId]/schedule-proposals/index" />
       <Stack.Screen name="coaching/[relationshipId]/schedule-proposals/new" />
       <Stack.Screen name="coaching/[relationshipId]/schedule-proposals/[proposalId]" />
+      <Stack.Screen name="coaching/[relationshipId]/change-proposals/index" />
+      <Stack.Screen name="coaching/[relationshipId]/change-proposals/new" />
+      <Stack.Screen name="coaching/[relationshipId]/change-proposals/[proposalId]" />
       <Stack.Screen name="coaching/[relationshipId]/workout-plans/new" />
       <Stack.Screen name="students/[studentId]/workout-plans/[planId]/index" />
       <Stack.Screen name="students/[studentId]/workout-plans/[planId]/builder" />
@@ -55,6 +58,8 @@ export default function AppLayout() {
       <Stack.Screen name="workouts/schedule/[occurrenceId]" />
       <Stack.Screen name="workout-schedule-proposals/index" />
       <Stack.Screen name="workout-schedule-proposals/[proposalId]" />
+      <Stack.Screen name="workout-change-proposals/index" />
+      <Stack.Screen name="workout-change-proposals/[proposalId]" />
       <Stack.Screen name="workouts/history" />
       <Stack.Screen name="workouts/[executionId]" />
     </Stack>

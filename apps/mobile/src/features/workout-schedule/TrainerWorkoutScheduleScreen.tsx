@@ -18,8 +18,9 @@ function localIntent(value: string | null, offset: string | null, timezone: stri
   return `${value.replace('T', ' ')} · ${offset ? `UTC${offset}` : 'chưa có UTC offset'} · ${timezone || 'chưa có múi giờ gốc'}`;
 }
 
-function TrainerOccurrenceCard({ item }: { item: PlannedWorkoutOccurrence }) {
+function TrainerOccurrenceCard({ item, relationshipId, canContribute }: { item: PlannedWorkoutOccurrence; relationshipId: string; canContribute: boolean }) {
   const theme = getSemanticColors(useColorScheme() === 'dark');
+  const router = useRouter();
   return <WorkoutCard testID={`trainer-calendar-occurrence-${item.occurrenceId}`}>
     <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{item.sessionSummary?.name?.trim() || 'Buổi tập theo lịch'}</Text>
     <Text style={[styles.label, { color: theme.textPrimary }]}>{plannedWorkoutStatusLabels[item.status]}</Text>
@@ -30,6 +31,8 @@ function TrainerOccurrenceCard({ item }: { item: PlannedWorkoutOccurrence }) {
     <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {item.planSummary?.planName?.trim() || 'Chưa có tên kế hoạch trong bản ghi cũ'}{item.planSummary ? ` · Phiên bản ${item.planSummary.planVersionNumber}` : ''}</Text>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi: {item.sessionSummary ? `Tuần ${item.sessionSummary.weekNumber}, ngày ${item.sessionSummary.dayNumber}, thứ tự ${item.sessionSummary.sequenceNumber}` : 'Chưa có tóm tắt buổi tập trong bản ghi cũ'}</Text>
     {item.sessionSummary?.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {item.sessionSummary.focus}</Text> : null}
+    {canContribute && item.status === 'SCHEDULED' ? <WorkoutButton testID={`trainer-propose-change-${item.occurrenceId}`} label="Đề xuất đổi hoặc hủy buổi này" secondary
+      onPress={() => router.push(`/coaching/${relationshipId}/change-proposals/new?occurrenceId=${encodeURIComponent(item.occurrenceId)}` as never)} /> : null}
   </WorkoutCard>;
 }
 
@@ -49,6 +52,7 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
   const grant = sharingQuery.data?.items.find((item) => item.dataScope === 'WORKOUT_PLAN');
   const canView = activeCapability === 'TRAINER' && relationship?.trainerId === trainerId && relationship.status === 'ACTIVE'
     && grant?.state === 'ALLOWED' && ['VIEW', 'CONTRIBUTE', 'MANAGE'].includes(grant.accessLevel ?? '');
+  const canContribute = canView && ['CONTRIBUTE', 'MANAGE'].includes(grant?.accessLevel ?? '');
   const [verifiedScope, setVerifiedScope] = useState('');
   const [deniedScope, setDeniedScope] = useState('');
   const [anchor] = useState(() => Date.now() - 7 * DAY);
@@ -113,6 +117,7 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
   return <ScrollView testID="trainer-workout-schedule-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Lịch tập đã xác nhận</Text>
     <WorkoutButton label="Quay lại học viên" secondary onPress={() => router.back()} />
+    <WorkoutButton testID="open-trainer-change-proposals" label="Xem đề xuất đổi hoặc hủy lịch" secondary onPress={() => router.push(`/coaching/${relationshipId}/change-proposals` as never)} />
     <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch dự kiến của {relationship?.counterparty.displayName || 'học viên này'}. Chỉ xem; Trainer không thể bắt đầu, bỏ qua hoặc xem nhật ký tập từ đây.</Text>
     <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Cửa sổ 30 ngày</Text>
@@ -127,7 +132,7 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
     {!query.isPending && !query.isError && !refreshing && items.length === 0 ? <WorkoutState testID="trainer-calendar-empty" title="Chưa có buổi tập trong khoảng này" message="Thử xem cửa sổ 30 ngày khác. Đề xuất đang chờ không phải lịch đã xác nhận." /> : null}
     {!query.isError && !refreshing && !query.isPending ? <>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Có {total} buổi trong cửa sổ này.</Text>
-      {items.map((item) => <TrainerOccurrenceCard key={item.occurrenceId} item={item} />)}
+      {items.map((item) => <TrainerOccurrenceCard key={item.occurrenceId} item={item} relationshipId={relationshipId} canContribute={canContribute} />)}
       {query.hasNextPage ? <WorkoutButton testID="trainer-calendar-load-more" label={query.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm buổi tập'} secondary busy={query.isFetchingNextPage} disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
     </> : null}
   </ScrollView>;
