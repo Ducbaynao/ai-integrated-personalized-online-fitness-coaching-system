@@ -44,6 +44,17 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/ai-service/pyproject.toml
+      - name: Create FastAPI virtual environment
+        working-directory: services/ai-service
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e ".[dev]"
       - name: Make Maven wrapper executable
         run: chmod +x ./mvnw
         working-directory: services/backend

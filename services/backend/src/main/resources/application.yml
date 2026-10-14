@@ -42,3 +42,12 @@ auth:
     secret: ${JWT_SECRET:}
     access-token-ttl: ${ACCESS_TOKEN_TTL:PT15M}
     refresh-token-ttl: ${REFRESH_TOKEN_TTL:P30D}
+
+ai:
+  service:
+    enabled: ${AI_SERVICE_ENABLED:true}
+    mode: ${AI_SERVICE_MODE:simulated} # 'simulated' or 'http'
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+    internal-service-key: ${AI_INTERNAL_SERVICE_KEY:dev-ai-internal-key-change-me}
+    connect-timeout-ms: ${AI_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${AI_READ_TIMEOUT_MS:10000}
