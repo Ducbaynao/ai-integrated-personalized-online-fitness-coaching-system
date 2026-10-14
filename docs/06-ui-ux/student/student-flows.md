@@ -21,6 +21,8 @@ Lựa chọn onboarding không phải quyền vĩnh viễn. Student có thể Be
 
 AI không tự activate plan.
 
+Sau khi plan ACTIVE có phiên bản đã xuất bản hiện hành, Student có thể tự chọn nhiều session từ đúng phiên bản trong màn chi tiết plan để xác nhận một đợt lịch. Student chọn thứ Hai đầu tuần, IANA timezone, giờ bắt đầu/kết thúc địa phương và UTC offset cho từng buổi; giờ DST không tồn tại bị chặn, giờ lặp buộc chọn offset. Màn xem trước nêu rõ toàn bộ batch là all-or-nothing. POST chỉ sau xác nhận; activate plan không tự sinh occurrence. Khi server báo stale/409 hoặc lỗi theo item, tải lại nguồn và yêu cầu xem trước lại; lỗi mạng chưa rõ kết quả giữ nguyên body/commandKey khi thử lại. Lịch Student hiển thị occurrence thực do GET trả về, không tạo bản ghi giả trên Mobile.
+
 ## 3. Chuyển sang Human Coach
 
 1. Student chọn Trainer hoặc chấp nhận coaching request.
