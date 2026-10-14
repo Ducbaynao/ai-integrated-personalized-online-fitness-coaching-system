@@ -90,8 +90,10 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
 
         // Determine Python / Uvicorn executable in virtualenv
         File projectDir = new File(System.getProperty("user.dir")).getParentFile().getParentFile();
-        File venvPython = new File(projectDir, "services/ai-service/.venv/Scripts/python.exe");
         File aiServiceDir = new File(projectDir, "services/ai-service");
+        String pythonPath = System.getProperty("os.name").startsWith("Windows")
+                ? ".venv/Scripts/python.exe" : ".venv/bin/python";
+        File venvPython = new File(aiServiceDir, pythonPath);
 
         if (!venvPython.exists()) {
             throw new IllegalStateException("FastAPI virtual environment python not found at: " + venvPython.getAbsolutePath());
