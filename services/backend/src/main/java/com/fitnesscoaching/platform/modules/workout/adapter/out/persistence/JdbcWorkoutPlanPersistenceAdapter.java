@@ -6,7 +6,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -16,7 +20,11 @@ import java.util.UUID;
 @Repository
 public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistencePort {
     private final JdbcTemplate jdbc;
-    public JdbcWorkoutPlanPersistenceAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final PlatformTransactionManager transactionManager;
+    public JdbcWorkoutPlanPersistenceAdapter(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+        this.jdbc = jdbc;
+        this.transactionManager = transactionManager;
+    }
     private static Timestamp ts(Instant value) { return value == null ? null : Timestamp.from(value); }
 
     @Override public UUID findPlanStudent(UUID planId) {
@@ -284,8 +292,29 @@ public class JdbcWorkoutPlanPersistenceAdapter implements WorkoutPlanPersistence
                         .map(Timestamp::toInstant).orElse(null)), id).stream().findFirst().orElseThrow(() -> new WorkoutPlanFailure(
                     WorkoutPlanError.PLANNED_WORKOUT_NOT_FOUND, "Planned workout not found"));
         } catch (CannotAcquireLockException concurrent) {
+            if (isSerializationFailure(concurrent) && isCommittedExecutionSealed(id))
+                throw conflict(WorkoutPlanError.PLANNED_WORKOUT_SCHEDULE_LOCKED);
             throw conflict(WorkoutPlanError.PLANNED_WORKOUT_VERSION_CONFLICT);
         }
+    }
+
+    private boolean isCommittedExecutionSealed(UUID occurrenceId) {
+        // SQLSTATE 40001 aborts the original REPEATABLE READ transaction. Suspend it before
+        // inspecting the committed row; querying through its connection would fail with 25P02.
+        TransactionTemplate fresh = new TransactionTemplate(transactionManager);
+        fresh.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        fresh.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        fresh.setReadOnly(true);
+        return Boolean.TRUE.equals(fresh.execute(status -> jdbc.query("""
+                SELECT execution_started_at IS NOT NULL FROM fitness.planned_workouts WHERE id=?
+                """, (rs, row) -> rs.getBoolean(1), occurrenceId).stream().findFirst().orElse(false)));
+    }
+
+    private static boolean isSerializationFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
+        }
+        return false;
     }
 
     @Override public UUID appendAdjustment(Occurrence occurrence, UUID actorId, WorkoutSessionAdjustment.Type type,
