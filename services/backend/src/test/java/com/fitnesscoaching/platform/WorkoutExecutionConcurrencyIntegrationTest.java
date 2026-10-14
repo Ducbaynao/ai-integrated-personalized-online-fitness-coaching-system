@@ -14,6 +14,7 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanError;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanFailure;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionAdjustment;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -119,20 +120,20 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         }
     }
 
-    @Test
+    @RepeatedTest(10)
     void startWinningAgainstSchedulingBoundaryRejectsLateScheduleMutation() throws Exception {
         Fixture fixture = fixture();
         CountDownLatch startReady = new CountDownLatch(1);
         CountDownLatch releaseStart = new CountDownLatch(1);
-        CountDownLatch scheduleInvoked = new CountDownLatch(1);
+        CountDownLatch scheduleSnapshotReady = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             Future<WorkoutExecution> start = pool.submit(() -> heldTransaction(() -> executions.start(new StartCommand(
                     fixture.occurrenceId(), fixture.studentId(), 0, "start-schedule-" + fixture.occurrenceId())),
                     startReady, releaseStart));
             assertThat(startReady.await(10, TimeUnit.SECONDS)).isTrue();
-            Future<String> schedule = pool.submit(() -> transactionOutcome(scheduleInvoked,
+            Future<String> schedule = pool.submit(() -> transactionOutcomeWithSnapshot(scheduleSnapshotReady,
                     () -> { rescheduleThroughSharedBoundary(fixture); return null; }));
-            assertThat(scheduleInvoked.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(scheduleSnapshotReady.await(10, TimeUnit.SECONDS)).isTrue();
             releaseStart.countDown();
 
             start.get(10, TimeUnit.SECONDS);
@@ -140,6 +141,49 @@ class WorkoutExecutionConcurrencyIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT planned_start_at=original_planned_start_at FROM fitness.planned_workouts WHERE id=?",
                     Boolean.class, fixture.occurrenceId())).isTrue();
         }
+    }
+
+    @RepeatedTest(10)
+    void schedulingWinningAgainstStartKeepsOccurrenceUnsealed() throws Exception {
+        Fixture fixture = fixture();
+        CountDownLatch scheduleReady = new CountDownLatch(1);
+        CountDownLatch releaseSchedule = new CountDownLatch(1);
+        CountDownLatch startSnapshotReady = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<?> schedule = pool.submit(() -> heldTransaction(() -> {
+                rescheduleThroughSharedBoundary(fixture);
+                return null;
+            }, scheduleReady, releaseSchedule));
+            assertThat(scheduleReady.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<String> start = pool.submit(() -> transactionOutcomeWithSnapshot(startSnapshotReady, () ->
+                    executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
+                            "start-after-schedule-" + fixture.occurrenceId()))));
+            assertThat(startSnapshotReady.await(10, TimeUnit.SECONDS)).isTrue();
+            releaseSchedule.countDown();
+
+            schedule.get(10, TimeUnit.SECONDS);
+            assertThat(start.get(10, TimeUnit.SECONDS)).isEqualTo("WORKOUT_EXECUTION_VERSION_CONFLICT");
+            assertThat(jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id=?",
+                    Long.class, fixture.occurrenceId())).isOne();
+            assertThat(jdbc.queryForObject("SELECT execution_started_at IS NULL FROM fitness.planned_workouts WHERE id=?",
+                    Boolean.class, fixture.occurrenceId())).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                    Integer.class, fixture.occurrenceId())).isZero();
+        }
+    }
+
+    @Test
+    void unsealedVersionChangeStillReportsRealVersionConflict() {
+        Fixture fixture = fixture();
+        rescheduleThroughSharedBoundary(fixture);
+
+        String outcome = transactionOutcome(new CountDownLatch(1), () -> plans.adjustOccurrence(
+                new AdjustOccurrenceCommand(fixture.occurrenceId(), fixture.studentId(), 0,
+                        "stale-adjustment-" + fixture.occurrenceId(), WorkoutSessionAdjustment.Type.NOTE,
+                        fixture.prescriptionId(), null, null, "{\"note\":\"Stale\"}", "Stale change")));
+        assertThat(outcome).isEqualTo("PLANNED_WORKOUT_VERSION_CONFLICT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id=?",
+                Integer.class, fixture.occurrenceId())).isZero();
     }
 
     @Test
@@ -243,6 +287,31 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         }
     }
 
+    private String transactionOutcomeWithSnapshot(CountDownLatch snapshotReady, Callable<?> action) {
+        try {
+            transactionTemplate().execute(status -> {
+                try {
+                    // Establish the REPEATABLE READ snapshot before the competing commit.
+                    jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts", Integer.class);
+                    snapshotReady.countDown();
+                    action.call();
+                    return null;
+                } catch (RuntimeException failure) {
+                    throw failure;
+                } catch (Exception failure) {
+                    throw new IllegalStateException(failure);
+                }
+            });
+            return "SUCCESS";
+        } catch (WorkoutExecutionFailure failure) {
+            return failure.error().name();
+        } catch (WorkoutPlanFailure failure) {
+            return failure.error().name();
+        } catch (RuntimeException failure) {
+            return "RAW:" + failure.getClass().getSimpleName();
+        }
+    }
+
     private TransactionTemplate transactionTemplate() {
         TransactionTemplate template = new TransactionTemplate(transactionManager);
         template.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -257,11 +326,13 @@ class WorkoutExecutionConcurrencyIntegrationTest {
             throw new WorkoutPlanFailure(WorkoutPlanError.PLANNED_WORKOUT_SCHEDULE_LOCKED,
                     "Started occurrence schedule is locked");
         }
-        Instant moved = Instant.now().plusSeconds(3600);
-        jdbc.update("""
+        Instant moved = Instant.now().plusSeconds(172800);
+        int changed = jdbc.update("""
                 UPDATE fitness.planned_workouts SET planned_start_at=?,version=version+1,updated_at=clock_timestamp()
                 WHERE id=? AND version=? AND execution_started_at IS NULL
                 """, java.sql.Timestamp.from(moved), fixture.occurrenceId(), occurrence.version());
+        if (changed != 1) throw new WorkoutPlanFailure(WorkoutPlanError.PLANNED_WORKOUT_VERSION_CONFLICT,
+                "Concurrent schedule update");
     }
 
     private SetExecution completedSet(UUID clientSetId) {
@@ -298,7 +369,7 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         jdbc.update("UPDATE fitness.workout_plans SET status='ACTIVE',version=version+1 WHERE id=?", plan);
         UUID occurrence = UUID.randomUUID();
         jdbc.update("""
-                WITH boundary AS MATERIALIZED (SELECT clock_timestamp() AS planned_at)
+                WITH boundary AS MATERIALIZED (SELECT clock_timestamp() + interval '1 day' AS planned_at)
                 INSERT INTO fitness.planned_workouts
                 (id,student_id,workout_plan_session_id,coaching_period_id,planned_start_at,
                  original_planned_start_at,created_by)
