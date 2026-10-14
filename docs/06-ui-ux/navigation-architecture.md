@@ -49,6 +49,7 @@ Workout Plan của Student dùng stack authenticated và yêu cầu Student Prof
 - `/(app)/workout-plans`: ST-05 Plan hub; current ACTIVE luôn lấy từ endpoint current authoritative, còn collection chỉ dùng để mở draft, paused, completed và historical plans.
 - `/(app)/workout-plans/new`: tạo SELF_DIRECTED DRAFT; backend quyết định eligibility theo Coaching Period hiện tại.
 - `/(app)/workout-plans/[planId]`: ST-06 metadata, owner/read context, current version content, activation và lifecycle theo authority.
+- `/(app)/workout-plans/[planId]/schedule`: ST-05 Student tự xác nhận một đợt lịch từ kế hoạch ACTIVE và phiên bản đã xuất bản hiện hành. Chọn session thật, thứ Hai đầu tuần, múi giờ IANA, local start/end và UTC offset tường minh; xem trước toàn bộ trước POST `/planned-workout-batches`. Backend kiểm tra lại version, quyền, DST, giới hạn 90 ngày và xung đột; không tạo lịch khi chỉ activate plan. Sau thành công mở calendar để đọc occurrence thật.
 - `/(app)/workout-plans/[planId]/history`: version list/detail bất biến và explicit Student successor từ Trainer-authored locked version.
 - `/(app)/workout-plans/[planId]/edit`: complete replacement DRAFT snapshot hoặc significant version publication; không dùng cho occurrence-scoped minor adjustment.
 - `/(app)/workouts/current`: ST-07, đọc authoritative execution đang `IN_PROGRESS`; ghi từng set, thay Exercise Variation cho actual execution và gửi lệnh complete/abort bằng version backend mới nhất.

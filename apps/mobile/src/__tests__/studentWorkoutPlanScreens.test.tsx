@@ -66,6 +66,19 @@ describe('B04 Student Workout Plan screens', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('opens direct scheduling only from a current ACTIVE published plan', () => {
+    let tree = render(<WorkoutPlanDetailScreen planId="plan-1" />);
+    const entry = tree.root.findByProps({ accessibilityLabel: 'Tự lên lịch từ kế hoạch này' });
+    expect(entry.props.accessibilityRole).toBe('button');
+    renderer.act(() => entry.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/workout-plans/plan-1/schedule');
+    renderer.act(() => tree.unmount());
+    (useWorkoutPlan as jest.Mock).mockReturnValue({ data: { plan: { ...plan, status: 'PAUSED' }, currentVersion: version }, isPending: false, isError: false, error: null, refetch: jest.fn() });
+    tree = render(<WorkoutPlanDetailScreen planId="plan-1" />);
+    expect(tree.root.findAllByProps({ testID: 'open-direct-scheduling' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
   it('separates current 404 empty from retryable server errors', () => {
     (useCurrentWorkoutPlan as jest.Mock).mockReturnValue({ data: undefined, isPending: false, isError: true, error: new ApiError(404, 'missing'), refetch: jest.fn() });
     let tree = render(<StudentWorkoutPlansScreen />); expect(tree.root.findByProps({ testID: 'current-plan-empty' })).toBeTruthy(); renderer.act(() => tree.unmount());

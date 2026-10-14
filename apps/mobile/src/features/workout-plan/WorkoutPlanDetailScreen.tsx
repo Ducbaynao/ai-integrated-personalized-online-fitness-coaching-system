@@ -112,6 +112,8 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
 
     {currentVersion ? <WorkoutPlanVersionContent testID="plan-session-content" title="Nội dung phiên bản hiện tại" detail={versionQuery.data} isPending={versionQuery.isPending} isError={versionQuery.isError} error={versionQuery.error} onRetry={() => versionQuery.refetch()} /> : null}
 
+    {plan.status === 'ACTIVE' && plan.readContext === 'CURRENT' && currentVersion?.lockedAt && currentVersion.effectiveUntil === null ? <WorkoutButton testID="open-direct-scheduling" label="Tự lên lịch từ kế hoạch này" onPress={() => router.push(`/workout-plans/${plan.id}/schedule` as never)} hint="Chọn buổi từ phiên bản đã xuất bản; lịch chỉ được tạo sau khi bạn xác nhận cả đợt" /> : null}
+
     <WorkoutButton testID="open-plan-history-button" label="Xem lịch sử phiên bản" secondary onPress={() => router.push(`/workout-plans/${plan.id}/history` as never)} />
     {mutableContext && studentOwned && plan.status === 'DRAFT' ? <View style={styles.row}><WorkoutButton testID="edit-plan-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/workout-plans/${plan.id}/edit?mode=draft` as never)} /><WorkoutButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} /></View> : null}
     {mutableContext && studentOwned && ['ACTIVE', 'PAUSED'].includes(plan.status) && currentVersion ? <WorkoutButton testID="publish-plan-version-button" label="Tạo phiên bản chiến lược mới" onPress={() => router.push(`/workout-plans/${plan.id}/edit?mode=publish&versionId=${currentVersion.id}` as never)} /> : null}
