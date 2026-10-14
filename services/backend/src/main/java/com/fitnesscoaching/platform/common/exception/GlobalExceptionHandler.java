@@ -851,6 +851,13 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), Collections.emptyList()));
     }
 
+    @ExceptionHandler(AiFeatureDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleAiFeatureDisabled(AiFeatureDisabledException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse.of(
+                "SERVICE_UNAVAILABLE", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(AiRunValidationException.class)
     public ResponseEntity<ErrorResponse> handleAiRunValidation(AiRunValidationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(

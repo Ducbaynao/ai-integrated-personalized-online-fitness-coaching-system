@@ -15,6 +15,7 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiContextSnapshot;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunInputReference;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
+import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.exercise.application.port.out.ExerciseCatalogRepository;
 import com.fitnesscoaching.platform.modules.exercise.domain.ExerciseCatalogDetail;
@@ -47,6 +48,7 @@ public class AiRunF01Service implements AiRunF01UseCase {
     private final UserAccountStatusQuery accountStatusQuery;
     private final UserRoleQuery userRoleQuery;
     private final ExerciseCatalogRepository exerciseCatalogRepository;
+    private final F01InternalEnvelopeBuilder envelopeBuilder;
     private final ObjectMapper objectMapper;
 
     public AiRunF01Service(
@@ -55,6 +57,7 @@ public class AiRunF01Service implements AiRunF01UseCase {
             UserAccountStatusQuery accountStatusQuery,
             UserRoleQuery userRoleQuery,
             ExerciseCatalogRepository exerciseCatalogRepository,
+            F01InternalEnvelopeBuilder envelopeBuilder,
             ObjectMapper objectMapper
     ) {
         this.runRepository = runRepository;
@@ -62,12 +65,13 @@ public class AiRunF01Service implements AiRunF01UseCase {
         this.accountStatusQuery = accountStatusQuery;
         this.userRoleQuery = userRoleQuery;
         this.exerciseCatalogRepository = exerciseCatalogRepository;
+        this.envelopeBuilder = envelopeBuilder;
         this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
-    public AiRun createF01Run(UUID actorId, CreateF01AiRunCommand command) {
+    public CreatedF01RunContext createF01RunContext(UUID actorId, CreateF01AiRunCommand command) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authenticated actor ID is required");
         }
@@ -142,24 +146,18 @@ public class AiRunF01Service implements AiRunF01UseCase {
 
         AiRun created = runRepository.create(run);
 
-        // 7. Persist initial context snapshot and input references
-        Map<String, Object> contextEnvelope = new LinkedHashMap<>();
-        contextEnvelope.put("requestId", runId.toString());
-        contextEnvelope.put("requestType", "F01_GENERAL_KNOWLEDGE");
-        contextEnvelope.put("schemaVersion", "1.0.0");
-        contextEnvelope.put("actorId", actorId.toString());
-        contextEnvelope.put("actorRole", isStudent ? "STUDENT" : "TRAINER");
-        contextEnvelope.put("question", trimmedQuestion);
-        contextEnvelope.put("language", language);
-        if (exerciseDetail != null) {
-            contextEnvelope.put("exercise", Map.of(
-                    "exerciseId", exerciseDetail.id().toString(),
-                    "code", exerciseDetail.code(),
-                    "name", exerciseDetail.name()
-            ));
-        }
+        // 7. Build and persist authoritative internal context envelope
+        F01InternalContextEnvelope envelope = envelopeBuilder.build(
+                runId,
+                actorId,
+                isStudent ? "STUDENT" : "TRAINER",
+                trimmedQuestion,
+                language,
+                command.correlationId(),
+                exerciseDetail
+        );
 
-        String contextPayloadJson = toJson(contextEnvelope);
+        String contextPayloadJson = toJson(envelope);
         String contextHash = sha256Hex(contextPayloadJson);
 
         AiContextSnapshot snapshot = new AiContextSnapshot(
@@ -181,7 +179,13 @@ public class AiRunF01Service implements AiRunF01UseCase {
             ));
         }
 
-        return created;
+        return new CreatedF01RunContext(created, envelope);
+    }
+
+    @Override
+    @Transactional
+    public AiRun createF01Run(UUID actorId, CreateF01AiRunCommand command) {
+        return createF01RunContext(actorId, command).run();
     }
 
     @Override
