@@ -830,6 +830,34 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), Collections.emptyList()));
     }
 
+    @ExceptionHandler(AiRunNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAiRunNotFound(AiRunNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "AI_RUN_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(AiRunAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAiRunAccessDenied(AiRunAccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "AI_FORBIDDEN", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(AiRunLifecycleConflictException.class)
+    public ResponseEntity<ErrorResponse> handleAiRunLifecycleConflict(AiRunLifecycleConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "AI_RUN_LIFECYCLE_CONFLICT", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(AiRunValidationException.class)
+    public ResponseEntity<ErrorResponse> handleAiRunValidation(AiRunValidationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(
+                "VALIDATION_FAILED", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled exception caught in controller advice", ex);
