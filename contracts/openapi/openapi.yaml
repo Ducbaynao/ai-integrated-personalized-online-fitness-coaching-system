@@ -40,6 +40,8 @@ tags:
     description: Student-confirmed Planned Workout batches, Trainer proposals, and authority-scoped occurrence calendars.
   - name: Workout Execution
     description: Student-owned workout execution, actual set logging, terminal outcomes, and authority-scoped history.
+  - name: Basic Nutrition
+    description: Student-owned user-reported food and day logging; no strategic target or AI estimation authority.
   - name: AI General Knowledge (F01)
     description: >-
       [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
@@ -48,6 +50,178 @@ tags:
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
+  /nutrition/private-foods:
+    get:
+      tags: [Basic Nutrition]
+      operationId: listStudentPrivateFoods
+      summary: List the authenticated Student's private user-reported foods
+      responses:
+        '200':
+          description: Private foods, newest first, at most 100
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/NutritionPrivateFood' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+    post:
+      tags: [Basic Nutrition]
+      operationId: createStudentPrivateFood
+      summary: Create a private USER_REPORTED food
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NutritionFoodRequest' }
+      responses:
+        '201':
+          description: Created private food
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionPrivateFood' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/private-foods/{foodId}:
+    put:
+      tags: [Basic Nutrition]
+      operationId: updateStudentPrivateFood
+      summary: Update a private food without rewriting logged nutrient snapshots
+      parameters: [{ name: foodId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NutritionFoodUpdateRequest' }
+      responses:
+        '200':
+          description: Updated food
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionPrivateFood' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/days/{day}:
+    get:
+      tags: [Basic Nutrition]
+      operationId: getStudentNutritionDay
+      summary: Read one Student-owned local day
+      description: The explicit IANA timezone identifies the local day; a different stored timezone returns 409.
+      parameters:
+        - { name: day, in: path, required: true, schema: { type: string, format: date } }
+        - { name: timezone, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Nutrition day; absent day is NOT_LOGGED, not zero intake
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionDay' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/days/{day}/items:
+    post:
+      tags: [Basic Nutrition]
+      operationId: addStudentNutritionItem
+      summary: Add a private-food serving or an unquantified description
+      description: Mutation snapshots entered nutrients; description-only items contribute unknown, never zero.
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NutritionItemRequest' }
+      responses:
+        '201':
+          description: Updated day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionDay' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/items/{itemId}/correct:
+    post:
+      tags: [Basic Nutrition]
+      operationId: correctStudentNutritionItem
+      summary: Versioned correction or soft removal with append-only history
+      parameters: [{ name: itemId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NutritionCorrectionRequest' }
+      responses:
+        '200':
+          description: Updated day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionDay' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/items/{itemId}/corrections:
+    get:
+      tags: [Basic Nutrition]
+      operationId: listStudentNutritionCorrections
+      parameters: [{ name: itemId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Append-only correction history
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/NutritionCorrection' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /nutrition/days/{day}/confirm:
+    post:
+      tags: [Basic Nutrition]
+      operationId: confirmStudentNutritionDay
+      summary: Explicitly complete a logged day or affirm no intake
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NutritionConfirmRequest' }
+      responses:
+        '200':
+          description: Confirmed day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionDay' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /students/{studentId}/nutrition/days/{day}:
+    get:
+      tags: [Basic Nutrition]
+      operationId: getTrainerVisibleNutritionDay
+      summary: Read a Student day with current NUTRITION_LOGS VIEW authority
+      description: Former Trainers and callers without current scope are concealed; no Trainer mutation authority.
+      parameters:
+        - { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: day, in: path, required: true, schema: { type: string, format: date } }
+        - { name: timezone, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Visible day
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NutritionDay' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
   /coaching/trainers:
     get:
       tags: [Coaching Lifecycle]
@@ -3132,6 +3306,29 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    NutritionForbidden:
+      description: Authenticated actor lacks the Student capability for this operation (NUTRITION_ACCESS_DENIED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NutritionConcealed:
+      description: >-
+        Nutrition food, item, or Student day is absent or concealed from this actor.
+        Codes include NUTRITION_FOOD_NOT_FOUND, NUTRITION_ITEM_NOT_FOUND, and NUTRITION_DAY_NOT_FOUND.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NutritionConflict:
+      description: >-
+        Nutrition optimistic version, timezone identity, confirmation, or actor-scoped
+        commandKey conflict. Stable errorCode is NUTRITION_VERSION_STALE,
+        NUTRITION_TIMEZONE_CONFLICT, NUTRITION_DAY_CONFIRM_INVALID, or
+        NUTRITION_IDEMPOTENCY_CONFLICT, NUTRITION_LEGACY_SOURCE_UNKNOWN, or
+        NUTRITION_FOOD_DRAFT when an all-unknown private food is used as a quantified serving.
+        No other Student's data is disclosed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     WorkoutExecutionConcealed:
       description: >-
         Execution or Planned Workout occurrence is absent or concealed. Codes include
@@ -3415,6 +3612,132 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    NutritionFoodRequest:
+      type: object
+      additionalProperties: false
+      description: >-
+        Student-reported per-serving values. If all four nutrients are null or omitted,
+        the food remains DRAFT and cannot be used as a quantified serving until updated.
+        Explicit zero is a known value, not missing data.
+      required: [name, servingLabel, commandKey]
+      properties:
+        name: { type: string, minLength: 1 }
+        servingLabel: { type: string, minLength: 1 }
+        energyKcal: { type: [number, 'null'], minimum: 0 }
+        proteinG: { type: [number, 'null'], minimum: 0 }
+        carbohydrateG: { type: [number, 'null'], minimum: 0 }
+        fatG: { type: [number, 'null'], minimum: 0 }
+        expectedVersion: { type: [integer, 'null'], format: int64, minimum: 0 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionFoodUpdateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/NutritionFoodRequest' }
+        - { type: object, required: [expectedVersion] }
+    NutritionPrivateFood:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, name, servingLabel, source, quantificationStatus, energyKcal, proteinG, carbohydrateG, fatG, version]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        name: { type: string }
+        servingLabel: { type: string }
+        source: { type: string, enum: [USER_REPORTED] }
+        quantificationStatus:
+          type: string
+          enum: [DRAFT, LOGGABLE]
+          description: >-
+            DRAFT has no known per-serving nutrient and cannot be logged as a quantified
+            serving. LOGGABLE means at least one nutrient was self-reported; other nutrients
+            may remain unknown. Neither status implies verified catalog data.
+        energyKcal: { type: [number, 'null'] }
+        proteinG: { type: [number, 'null'] }
+        carbohydrateG: { type: [number, 'null'] }
+        fatG: { type: [number, 'null'] }
+        version: { type: integer, format: int64 }
+    NutritionItemRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, consumedAt, mealType, commandKey]
+      properties:
+        timezone: { type: string, description: Explicit Student-confirmed IANA timezone }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        description: { type: [string, 'null'] }
+        privateFoodId: { type: [string, 'null'], format: uuid }
+        servings: { type: [number, 'null'], exclusiveMinimum: 0 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionCorrectionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, remove, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        description: { type: [string, 'null'] }
+        privateFoodId: { type: [string, 'null'], format: uuid }
+        servings: { type: [number, 'null'], exclusiveMinimum: 0 }
+        remove: { type: boolean }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, expectedDayVersion, noIntakeConfirmed, commandKey]
+      properties:
+        timezone: { type: string, description: Explicit Student-confirmed IANA timezone. }
+        expectedDayVersion: { type: integer, format: int64, minimum: 0 }
+        noIntakeConfirmed: { type: boolean }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionNutrient:
+      type: object
+      additionalProperties: false
+      required: [code, total, knownSubtotal, knownItems, unknownItems]
+      description: A total is null if any relevant item lacks this nutrient; knownSubtotal is separately labelled and null if no known contribution exists.
+      properties:
+        code: { type: string }
+        total: { type: [number, 'null'] }
+        knownSubtotal: { type: [number, 'null'] }
+        knownItems: { type: integer, minimum: 0 }
+        unknownItems: { type: integer, minimum: 0 }
+    NutritionItem:
+      type: object
+      additionalProperties: false
+      required: [id, mealId, kind, name, privateFoodId, servings, servingLabel, consumedAt, version, removed, nutrients]
+      properties:
+        id: { type: string, format: uuid }
+        mealId: { type: string, format: uuid }
+        kind: { type: string, enum: [LEGACY, PRIVATE_SERVING, DESCRIPTION_ONLY] }
+        name: { type: string }
+        privateFoodId: { type: [string, 'null'], format: uuid }
+        servings: { type: [number, 'null'] }
+        servingLabel: { type: [string, 'null'] }
+        consumedAt: { type: string, format: date-time }
+        version: { type: integer, format: int64 }
+        removed: { type: boolean }
+        nutrients: { type: array, items: { $ref: '#/components/schemas/NutritionNutrient' } }
+    NutritionDay:
+      type: object
+      additionalProperties: false
+      required: [studentId, date, timezone, completeness, version, noIntakeConfirmed, nutrients, items]
+      properties:
+        studentId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        timezone: { type: [string, 'null'], description: Null only for a legacy day without recorded timezone identity. }
+        completeness: { type: string, enum: [NOT_LOGGED, PARTIAL, COMPLETE] }
+        version: { type: integer, format: int64 }
+        noIntakeConfirmed: { type: boolean }
+        nutrients: { type: array, items: { $ref: '#/components/schemas/NutritionNutrient' } }
+        items: { type: array, items: { $ref: '#/components/schemas/NutritionItem' } }
+    NutritionCorrection:
+      type: object
+      additionalProperties: false
+      required: [id, fromVersion, toVersion, beforeJson, afterJson, correctedAt]
+      properties:
+        id: { type: string, format: uuid }
+        fromVersion: { type: integer, format: int64 }
+        toVersion: { type: integer, format: int64 }
+        beforeJson: { type: string }
+        afterJson: { type: string }
+        correctedAt: { type: string, format: date-time }
     WorkoutExecutionStatus:
       type: string
       enum: [IN_PROGRESS, COMPLETED, PARTIALLY_COMPLETED, ABORTED]

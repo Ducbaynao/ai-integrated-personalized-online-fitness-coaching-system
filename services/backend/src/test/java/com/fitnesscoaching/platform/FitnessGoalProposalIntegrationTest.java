@@ -269,6 +269,11 @@ class FitnessGoalProposalIntegrationTest {
         return relId;
     }
 
+    private short kgUnitId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.measurement_units WHERE code = 'KG'", Short.class);
+    }
+
     private UUID createActiveGoal(UUID studentId, String title) throws Exception {
         String studentToken = createAccessToken(studentId, "student@example.com", List.of("STUDENT"));
         CreateFitnessGoalRequest request = new CreateFitnessGoalRequest(
@@ -278,7 +283,7 @@ class FitnessGoalProposalIntegrationTest {
                 90,
                 true,
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult result = mockMvc.perform(post("/api/v1/fitness-goals")
@@ -311,7 +316,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Accelerate progress for competition",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult create1Result = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -391,7 +396,7 @@ class FitnessGoalProposalIntegrationTest {
                 75,
                 "Moderate pace adjustment",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(74), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(74), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult create2Result = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -1030,7 +1035,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Ready for review",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, kgUnitId(), null, null, null, null))
         );
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -1601,7 +1606,7 @@ class FitnessGoalProposalIntegrationTest {
                 90,
                 "No actual changes proposed",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(75), null, null, kgUnitId(), null, null, null, null))
         );
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -1664,7 +1669,7 @@ class FitnessGoalProposalIntegrationTest {
         CreateGoalProposalRequest req1 = new CreateGoalProposalRequest(
                 "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.ZERO, BigDecimal.valueOf(70), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.ZERO, BigDecimal.valueOf(70), null, null, kgUnitId(), null, null, null, null))
         );
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -1677,7 +1682,7 @@ class FitnessGoalProposalIntegrationTest {
         CreateGoalProposalRequest req2 = new CreateGoalProposalRequest(
                 "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(-1), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(-1), null, null, kgUnitId(), null, null, null, null))
         );
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -1690,7 +1695,7 @@ class FitnessGoalProposalIntegrationTest {
         CreateGoalProposalRequest req3 = new CreateGoalProposalRequest(
                 "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.ZERO, BigDecimal.valueOf(90), (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.ZERO, BigDecimal.valueOf(90), kgUnitId(), null, null, null, null))
         );
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -1703,7 +1708,7 @@ class FitnessGoalProposalIntegrationTest {
         CreateGoalProposalRequest req4 = new CreateGoalProposalRequest(
                 "New Title", LocalDate.now(), LocalDate.now().plusDays(60), 60, "Reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.valueOf(10), BigDecimal.valueOf(-5), (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), null, BigDecimal.valueOf(10), BigDecimal.valueOf(-5), kgUnitId(), null, null, null, null))
         );
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
                         .header("Authorization", "Bearer " + trainerToken)
@@ -2115,7 +2120,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal without coaching relationship",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -2143,7 +2148,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal with non-active relationship",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         // 1. PAUSED relationship
@@ -2187,7 +2192,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal with expired coaching period",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -2215,7 +2220,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal with invalid permission",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         // 1. Revoked permission
@@ -2272,7 +2277,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Trying to propose cross-student",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         // Trainer 2 cannot propose for Student 1's goal
@@ -2316,7 +2321,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(72), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -2397,7 +2402,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Valid proposal reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -2463,7 +2468,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Valid proposal reason",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
@@ -2528,7 +2533,7 @@ class FitnessGoalProposalIntegrationTest {
                 60,
                 "Proposal on non-active goal",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(78), BigDecimal.valueOf(71), null, null, kgUnitId(), null, null, null, null))
         );
 
         // 1. DRAFT goal
@@ -2601,7 +2606,7 @@ class FitnessGoalProposalIntegrationTest {
                 45,
                 "Intense short-term cycle",
                 List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
-                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(70), null, null, (short) 1, null, null, null, null))
+                List.of(new CreateGoalTargetRequest(1, null, null, BigDecimal.valueOf(80), BigDecimal.valueOf(70), null, null, kgUnitId(), null, null, null, null))
         );
 
         MvcResult res = mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)

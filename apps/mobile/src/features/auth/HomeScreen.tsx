@@ -173,6 +173,15 @@ export function HomeScreen() {
               </Pressable>
 
               <Pressable
+                testID="view-nutrition-button"
+                accessibilityRole="button"
+                accessibilityLabel="Mở nhật ký dinh dưỡng"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/nutrition' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Nhật ký dinh dưỡng →</Text>
+              </Pressable>
+
+              <Pressable
                 testID="view-coaching-button"
                 accessibilityRole="button"
                 accessibilityLabel="Quản lý quan hệ huấn luyện"

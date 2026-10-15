@@ -26,8 +26,8 @@
 | ST-09 | Progress Dashboard | Current Goal/Lifetime, trend, continuity |
 | ST-10 | Measurements | Add/history/source/quality |
 | ST-11 | Progress Photos | Consent, visibility, comparison |
-| ST-12 | Nutrition Today | Target vs actual, completeness, day type |
-| ST-13 | Food Log Entry | Text/search/manual |
+| ST-12 | Nutrition Today | B07 basic route `/(app)/nutrition`: explicit local day/IANA timezone, completeness and nullable actual nutrient totals; strategic target comparison remains deferred |
+| ST-13 | Food Log Entry | Same route: private USER_REPORTED food per serving or unquantified description; all-unknown private food stays DRAFT and cannot be selected for a quantified serving until Student supplies at least one nutrient; versioned correction/removal, explicit day confirmation |
 | ST-14 | Food Photo Confirmation | AI estimate, confidence, correction |
 | ST-15 | Nutrition Goal and Proposal | Lifecycle/version/approval |
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
@@ -46,7 +46,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 |---|---|---|
 | TR-01 | Trainer Overview | Sessions, review due, attention queue; B03 pending relationships are available from `/(app)/coaching` |
 | TR-02 | Student List | Needs attention, on track, inactive, review due |
-| TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; B04 Program context at `/(app)/coaching/[relationshipId]/program` lists only backend-visible current/history plans and removes Student plan cache on authority loss. B06 Trainer reads confirmed occurrences at `/(app)/coaching/[relationshipId]/workout-schedule` with current WORKOUT_PLAN VIEW+, without START/SKIP or execution/history access. Trainer proposal list/detail use `/(app)/coaching/[relationshipId]/schedule-proposals`; PENDING withdrawal requires current CONTRIBUTE. Create route `/new` uses published source version/session and explicit Trainer-selected IANA timezone, local times and offsets; Student sees these before an all-or-nothing decision. |
+| TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; B04 Program context at `/(app)/coaching/[relationshipId]/program` lists only backend-visible current/history plans and removes Student plan cache on authority loss. B06 Trainer reads confirmed occurrences at `/(app)/coaching/[relationshipId]/workout-schedule` with current WORKOUT_PLAN VIEW+, without START/SKIP or execution/history access. Trainer proposal list/detail use `/(app)/coaching/[relationshipId]/schedule-proposals`; PENDING withdrawal requires current CONTRIBUTE. Create route `/new` uses published source version/session and explicit Trainer-selected IANA timezone, local times and offsets; Student sees these before an all-or-nothing decision. B07 read-only nutrition day is `/(app)/coaching/[relationshipId]/nutrition`, authorized by current NUTRITION_LOGS VIEW and concealed after authority loss. |
 | TR-04 | Attention Signal Detail | Evidence, severity, acknowledge/resolve |
 | TR-05 | Plan Builder | Trainer create/edit DRAFT at relationship/Student-scoped routes; detail/version history and significant complete-snapshot publication under `/(app)/students/[studentId]/workout-plans/[planId]`; occurrence-scoped minor change remains B05 |
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |

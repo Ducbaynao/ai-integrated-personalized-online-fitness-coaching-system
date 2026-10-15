@@ -88,6 +88,9 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       {actionPolicy?.canRequestResume ? <CoachingButton label={labels['request-resume']} onPress={() => openAction({ kind: 'request-resume' })} /> : null}
     </View>
     <CoachingButton testID="open-sharing-button" label="Xem quyền chia sẻ dữ liệu" secondary onPress={() => router.push(`/coaching/${relationship.id}/sharing` as never)} />
+    {activeCapability === 'TRAINER' && relationship.trainerId === user?.id ?
+      <CoachingButton testID="open-student-nutrition-button" label="Xem nhật ký dinh dưỡng học viên" secondary
+        onPress={() => router.push(`/coaching/${relationship.id}/nutrition` as never)} /> : null}
     {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? <CoachingButton testID="open-program-button" label="Mở chương trình tập luyện" secondary onPress={() => router.push(`/coaching/${relationship.id}/program` as never)} /> : null}
     <CoachingCard testID="relationship-history">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử quan hệ</Text>
