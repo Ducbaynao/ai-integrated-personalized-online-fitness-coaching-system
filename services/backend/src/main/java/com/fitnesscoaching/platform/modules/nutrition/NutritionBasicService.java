@@ -36,12 +36,15 @@ public class NutritionBasicService {
     private final CoachingAuthorityQuery coaching;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final NutritionTargetDayService targetDays;
 
     public NutritionBasicService(JdbcTemplate jdbc, UserAccountStatusQuery accounts,
                                  StudentCapabilityQuery students, CoachingAuthorityQuery coaching,
-                                 AuditService audit, ObjectMapper mapper) {
+                                 AuditService audit, ObjectMapper mapper,
+                                 NutritionTargetDayService targetDays) {
         this.jdbc = jdbc; this.accounts = accounts; this.students = students;
         this.coaching = coaching; this.audit = audit; this.mapper = mapper;
+        this.targetDays = targetDays;
     }
 
     public record FoodInput(String name, String servingLabel, BigDecimal energyKcal,
@@ -136,6 +139,7 @@ public class NutritionBasicService {
                     actor, day, input.timezone());
             UUID itemId = UUID.randomUUID();
             Food food = input.privateFoodId() == null ? null : requireLoggableFood(actor, input.privateFoodId());
+            targetDays.freezeInCurrentTransaction(actor, day, input.timezone(), "FIRST_LOG");
             insertItem(actor, itemId, mealId, input.description(), input.servings(), food);
             recalculate(actor, day, false);
             audit(actor, "NUTRITION_ITEM_LOGGED", "FOOD_LOG_ITEM", itemId);
@@ -200,6 +204,7 @@ public class NutritionBasicService {
             if (version != input.expectedDayVersion()) throw fail("NUTRITION_VERSION_STALE", 409);
             int count = itemCount(actor, day);
             if ((count == 0) != input.noIntakeConfirmed()) throw fail("NUTRITION_DAY_CONFIRM_INVALID", 409);
+            targetDays.freezeInCurrentTransaction(actor, day, input.timezone(), "DAY_CONFIRM");
             recalculate(actor, day, true);
             jdbc.update("""
                     UPDATE fitness.daily_nutrition_log_status SET completeness='COMPLETE',

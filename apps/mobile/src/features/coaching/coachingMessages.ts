@@ -15,6 +15,7 @@ export const dataScopeLabels: Record<DataScope, string> = {
   WORKOUT_HISTORY: 'Lịch sử buổi tập', WORKOUT_PLAN_HISTORY: 'Lịch sử kế hoạch',
   BODY_METRICS: 'Chỉ số cơ thể', PROGRESS_PHOTOS: 'Ảnh tiến trình',
   NUTRITION_LOGS: 'Nhật ký dinh dưỡng', AI_RECOMMENDATIONS: 'Đề xuất AI',
+  NUTRITION_GOAL: 'Mục tiêu dinh dưỡng',
 };
 
 const codeMessages: Record<string, string> = {

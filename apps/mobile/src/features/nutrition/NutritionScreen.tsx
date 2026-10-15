@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment-timezone';
@@ -31,6 +32,7 @@ export function nutrientLabel(code: string): string {
 }
 
 export function NutritionScreen() {
+  const router = useRouter();
   const { user, activeCapability } = useAuth();
   const actor = user?.id ?? '';
   const theme = getSemanticColors(useColorScheme() === 'dark');
@@ -154,6 +156,7 @@ export function NutritionScreen() {
   return <ScrollView testID="nutrition-student-screen" style={[styles.screen, { backgroundColor: theme.canvas }]}
     contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng</Text>
+    <WorkoutButton label="Mục tiêu dinh dưỡng và đề xuất" secondary onPress={() => router.push('/nutrition/strategy' as never)} />
     <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu bạn tự khai báo. Chưa biết không có nghĩa là 0.</Text>
     <WorkoutCard>
       {input('Ngày ghi (YYYY-MM-DD)', day, (value) => { setDay(value); setConfirmedContext(false); })}

@@ -13,6 +13,7 @@ export type DataScope =
   | 'BODY_METRICS'
   | 'PROGRESS_PHOTOS'
   | 'NUTRITION_LOGS'
+  | 'NUTRITION_GOAL'
   | 'AI_RECOMMENDATIONS';
 
 export interface Page<T> { items: T[]; page: number; size: number }
