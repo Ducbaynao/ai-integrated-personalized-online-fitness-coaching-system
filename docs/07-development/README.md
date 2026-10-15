@@ -9,6 +9,7 @@ This section explains how to run, understand, plan, change, and verify the monor
 - [Testing guide](testing-guide.md)
 - [B03 Coaching Relationship and Coaching Period decisions](features/03-coaching.md)
 - [B06 Planned Workout occurrence decisions — APPROVED](features/06-schedule.md)
+- [B07 Basic Nutrition first-slice decisions — APPROVED](features/07-nutrition.md)
 
 Before changing code, read the repository `AGENTS.md` and any component-specific instructions. A feature change is incomplete when it changes a business rule but leaves the corresponding documentation, contract, migration, or test outdated.
 

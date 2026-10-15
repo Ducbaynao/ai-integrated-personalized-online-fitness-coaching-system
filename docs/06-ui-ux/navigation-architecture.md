@@ -1,5 +1,11 @@
 # Navigation Architecture
 
+## B07 basic nutrition runtime (13/10/2026)
+
+Student Home opens `/(app)/nutrition` (ST-12/ST-13). Student must review and confirm the local date and IANA timezone before reading or writing a day. Private food nutrient values are explicitly USER_REPORTED; blank means unknown, never zero. An all-unknown private food stays DRAFT and cannot be selected for a quantified serving until Student enters at least one nutrient; missing other nutrients remain unknown. A description-only item is unquantified and makes its day nutrient total unknown. Known subtotals are labelled separately. Completion requires a separate confirmation, including explicit no-intake confirmation for an empty day. A correction uses item version and keeps history; network retry keeps its command key, while 409 requires review and a new decision.
+
+Trainer opens read-only `/(app)/coaching/[relationshipId]/nutrition` from the Student relationship context. Backend checks current NUTRITION_LOGS VIEW and conceals the day after authority loss. This route does not create strategic targets or authorize Trainer edits. B07 target/proposal/version, catalog governance and AI estimation remain later scope. The SuperFit kit informs visual language only, not Nutrition product authority.
+
 ## Common account và role switching
 
 Một User có thể có Student Profile, Trainer Profile hoặc cả hai. Role switcher chỉ xuất hiện khi người dùng có nhiều capability đang hoạt động. Trainer Profile chưa verified không được mở các chức năng coaching có authority.
