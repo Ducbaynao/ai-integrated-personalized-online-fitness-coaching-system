@@ -4,7 +4,15 @@
 
 Student Home opens `/(app)/nutrition` (ST-12/ST-13). Student must review and confirm the local date and IANA timezone before reading or writing a day. Private food nutrient values are explicitly USER_REPORTED; blank means unknown, never zero. An all-unknown private food stays DRAFT and cannot be selected for a quantified serving until Student enters at least one nutrient; missing other nutrients remain unknown. A description-only item is unquantified and makes its day nutrient total unknown. Known subtotals are labelled separately. Completion requires a separate confirmation, including explicit no-intake confirmation for an empty day. A correction uses item version and keeps history; network retry keeps its command key, while 409 requires review and a new decision.
 
-Trainer opens read-only `/(app)/coaching/[relationshipId]/nutrition` from the Student relationship context. Backend checks current NUTRITION_LOGS VIEW and conceals the day after authority loss. This route does not create strategic targets or authorize Trainer edits. B07 target/proposal/version, catalog governance and AI estimation remain later scope. The SuperFit kit informs visual language only, not Nutrition product authority.
+Trainer opens read-only `/(app)/coaching/[relationshipId]/nutrition` from the Student relationship context. Backend checks current NUTRITION_LOGS VIEW and conceals the day after authority loss. This route does not create strategic targets or authorize Trainer edits. Catalog governance and AI estimation remain later scope. The SuperFit kit informs visual language only, not Nutrition product authority.
+
+## B07 nutrition strategy runtime (15/10/2026)
+
+Student opens `/(app)/nutrition/strategy` from the nutrition log. The screen reads Goal types, nutrient identities and default unit presentation from backend catalogs. Student explicitly chooses NEW_GOAL or CHANGE_TARGET, an IANA target-calendar timezone, an effective date and at least one nutrient target, previews the full change, then confirms publication. Pausing, resuming and ending require a reason and current aggregate version. Proposals show all targets and require a separate ACCEPT/REJECT confirmation; stale 409 clears the pending retry and reloads state. A network-uncertain retry preserves the exact body and command key.
+
+Student day target preview in the same route is read-only until a log write or day confirmation freezes a snapshot. Explicit REST_DAY selection and a version-bound nutrient override require a separate action; a frozen day cannot be changed. Target values never replace actual Food Log or convert unknown intake to zero.
+
+Trainer opens `/(app)/coaching/[relationshipId]/nutrition-strategy` for the current Student. Current NUTRITION_GOAL VIEW permits read; current CONTRIBUTE/MANAGE and Coaching Period permit a proposal, not direct Goal mutation. The proposal remains pending until Student decision. The route hides Student data after authority loss. These B07 routes use the existing visual primitives; SuperFit is a visual reference, not a Nutrition contract. AI estimation and governed food catalog remain deferred.
 
 ## Common account và role switching
 

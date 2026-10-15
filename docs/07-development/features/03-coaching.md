@@ -169,13 +169,13 @@ Therefore a pre-coaching record needs both a currently effective authorization c
 | Create/publish/manage the current plan in human coaching | Trainer | proposed `WORKOUT_PLAN` + `MANAGE` | B04 validates Trainer plan authority and version/lifecycle rules. The new scope is justified by the confirmed B04 consumer and must not be inferred from `WORKOUT_PLAN_HISTORY`. |
 | Read body measurements | Trainer | `BODY_METRICS` + `VIEW` | Measurement module applies metric sensitivity and history window. |
 | Read progress photos | Trainer | `PROGRESS_PHOTOS` + `VIEW` | Explicit scope only; media authorization remains separate. |
-| Read nutrition logs | Trainer | `NUTRITION_LOGS` + `VIEW` | `Not shared` and `No data` remain distinct. Strategic nutrition proposal scope is deferred until B07 scope is approved. |
+| Read nutrition logs | Trainer | `NUTRITION_LOGS` + `VIEW` | `Not shared` and `No data` remain distinct. B07 strategic Goal has a separate `NUTRITION_GOAL` scope. |
 | Read authorized AI recommendations | Trainer | `AI_RECOMMENDATIONS` + `VIEW` | AI output remains assistance; owning business data policy still applies. |
 | Appointment collaboration | Student/Trainer party | No new data scope in this checkpoint | B06 uses relationship/party/object authority; appointment is not a blanket Student-data grant. |
 | Chat membership/send/read | Student/Trainer member | No new data scope in this checkpoint | B08 owns retention and conversation policy; membership never implies access to linked live domain resources. |
 | Coaching or Student-data operation | Administrator/support | Never satisfied by Trainer sharing | Requires a separate privileged platform workflow with purpose, scope, expiry, step-up where required, and immutable audit. |
 
-No scopes are added for modules without a confirmed consumer. V27 introduces `WORKOUT_PLAN` for the confirmed B04 consumer contract; B07 must decide whether a distinct strategic Nutrition Goal scope is required before implementation.
+No scopes are added for modules without a confirmed consumer. V27 introduces `WORKOUT_PLAN` for B04; B07's approved strategic Goal flow adds distinct `NUTRITION_GOAL` in forward V40. `NUTRITION_LOGS` does not authorize strategic proposals.
 
 ## 8. Stable error-code proposal
 
@@ -309,7 +309,7 @@ End/pause/switch and sharing changes require confirmation with an impact summary
 | B04 Workout Plan | current coaching context; `WORKOUT_PLAN` `MANAGE`; relationship/period IDs | Student controls self-directed plans; only the responsible eligible Trainer manages a human-coach plan. Historical archived Exercise resolution remains B04's authorized consumer responsibility. |
 | B05 Workout Logging | authorized workout-history read and immutable source relationship/period/plan-version IDs | Actual Workout remains Student fact; former Trainer does not receive live access merely because they authored a plan. Archived Exercise references stay resolvable in historical logs. |
 | B06 Schedule | active relationship party/context query and lifecycle events | Appointment is separate from Workout and does not itself grant broad Student-data access. Commit-time conflict and supervision rules remain B06-owned. |
-| B07 Nutrition | `NUTRITION_LOGS` read authorization and history window | Missing intake is never zero. Strategic Nutrition Goal/proposal scope and access level must be decided in B07 before adding a new scope. |
+| B07 Nutrition | `NUTRITION_LOGS` read authorization and history window; distinct `NUTRITION_GOAL` VIEW/CONTRIBUTE policy from B07 decision record | Missing intake is never zero. Strategic change is Student-confirmed; Trainer only proposes with current scope and period. |
 | B08 Chat/Notification | relationship parties/status events and authorized context identifiers | Chat retention/send/read policy is B08-owned. Notifications consume committed facts; neither conversation membership nor a deep link bypasses current domain authorization. |
 
 No consumer may query a Coaching repository directly. Notifications and AI outputs never become sources of relationship, period, or permission truth.

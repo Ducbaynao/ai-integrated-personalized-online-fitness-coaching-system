@@ -26,10 +26,10 @@
 | ST-09 | Progress Dashboard | Current Goal/Lifetime, trend, continuity |
 | ST-10 | Measurements | Add/history/source/quality |
 | ST-11 | Progress Photos | Consent, visibility, comparison |
-| ST-12 | Nutrition Today | B07 basic route `/(app)/nutrition`: explicit local day/IANA timezone, completeness and nullable actual nutrient totals; strategic target comparison remains deferred |
+| ST-12 | Nutrition Today | B07 basic route `/(app)/nutrition`: explicit local day/IANA timezone, completeness and nullable actual nutrient totals; target preview lives separately at `/(app)/nutrition/strategy` and never redefines actual intake |
 | ST-13 | Food Log Entry | Same route: private USER_REPORTED food per serving or unquantified description; all-unknown private food stays DRAFT and cannot be selected for a quantified serving until Student supplies at least one nutrient; versioned correction/removal, explicit day confirmation |
 | ST-14 | Food Photo Confirmation | AI estimate, confidence, correction |
-| ST-15 | Nutrition Goal and Proposal | Lifecycle/version/approval |
+| ST-15 | Nutrition Goal and Proposal | Route `/(app)/nutrition/strategy`: Student NEW_GOAL/CHANGE_TARGET with explicit effective date/timezone, target versions, pause/resume/end, Trainer proposal ACCEPT/REJECT, day-type preview/selection and version-bound override; 409 requires review again |
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
 | ST-17 | Coaching Profile | Route `/(app)/coaching`; relationship lifecycle, current period, history list, and Student-owned sharing permission management |
 | ST-18 | Reschedule Request | Conflict, accept/reject, workout independence |
@@ -50,7 +50,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | TR-04 | Attention Signal Detail | Evidence, severity, acknowledge/resolve |
 | TR-05 | Plan Builder | Trainer create/edit DRAFT at relationship/Student-scoped routes; detail/version history and significant complete-snapshot publication under `/(app)/students/[studentId]/workout-plans/[planId]`; occurrence-scoped minor change remains B05 |
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |
-| TR-07 | Nutrition Proposal Builder | Strategic target proposal |
+| TR-07 | Nutrition Proposal Builder | Route `/(app)/coaching/[relationshipId]/nutrition-strategy`: current NUTRITION_GOAL VIEW read; CONTRIBUTE+ proposal only, Student publishes |
 | TR-08 | Coaching Review | Review data, request data, feedback, plan action |
 | TR-09 | Trainer Schedule | Appointment, availability, conflict |
 | TR-10 | Reschedule Request | Từ TR-03/Trainer calendar mở `/(app)/coaching/[relationshipId]/change-proposals`: Trainer VIEW+ xem proposal đổi/hủy một occurrence do chính mình tạo, lọc/trang/detail; CONTRIBUTE+ chọn occurrence thật, gửi RESCHEDULE với IANA timezone/local start-end/UTC offsets rõ ràng hoặc CANCEL với lý do tùy chọn, và rút PENDING bằng proposalVersion thật. Backend recheck quyền, seal, Appointment, thời gian và xung đột; Student ACCEPT/REJECT trên Mobile thuộc checkpoint tiếp theo. |

@@ -42,6 +42,8 @@ tags:
     description: Student-owned workout execution, actual set logging, terminal outcomes, and authority-scoped history.
   - name: Basic Nutrition
     description: Student-owned user-reported food and day logging; no strategic target or AI estimation authority.
+  - name: Nutrition Strategy
+    description: Student-confirmed Nutrition Goal, effective target versions, Trainer proposals and frozen daily targets.
   - name: AI General Knowledge (F01)
     description: >-
       [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
@@ -50,6 +52,176 @@ tags:
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
+  /nutrition/strategy/goal-types:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listNutritionGoalTypes
+      summary: Read active Goal types from the existing catalog
+      responses:
+        '200':
+          description: Catalog entries; an empty catalog does not authorize Mobile to invent types
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionGoalType' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /nutrition/strategy/target-nutrients:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listNutritionTargetNutrients
+      summary: Read nutrient identities and their default dimension-correct unit presentation
+      description: Unit identities are catalog data, not client constants; the server validates any submitted unit dimension.
+      responses:
+        '200':
+          description: Available nutrient and default unit references
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionTargetNutrient' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /nutrition/strategy/me:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: getMyNutritionStrategy
+      summary: Read Student-owned current Goal, versions and proposals without changing targets
+      responses:
+        '200': { description: Strategy state, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyState' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+  /nutrition/strategy/goals:
+    post:
+      tags: [Nutrition Strategy]
+      operationId: confirmStudentNutritionStrategyChange
+      summary: Student confirms NEW_GOAL or CHANGE_TARGET and publishes an immutable target version
+      description: >-
+        Uses actor-scoped commandKey and expectedGoalVersion/baseVersionId for changes. Same key/body replays
+        one effect; a changed body conflicts. A new Goal conflicts while another ACTIVE Goal exists.
+        First version may start today only if that day has no frozen target; later versions start tomorrow or later.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyChangeRequest' } } } }
+      responses:
+        '200': { description: Published Goal and version, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyGoal' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/goals/{goalId}/transitions:
+    post:
+      tags: [Nutrition Strategy]
+      operationId: transitionStudentNutritionGoal
+      summary: Explicit Student PAUSE, RESUME or END of one Goal
+      parameters: [{ name: goalId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionGoalTransitionRequest' } } } }
+      responses:
+        '200': { description: Updated Goal, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyGoal' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/days/{day}:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: previewStudentNutritionTargetDay
+      summary: Preview or read a frozen target separately from actual Food Log
+      description: GET never writes or freezes. A legacy Goal version without half-open semantics has no resolved target.
+      parameters:
+        - { name: day, in: path, required: true, schema: { type: string, format: date } }
+        - { name: timezone, in: query, required: true, schema: { type: string }, description: Explicit IANA target-calendar timezone }
+      responses:
+        '200': { description: Target preview or frozen snapshot, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionTargetDay' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/days/{day}/day-type:
+    post:
+      tags: [Nutrition Strategy]
+      operationId: chooseStudentNutritionDayType
+      summary: Explicitly mark REST_DAY or clear that choice on an unfrozen day
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionDayTypeRequest' } } } }
+      responses:
+        '200': { description: Recomputed preview, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionTargetDay' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/days/{day}/overrides:
+    post:
+      tags: [Nutrition Strategy]
+      operationId: upsertStudentNutritionTargetOverride
+      summary: Student creates or corrects one version-bound nutrient/day override
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionOverrideRequest' } } } }
+      responses:
+        '200': { description: Recomputed preview, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionTargetDay' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/proposals/me:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listMyNutritionStrategyProposals
+      summary: Student reads own PENDING and terminal proposals, including after Coaching Period ends
+      responses:
+        '200': { description: Newest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionStrategyProposal' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+  /nutrition/strategy/proposals/{proposalId}:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: getNutritionStrategyProposal
+      summary: Student or currently authorized proposing Trainer reads proposal detail
+      parameters: [{ name: proposalId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Proposal, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyProposal' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /nutrition/strategy/proposals/{proposalId}/decisions:
+    post:
+      tags: [Nutrition Strategy]
+      operationId: decideStudentNutritionStrategyProposal
+      summary: Owning Student ACCEPTS or REJECTS a whole strategic proposal
+      description: >-
+        ACCEPT rechecks Trainer NUTRITION_GOAL CONTRIBUTE, Coaching Period and pinned base version.
+        A stale ACCEPT returns 409 while proposal stays PENDING. REJECT remains possible after authority loss.
+      parameters: [{ name: proposalId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionProposalDecisionRequest' } } } }
+      responses:
+        '200': { description: Decided proposal, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyProposal' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /students/{studentId}/nutrition/strategy:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: getTrainerVisibleNutritionStrategy
+      summary: Current NUTRITION_GOAL VIEW Trainer read without mutation authority
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Visible strategy, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyState' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /students/{studentId}/nutrition/strategy/proposals:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listTrainerNutritionStrategyProposals
+      summary: Currently authorized Trainer reads only own proposals for this Student
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Own proposals, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionStrategyProposal' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+    post:
+      tags: [Nutrition Strategy]
+      operationId: proposeTrainerNutritionStrategyChange
+      summary: Current NUTRITION_GOAL CONTRIBUTE Trainer creates a PENDING proposal only
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyChangeRequest' } } } }
+      responses:
+        '201': { description: Pending proposal; no target change, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionStrategyProposal' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
   /nutrition/private-foods:
     get:
       tags: [Basic Nutrition]
@@ -3325,6 +3497,10 @@ components:
         NUTRITION_TIMEZONE_CONFLICT, NUTRITION_DAY_CONFIRM_INVALID, or
         NUTRITION_IDEMPOTENCY_CONFLICT, NUTRITION_LEGACY_SOURCE_UNKNOWN, or
         NUTRITION_FOOD_DRAFT when an all-unknown private food is used as a quantified serving.
+        Strategy codes also include NUTRITION_ACTIVE_GOAL_EXISTS, NUTRITION_GOAL_STATE_CONFLICT,
+        NUTRITION_TARGET_DAY_FROZEN, NUTRITION_TARGET_VERSION_STALE,
+        NUTRITION_PROPOSAL_STALE, NUTRITION_PROPOSAL_ALREADY_DECIDED and
+        NUTRITION_LEGACY_TARGET_UNRESOLVED. No legacy effective-date convention is inferred.
         No other Student's data is disclosed.
       content:
         application/json:
@@ -3612,6 +3788,170 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    NutritionGoalType:
+      type: object
+      additionalProperties: false
+      required: [id, code, name]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+    NutritionTargetNutrient:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, defaultUnitId, unitCode, unitSymbol, dimension]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        defaultUnitId: { type: integer }
+        unitCode: { type: string }
+        unitSymbol: { type: string }
+        dimension: { type: string }
+    NutritionTargetSpec:
+      type: object
+      additionalProperties: false
+      required: [nutrientId, unitId, dayType, targetAmount]
+      properties:
+        nutrientId: { type: integer }
+        unitId: { type: integer }
+        dayType: { type: string, enum: [DEFAULT, TRAINING_DAY, REST_DAY] }
+        targetAmount: { type: number, minimum: 0, description: Explicit amount in the supplied dimension-correct unit; omitted nutrients have no target. }
+    NutritionStrategyChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, title, goalTypeId, timezone, effectiveFrom, targets, confirmed, commandKey]
+      properties:
+        kind: { type: string, enum: [NEW_GOAL, CHANGE_TARGET] }
+        goalId: { type: [string, 'null'], format: uuid, description: Required for CHANGE_TARGET; absent for NEW_GOAL. }
+        expectedGoalVersion: { type: [integer, 'null'], format: int64, minimum: 0 }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        goalTypeId: { type: integer }
+        timezone: { type: string, description: Student-confirmed IANA target-calendar timezone, maxLength: 64 }
+        effectiveFrom: { type: string, format: date }
+        targets: { type: array, minItems: 1, items: { $ref: '#/components/schemas/NutritionTargetSpec' } }
+        reason: { type: [string, 'null'], description: Required for a Trainer-created proposal. }
+        confirmed: { type: boolean, description: Student direct change requires true; Trainer proposal requires false and does not publish. }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionTargetVersion:
+      type: object
+      additionalProperties: false
+      required: [id, versionNumber, effectiveFrom, effectiveUntil, dateSemantics, timezone, goalTypeId, targets]
+      properties:
+        id: { type: string, format: uuid }
+        versionNumber: { type: integer, minimum: 1 }
+        effectiveFrom: { type: string, format: date }
+        effectiveUntil: { type: [string, 'null'], format: date }
+        dateSemantics: { type: string, enum: [LEGACY, HALF_OPEN] }
+        timezone: { type: [string, 'null'] }
+        goalTypeId: { type: [integer, 'null'] }
+        targets: { type: array, items: { $ref: '#/components/schemas/NutritionTargetSpec' } }
+    NutritionStrategyGoal:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, title, status, aggregateVersion, timezone, versions]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, PAUSED, COMPLETED, ENDED, ABANDONED, REPLACED, ARCHIVED] }
+        aggregateVersion: { type: integer, format: int64 }
+        timezone: { type: [string, 'null'] }
+        versions: { type: array, items: { $ref: '#/components/schemas/NutritionTargetVersion' } }
+    NutritionStrategyState:
+      type: object
+      additionalProperties: false
+      required: [goal, proposals]
+      properties:
+        goal: { anyOf: [{ $ref: '#/components/schemas/NutritionStrategyGoal' }, { type: 'null' }] }
+        proposals: { type: array, items: { $ref: '#/components/schemas/NutritionStrategyProposal' } }
+    NutritionGoalTransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedGoalVersion, reason, commandKey]
+      properties:
+        action: { type: string, enum: [PAUSE, RESUME, END] }
+        expectedGoalVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionDayTypeRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, dayType, commandKey]
+      properties:
+        timezone: { type: string, description: Explicit IANA target-calendar timezone; REST_DAY choice retains this timezone and does not silently carry into a different target-calendar timezone. }
+        dayType: { type: string, enum: [REST_DAY, DEFAULT], description: DEFAULT clears an explicit REST_DAY choice. }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionOverrideRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, goalVersionId, nutrientId, unitId, targetAmount, reason, commandKey]
+      properties:
+        timezone: { type: string }
+        goalVersionId: { type: string, format: uuid }
+        nutrientId: { type: integer }
+        unitId: { type: integer }
+        targetAmount: { type: number, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        expectedOverrideVersion: { type: [integer, 'null'], format: int64, minimum: 0, description: Null creates; a number corrects the same version-bound override. }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionResolvedTarget:
+      type: object
+      additionalProperties: false
+      required: [nutrientId, unitId, targetAmount, source, sourceTargetId, sourceOverrideId, overrideVersion]
+      properties:
+        nutrientId: { type: integer }
+        unitId: { type: integer }
+        targetAmount: { type: number }
+        source: { type: string, enum: [OVERRIDE, DAY_TYPE, DEFAULT] }
+        sourceTargetId: { type: [string, 'null'], format: uuid }
+        sourceOverrideId: { type: [string, 'null'], format: uuid }
+        overrideVersion: { type: [integer, 'null'], format: int64, description: Current override token when source is OVERRIDE and day is not frozen; null for frozen/history or non-overrides. }
+    NutritionTargetDay:
+      type: object
+      additionalProperties: false
+      required: [date, timezone, frozen, dayType, goalVersionId, targets]
+      description: Target fact only; actual intake and completeness remain in Basic Nutrition.
+      properties:
+        date: { type: string, format: date }
+        timezone: { type: string }
+        frozen: { type: boolean }
+        dayType: { type: string, enum: [DEFAULT, TRAINING_DAY, REST_DAY] }
+        goalVersionId: { type: [string, 'null'], format: uuid }
+        targets: { type: array, items: { $ref: '#/components/schemas/NutritionResolvedTarget' } }
+    NutritionStrategyProposal:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, trainerId, kind, status, proposalVersion, goalId, baseVersionId, baseGoalVersion, title, goalTypeId, timezone, effectiveFrom, reason, targets, createdAt, decidedAt, decidedGoalId, decidedGoalVersionId]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        kind: { type: string, enum: [NEW_GOAL, CHANGE_TARGET] }
+        status: { type: string, enum: [PENDING, ACCEPTED, REJECTED] }
+        proposalVersion: { type: integer, format: int64 }
+        goalId: { type: [string, 'null'], format: uuid }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        baseGoalVersion: { type: [integer, 'null'], format: int64 }
+        title: { type: string }
+        goalTypeId: { type: integer }
+        timezone: { type: string }
+        effectiveFrom: { type: string, format: date }
+        reason: { type: string }
+        targets: { type: array, items: { $ref: '#/components/schemas/NutritionTargetSpec' } }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decidedGoalId: { type: [string, 'null'], format: uuid }
+        decidedGoalVersionId: { type: [string, 'null'], format: uuid }
+    NutritionProposalDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, expectedProposalVersion, commandKey]
+      properties:
+        decision: { type: string, enum: [ACCEPT, REJECT] }
+        expectedProposalVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
     NutritionFoodRequest:
       type: object
       additionalProperties: false
@@ -4932,7 +5272,7 @@ components:
       enum: [HUMAN_COACH, SELF_DIRECTED]
     CoachingDataScope:
       type: string
-      enum: [FITNESS_GOAL, WORKOUT_PLAN, WORKOUT_HISTORY, WORKOUT_PLAN_HISTORY, BODY_METRICS, PROGRESS_PHOTOS, NUTRITION_LOGS, AI_RECOMMENDATIONS]
+      enum: [FITNESS_GOAL, WORKOUT_PLAN, WORKOUT_HISTORY, WORKOUT_PLAN_HISTORY, BODY_METRICS, PROGRESS_PHOTOS, NUTRITION_LOGS, NUTRITION_GOAL, AI_RECOMMENDATIONS]
     CoachingSharingDecision:
       type: string
       enum: [ALLOW, DENY]

@@ -8,5 +8,6 @@ public enum DataScope {
     BODY_METRICS,
     PROGRESS_PHOTOS,
     NUTRITION_LOGS,
+    NUTRITION_GOAL,
     AI_RECOMMENDATIONS
 }

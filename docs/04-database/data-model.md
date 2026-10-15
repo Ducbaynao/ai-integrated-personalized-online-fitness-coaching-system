@@ -65,6 +65,8 @@ Training Activity Period records active/inactive time ranges and reason/source. 
 
 Nutrition Goal is Student-owned and may link to a Fitness Goal for alignment. Nutrition Proposal references the source version and proposed strategic change. Nutrition Target Version uses effective dates and may own day-type rules. Daily Target resolves the applicable version/rule plus an optional Daily Override. Meal and Food Log Item store actual intake. Food estimates store AI provenance and Student confirmation/correction state.
 
+V40 adds a separate `NUTRITION_GOAL` sharing scope, a one-ACTIVE-Goal partial unique index, optimistic strategy/proposal/override versions, explicit REST_DAY choice history, and a target-day snapshot header. New target versions use `[effective_from,effective_until)` and a confirmed IANA calendar timezone; pre-existing V7 versions retain `LEGACY` date semantics and are not silently reinterpreted. The snapshot header can record an explicit no-target day, so later schedule or Goal changes do not rewrite a day already confirmed or first logged. Actual Food Log facts remain separate from target facts. Strategy commands reuse V39 actor-scoped `nutrition_command_receipts`.
+
 ## AI and knowledge
 
 Knowledge Document owns ordered Knowledge Versions. A version owns chunks and embeddings and has `DRAFT`, `ACTIVE`, or `ARCHIVED` status. AI Run stores request/model/prompt/input references/output/validation/latency/usage. AI Recommendation references its Run, target resource/version, status, decision actor/time, and application result.
