@@ -264,18 +264,22 @@ Content-Type: application/json
 | **FastAPI Linter** | `ruff check services/ai-service` | Zero lint or formatting warnings across all Python AI service code. | **PASSED** |
 | **AI Orchestration Integration** | `mvn test -Dtest=AiKnowledgeQueryOrchestrationIntegrationTest` | 11 tests: Student/Trainer access, policy guardrail, timeout, 502 error, rejection of citations to ACTIVE chunks outside run evidence set, and **preservation of original run evidence across concurrent ranking changes**. | **PASSED (11/11)** |
 | **HTTP End-to-End Integration** | `mvn test -Dtest=AiKnowledgeQueryHttpEndToEndIntegrationTest` | 8 tests: Spring MVC -> Wiremock HTTP -> FastAPI mock -> pgvector -> AI Run persistence & error codes. | **PASSED (8/8)** |
-| **Targeted Backend A-27 Suite** | `mvn test -Dtest=DeterministicEmbeddingGeneratorTest,KnowledgeChunkerTest,KnowledgeRetrievalServiceTest,KnowledgeIndexingOutboxConsumerTest,AiKnowledgeRetrievalIntegrationTest,ContentManagementIntegrationTest,AiKnowledgeQueryOrchestrationIntegrationTest,AiKnowledgeQueryHttpEndToEndIntegrationTest` | 42 unit and integration tests covering chunking, embeddings, indexing worker fencing, pgvector search, and orchestration. | **PASSED (42/42)** |
+| **Real FastAPI Process Integration** | `mvn test -Dtest=AiKnowledgeQueryRealFastApiIntegrationTest` | 4 tests: Full stack execution against real Uvicorn FastAPI process with backend retrieval enabled, Hikari init SQL, and seeded pgvector embeddings. | **PASSED (4/4)** |
+| **Targeted Backend A-27 Suite** | `mvn test -Dtest=DeterministicEmbeddingGeneratorTest,KnowledgeChunkerTest,KnowledgeRetrievalServiceTest,KnowledgeIndexingOutboxConsumerTest,AiKnowledgeRetrievalIntegrationTest,ContentManagementIntegrationTest,AiKnowledgeQueryOrchestrationIntegrationTest,AiKnowledgeQueryHttpEndToEndIntegrationTest,AiKnowledgeQueryRealFastApiIntegrationTest` | 49 unit and integration tests covering chunking, embeddings, indexing worker fencing, pgvector search, and orchestration. | **PASSED (49/49)** |
 
 ---
 
-## 8. Original Evidence Tracking vs. Post-Response Re-Querying
+## 8. Original Evidence Tracking & Review Hardening
 
-Trong quy trình xác thực trích dẫn:
+Trong quy trình xác thực trích dẫn và bảo đảm kiến trúc:
 - **Không truy vấn retrieval mới sau response:** Việc re-query database sau khi model trả lời có nguy cơ gây race condition và loại bỏ sai trích dẫn hợp lệ nếu thứ hạng vector bị thay đổi giữa lúc sinh câu trả lời và lúc validation (do tài liệu mới được index đồng thời).
-- **Lưu giữ evidence gốc (`F01RunEvidenceTracker`):** Tập chunk tri thức được truy xuất thực tế và cung cấp cho provider được ghi nhận an toàn theo `correlationId`. Quá trình validation kiểm tra:
+- **Lưu giữ evidence gốc (`F01RunEvidenceTracker`):** Tập chunk tri thức được truy xuất thực tế và cung cấp cho provider được ghi nhận an toàn theo **server-generated unique `runId`** (có fallback sang `correlationId`). Quá trình validation kiểm tra:
   1. Trích dẫn trong response phải tồn tại trong tập bằng chứng gốc đã cấp cho run (`originalEvidence`).
-  2. Chunk trích dẫn vẫn phải thỏa mãn điều kiện hợp lệ hiện hành trong PostgreSQL (`ACTIVE`, `TECHNICAL_VERIFICATION_PASSED`, chưa bị xóa logic).
-- **Kiểm thử xác minh (Test 11):** Đã kiểm chứng trường hợp một tài liệu mới được index làm thay đổi thứ hạng tìm kiếm trước khi validation diễn ra, hệ thống vẫn đối chiếu đúng tập bằng chứng gốc của run và chấp nhận trích dẫn hợp lệ.
+  2. Xác thực toàn diện các trường citation: `sourceId`, locator `sourcePath`, và trích đoạn `quoteOrExcerpt` (chuẩn hóa loại bỏ định dạng Markdown và dấu ba chấm) phải khớp với nội dung chunk thực tế.
+  3. Chunk trích dẫn vẫn phải thỏa mãn điều kiện hợp lệ hiện hành trong PostgreSQL (`ACTIVE`, `TECHNICAL_VERIFICATION_PASSED`, chưa bị xóa logic) qua inbound port `KnowledgeRetrievalUseCase.isChunkEligible(...)`, tuân thủ nghiêm ngặt ranh giới module (AI không gọi repository của Content).
+- **Bảo tồn chunk ID khi reindex:** Outbox indexing worker thay thế embedding thay vì xóa `knowledge_chunks`, giữ nguyên tính toàn vẹn của ràng buộc khóa ngoại `ON DELETE RESTRICT` từ `ai_run_knowledge_chunks` đối với các chunk đã từng được trích dẫn trong lịch sử.
+- **Lọc lân cận tương đồng:** Loại bỏ các lân cận cosine có độ tương đồng không dương (`<= 0.0`), ngăn chặn việc ghép nối ngẫu nhiên chunk không liên quan khi người dùng hỏi ngoài phạm vi.
+- **Kiểm thử xác minh:** Đã kiểm chứng trường hợp một tài liệu mới được index làm thay đổi thứ hạng tìm kiếm trước khi validation diễn ra, hệ thống vẫn đối chiếu đúng tập bằng chứng gốc của run và chấp nhận trích dẫn hợp lệ. Đồng thời kiểm thử đầu-cuối với tiến trình thật Uvicorn FastAPI hoàn tất 100% kịch bản.
 
 ---
 

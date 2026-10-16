@@ -26,6 +26,9 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
             "NIDDK-WEIGHT-FACTORS-2023"
     );
 
+    // Deterministic cosine similarity relevance cutoff: non-positively aligned neighbors (similarity <= 0.0) are discarded
+    public static final double DEFAULT_MIN_SIMILARITY_THRESHOLD = 0.0;
+
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingModelPort embeddingModelPort;
 
@@ -91,6 +94,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                   AND d.deleted_at IS NULL
                   AND d.source_id IN (%s)
                   AND e.embedding_model_version_id = ?
+                  AND (1.0 - (e.embedding <=> ?::vector)) > ?
                   AND EXISTS (
                       SELECT 1 FROM fitness.knowledge_processing_runs pr
                       WHERE pr.knowledge_version_id = v.id
@@ -106,6 +110,8 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
         params.add(vectorParam);
         params.addAll(authorizedSourceIds);
         params.add(embeddingModelPort.modelVersionId());
+        params.add(vectorParam);
+        params.add(DEFAULT_MIN_SIMILARITY_THRESHOLD);
         params.add(embeddingModelPort.modelVersionId());
         params.add(embeddingModelPort.modelVersionId());
         params.add(vectorParam);
@@ -129,6 +135,27 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                     rs.getDouble("similarity")
             );
         }, params.toArray());
+    }
+
+    @Override
+    public boolean isChunkEligible(String documentCode, String versionLabel, int sectionIndex) {
+        if (documentCode == null || documentCode.isBlank() || versionLabel == null || versionLabel.isBlank()) {
+            return false;
+        }
+        String sql = """
+                SELECT COUNT(*)
+                FROM fitness.knowledge_chunks c
+                JOIN fitness.knowledge_versions v ON v.id = c.knowledge_version_id
+                JOIN fitness.knowledge_documents d ON d.id = v.knowledge_document_id
+                WHERE d.document_code = ?
+                  AND v.version_label = ?
+                  AND c.chunk_index = ?
+                  AND v.status = 'ACTIVE'
+                  AND v.technical_readiness = 'TECHNICAL_VERIFICATION_PASSED'
+                  AND d.deleted_at IS NULL
+                """;
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, documentCode, versionLabel, sectionIndex);
+        return count != null && count > 0;
     }
 
     private static String extractSnippet(String content, int maxLength) {

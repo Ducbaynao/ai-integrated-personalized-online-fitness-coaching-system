@@ -133,6 +133,7 @@ class SimulatedF01KnowledgeProvider(F01KnowledgeProvider):
             query=envelope.question,
             allowed_source_ids=envelope.knowledgeScope.allowedSourceIds,
             limit=3,
+            run_id=str(envelope.requestId) if envelope.requestId else None,
             correlation_id=str(envelope.correlationId) if envelope.correlationId else None,
         )
 

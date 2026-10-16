@@ -44,7 +44,29 @@ def test_auth_invalid_key():
     assert "Invalid" in response.json()["detail"]
 
 
-def test_query_knowledge_success_information():
+def test_query_knowledge_success_information(monkeypatch):
+    from app.rag.retriever import KnowledgeRetriever, RetrievalResult, RetrievedChunkDto
+
+    async def mock_retrieve(self, query, allowed_source_ids, limit=5, run_id=None, correlation_id=None):
+        return RetrievalResult(
+            chunks=[
+                RetrievedChunkDto(
+                    chunkId="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    documentCode="ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                    version="1.0.0",
+                    sourceId="ISSN-PROTEIN-EXERCISE-2017",
+                    sourcePath="data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                    heading="Protein, leucine và EAA trong từng lần ăn",
+                    sectionIndex=0,
+                    snippet="Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+                    similarityScore=0.92,
+                )
+            ],
+            server_responded=True,
+        )
+
+    monkeypatch.setattr(KnowledgeRetriever, "retrieve", mock_retrieve)
+
     response = client.post(
         "/internal/v1/knowledge/query",
         headers=VALID_AUTH_HEADER,

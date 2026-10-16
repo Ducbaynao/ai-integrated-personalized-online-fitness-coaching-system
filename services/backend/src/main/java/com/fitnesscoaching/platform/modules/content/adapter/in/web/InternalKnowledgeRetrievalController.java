@@ -40,6 +40,7 @@ public class InternalKnowledgeRetrievalController {
     @PostMapping("/retrieval")
     public ResponseEntity<InternalRetrievalResponse> retrieveChunks(
             @RequestHeader(value = "X-Internal-Service-Key", required = false) String internalKey,
+            @RequestHeader(value = "X-Run-ID", required = false) String runIdHeader,
             @RequestHeader(value = "X-Correlation-ID", required = false) String correlationIdHeader,
             @RequestBody InternalRetrievalRequest request
     ) {
@@ -58,12 +59,13 @@ public class InternalKnowledgeRetrievalController {
                 limit
         );
 
-        if (correlationIdHeader != null && !correlationIdHeader.isBlank()) {
+        String idToUse = (runIdHeader != null && !runIdHeader.isBlank()) ? runIdHeader : correlationIdHeader;
+        if (idToUse != null && !idToUse.isBlank()) {
             try {
-                UUID correlationId = UUID.fromString(correlationIdHeader.trim());
-                evidenceTracker.recordRunEvidence(correlationId, chunks);
+                UUID runId = UUID.fromString(idToUse.trim());
+                evidenceTracker.recordRunEvidence(runId, chunks);
             } catch (IllegalArgumentException ignored) {
-                // Ignore non-UUID correlation ID headers
+                // Ignore non-UUID identifier header
             }
         }
 

@@ -151,6 +151,7 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
                                         .uri(uri)
                                         .header("Content-Type", "application/json")
                                         .header("X-Internal-Service-Key", SERVICE_KEY)
+                                        .header("X-Run-ID", requestId)
                                         .header("X-Correlation-ID", correlationId)
                                         .POST(java.net.http.HttpRequest.BodyPublishers.ofString(retrievalReqBody))
                                         .build();

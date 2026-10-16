@@ -19,9 +19,8 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRunKnowledgeChunk;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 import com.fitnesscoaching.platform.modules.ai.domain.AiValidationResult;
 import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope;
-import com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeChunkRepository;
+import com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase;
 import com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker;
-import com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk;
 import com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +47,7 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
     private final AiRunF01UseCase aiRunUseCase;
     private final F01AiServiceClient aiServiceClient;
     private final AiProvenanceRepository provenanceRepository;
-    private final KnowledgeChunkRepository chunkRepository;
+    private final KnowledgeRetrievalUseCase retrievalUseCase;
     private final F01RunEvidenceTracker evidenceTracker;
     private final ObjectMapper objectMapper;
     private final AiServiceProperties aiProperties;
@@ -58,7 +57,7 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
             AiRunF01UseCase aiRunUseCase,
             F01AiServiceClient aiServiceClient,
             AiProvenanceRepository provenanceRepository,
-            KnowledgeChunkRepository chunkRepository,
+            KnowledgeRetrievalUseCase retrievalUseCase,
             F01RunEvidenceTracker evidenceTracker,
             ObjectMapper objectMapper,
             AiServiceProperties aiProperties,
@@ -67,7 +66,7 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
         this.aiRunUseCase = aiRunUseCase;
         this.aiServiceClient = aiServiceClient;
         this.provenanceRepository = provenanceRepository;
-        this.chunkRepository = chunkRepository;
+        this.retrievalUseCase = retrievalUseCase;
         this.evidenceTracker = evidenceTracker;
         this.objectMapper = objectMapper;
         this.aiProperties = aiProperties;
@@ -162,19 +161,19 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                         // Strict evidence grounding: verify all citations against the original evidence set of THIS AI Run
                         // and verify current database eligibility (active, technical verification passed, not deleted)
                         if (serviceResponse.citations() != null && !serviceResponse.citations().isEmpty()) {
-                            List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(envelope.correlationId());
+                            List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(run.id());
 
                             for (F01KnowledgeQueryResponse.CitationDto citation : serviceResponse.citations()) {
                                 int sectionIdx = citation.locator() != null && citation.locator().sectionIndex() != null
                                         ? citation.locator().sectionIndex()
                                         : 0;
-                                Optional<RetrievedKnowledgeChunk> matchedEvidence = originalEvidence.stream()
+                                Optional<RetrievedKnowledgeChunk> matchedOpt = originalEvidence.stream()
                                         .filter(c -> c.documentCode().equals(citation.documentId())
                                                 && c.versionLabel().equals(citation.version())
                                                 && c.sectionIndex() == sectionIdx)
                                         .findFirst();
 
-                                if (matchedEvidence.isEmpty()) {
+                                if (matchedOpt.isEmpty()) {
                                     log.warn("AI response contained citation outside original run evidence set: run={}, doc={}, version={}, section={}",
                                             run.id(), citation.documentId(), citation.version(), sectionIdx);
                                     terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
@@ -187,9 +186,54 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                                     break;
                                 }
 
-                                Optional<KnowledgeChunk> currentEligible = chunkRepository.findByDocumentCodeAndVersionAndIndex(
-                                        citation.documentId(), citation.version(), sectionIdx);
-                                if (currentEligible.isEmpty()) {
+                                RetrievedKnowledgeChunk matched = matchedOpt.get();
+
+                                // Complete citation validation against matched evidence (P2 review finding)
+                                if (citation.sourceId() != null && !citation.sourceId().isBlank()
+                                        && !citation.sourceId().equals(matched.sourceId())) {
+                                    log.warn("Citation sourceId mismatch: expected {} but was {}", matched.sourceId(), citation.sourceId());
+                                    terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                                    errorCode = "UNVERIFIED_CITATION";
+                                    errorMessage = "Citation sourceId does not match evidence: " + citation.sourceId();
+                                    serviceResponse = null;
+                                    validationPassed = false;
+                                    validationDetail = "CITATION_SOURCE_ID_MISMATCH";
+                                    break;
+                                }
+
+                                if (citation.locator() != null && citation.locator().sourcePath() != null && !citation.locator().sourcePath().isBlank()
+                                        && !citation.locator().sourcePath().equals(matched.contentPath())) {
+                                    log.warn("Citation sourcePath mismatch: expected {} but was {}", matched.contentPath(), citation.locator().sourcePath());
+                                    terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                                    errorCode = "UNVERIFIED_CITATION";
+                                    errorMessage = "Citation locator sourcePath does not match evidence: " + citation.locator().sourcePath();
+                                    serviceResponse = null;
+                                    validationPassed = false;
+                                    validationDetail = "CITATION_SOURCE_PATH_MISMATCH";
+                                    break;
+                                }
+
+                                if (citation.quoteOrExcerpt() != null && !citation.quoteOrExcerpt().isBlank()) {
+                                    String quote = citation.quoteOrExcerpt().trim();
+                                    if (quote.endsWith("...")) {
+                                        quote = quote.substring(0, quote.length() - 3).trim();
+                                    }
+                                    String normContent = matched.content().toLowerCase().replaceAll("[^\\p{L}\\p{Nd}\\s]", " ").replaceAll("\\s+", " ").trim();
+                                    String normQuote = quote.toLowerCase().replaceAll("[^\\p{L}\\p{Nd}\\s]", " ").replaceAll("\\s+", " ").trim();
+                                    if (!normQuote.isBlank() && !normContent.contains(normQuote)) {
+                                        log.warn("Citation quoteOrExcerpt not found in chunk content for run {}", run.id());
+                                        terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                                        errorCode = "UNVERIFIED_CITATION";
+                                        errorMessage = "Citation quoteOrExcerpt is not supported by the retrieved chunk content.";
+                                        serviceResponse = null;
+                                        validationPassed = false;
+                                        validationDetail = "CITATION_QUOTE_NOT_IN_CHUNK_CONTENT";
+                                        break;
+                                    }
+                                }
+
+                                boolean eligible = retrievalUseCase.isChunkEligible(citation.documentId(), citation.version(), sectionIdx);
+                                if (!eligible) {
                                     log.warn("AI response citation matched run evidence but is no longer active/eligible in database: run={}, doc={}, version={}, section={}",
                                             run.id(), citation.documentId(), citation.version(), sectionIdx);
                                     terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
@@ -228,7 +272,7 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
 
                 // Persist knowledge chunk citations in ai_run_knowledge_chunks from original evidence
                 if (serviceResponse.citations() != null && !serviceResponse.citations().isEmpty()) {
-                    List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(envelope.correlationId());
+                    List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(run.id());
                     List<AiRunKnowledgeChunk> chunkRefs = new ArrayList<>();
                     int rank = 1;
                     for (F01KnowledgeQueryResponse.CitationDto citation : serviceResponse.citations()) {
@@ -314,8 +358,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                 );
             }
         } finally {
-            if (envelope.correlationId() != null) {
-                evidenceTracker.clearRunEvidence(envelope.correlationId());
+            if (run != null && run.id() != null) {
+                evidenceTracker.clearRunEvidence(run.id());
             }
         }
     }

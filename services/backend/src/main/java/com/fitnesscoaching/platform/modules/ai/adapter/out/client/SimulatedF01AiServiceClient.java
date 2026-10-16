@@ -102,8 +102,8 @@ public class SimulatedF01AiServiceClient implements F01AiServiceClient {
             List<com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk> retrievedChunks =
                     retrievalUseCase.retrieveActiveKnowledge(envelope.question(), allowedSourceIds, 3);
 
-            if (evidenceTracker != null && envelope.correlationId() != null) {
-                evidenceTracker.recordRunEvidence(envelope.correlationId(), retrievedChunks);
+            if (evidenceTracker != null && envelope.requestId() != null) {
+                evidenceTracker.recordRunEvidence(envelope.requestId(), retrievedChunks);
             }
 
             if (retrievedChunks.isEmpty()) {

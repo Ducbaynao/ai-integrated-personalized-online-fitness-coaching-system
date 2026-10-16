@@ -7,4 +7,6 @@ import java.util.List;
 public interface KnowledgeRetrievalUseCase {
 
     List<RetrievedKnowledgeChunk> retrieveActiveKnowledge(String query, List<String> allowedSourceIds, int limit);
+
+    boolean isChunkEligible(String documentCode, String versionLabel, int sectionIndex);
 }

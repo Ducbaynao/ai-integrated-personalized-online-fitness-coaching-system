@@ -18,24 +18,24 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class F01RunEvidenceTracker {
 
-    private final Map<UUID, List<RetrievedKnowledgeChunk>> evidenceByCorrelationId = new ConcurrentHashMap<>();
+    private final Map<UUID, List<RetrievedKnowledgeChunk>> evidenceByRunId = new ConcurrentHashMap<>();
 
-    public void recordRunEvidence(UUID correlationId, List<RetrievedKnowledgeChunk> chunks) {
-        if (correlationId != null && chunks != null) {
-            evidenceByCorrelationId.put(correlationId, List.copyOf(chunks));
+    public void recordRunEvidence(UUID runId, List<RetrievedKnowledgeChunk> chunks) {
+        if (runId != null && chunks != null) {
+            evidenceByRunId.put(runId, List.copyOf(chunks));
         }
     }
 
-    public List<RetrievedKnowledgeChunk> getRunEvidence(UUID correlationId) {
-        if (correlationId == null) {
+    public List<RetrievedKnowledgeChunk> getRunEvidence(UUID runId) {
+        if (runId == null) {
             return List.of();
         }
-        return evidenceByCorrelationId.getOrDefault(correlationId, List.of());
+        return evidenceByRunId.getOrDefault(runId, List.of());
     }
 
-    public void clearRunEvidence(UUID correlationId) {
-        if (correlationId != null) {
-            evidenceByCorrelationId.remove(correlationId);
+    public void clearRunEvidence(UUID runId) {
+        if (runId != null) {
+            evidenceByRunId.remove(runId);
         }
     }
 }

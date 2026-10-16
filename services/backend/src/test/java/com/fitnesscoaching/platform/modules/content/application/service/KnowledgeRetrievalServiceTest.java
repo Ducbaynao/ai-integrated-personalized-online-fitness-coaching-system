@@ -100,15 +100,44 @@ class KnowledgeRetrievalServiceTest {
         assertThat(chunks.get(0).documentCode()).isEqualTo("WHO-PA-SB-2020-VI-01");
         assertThat(chunks.get(0).similarityScore()).isEqualTo(0.92);
 
-        // Verify SQL includes strict eligibility guards: ACTIVE, TECHNICAL_VERIFICATION_PASSED, and index_ready
+        // Verify SQL includes strict eligibility guards: ACTIVE, TECHNICAL_VERIFICATION_PASSED, index_ready, and relevance threshold
         verify(jdbcTemplate).query(
                 org.mockito.ArgumentMatchers.argThat((String sql) ->
                         sql.contains("v.status = 'ACTIVE'") &&
                         sql.contains("v.technical_readiness = 'TECHNICAL_VERIFICATION_PASSED'") &&
                         sql.contains("index_ready") &&
-                        sql.contains("<=>")),
+                        sql.contains("<=>") &&
+                        sql.contains("> ?")),
                 any(RowMapper.class),
                 any(Object[].class)
         );
+    }
+
+    @Test
+    @DisplayName("isChunkEligible returns true when matching active verified chunk exists")
+    void isChunkEligibleReturnsTrue() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("WHO-PA-SB-2020-VI-01"), eq("1.1.0"), eq(0)))
+                .thenReturn(1);
+
+        boolean eligible = service.isChunkEligible("WHO-PA-SB-2020-VI-01", "1.1.0", 0);
+        assertThat(eligible).isTrue();
+    }
+
+    @Test
+    @DisplayName("isChunkEligible returns false when chunk is missing or inactive")
+    void isChunkEligibleReturnsFalse() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("UNKNOWN"), eq("1.0.0"), eq(0)))
+                .thenReturn(0);
+
+        boolean eligible = service.isChunkEligible("UNKNOWN", "1.0.0", 0);
+        assertThat(eligible).isFalse();
+    }
+
+    @Test
+    @DisplayName("isChunkEligible returns false immediately for null or blank inputs")
+    void isChunkEligibleReturnsFalseForBlank() {
+        assertThat(service.isChunkEligible(null, "1.0.0", 0)).isFalse();
+        assertThat(service.isChunkEligible("WHO", "  ", 0)).isFalse();
+        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), any(), any(), any());
     }
 }

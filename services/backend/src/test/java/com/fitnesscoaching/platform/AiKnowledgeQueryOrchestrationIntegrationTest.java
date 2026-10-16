@@ -563,7 +563,7 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                         org.mockito.Mockito.mock(com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase.class),
                         simulatedAiClient,
                         provenanceRepository,
-                        chunkRepository,
+                        retrievalUseCase,
                         evidenceTracker,
                         objectMapper,
                         disabledProps,
@@ -743,7 +743,7 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
             // 1. Perform normal retrieval and record original evidence
             List<com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk> initialChunks =
                     retrievalUseCase.retrieveActiveKnowledge(envelope.question(), envelope.knowledgeScope().allowedSourceIds(), 3);
-            evidenceTracker.recordRunEvidence(envelope.correlationId(), initialChunks);
+            evidenceTracker.recordRunEvidence(envelope.requestId(), initialChunks);
 
             // 2. Simulate concurrent database update: insert a new document that changes future retrieval rankings
             jdbcTemplate.update("""

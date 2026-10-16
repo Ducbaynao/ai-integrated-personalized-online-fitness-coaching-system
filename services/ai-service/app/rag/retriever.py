@@ -45,6 +45,7 @@ class KnowledgeRetriever:
         query: str,
         allowed_source_ids: list[str],
         limit: int = 5,
+        run_id: str | None = None,
         correlation_id: str | None = None,
     ) -> RetrievalResult:
         if not allowed_source_ids or not query or not query.strip():
@@ -58,6 +59,8 @@ class KnowledgeRetriever:
             "X-Internal-Service-Key": self.internal_key,
             "Content-Type": "application/json",
         }
+        if run_id:
+            headers["X-Run-ID"] = run_id
         if correlation_id:
             headers["X-Correlation-ID"] = correlation_id
 

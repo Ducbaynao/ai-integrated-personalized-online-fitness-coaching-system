@@ -218,9 +218,8 @@ public class KnowledgeIndexingOutboxWorker {
                     return false;
                 }
 
-                // Delete previous chunks and embeddings for this version (ensures idempotency on REINDEX)
+                // Replace embeddings for this version (ensures idempotency on REINDEX while preserving cited chunk IDs)
                 embeddingRepository.deleteByKnowledgeVersionId(version.id());
-                chunkRepository.deleteByKnowledgeVersionId(version.id());
 
                 if (!chunks.isEmpty()) {
                     chunkRepository.saveBatch(chunks);
