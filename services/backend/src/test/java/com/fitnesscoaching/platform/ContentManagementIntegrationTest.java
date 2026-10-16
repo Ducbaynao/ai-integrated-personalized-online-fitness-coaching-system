@@ -75,6 +75,7 @@ class ContentManagementIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET search_path TO fitness, public;");
     }
 
     @Autowired private MockMvc mockMvc;
@@ -414,14 +415,16 @@ class ContentManagementIntegrationTest {
                 """, String.class, whoVersionId);
         assertThat(runStatus).isEqualTo("SUCCEEDED");
 
-        // Verify statistics in outbox run: boundary test only, real embeddings false
+        // Verify statistics in outbox run: real embeddings true, real retrieval indexing, index ready
         String statisticsJson = jdbcTemplate.queryForObject("""
                 SELECT statistics::text FROM fitness.knowledge_processing_runs
                 WHERE knowledge_version_id = ?
                 """, String.class, whoVersionId);
         JsonNode statsNode = objectMapper.readTree(statisticsJson);
-        assertThat(statsNode.path("real_embeddings").asBoolean()).isFalse();
-        assertThat(statsNode.path("mode").asText()).isEqualTo("BOUNDARY_VERIFICATION_ONLY");
+        assertThat(statsNode.path("real_embeddings").asBoolean()).isTrue();
+        assertThat(statsNode.path("mode").asText()).isEqualTo("REAL_RETRIEVAL_INDEXING");
+        assertThat(statsNode.path("index_ready").asBoolean()).isTrue();
+        assertThat(statsNode.path("indexed_chunks").asInt()).isGreaterThan(0);
 
         // Verify database immutability: Cannot modify content of ACTIVE version
         assertThatThrownBy(() -> {
@@ -474,7 +477,7 @@ class ContentManagementIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"guidelines\",\"allowedSourceIds\":[\"WHO-PA-SB-2020\"]}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.citations", hasSize(1)));
+                .andExpect(jsonPath("$.citations", hasSize(5)));
 
         // Case 6D: allowedSourceIds is empty -> returns 0 citations
         mockMvc.perform(post("/api/v1/content/knowledge/query")
@@ -498,7 +501,7 @@ class ContentManagementIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"guidelines\",\"allowedSourceIds\":[\"WHO-PA-SB-2020\"]}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.citations", hasSize(1)))
+                .andExpect(jsonPath("$.citations", hasSize(5)))
                 .andExpect(jsonPath("$.citations[0].documentCode", is("WHO-PA-SB-2020-VI-01")))
                 .andExpect(jsonPath("$.citations[0].version", is("1.1.0")))
                 .andExpect(jsonPath("$.citations[0].sourceId", is("WHO-PA-SB-2020")));

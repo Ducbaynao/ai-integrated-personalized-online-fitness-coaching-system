@@ -19,8 +19,9 @@ NIH ODS snapshots. Read the [integration review](knowledge-corpus-review-2026-10
 [F01 AI Run persistence handoff (A-28)](f01-a28-ai-run-persistence-handoff.md),
 [F01 Spring orchestration and envelope handoff (A-22/A-23)](f01-a22-a23-orchestration-handoff.md),
 [F01 FastAPI endpoint and HTTP client handoff (A-26)](f01-a26-fastapi-mock-handoff.md),
-and [F01 runtime output validation and E2E verification handoff (A-25/A-31)](f01-a25-a31-runtime-validation-handoff.md) before using it.
-File import, technical review, AI Run persistence, orchestration, mock provider endpoints, and runtime validation do not publish Knowledge or complete F01/F09. Retrieval remains disabled.
+[F01 runtime output validation and E2E verification handoff (A-25/A-31)](f01-a25-a31-runtime-validation-handoff.md),
+and [F01 real retrieval, chunking, and indexing handoff (A-27)](f01-a27-real-retrieval-handoff.md) before using it.
+Retrieval is supported through pgvector over published ACTIVE sources with index readiness verification. Held drafts (NIDDK 05/06) remain unindexed. Production LLM evaluation and release remain in subsequent milestones (A-49/A-52).
 
 ## Supported capabilities
 

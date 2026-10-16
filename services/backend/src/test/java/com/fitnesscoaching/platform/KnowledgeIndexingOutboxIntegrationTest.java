@@ -61,6 +61,7 @@ class KnowledgeIndexingOutboxIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET search_path TO fitness, public;");
     }
 
     @Autowired private JdbcTemplate jdbcTemplate;

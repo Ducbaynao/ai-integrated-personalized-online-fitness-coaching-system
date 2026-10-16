@@ -195,6 +195,7 @@ public class JdbcKnowledgeProcessingRunRepository implements KnowledgeProcessing
                 UPDATE fitness.knowledge_processing_runs
                 SET status = 'SUCCEEDED',
                     statistics = ?::jsonb,
+                    model_version_id = COALESCE(NULLIF(?::jsonb->>'embedding_model_version_id', '')::uuid, model_version_id),
                     completed_at = clock_timestamp(),
                     locked_at = null,
                     locked_by = null,
@@ -204,8 +205,10 @@ public class JdbcKnowledgeProcessingRunRepository implements KnowledgeProcessing
                   AND claim_token = ?
                   AND (lease_expires_at IS NULL OR lease_expires_at >= clock_timestamp())
                 """;
+        String stats = statisticsJson != null ? statisticsJson : "{}";
         int updated = jdbcTemplate.update(sql,
-                statisticsJson != null ? statisticsJson : "{}",
+                stats,
+                stats,
                 id,
                 claimToken
         );

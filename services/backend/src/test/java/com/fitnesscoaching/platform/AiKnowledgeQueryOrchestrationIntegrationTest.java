@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.config.JwtProperties;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F01KnowledgeQueryApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F01KnowledgeQueryResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.out.client.SimulatedF01AiServiceClient;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiProvenanceRepository;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunRepository;
@@ -77,6 +78,7 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET search_path TO fitness, public;");
     }
 
     @Autowired
@@ -103,12 +105,25 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeChunkRepository chunkRepository;
+
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase retrievalUseCase;
+
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.out.EmbeddingModelPort embeddingModelPort;
+
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker evidenceTracker;
+
     private UUID activeExerciseId;
 
     @BeforeEach
     void setUp() {
         simulatedAiClient.reset();
 
+        jdbcTemplate.execute("TRUNCATE TABLE fitness.knowledge_documents, fitness.knowledge_processing_runs CASCADE");
         jdbcTemplate.execute("DELETE FROM fitness.ai_runs");
         jdbcTemplate.execute("DELETE FROM fitness.user_roles");
         jdbcTemplate.execute("DELETE FROM fitness.student_profiles");
@@ -127,6 +142,69 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                     ?, ?, ?, 'BEGINNER', 'SQUAT', 'ACTIVE', clock_timestamp(), clock_timestamp()
                 ) ON CONFLICT (id) DO NOTHING
                 """, activeExerciseId, "TEST-SQUAT-" + UUID.randomUUID().toString().substring(0, 8), "Standard Air Squat");
+
+        seedActiveKnowledgeDocument();
+    }
+
+    private void seedActiveKnowledgeDocument() {
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        UUID chunkId = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (
+                    id, title, source_name, document_type, document_code, source_id, language
+                ) VALUES (
+                    ?, 'ISSN Protein Timing', 'ISSN', 'GUIDELINE', 'ISSN-PROTEIN-EXERCISE-2017-VI-04', 'ISSN-PROTEIN-EXERCISE-2017', 'vi'
+                )
+                """, docId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (
+                    id, knowledge_document_id, version_number, version_label, status, content_hash, technical_readiness, content_path, created_at
+                ) VALUES (
+                    ?, ?, 1, '1.0.0', 'ACTIVE', 'dummyhash123', 'TECHNICAL_VERIFICATION_PASSED', 'derivatives/issn-2017/04-timing.vi.md', clock_timestamp()
+                )
+                """, versionId, docId);
+
+        UUID modelVersionId = jdbcTemplate.queryForObject("""
+                SELECT v.id FROM fitness.ai_model_versions v
+                JOIN fitness.ai_models m ON m.id = v.ai_model_id
+                WHERE m.is_active = true AND m.capability = 'EMBEDDING'
+                LIMIT 1
+                """, UUID.class);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (
+                    id, knowledge_version_id, run_type, status, model_version_id, statistics, operation_key, created_at
+                ) VALUES (
+                    ?, ?, 'REINDEX', 'SUCCEEDED', ?, '{"index_ready": true}'::jsonb, ?, clock_timestamp()
+                )
+                """, runId, versionId, modelVersionId, "OP-" + runId);
+
+        String chunkContent = "Nạp protein đều đặn mỗi 3-4 giờ tối ưu hóa tốc độ tổng hợp protein cơ bắp (MPS) trong suốt 24 giờ.";
+        chunkRepository.saveBatch(List.of(new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                chunkId,
+                versionId,
+                0,
+                "Thời điểm nạp protein",
+                chunkContent,
+                25,
+                "{\"sectionIndex\": 0, \"contentPath\": \"derivatives/issn-2017/04-timing.vi.md\"}",
+                Instant.now()
+        )));
+
+        float[] vector = embeddingModelPort.generateEmbedding(chunkContent);
+        String vectorStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(vector);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (
+                    id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                )
+                """, chunkId, modelVersionId, vectorStr);
     }
 
     @AfterEach
@@ -485,6 +563,8 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                         org.mockito.Mockito.mock(com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase.class),
                         simulatedAiClient,
                         provenanceRepository,
+                        retrievalUseCase,
+                        evidenceTracker,
                         objectMapper,
                         disabledProps,
                         new com.fitnesscoaching.platform.modules.ai.application.service.F01RuntimeOutputValidator()
@@ -501,5 +581,265 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                 disabledOrchestrator.queryKnowledge(STUDENT_USER_ID, validReq)
         ).isInstanceOf(com.fitnesscoaching.platform.common.exception.AiFeatureDisabledException.class)
          .hasMessageContaining("disabled by administrator configuration");
+    }
+
+    @Test
+    @DisplayName("10. Citation points to ACTIVE chunk outside run evidence -> 502 Bad Gateway with UNVERIFIED_CITATION")
+    void citationPointsToActiveChunkNotInRunEvidenceRejection() throws Exception {
+        UUID doc2Id = UUID.randomUUID();
+        UUID version2Id = UUID.randomUUID();
+        UUID chunk2Id = UUID.randomUUID();
+        UUID run2Id = UUID.randomUUID();
+
+        // Seed 2 additional chunks for the protein document so it has chunks 0, 1, 2 (filling top-3 evidence slots)
+        UUID version1Id = jdbcTemplate.queryForObject(
+                "SELECT id FROM fitness.knowledge_versions WHERE version_label = '1.0.0' LIMIT 1", UUID.class);
+        UUID modelVersionId = jdbcTemplate.queryForObject("""
+                SELECT v.id FROM fitness.ai_model_versions v
+                JOIN fitness.ai_models m ON m.id = v.ai_model_id
+                WHERE m.is_active = true AND m.capability = 'EMBEDDING'
+                LIMIT 1
+                """, UUID.class);
+
+        for (int i = 1; i <= 2; i++) {
+            UUID extraChunkId = UUID.randomUUID();
+            String extraContent = "Khuyến nghị phân bổ protein thời điểm bữa ăn " + i + " theo ISSN 2017.";
+            chunkRepository.saveBatch(List.of(new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                    extraChunkId,
+                    version1Id,
+                    i,
+                    "Thời điểm protein phần " + i,
+                    extraContent,
+                    20,
+                    "{\"sectionIndex\": " + i + ", \"contentPath\": \"derivatives/issn-2017/04-timing.vi.md\"}",
+                    Instant.now()
+            )));
+            float[] extraVec = embeddingModelPort.generateEmbedding(extraContent);
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.knowledge_embeddings (
+                        id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                    ) VALUES (
+                        gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                    )
+                    """, extraChunkId, modelVersionId,
+                    com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(extraVec));
+        }
+
+        // Seed second document: ACTIVE, TECHNICAL_VERIFICATION_PASSED, and indexed, but about squat mechanics
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (
+                    id, title, source_name, document_type, document_code, source_id, language
+                ) VALUES (
+                    ?, 'ISSN Resistance Training', 'ISSN', 'GUIDELINE', 'ISSN-PROTEIN-EXERCISE-2017-VI-08', 'ISSN-PROTEIN-EXERCISE-2017', 'vi'
+                )
+                """, doc2Id);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (
+                    id, knowledge_document_id, version_number, version_label, status, content_hash, technical_readiness, content_path, created_at
+                ) VALUES (
+                    ?, ?, 1, '1.0.0', 'ACTIVE', 'dummyhash456', 'TECHNICAL_VERIFICATION_PASSED', 'derivatives/issn-2017/08-resistance.vi.md', clock_timestamp()
+                )
+                """, version2Id, doc2Id);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (
+                    id, knowledge_version_id, run_type, status, model_version_id, statistics, operation_key, created_at
+                ) VALUES (
+                    ?, ?, 'REINDEX', 'SUCCEEDED', ?, '{"index_ready": true}'::jsonb, ?, clock_timestamp()
+                )
+                """, run2Id, version2Id, modelVersionId, "OP-" + run2Id);
+
+        String doc2Content = "Kỹ thuật squat đòn gánh sau lưng và cơ sinh học khớp gối khớp háng.";
+        chunkRepository.saveBatch(List.of(new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                chunk2Id,
+                version2Id,
+                0,
+                "Kỹ thuật Squat",
+                doc2Content,
+                20,
+                "{\"sectionIndex\": 0, \"contentPath\": \"derivatives/issn-2017/08-resistance.vi.md\"}",
+                Instant.now()
+        )));
+
+        float[] vector2 = embeddingModelPort.generateEmbedding(doc2Content);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (
+                    id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                )
+                """, chunk2Id, modelVersionId,
+                com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(vector2));
+
+        // Configure AI client to return citation pointing to doc2 (which IS ACTIVE in the database),
+        // but was NOT retrieved in the top-3 evidence chunks for the protein timing question.
+        simulatedAiClient.setCustomBehavior(envelope -> new F01KnowledgeQueryResponse(
+                envelope.requestId(),
+                envelope.correlationId(),
+                "SUCCEEDED",
+                "INFORMATION",
+                "NONE",
+                "Nạp protein đều đặn tối ưu hóa MPS.",
+                List.of(new F01KnowledgeQueryResponse.CitationDto(
+                        "ISSN-PROTEIN-EXERCISE-2017-VI-08",
+                        "1.0.0",
+                        "ISSN-PROTEIN-EXERCISE-2017",
+                        new F01KnowledgeQueryResponse.LocatorDto("derivatives/issn-2017/08-resistance.vi.md", "Kỹ thuật Squat", null, 0),
+                        "Trích dẫn từ tài liệu squat"
+                )),
+                List.of("Khuyến nghị chung"),
+                List.of(),
+                Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
+                new F01KnowledgeQueryResponse.UsageDto(300, 50, 350, 100),
+                null,
+                new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "f01-rule-v1", "simulated", "simulated-f01-v1", null, null)
+        ));
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Thời điểm nạp protein tối ưu trong ngày là khi nào?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        String responseContent = mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.runStatus", is("REJECTED_BY_VALIDATOR")))
+                .andExpect(jsonPath("$.reasonCode", is("UNVERIFIED_CITATION")))
+                .andExpect(jsonPath("$.error.code", is("UNVERIFIED_CITATION")))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode responseJson = objectMapper.readTree(responseContent);
+        UUID runId = UUID.fromString(responseJson.get("runId").asText());
+
+        Optional<AiRun> runOpt = aiRunRepository.findById(runId);
+        assertThat(runOpt).isPresent();
+        assertThat(runOpt.get().status()).isEqualTo(AiRunStatus.REJECTED_BY_VALIDATOR);
+        assertThat(runOpt.get().errorCode()).isEqualTo("UNVERIFIED_CITATION");
+    }
+
+    @Test
+    @DisplayName("11. Citation validation uses original run evidence when database retrieval results change before validation")
+    void citationValidationPreservesOriginalEvidenceAcrossRankingChanges() throws Exception {
+        UUID doc3Id = UUID.randomUUID();
+        UUID version3Id = UUID.randomUUID();
+        UUID run3Id = UUID.randomUUID();
+        UUID chunk3Id = UUID.randomUUID();
+
+        UUID modelVersionId = jdbcTemplate.queryForObject("""
+                SELECT v.id FROM fitness.ai_model_versions v
+                JOIN fitness.ai_models m ON m.id = v.ai_model_id
+                WHERE m.is_active = true AND m.capability = 'EMBEDDING'
+                LIMIT 1
+                """, UUID.class);
+
+        // When the AI client receives the request, it gets the original evidence (doc 1, ISSN protein timing).
+        // During processing, another background process adds/changes retrieval rankings, but AI client responds citing doc 1.
+        simulatedAiClient.setCustomBehavior(envelope -> {
+            // 1. Perform normal retrieval and record original evidence
+            List<com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk> initialChunks =
+                    retrievalUseCase.retrieveActiveKnowledge(envelope.question(), envelope.knowledgeScope().allowedSourceIds(), 3);
+            evidenceTracker.recordRunEvidence(envelope.requestId(), initialChunks);
+
+            // 2. Simulate concurrent database update: insert a new document that changes future retrieval rankings
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.knowledge_documents (
+                        id, title, source_name, document_type, document_code, source_id, language
+                    ) VALUES (
+                        ?, 'Newer Protein Guideline', 'ISSN', 'GUIDELINE', 'ISSN-PROTEIN-EXERCISE-2024-VI-01', 'ISSN-PROTEIN-EXERCISE-2017', 'vi'
+                    )
+                    """, doc3Id);
+
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.knowledge_versions (
+                        id, knowledge_document_id, version_number, version_label, status, content_hash, technical_readiness, content_path, created_at
+                    ) VALUES (
+                        ?, ?, 1, '1.0.0', 'ACTIVE', 'dummyhash789', 'TECHNICAL_VERIFICATION_PASSED', 'derivatives/issn-2024/01-timing.vi.md', clock_timestamp()
+                    )
+                    """, version3Id, doc3Id);
+
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.knowledge_processing_runs (
+                        id, knowledge_version_id, run_type, status, model_version_id, statistics, operation_key, created_at
+                    ) VALUES (
+                        ?, ?, 'REINDEX', 'SUCCEEDED', ?, '{"index_ready": true}'::jsonb, ?, clock_timestamp()
+                    )
+                    """, run3Id, version3Id, modelVersionId, "OP-" + run3Id);
+
+            String doc3Content = "Thời điểm nạp protein tối ưu nhất theo nghiên cứu mới.";
+            chunkRepository.saveBatch(List.of(new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                    chunk3Id,
+                    version3Id,
+                    0,
+                    "Thời điểm protein mới",
+                    doc3Content,
+                    25,
+                    "{\"sectionIndex\": 0, \"contentPath\": \"derivatives/issn-2024/01-timing.vi.md\"}",
+                    Instant.now()
+            )));
+
+            float[] vec3 = embeddingModelPort.generateEmbedding(doc3Content);
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.knowledge_embeddings (
+                        id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                    ) VALUES (
+                        gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                    )
+                    """, chunk3Id, modelVersionId,
+                    com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(vec3));
+
+            // 3. Return answer grounded in the original doc 1 evidence
+            com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk originalChunk = initialChunks.get(0);
+            return new F01KnowledgeQueryResponse(
+                    envelope.requestId(),
+                    envelope.correlationId(),
+                    "SUCCEEDED",
+                    "INFORMATION",
+                    "NONE",
+                    "Theo tài liệu: " + originalChunk.snippet(),
+                    List.of(new F01KnowledgeQueryResponse.CitationDto(
+                            originalChunk.documentCode(),
+                            originalChunk.versionLabel(),
+                            originalChunk.sourceId(),
+                            new F01KnowledgeQueryResponse.LocatorDto(originalChunk.contentPath(), originalChunk.headingPath(), List.of(1, 2), originalChunk.sectionIndex()),
+                            originalChunk.snippet()
+                    )),
+                    List.of("Khuyến nghị chung"),
+                    List.of(),
+                    Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
+                    new F01KnowledgeQueryResponse.UsageDto(200, 40, 240, 80),
+                    null,
+                    new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "f01-rule-v1", "simulated", "simulated-f01-v1", null, null)
+            );
+        });
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Thời điểm nạp protein tối ưu trong ngày là khi nào?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        String responseContent = mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.citations[0].documentId", is("ISSN-PROTEIN-EXERCISE-2017-VI-04")))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode responseJson = objectMapper.readTree(responseContent);
+        UUID runId = UUID.fromString(responseJson.get("runId").asText());
+
+        // Verify that AI run provenance recorded the original chunk reference
+        List<AiRunKnowledgeChunk> chunkRefs = provenanceRepository.findKnowledgeChunkReferencesByRunId(runId);
+
+        assertThat(chunkRefs).hasSize(1);
+        assertThat(chunkRefs.get(0).rank()).isEqualTo(1);
     }
 }

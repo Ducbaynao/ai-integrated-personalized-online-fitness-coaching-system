@@ -20,7 +20,25 @@ import java.util.function.Function;
  */
 public class SimulatedF01AiServiceClient implements F01AiServiceClient {
 
+    private final com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase retrievalUseCase;
+    private final com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker evidenceTracker;
     private Function<F01InternalContextEnvelope, F01KnowledgeQueryResponse> customBehavior;
+
+    public SimulatedF01AiServiceClient() {
+        this(null, null);
+    }
+
+    public SimulatedF01AiServiceClient(com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase retrievalUseCase) {
+        this(retrievalUseCase, null);
+    }
+
+    public SimulatedF01AiServiceClient(
+            com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase retrievalUseCase,
+            com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker evidenceTracker
+    ) {
+        this.retrievalUseCase = retrievalUseCase;
+        this.evidenceTracker = evidenceTracker;
+    }
 
     public void setCustomBehavior(Function<F01InternalContextEnvelope, F01KnowledgeQueryResponse> customBehavior) {
         this.customBehavior = customBehavior;
@@ -73,29 +91,71 @@ public class SimulatedF01AiServiceClient implements F01AiServiceClient {
             );
         }
 
-        // 5. Insufficient data -> SUCCEEDED + INSUFFICIENT_DATA
-        if (envelope.knowledgeScope() == null
-                || envelope.knowledgeScope().allowedSourceIds() == null
-                || envelope.knowledgeScope().allowedSourceIds().isEmpty()
-                || question.contains("trigger_insufficient_data")) {
+        // 5. Insufficient data trigger
+        if (question.contains("trigger_insufficient_data")) {
+            return buildInsufficientDataResponse(envelope, asOf);
+        }
+
+        // 6. Real Retrieval-grounded response (A-27)
+        if (retrievalUseCase != null) {
+            List<String> allowedSourceIds = envelope.knowledgeScope() != null ? envelope.knowledgeScope().allowedSourceIds() : List.of();
+            List<com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk> retrievedChunks =
+                    retrievalUseCase.retrieveActiveKnowledge(envelope.question(), allowedSourceIds, 3);
+
+            if (evidenceTracker != null && envelope.requestId() != null) {
+                evidenceTracker.recordRunEvidence(envelope.requestId(), retrievedChunks);
+            }
+
+            if (retrievedChunks.isEmpty()) {
+                return buildInsufficientDataResponse(envelope, asOf);
+            }
+
+            List<F01KnowledgeQueryResponse.CitationDto> citations = retrievedChunks.stream()
+                    .map(chunk -> new F01KnowledgeQueryResponse.CitationDto(
+                            chunk.documentCode(),
+                            chunk.versionLabel(),
+                            chunk.sourceId(),
+                            new F01KnowledgeQueryResponse.LocatorDto(
+                                    chunk.contentPath(),
+                                    chunk.headingPath(),
+                                    List.of(1, 2),
+                                    chunk.sectionIndex()
+                            ),
+                            chunk.snippet()
+                    ))
+                    .toList();
+
+            com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk topChunk = retrievedChunks.get(0);
+            String answer = "Theo " + topChunk.title() + " (" + topChunk.documentCode() + " phiên bản " + topChunk.versionLabel() + "): " +
+                    topChunk.snippet();
+
             return new F01KnowledgeQueryResponse(
                     envelope.requestId(),
                     envelope.correlationId(),
                     "SUCCEEDED",
-                    "INSUFFICIENT_DATA",
-                    "NO_RELEVANT_EVIDENCE",
-                    null,
-                    null,
-                    List.of("Hệ thống chỉ giải thích dựa trên các nguồn tri thức đã được kiểm duyệt (ISSN, WHO, NIDDK, NIH ODS)."),
-                    List.of("Không tìm thấy tài liệu khoa học nào trong kho tri thức ACTIVE đề cập đến câu hỏi này."),
+                    "INFORMATION",
+                    "NONE",
+                    answer,
+                    citations,
+                    List.of(
+                            "Khuyến nghị áp dụng cho người trưởng thành khỏe mạnh tham gia tập luyện.",
+                            "Không thay thế tư vấn y khoa hoặc hướng dẫn lâm sàng cá nhân hóa."
+                    ),
+                    List.of(),
                     asOf,
-                    new F01KnowledgeQueryResponse.UsageDto(250, 50, 300, 320),
+                    new F01KnowledgeQueryResponse.UsageDto(520, 160, 680, 850),
                     null,
                     new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "rule-v1", "simulated", "simulated-f01-v1", null, null)
             );
         }
 
-        // 6. Normal INFORMATION result
+        // 7. Fallback when retrievalUseCase is not configured (e.g., isolated legacy unit tests)
+        if (envelope.knowledgeScope() == null
+                || envelope.knowledgeScope().allowedSourceIds() == null
+                || envelope.knowledgeScope().allowedSourceIds().isEmpty()) {
+            return buildInsufficientDataResponse(envelope, asOf);
+        }
+
         F01KnowledgeQueryResponse.LocatorDto locator = new F01KnowledgeQueryResponse.LocatorDto(
                 "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
                 "Protein, leucine và EAA trong từng lần ăn",
@@ -126,6 +186,24 @@ public class SimulatedF01AiServiceClient implements F01AiServiceClient {
                 List.of(),
                 asOf,
                 new F01KnowledgeQueryResponse.UsageDto(520, 160, 680, 850),
+                null,
+                new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "rule-v1", "simulated", "simulated-f01-v1", null, null)
+        );
+    }
+
+    private F01KnowledgeQueryResponse buildInsufficientDataResponse(F01InternalContextEnvelope envelope, String asOf) {
+        return new F01KnowledgeQueryResponse(
+                envelope.requestId(),
+                envelope.correlationId(),
+                "SUCCEEDED",
+                "INSUFFICIENT_DATA",
+                "NO_RELEVANT_EVIDENCE",
+                null,
+                List.of(),
+                List.of("Hệ thống chỉ giải thích dựa trên các nguồn tri thức đã được kiểm duyệt (ISSN, WHO, NIDDK, NIH ODS)."),
+                List.of("Không tìm thấy tài liệu khoa học nào trong kho tri thức ACTIVE đề cập đến câu hỏi này."),
+                asOf,
+                new F01KnowledgeQueryResponse.UsageDto(250, 50, 300, 320),
                 null,
                 new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "rule-v1", "simulated", "simulated-f01-v1", null, null)
         );

@@ -72,6 +72,7 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
 
     private static Process fastApiProcess;
     private static int fastApiPort;
+    private static int springPort;
 
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
@@ -83,9 +84,12 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
     static void startServices() throws Exception {
         postgres.start();
 
-        // Find free port for FastAPI uvicorn
+        // Find free port for FastAPI uvicorn and Spring Boot
         try (ServerSocket socket = new ServerSocket(0)) {
             fastApiPort = socket.getLocalPort();
+        }
+        try (ServerSocket socket = new ServerSocket(0)) {
+            springPort = socket.getLocalPort();
         }
 
         // Determine Python / Uvicorn executable in virtualenv
@@ -109,6 +113,8 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
         pb.directory(aiServiceDir);
         pb.environment().put("INTERNAL_SERVICE_KEY", SERVICE_KEY);
         pb.environment().put("F01_MOCK_ENABLED", "true");
+        pb.environment().put("BACKEND_INTERNAL_RETRIEVAL_ENABLED", "true");
+        pb.environment().put("BACKEND_BASE_URL", "http://127.0.0.1:" + springPort);
         pb.redirectErrorStream(true);
 
         fastApiProcess = pb.start();
@@ -151,6 +157,7 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("server.port", () -> springPort);
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
@@ -159,6 +166,7 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET search_path TO fitness, public;");
 
         // Configure Spring to use HTTP mode pointing to real FastAPI process
         registry.add("ai.service.mode", () -> "http");
@@ -190,10 +198,17 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
     @Autowired
     private AiProvenanceRepository provenanceRepository;
 
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeChunkRepository chunkRepository;
+
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.out.EmbeddingModelPort embeddingModelPort;
+
     private String validJwtToken;
 
     @BeforeEach
     void setUpTestData() {
+        jdbcTemplate.execute("TRUNCATE TABLE fitness.knowledge_documents, fitness.knowledge_processing_runs CASCADE");
         jdbcTemplate.update("DELETE FROM fitness.ai_validation_results");
         jdbcTemplate.update("DELETE FROM fitness.ai_context_snapshots");
         jdbcTemplate.update("DELETE FROM fitness.ai_runs");
@@ -220,6 +235,69 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
                 """, STUDENT_USER_ID, STUDENT_USER_ID);
 
         validJwtToken = generateJwtToken(STUDENT_USER_ID, List.of("STUDENT"));
+
+        seedActiveKnowledgeDocument();
+    }
+
+    private void seedActiveKnowledgeDocument() {
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        UUID chunkId = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (
+                    id, title, source_name, document_type, document_code, source_id, language
+                ) VALUES (
+                    ?, 'ISSN Protein Timing', 'ISSN', 'GUIDELINE', 'ISSN-PROTEIN-EXERCISE-2017-VI-04', 'ISSN-PROTEIN-EXERCISE-2017', 'vi'
+                )
+                """, docId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (
+                    id, knowledge_document_id, version_number, version_label, status, content_hash, technical_readiness, content_path, created_at
+                ) VALUES (
+                    ?, ?, 1, '1.0.0', 'ACTIVE', 'dummyhash123', 'TECHNICAL_VERIFICATION_PASSED', 'data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md', clock_timestamp()
+                )
+                """, versionId, docId);
+
+        UUID modelVersionId = jdbcTemplate.queryForObject("""
+                SELECT v.id FROM fitness.ai_model_versions v
+                JOIN fitness.ai_models m ON m.id = v.ai_model_id
+                WHERE m.is_active = true AND m.capability = 'EMBEDDING'
+                LIMIT 1
+                """, UUID.class);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (
+                    id, knowledge_version_id, run_type, status, model_version_id, statistics, operation_key, created_at
+                ) VALUES (
+                    ?, ?, 'REINDEX', 'SUCCEEDED', ?, '{"index_ready": true}'::jsonb, ?, clock_timestamp()
+                )
+                """, runId, versionId, modelVersionId, "OP-" + runId);
+
+        String chunkContent = "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa và phân bổ protein tối ưu để tối đa hóa MPS trong tập luyện.";
+        chunkRepository.saveBatch(List.of(new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                chunkId,
+                versionId,
+                0,
+                "Protein, leucine và EAA trong từng lần ăn",
+                chunkContent,
+                30,
+                "{\"sectionIndex\": 0, \"contentPath\": \"data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md\"}",
+                Instant.now()
+        )));
+
+        float[] vector = embeddingModelPort.generateEmbedding(chunkContent);
+        String vectorStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(vector);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (
+                    id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                )
+                """, chunkId, modelVersionId, vectorStr);
     }
 
     private String generateJwtToken(UUID userId, List<String> roles) {
