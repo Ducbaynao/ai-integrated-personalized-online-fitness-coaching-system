@@ -223,6 +223,7 @@ public class KnowledgeIndexingOutboxWorker {
 
                 if (!chunks.isEmpty()) {
                     chunkRepository.saveBatch(chunks);
+                    chunkRepository.deleteUnreferencedChunksBeyondIndex(version.id(), chunks.size());
 
                     List<KnowledgeEmbeddingRecord> embeddingRecords = new ArrayList<>(chunks.size());
                     for (int i = 0; i < chunks.size(); i++) {

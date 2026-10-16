@@ -48,6 +48,14 @@ public class JdbcKnowledgeChunkRepository implements KnowledgeChunkRepository {
                     token_count = EXCLUDED.token_count,
                     metadata = EXCLUDED.metadata,
                     created_at = EXCLUDED.created_at
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM fitness.ai_run_knowledge_chunks rc
+                    WHERE rc.knowledge_chunk_id = fitness.knowledge_chunks.id
+                      AND (
+                          fitness.knowledge_chunks.content <> EXCLUDED.content
+                          OR (fitness.knowledge_chunks.metadata->>'chunkHash') <> (EXCLUDED.metadata->>'chunkHash')
+                      )
+                )
                 """;
 
         List<Object[]> batchArgs = chunks.stream()
@@ -64,6 +72,17 @@ public class JdbcKnowledgeChunkRepository implements KnowledgeChunkRepository {
                 .toList();
 
         jdbcTemplate.batchUpdate(sql, batchArgs);
+    }
+
+    @Override
+    public void deleteUnreferencedChunksBeyondIndex(UUID versionId, int activeChunkCount) {
+        String sql = """
+                DELETE FROM fitness.knowledge_chunks
+                WHERE knowledge_version_id = ?
+                  AND chunk_index >= ?
+                  AND id NOT IN (SELECT knowledge_chunk_id FROM fitness.ai_run_knowledge_chunks)
+                """;
+        jdbcTemplate.update(sql, versionId, activeChunkCount);
     }
 
     @Override

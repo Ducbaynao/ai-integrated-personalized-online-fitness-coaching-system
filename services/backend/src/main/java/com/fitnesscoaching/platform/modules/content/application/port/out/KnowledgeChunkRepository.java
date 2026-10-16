@@ -17,4 +17,6 @@ public interface KnowledgeChunkRepository {
     Optional<KnowledgeChunk> findByDocumentCodeAndVersionAndIndex(String documentCode, String versionLabel, int chunkIndex);
 
     Optional<KnowledgeChunk> findById(UUID chunkId);
+
+    void deleteUnreferencedChunksBeyondIndex(UUID versionId, int activeChunkCount);
 }

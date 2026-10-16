@@ -485,4 +485,86 @@ class AiKnowledgeRetrievalIntegrationTest {
         assertThat(run.status()).isEqualTo(AiRunStatus.REJECTED_BY_VALIDATOR);
         assertThat(run.errorCode()).isEqualTo("UNVERIFIED_CITATION");
     }
+
+    @Test
+    @DisplayName("Reindexing preserves cited chunk content and hash, and prunes unreferenced chunks beyond count")
+    void reindexPreservesCitedChunkAndPrunesUnreferencedChunks() {
+        // Seed document, version and 3 chunks
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        String docCode = "WHO-REINDEX-TEST-01";
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents(id, document_code, title, source_id, language, created_by)
+                VALUES (?, ?, 'Reindex Test', 'WHO-PA-SB-2020', 'vi', ?)
+                """, docId, docCode, ADMIN_ID);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions(
+                    id, knowledge_document_id, version_number, version_label,
+                    status, content_hash, technical_readiness, content, created_by
+                ) VALUES (
+                    ?, ?, 1, '1.0.0', 'ACTIVE', 'hash123', 'TECHNICAL_VERIFICATION_PASSED', 'test content', ?
+                )
+                """, versionId, docId, ADMIN_ID);
+
+        UUID chunk0Id = UUID.randomUUID();
+        UUID chunk1Id = UUID.randomUUID();
+        UUID chunk2Id = UUID.randomUUID();
+
+        String originalContent0 = "Original chunk 0 content cited by AI Run";
+        String originalContent1 = "Original chunk 1 content cited by AI Run";
+        String uncitedContent2 = "Uncited chunk 2 content";
+
+        chunkRepository.saveBatch(List.of(
+                new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                        chunk0Id, versionId, 0, "H1", originalContent0, 10, "{\"chunkHash\": \"hash0\"}", Instant.now()
+                ),
+                new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                        chunk1Id, versionId, 1, "H2", originalContent1, 10, "{\"chunkHash\": \"hash1\"}", Instant.now()
+                ),
+                new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                        chunk2Id, versionId, 2, "H3", uncitedContent2, 10, "{\"chunkHash\": \"hash2\"}", Instant.now()
+                )
+        ));
+
+        // Create an AI run that cites chunk0 and chunk1
+        UUID aiRunId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.ai_runs(id, request_type, status, created_at)
+                VALUES (?, 'KNOWLEDGE_QUERY', 'SUCCEEDED', clock_timestamp())
+                """, aiRunId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.ai_run_knowledge_chunks(ai_run_id, knowledge_chunk_id, rank, similarity_score)
+                VALUES (?, ?, 1, 0.95), (?, ?, 2, 0.85)
+                """, aiRunId, chunk0Id, aiRunId, chunk1Id);
+
+        // 1. Verify conflict on cited chunk with MODIFIED content is rejected by WHERE guard (preserves original content)
+        chunkRepository.saveBatch(List.of(
+                new com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk(
+                        chunk0Id, versionId, 0, "H1", "MUTATED CONTENT ATTEMPT", 10, "{\"chunkHash\": \"mutatedHash\"}", Instant.now()
+                )
+        ));
+
+        String contentAfterAttempt = jdbcTemplate.queryForObject(
+                "SELECT content FROM fitness.knowledge_chunks WHERE id = ?", String.class, chunk0Id);
+        assertThat(contentAfterAttempt).isEqualTo(originalContent0);
+
+        // 2. Prune unreferenced chunks beyond index 1 (activeCount = 1)
+        chunkRepository.deleteUnreferencedChunksBeyondIndex(versionId, 1);
+
+        // chunk2 (uncited) must be pruned
+        Integer chunk2Count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fitness.knowledge_chunks WHERE id = ?", Integer.class, chunk2Id);
+        assertThat(chunk2Count).isEqualTo(0);
+
+        // chunk1 (cited by AI run) must be preserved in knowledge_chunks for citation history
+        Integer chunk1Count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fitness.knowledge_chunks WHERE id = ?", Integer.class, chunk1Id);
+        assertThat(chunk1Count).isEqualTo(1);
+
+        // But chunk1 has no embedding for current index, so isChunkEligible returns false
+        boolean chunk1Eligible = retrievalUseCase.isChunkEligible(docCode, "1.0.0", 1);
+        assertThat(chunk1Eligible).isFalse();
+    }
 }

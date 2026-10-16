@@ -277,20 +277,24 @@ Trong quy trình xác thực trích dẫn và bảo đảm kiến trúc:
   1. Trích dẫn trong response phải tồn tại trong tập bằng chứng gốc đã cấp cho run (`originalEvidence`).
   2. Xác thực toàn diện các trường citation: `sourceId`, locator `sourcePath`, và trích đoạn `quoteOrExcerpt` (chuẩn hóa loại bỏ định dạng Markdown và dấu ba chấm) phải khớp với nội dung chunk thực tế.
   3. Chunk trích dẫn vẫn phải thỏa mãn điều kiện hợp lệ hiện hành trong PostgreSQL (`ACTIVE`, `TECHNICAL_VERIFICATION_PASSED`, chưa bị xóa logic) qua inbound port `KnowledgeRetrievalUseCase.isChunkEligible(...)`, tuân thủ nghiêm ngặt ranh giới module (AI không gọi repository của Content).
-- **Bảo tồn chunk ID khi reindex:** Outbox indexing worker thay thế embedding thay vì xóa `knowledge_chunks`, giữ nguyên tính toàn vẹn của ràng buộc khóa ngoại `ON DELETE RESTRICT` từ `ai_run_knowledge_chunks` đối với các chunk đã từng được trích dẫn trong lịch sử.
-- **Lọc lân cận tương đồng:** Loại bỏ các lân cận cosine có độ tương đồng không dương (`<= 0.0`), ngăn chặn việc ghép nối ngẫu nhiên chunk không liên quan khi người dùng hỏi ngoài phạm vi.
+- **Bảo tồn chunk ID và lịch sử trích dẫn khi reindex:**
+  - `knowledge_chunks` sử dụng `ON CONFLICT (knowledge_version_id, chunk_index) DO UPDATE` với điều kiện bảo vệ `WHERE NOT EXISTS (SELECT 1 FROM ai_run_knowledge_chunks WHERE ...)`. Nếu một chunk đã được trích dẫn trong lịch sử bởi một AI Run, việc reindex không được phép làm thay đổi nội dung, chunkHash hay provenance của chunk đó.
+  - Khi reindex với thuật toán chunking mới hoặc số lượng chunk giảm đi, các chunk cũ không được trích dẫn ngoài phạm vi active count sẽ được tự động dọn dẹp bằng `deleteUnreferencedChunksBeyondIndex`. Các chunk cũ đã từng được trích dẫn tiếp tục được lưu giữ để phục vụ tra cứu lịch sử nhưng bị xóa bỏ embedding khỏi `knowledge_embeddings`, đảm bảo không bao giờ bị retrieval nhầm hay được coi là hợp lệ (`isChunkEligible == false`).
+- **Lọc kỹ thuật độ tương đồng:** Điều kiện `AND (1.0 - (e.embedding <=> ?::vector)) > 0.0` loại bỏ các lân cận cosine không dương / trực giao. **Lưu ý quan trọng:** Ngưỡng similarity > 0.0 này là một bộ lọc kỹ thuật cơ bản, chưa được benchmark định lượng và không bảo đảm semantic relevance thực tế đối với không gian vector giả lập tất định (việc đánh giá độ liên quan ngữ nghĩa thuộc mốc A-52).
+- **Giới hạn Single Backend Instance của Evidence Tracker:** `F01RunEvidenceTracker` hoạt động in-memory trong bộ nhớ của tiến trình Spring Boot đơn lẻ. Trong mô hình kiến trúc hiện tại, FastAPI AI Service gọi callback về local internal endpoint của đúng instance điều phối. Nếu mở rộng kiến trúc thành cụm nhiều backend instance đặt sau load balancer không có sticky routing, tracker cần được cấu hình routing affinity hoặc chuyển sang bộ nhớ đệm phân tán có TTL (như Redis).
 - **Kiểm thử xác minh:** Đã kiểm chứng trường hợp một tài liệu mới được index làm thay đổi thứ hạng tìm kiếm trước khi validation diễn ra, hệ thống vẫn đối chiếu đúng tập bằng chứng gốc của run và chấp nhận trích dẫn hợp lệ. Đồng thời kiểm thử đầu-cuối với tiến trình thật Uvicorn FastAPI hoàn tất 100% kịch bản.
 
 ---
 
 ## 9. Remaining Boundaries & Next Milestones
 
-1. **Deterministic Test Double vs. Paid Embedding API:**
-   - Development và CI test suites sử dụng `DeterministicEmbeddingGenerator` (tạo vector đơn vị 1536 chiều bằng băm n-gram tất định) để kiểm thử indexing và cosine similarity pgvector mà không phát sinh chi phí hoặc rò rỉ credential.
-   - Môi trường production sẽ cấu hình model embedding thực tế (ví dụ: `openai/text-embedding-3-small` hoặc service embedding nội bộ) thông qua cổng `EmbeddingModelPort`.
-2. **LLM Provider Generation:**
-   - Trích dẫn và provenance trong task này đã được nối đất 100% với chunk trong database thật. Khâu sinh text câu trả lời tiếp tục sử dụng adapter giả lập cho đến khi mô hình và ngưỡng chất lượng được phê duyệt.
-3. **Phân định rõ A-49 và A-52:**
+1. **Simulated Embedding & Text Generation:**
+   - Embeddings sử dụng `DeterministicEmbeddingGenerator` (`simulated/deterministic-1536/1.0.0`). Không có API embedding trả phí nào được gọi.
+   - Text generation tiếp tục sử dụng adapter giả lập; việc tích hợp LLM generation thực tế chỉ được triển khai khi có credential production được phê duyệt.
+2. **Chưa Hoàn Thành Toàn Bộ A-27 / F01 Hoặc Điều Kiện Production:**
+   - PR này cung cấp nền tảng pipeline kỹ thuật (chunking, outbox indexing, pgvector retrieval, citation validation grounded in evidence).
+   - Hệ thống chưa đạt điều kiện production: chưa có specialist catalog review cho toàn bộ 73 bài viết, chưa cấu hình embedding provider thật, chưa benchmark chất lượng truy xuất và độ bao phủ tri thức.
+3. **Phân định rõ ràng A-49 và A-52:**
    - **A-49 (Evaluation Runner & Harness):** Xây dựng runner tự động, bộ tiêu chí đánh giá (rubric), tập dữ liệu kiểm thử phân chia (train/test/split/holdout) và hạ tầng lưu trữ kết quả benchmark.
    - **A-52 (Model & Retrieval Quality Evaluation):** Đánh giá chất lượng thực tế của retrieval và model trên bộ ngữ liệu: tỷ lệ hỗ trợ trích dẫn (citation support), tỷ lệ trúng tri thức (retrieval hit rate), tỷ lệ từ chối sai (false refusal), và độ nối đất ở mức từng mệnh đề (claim-level groundedness).
-   - Hai milestone này hoàn toàn độc lập với việc hoàn thiện pipeline kỹ thuật A-27 và sẽ được triển khai theo kế hoạch tiếp theo.
+   - Cả A-49 và A-52 hoàn toàn tách biệt với PR này và sẽ được thực hiện ở các milestone tiếp theo.

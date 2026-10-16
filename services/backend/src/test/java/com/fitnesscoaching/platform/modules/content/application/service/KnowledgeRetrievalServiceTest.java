@@ -114,9 +114,11 @@ class KnowledgeRetrievalServiceTest {
     }
 
     @Test
-    @DisplayName("isChunkEligible returns true when matching active verified chunk exists")
+    @DisplayName("isChunkEligible returns true when matching active verified chunk with embedding exists")
     void isChunkEligibleReturnsTrue() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("WHO-PA-SB-2020-VI-01"), eq("1.1.0"), eq(0)))
+        UUID modelVersionId = UUID.randomUUID();
+        when(embeddingModelPort.modelVersionId()).thenReturn(modelVersionId);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("WHO-PA-SB-2020-VI-01"), eq("1.1.0"), eq(0), eq(modelVersionId)))
                 .thenReturn(1);
 
         boolean eligible = service.isChunkEligible("WHO-PA-SB-2020-VI-01", "1.1.0", 0);
@@ -126,7 +128,9 @@ class KnowledgeRetrievalServiceTest {
     @Test
     @DisplayName("isChunkEligible returns false when chunk is missing or inactive")
     void isChunkEligibleReturnsFalse() {
-        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("UNKNOWN"), eq("1.0.0"), eq(0)))
+        UUID modelVersionId = UUID.randomUUID();
+        when(embeddingModelPort.modelVersionId()).thenReturn(modelVersionId);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("UNKNOWN"), eq("1.0.0"), eq(0), eq(modelVersionId)))
                 .thenReturn(0);
 
         boolean eligible = service.isChunkEligible("UNKNOWN", "1.0.0", 0);
@@ -138,6 +142,6 @@ class KnowledgeRetrievalServiceTest {
     void isChunkEligibleReturnsFalseForBlank() {
         assertThat(service.isChunkEligible(null, "1.0.0", 0)).isFalse();
         assertThat(service.isChunkEligible("WHO", "  ", 0)).isFalse();
-        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), any(), any(), any());
+        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), any(), any(), any(), any());
     }
 }

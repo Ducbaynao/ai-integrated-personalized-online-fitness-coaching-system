@@ -145,6 +145,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
         String sql = """
                 SELECT COUNT(*)
                 FROM fitness.knowledge_chunks c
+                JOIN fitness.knowledge_embeddings e ON e.knowledge_chunk_id = c.id
                 JOIN fitness.knowledge_versions v ON v.id = c.knowledge_version_id
                 JOIN fitness.knowledge_documents d ON d.id = v.knowledge_document_id
                 WHERE d.document_code = ?
@@ -153,8 +154,16 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                   AND v.status = 'ACTIVE'
                   AND v.technical_readiness = 'TECHNICAL_VERIFICATION_PASSED'
                   AND d.deleted_at IS NULL
+                  AND e.embedding_model_version_id = ?
                 """;
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, documentCode, versionLabel, sectionIndex);
+        Integer count = jdbcTemplate.queryForObject(
+                sql,
+                Integer.class,
+                documentCode,
+                versionLabel,
+                sectionIndex,
+                embeddingModelPort.modelVersionId()
+        );
         return count != null && count > 0;
     }
 
