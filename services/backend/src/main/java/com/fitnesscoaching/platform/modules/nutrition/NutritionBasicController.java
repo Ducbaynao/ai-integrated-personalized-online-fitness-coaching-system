@@ -46,6 +46,16 @@ public class NutritionBasicController {
         return ResponseEntity.status(201).body(nutrition.addItem(actor(jwt), day, body.toInput()));
     }
 
+    @PostMapping("/nutrition/days/{day}/catalog-items")
+    public ResponseEntity<NutritionBasicService.Day> addCatalogItem(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day,
+            @Valid @RequestBody CatalogItemRequest body) {
+        return ResponseEntity.status(201).body(nutrition.addCatalogItem(actor(jwt), day,
+                new NutritionBasicService.CatalogItemInput(body.timezone(), body.consumedAt(),
+                        body.mealType(), body.catalogFoodId(), body.expectedRevisionId(), body.portionId(),
+                        body.quantityBasis(), body.quantity(), body.commandKey())));
+    }
+
     @PostMapping("/nutrition/items/{itemId}/correct")
     public NutritionBasicService.Day correctItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID itemId,
             @Valid @RequestBody CorrectionRequest body) {
@@ -98,6 +108,11 @@ public class NutritionBasicController {
                     privateFoodId, servings, commandKey);
         }
     }
+    public record CatalogItemRequest(@NotBlank String timezone, @NotNull Instant consumedAt,
+                                     @NotBlank String mealType, @NotNull UUID catalogFoodId,
+                                     @NotNull UUID expectedRevisionId, UUID portionId,
+                                     @NotBlank String quantityBasis, @NotNull BigDecimal quantity,
+                                     @NotBlank String commandKey) {}
     public record CorrectionRequest(@NotNull Long expectedVersion, String description,
                                     UUID privateFoodId, BigDecimal servings, boolean remove,
                                     @NotBlank String commandKey) {

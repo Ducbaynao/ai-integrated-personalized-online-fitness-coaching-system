@@ -44,6 +44,8 @@ tags:
     description: Student-owned user-reported food and day logging; no strategic target or AI estimation authority.
   - name: Nutrition Strategy
     description: Student-confirmed Nutrition Goal, effective target versions, Trainer proposals and frozen daily targets.
+  - name: Nutrition Catalog
+    description: Admin-curated USDA Foundation subset, separate from Student USER_REPORTED private foods.
   - name: AI General Knowledge (F01)
     description: >-
       [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
@@ -52,6 +54,91 @@ tags:
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
+  /nutrition/catalog/foods:
+    get:
+      tags: [Nutrition Catalog]
+      operationId: listPublishedNutritionCatalogFoods
+      summary: Read the small published USDA Foundation subset; no private foods are included
+      responses:
+        '200': { description: Published foods, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionCatalogFood' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /nutrition/catalog/foods/{foodId}:
+    get:
+      tags: [Nutrition Catalog]
+      operationId: getPublishedNutritionCatalogFood
+      parameters: [{ name: foodId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Current published revision and approved portion evidence, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogFood' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /admin/nutrition/catalog/foods:
+    get:
+      tags: [Nutrition Catalog]
+      operationId: listAdminNutritionCatalogFoods
+      summary: Active ADMIN with CATALOG_MANAGE reads drafts, published and retired foods
+      responses:
+        '200': { description: Admin catalog, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionCatalogFood' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+    post:
+      tags: [Nutrition Catalog]
+      operationId: createAdminNutritionCatalogDraft
+      summary: Admin selects one pinned USDA Foundation source record into a draft
+      description: Source values are reviewed Admin input from the pinned release; no live USDA call or USER_REPORTED promotion.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogDraftRequest' } } } }
+      responses:
+        '201': { description: Draft, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogFood' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /admin/nutrition/catalog/foods/{foodId}/revisions:
+    post:
+      tags: [Nutrition Catalog]
+      operationId: reviseAdminNutritionCatalogFood
+      summary: Admin creates a new immutable revision; existing logs retain their pinned revision and nutrient facts
+      parameters: [{ name: foodId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogRevisionRequest' } } } }
+      responses:
+        '200': { description: Updated aggregate, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogFood' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /admin/nutrition/catalog/foods/{foodId}/transitions:
+    post:
+      tags: [Nutrition Catalog]
+      operationId: transitionAdminNutritionCatalogFood
+      summary: Admin publishes a draft or retires a published food, with reason and audit
+      parameters: [{ name: foodId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogTransitionRequest' } } } }
+      responses:
+        '200': { description: Updated aggregate, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogFood' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/days/{day}/catalog-items:
+    post:
+      tags: [Basic Nutrition]
+      operationId: logPublishedNutritionCatalogItem
+      summary: Student confirms one catalog item with explicit approved quantity evidence
+      description: >-
+        GRAM uses the per-100g source basis. SERVING needs approved gramsPerServing;
+        MILLILITRE needs separately evidenced gramsPerMl. No intermediate rounding or
+        silent conversion. A revision change or absent factor conflicts; meal nutrient
+        snapshots remain unchanged by later catalog revisions.
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogItemRequest' } } } }
+      responses:
+        '201': { description: Day with real persisted item and actual nutrient facts, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionDay' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
   /nutrition/strategy/goal-types:
     get:
       tags: [Nutrition Strategy]
@@ -154,6 +241,46 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/NutritionForbidden' }
         '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/strategy/days/{day}/frozen-target-corrections:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listMyFrozenNutritionTargetCorrections
+      summary: Student reads append-only corrections to one frozen target day
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      responses:
+        '200': { description: Correction history, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionFrozenTargetCorrection' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+    post:
+      tags: [Nutrition Strategy]
+      operationId: correctMyFrozenNutritionTarget
+      summary: Student corrects one nutrient of one frozen day without rewriting original target or actual intake
+      description: >-
+        expectedVersion is zero before the first correction and increments per day/nutrient.
+        Same actor commandKey and identical payload replay one effect. The original frozen target
+        and Food Log remain untouched; no fixed age window applies. A missing frozen provenance
+        or a stale token conflicts. Reason and before/after history are mandatory.
+      parameters: [{ name: day, in: path, required: true, schema: { type: string, format: date } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionFrozenTargetCorrectionRequest' } } } }
+      responses:
+        '200': { description: Target day with corrected current values and original values, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionTargetDay' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /students/{studentId}/nutrition/strategy/days/{day}/frozen-target-corrections:
+    get:
+      tags: [Nutrition Strategy]
+      operationId: listTrainerVisibleFrozenNutritionTargetCorrections
+      summary: Current NUTRITION_GOAL VIEW Trainer reads correction history only
+      parameters:
+        - { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: day, in: path, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Authorized history, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NutritionFrozenTargetCorrection' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
   /nutrition/strategy/proposals/me:
     get:
       tags: [Nutrition Strategy]
@@ -3896,18 +4023,47 @@ components:
         reason: { type: string, minLength: 1, maxLength: 1000 }
         expectedOverrideVersion: { type: [integer, 'null'], format: int64, minimum: 0, description: Null creates; a number corrects the same version-bound override. }
         commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionFrozenTargetCorrectionRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, nutrientId, targetAmount, expectedVersion, reason, commandKey]
+      properties:
+        timezone: { type: string, description: Exact frozen IANA timezone, never inferred from device. }
+        nutrientId: { type: integer, minimum: 1 }
+        targetAmount: { type: number, minimum: 0, multipleOf: 0.000001 }
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionFrozenTargetCorrection:
+      type: object
+      additionalProperties: false
+      required: [id, date, nutrientId, unitId, version, originalAmount, beforeAmount, afterAmount, reason, actorId, correctedAt]
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        nutrientId: { type: integer }
+        unitId: { type: integer }
+        version: { type: integer, format: int64 }
+        originalAmount: { type: number }
+        beforeAmount: { type: number }
+        afterAmount: { type: number }
+        reason: { type: string }
+        actorId: { type: string, format: uuid }
+        correctedAt: { type: string, format: date-time }
     NutritionResolvedTarget:
       type: object
       additionalProperties: false
-      required: [nutrientId, unitId, targetAmount, source, sourceTargetId, sourceOverrideId, overrideVersion]
+      required: [nutrientId, unitId, targetAmount, source, sourceTargetId, sourceOverrideId, overrideVersion, originalTargetAmount, correctionVersion]
       properties:
         nutrientId: { type: integer }
         unitId: { type: integer }
         targetAmount: { type: number }
-        source: { type: string, enum: [OVERRIDE, DAY_TYPE, DEFAULT] }
+        source: { type: string, enum: [OVERRIDE, DAY_TYPE, DEFAULT, CORRECTED] }
         sourceTargetId: { type: [string, 'null'], format: uuid }
         sourceOverrideId: { type: [string, 'null'], format: uuid }
         overrideVersion: { type: [integer, 'null'], format: int64, description: Current override token when source is OVERRIDE and day is not frozen; null for frozen/history or non-overrides. }
+        originalTargetAmount: { type: [number, 'null'], description: Immutable frozen amount; null before freezing. }
+        correctionVersion: { type: [integer, 'null'], format: int64, description: Zero for an uncorrected frozen target; null for an unfrozen preview. }
     NutritionTargetDay:
       type: object
       additionalProperties: false
@@ -3951,6 +4107,97 @@ components:
       properties:
         decision: { type: string, enum: [ACCEPT, REJECT] }
         expectedProposalVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionCatalogPortionInput:
+      type: object
+      additionalProperties: false
+      required: [label, gramsPerServing, gramsPerMl, factorSource, mlFactorSource]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 100 }
+        gramsPerServing: { type: [number, 'null'], exclusiveMinimum: 0, description: Approved grams per one named serving; null means no serving conversion. }
+        gramsPerMl: { type: [number, 'null'], exclusiveMinimum: 0, description: Separately evidenced density; null means volume conversion unknown. }
+        factorSource: { type: [string, 'null'], description: Required provenance for gramsPerServing. }
+        mlFactorSource: { type: [string, 'null'], description: Separate required provenance for gramsPerMl; serving evidence cannot stand in for volume density. }
+    NutritionCatalogRevisionInput:
+      type: object
+      additionalProperties: false
+      required: [name, energyKcalPer100g, proteinGPer100g, carbohydrateGPer100g, fatGPer100g, sourceRecordVersion, sourceUrl, portions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        energyKcalPer100g: { type: [number, 'null'], minimum: 0 }
+        proteinGPer100g: { type: [number, 'null'], minimum: 0 }
+        carbohydrateGPer100g: { type: [number, 'null'], minimum: 0 }
+        fatGPer100g: { type: [number, 'null'], minimum: 0 }
+        sourceRecordVersion: { type: string, minLength: 1 }
+        sourceUrl: { type: string, format: uri, description: USDA FoodData Central record URL with matching FDC ID. }
+        portions: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/NutritionCatalogPortionInput' } }
+    NutritionCatalogDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [fdcId, sourceRelease, sourceDate, revision, commandKey]
+      properties:
+        fdcId: { type: integer, format: int64, minimum: 1 }
+        sourceRelease: { type: string, minLength: 1 }
+        sourceDate: { type: string, format: date }
+        revision: { $ref: '#/components/schemas/NutritionCatalogRevisionInput' }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionCatalogRevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, revision, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        revision: { $ref: '#/components/schemas/NutritionCatalogRevisionInput' }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionCatalogTransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, action, reason, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        action: { type: string, enum: [PUBLISH, RETIRE] }
+        reason: { type: string, minLength: 1 }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    NutritionCatalogPortion:
+      allOf:
+        - { $ref: '#/components/schemas/NutritionCatalogPortionInput' }
+        - { type: object, required: [id], properties: { id: { type: string, format: uuid } } }
+    NutritionCatalogFood:
+      type: object
+      additionalProperties: false
+      required: [id, fdcId, dataType, sourceName, sourceRelease, sourceDate, status, aggregateVersion, revisionId, revisionNumber, name, energyKcalPer100g, proteinGPer100g, carbohydrateGPer100g, fatGPer100g, sourceRecordVersion, sourceUrl, portions]
+      properties:
+        id: { type: string, format: uuid }
+        fdcId: { type: integer, format: int64 }
+        dataType: { type: string, enum: [Foundation] }
+        sourceName: { type: string }
+        sourceRelease: { type: string }
+        sourceDate: { type: string, format: date }
+        status: { type: string, enum: [DRAFT, PUBLISHED, RETIRED] }
+        aggregateVersion: { type: integer, format: int64 }
+        revisionId: { type: string, format: uuid }
+        revisionNumber: { type: integer }
+        name: { type: string }
+        energyKcalPer100g: { type: [number, 'null'] }
+        proteinGPer100g: { type: [number, 'null'] }
+        carbohydrateGPer100g: { type: [number, 'null'] }
+        fatGPer100g: { type: [number, 'null'] }
+        sourceRecordVersion: { type: string }
+        sourceUrl: { type: string, format: uri }
+        portions: { type: array, items: { $ref: '#/components/schemas/NutritionCatalogPortion' } }
+    NutritionCatalogItemRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, consumedAt, mealType, catalogFoodId, expectedRevisionId, portionId, quantityBasis, quantity, commandKey]
+      properties:
+        timezone: { type: string, description: Student-confirmed IANA timezone. }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        catalogFoodId: { type: string, format: uuid }
+        expectedRevisionId: { type: string, format: uuid }
+        portionId: { type: [string, 'null'], format: uuid }
+        quantityBasis: { type: string, enum: [SERVING, GRAM, MILLILITRE] }
+        quantity: { type: number, exclusiveMinimum: 0 }
         commandKey: { type: string, minLength: 1, maxLength: 120 }
     NutritionFoodRequest:
       type: object
@@ -4041,11 +4288,11 @@ components:
     NutritionItem:
       type: object
       additionalProperties: false
-      required: [id, mealId, kind, name, privateFoodId, servings, servingLabel, consumedAt, version, removed, nutrients]
+      required: [id, mealId, kind, name, privateFoodId, servings, servingLabel, consumedAt, version, removed, nutrients, catalogRevisionId, catalogPortionId, quantityBasis]
       properties:
         id: { type: string, format: uuid }
         mealId: { type: string, format: uuid }
-        kind: { type: string, enum: [LEGACY, PRIVATE_SERVING, DESCRIPTION_ONLY] }
+        kind: { type: string, enum: [LEGACY, PRIVATE_SERVING, DESCRIPTION_ONLY, CATALOG_QUANTIFIED] }
         name: { type: string }
         privateFoodId: { type: [string, 'null'], format: uuid }
         servings: { type: [number, 'null'] }
@@ -4054,6 +4301,9 @@ components:
         version: { type: integer, format: int64 }
         removed: { type: boolean }
         nutrients: { type: array, items: { $ref: '#/components/schemas/NutritionNutrient' } }
+        catalogRevisionId: { type: [string, 'null'], format: uuid, description: Immutable source revision pinned at logging; null on V39/legacy items. }
+        catalogPortionId: { type: [string, 'null'], format: uuid }
+        quantityBasis: { type: [string, 'null'], enum: [SERVING, GRAM, MILLILITRE, null] }
     NutritionDay:
       type: object
       additionalProperties: false

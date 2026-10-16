@@ -49,4 +49,17 @@ describe('B07 nutrition strategy contract', () => {
     expect(request).toHaveBeenNthCalledWith(2, '/students/student-id/nutrition/strategy');
     expect(request).toHaveBeenNthCalledWith(3, '/nutrition/strategy/days/2026-10-18?timezone=Asia%2FHo_Chi_Minh');
   });
+
+  it('sends frozen target correction separately from Food Log actual and exposes history reads', async () => {
+    const correction = { timezone: 'Asia/Ho_Chi_Minh', nutrientId: 41, targetAmount: 1800,
+      expectedVersion: 2, reason: 'Student reviewed target', commandKey: 'correction-command' };
+    await nutritionApi.correctFrozenTarget('2026-10-16', correction);
+    await nutritionApi.frozenCorrections('2026-10-16');
+    await nutritionApi.trainerFrozenCorrections('student-id', '2026-10-16');
+    expect(request).toHaveBeenNthCalledWith(1, '/nutrition/strategy/days/2026-10-16/frozen-target-corrections',
+      { method: 'POST', body: correction });
+    expect(request).toHaveBeenNthCalledWith(2, '/nutrition/strategy/days/2026-10-16/frozen-target-corrections');
+    expect(request).toHaveBeenNthCalledWith(3,
+      '/students/student-id/nutrition/strategy/days/2026-10-16/frozen-target-corrections');
+  });
 });

@@ -72,6 +72,28 @@ public class NutritionStrategyController {
                 body.targetAmount(), body.reason(), body.expectedOverrideVersion(), body.commandKey()));
     }
 
+    @PostMapping("/nutrition/strategy/days/{day}/frozen-target-corrections")
+    public NutritionTargetDayService.TargetDay correctFrozenTarget(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day,
+            @Valid @RequestBody FrozenCorrectionRequest body) {
+        return days.correctFrozen(actor(jwt), day, new NutritionTargetDayService.FrozenCorrectionInput(
+                body.timezone(), body.nutrientId(), body.targetAmount(), body.expectedVersion(),
+                body.reason(), body.commandKey()));
+    }
+
+    @GetMapping("/nutrition/strategy/days/{day}/frozen-target-corrections")
+    public List<NutritionTargetDayService.FrozenCorrection> correctionHistory(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        return days.correctionHistory(actor(jwt), actor(jwt), day);
+    }
+
+    @GetMapping("/students/{studentId}/nutrition/strategy/days/{day}/frozen-target-corrections")
+    public List<NutritionTargetDayService.FrozenCorrection> trainerCorrectionHistory(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID studentId,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        return days.correctionHistory(actor(jwt), studentId, day);
+    }
+
     @GetMapping("/nutrition/strategy/proposals/me")
     public List<NutritionStrategyService.Proposal> myProposals(@AuthenticationPrincipal Jwt jwt) {
         return strategy.proposalsMine(actor(jwt));
@@ -129,6 +151,9 @@ public class NutritionStrategyController {
                                   @NotNull Integer nutrientId, @NotNull Integer unitId,
                                   @NotNull BigDecimal targetAmount, @NotBlank String reason,
                                   Long expectedOverrideVersion, @NotBlank String commandKey) {}
+    public record FrozenCorrectionRequest(@NotBlank String timezone, @NotNull Integer nutrientId,
+                                          @NotNull BigDecimal targetAmount, @NotNull Long expectedVersion,
+                                          @NotBlank String reason, @NotBlank String commandKey) {}
     public record DecisionRequest(@NotBlank String decision, @NotNull Long expectedProposalVersion,
                                   @NotBlank String commandKey) {}
 }

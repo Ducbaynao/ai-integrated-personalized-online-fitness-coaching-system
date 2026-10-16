@@ -6,10 +6,23 @@ export type PrivateFood = {
   energyKcal: number | null; proteinG: number | null; carbohydrateG: number | null; fatG: number | null; version: number;
 };
 export type NutritionItem = {
-  id: string; mealId: string; kind: 'LEGACY' | 'PRIVATE_SERVING' | 'DESCRIPTION_ONLY'; name: string;
+  id: string; mealId: string; kind: 'LEGACY' | 'PRIVATE_SERVING' | 'DESCRIPTION_ONLY' | 'CATALOG_QUANTIFIED'; name: string;
   privateFoodId: string | null; servings: number | null; servingLabel: string | null;
   consumedAt: string; version: number; removed: boolean; nutrients: Nutrient[];
+  catalogRevisionId: string | null; catalogPortionId: string | null;
+  quantityBasis: 'SERVING' | 'GRAM' | 'MILLILITRE' | null;
 };
+export type CatalogPortion = { id: string; label: string; gramsPerServing: number | null;
+  gramsPerMl: number | null; factorSource: string | null; mlFactorSource: string | null };
+export type CatalogFood = { id: string; fdcId: number; dataType: 'Foundation'; sourceName: string;
+  sourceRelease: string; sourceDate: string; status: 'DRAFT' | 'PUBLISHED' | 'RETIRED';
+  aggregateVersion: number; revisionId: string; revisionNumber: number; name: string;
+  energyKcalPer100g: number | null; proteinGPer100g: number | null;
+  carbohydrateGPer100g: number | null; fatGPer100g: number | null;
+  sourceRecordVersion: string; sourceUrl: string; portions: CatalogPortion[] };
+export type CatalogItemBody = { timezone: string; consumedAt: string; mealType: ItemBody['mealType'];
+  catalogFoodId: string; expectedRevisionId: string; portionId: string | null;
+  quantityBasis: 'SERVING' | 'GRAM' | 'MILLILITRE'; quantity: number; commandKey: string };
 export type NutritionDay = {
   studentId: string; date: string; timezone: string | null; completeness: 'NOT_LOGGED' | 'PARTIAL' | 'COMPLETE';
   version: number; noIntakeConfirmed: boolean; nutrients: Nutrient[]; items: NutritionItem[];
@@ -39,16 +52,22 @@ export type NutritionStrategyProposal = { id: string; studentId: string; trainer
   targets: NutritionTargetSpec[]; createdAt: string; decidedAt: string | null; decidedGoalId: string | null; decidedGoalVersionId: string | null };
 export type NutritionStrategyState = { goal: NutritionStrategyGoal | null; proposals: NutritionStrategyProposal[] };
 export type NutritionResolvedTarget = { nutrientId: number; unitId: number; targetAmount: number;
-  source: 'OVERRIDE' | 'DAY_TYPE' | 'DEFAULT'; sourceTargetId: string | null; sourceOverrideId: string | null;
-  overrideVersion: number | null };
+  source: 'OVERRIDE' | 'DAY_TYPE' | 'DEFAULT' | 'CORRECTED'; sourceTargetId: string | null; sourceOverrideId: string | null;
+  overrideVersion: number | null; originalTargetAmount: number | null; correctionVersion: number | null };
 export type NutritionTargetDay = { date: string; timezone: string; frozen: boolean;
   dayType: 'DEFAULT' | 'TRAINING_DAY' | 'REST_DAY'; goalVersionId: string | null; targets: NutritionResolvedTarget[] };
+export type FrozenTargetCorrection = { id: string; date: string; nutrientId: number; unitId: number;
+  version: number; originalAmount: number; beforeAmount: number; afterAmount: number;
+  reason: string; actorId: string; correctedAt: string };
 export type NutritionChangeBody = { kind: 'NEW_GOAL' | 'CHANGE_TARGET'; goalId: string | null;
   expectedGoalVersion: number | null; baseVersionId: string | null; title: string; goalTypeId: number;
   timezone: string; effectiveFrom: string; targets: NutritionTargetSpec[]; reason: string | null;
   confirmed: boolean; commandKey: string };
 
 export const nutritionApi = {
+  catalogFoods: () => request<CatalogFood[]>('/nutrition/catalog/foods'),
+  catalogFood: (id: string) => request<CatalogFood>(`/nutrition/catalog/foods/${id}`),
+  addCatalogItem: (day: string, body: CatalogItemBody) => request<NutritionDay>(`/nutrition/days/${day}/catalog-items`, { method: 'POST', body }),
   foods: () => request<PrivateFood[]>('/nutrition/private-foods'),
   createFood: (body: FoodBody) => request<PrivateFood>('/nutrition/private-foods', { method: 'POST', body }),
   updateFood: (id: string, body: FoodBody) => request<PrivateFood>(`/nutrition/private-foods/${id}`, { method: 'PUT', body }),
@@ -67,6 +86,12 @@ export const nutritionApi = {
   transitionGoal: (goalId: string, body: { action: 'PAUSE' | 'RESUME' | 'END'; expectedGoalVersion: number; reason: string; commandKey: string }) =>
     request<NutritionStrategyGoal>(`/nutrition/strategy/goals/${goalId}/transitions`, { method: 'POST', body }),
   targetDay: (day: string, timezone: string) => request<NutritionTargetDay>(`/nutrition/strategy/days/${day}?timezone=${encodeURIComponent(timezone)}`),
+  frozenCorrections: (day: string) => request<FrozenTargetCorrection[]>(`/nutrition/strategy/days/${day}/frozen-target-corrections`),
+  trainerFrozenCorrections: (studentId: string, day: string) => request<FrozenTargetCorrection[]>(
+    `/students/${studentId}/nutrition/strategy/days/${day}/frozen-target-corrections`),
+  correctFrozenTarget: (day: string, body: { timezone: string; nutrientId: number; targetAmount: number;
+    expectedVersion: number; reason: string; commandKey: string }) => request<NutritionTargetDay>(
+      `/nutrition/strategy/days/${day}/frozen-target-corrections`, { method: 'POST', body }),
   chooseDayType: (day: string, body: { timezone: string; dayType: 'REST_DAY' | 'DEFAULT'; commandKey: string }) =>
     request<NutritionTargetDay>(`/nutrition/strategy/days/${day}/day-type`, { method: 'POST', body }),
   overrideTarget: (day: string, body: { timezone: string; goalVersionId: string; nutrientId: number; unitId: number;

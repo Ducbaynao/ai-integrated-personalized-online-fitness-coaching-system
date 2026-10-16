@@ -19,6 +19,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -66,6 +68,142 @@ class NutritionStrategyIntegrationTest {
     @Autowired CoachingSharingUseCase sharing;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired ObjectMapper json;
+
+    @Test void httpStudentBasicAndStrategyJourneyKeepsUnknownActualSeparateFromZeroTarget() throws Exception {
+        UUID student = student();
+        LocalDate day = today().plusDays(2);
+        String key = UUID.randomUUID().toString();
+        String dayPath = "/api/v1/nutrition/days/" + day;
+
+        JsonNode empty = response(mvc.perform(get(dayPath).param("timezone", "Etc/UTC")
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completeness").value("NOT_LOGGED"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(nutrient(empty, "B07_ENERGY_KCAL").get("total").isNull()).isTrue();
+
+        String goalBody = """
+                {"kind":"NEW_GOAL","title":"Nutrition goal","goalTypeId":%d,
+                 "timezone":"Etc/UTC","effectiveFrom":"%s","confirmed":true,
+                 "commandKey":"goal-%s","targets":[{"nutrientId":%d,"unitId":%d,
+                 "dayType":"DEFAULT","targetAmount":0}]}
+                """.formatted(goalType(), day, key, energy(), kcal());
+        mvc.perform(post("/api/v1/nutrition/strategy/goals")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(goalBody)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.nutrition_target_day_snapshots WHERE student_id=?",
+                Integer.class, student)).isZero();
+        mvc.perform(get("/api/v1/nutrition/strategy/days/{day}", day)
+                .param("timezone", "Etc/UTC").with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.frozen").value(false))
+                .andExpect(jsonPath("$.targets[0].targetAmount").value(0));
+
+        String foodBody = """
+                {"name":"User food","servingLabel":"serving","proteinG":0,"commandKey":"food-%s"}
+                """.formatted(key);
+        JsonNode food = response(mvc.perform(post("/api/v1/nutrition/private-foods")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(foodBody))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.source").value("USER_REPORTED"))
+                .andReturn().getResponse().getContentAsString());
+        String itemBody = """
+                {"timezone":"Etc/UTC","consumedAt":"%s","mealType":"LUNCH",
+                 "privateFoodId":"%s","servings":1.5,"commandKey":"item-%s"}
+                """.formatted(day.atTime(12, 0).toInstant(ZoneOffset.UTC), food.get("id").asText(), key);
+        JsonNode logged = response(mvc.perform(post(dayPath + "/items")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(itemBody))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.completeness").value("PARTIAL"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(nutrient(logged, "B07_ENERGY_KCAL").get("total").isNull()).isTrue();
+        assertThat(nutrient(logged, "B07_PROTEIN_G").get("total").decimalValue())
+                .isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(logged.get("items").size()).isEqualTo(1);
+        mvc.perform(get("/api/v1/nutrition/strategy/days/{day}", day)
+                .param("timezone", "Etc/UTC").with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.frozen").value(true))
+                .andExpect(jsonPath("$.targets[0].targetAmount").value(0));
+        mvc.perform(post(dayPath + "/items")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(itemBody))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(post(dayPath + "/items")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(itemBody.replace("1.5", "2")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("NUTRITION_IDEMPOTENCY_CONFLICT"));
+        mvc.perform(get(dayPath).param("timezone", "Asia/Bangkok")
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("NUTRITION_TIMEZONE_CONFLICT"));
+    }
+
+    private JsonNode response(String body) { return json.readTree(body); }
+    private JsonNode nutrient(JsonNode day, String code) {
+        for (JsonNode value : day.get("nutrients")) if (code.equals(value.get("code").asText())) return value;
+        throw new AssertionError("Missing nutrient " + code);
+    }
+
+    @Test void httpTrainerViewContributeAndStudentDecisionsRecheckLiveAuthority() throws Exception {
+        UUID student = student(), trainer = trainer();
+        Goal goal = strategy.confirmChange(student, change("NEW_GOAL", null, null, null,
+                today().plusDays(1), "http-initial-" + student, targets("2000", "100")));
+        var pending = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
+        var active = lifecycle.relationshipAction(trainer, pending.relationship().id(), "ACCEPT",
+                0, null, UUID.randomUUID());
+        var grant = sharing.grantOrReplace(student, active.relationship().id(), DataScope.NUTRITION_GOAL,
+                SharingDecision.ALLOW, DataAccessLevel.VIEW, Instant.parse("2026-01-01T00:00:00Z"),
+                null, null, null, UUID.randomUUID());
+        String trainerPath = "/api/v1/students/" + student + "/nutrition/strategy";
+        mvc.perform(get(trainerPath).with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.goal.id").value(goal.id().toString()));
+
+        String body = """
+                {"kind":"CHANGE_TARGET","goalId":"%s","expectedGoalVersion":%d,
+                 "baseVersionId":"%s","title":"New target","goalTypeId":%d,
+                 "timezone":"Etc/UTC","effectiveFrom":"%s","confirmed":false,
+                 "reason":"Trainer recommendation","commandKey":"trainer-%s",
+                 "targets":[{"nutrientId":%d,"unitId":%d,"dayType":"DEFAULT","targetAmount":1800}]}
+                """.formatted(goal.id(), goal.aggregateVersion(), goal.versions().getFirst().id(),
+                goalType(), today().plusDays(3), trainer, energy(), kcal());
+        mvc.perform(post(trainerPath + "/proposals")
+                .with(jwt().jwt(j -> j.subject(trainer.toString())))
+                .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("NUTRITION_PROPOSAL_NOT_FOUND"));
+
+        var contribute = sharing.grantOrReplace(student, active.relationship().id(), DataScope.NUTRITION_GOAL,
+                SharingDecision.ALLOW, DataAccessLevel.CONTRIBUTE, Instant.parse("2026-01-01T00:00:00Z"),
+                null, null, grant.version(), UUID.randomUUID());
+        JsonNode proposal = response(mvc.perform(post(trainerPath + "/proposals")
+                .with(jwt().jwt(j -> j.subject(trainer.toString())))
+                .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"))
+                .andReturn().getResponse().getContentAsString());
+        String proposalId = proposal.get("id").asText();
+        String decisionPath = "/api/v1/nutrition/strategy/proposals/" + proposalId + "/decisions";
+        String accept = """
+                {"decision":"ACCEPT","expectedProposalVersion":0,"commandKey":"accept-%s"}
+                """.formatted(student);
+        mvc.perform(post(decisionPath).with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(accept))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
+        mvc.perform(post(decisionPath).with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(APPLICATION_JSON).content(accept))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
+        assertThat(strategy.mine(student).goal().versions()).hasSize(2);
+
+        sharing.revoke(student, active.relationship().id(), contribute.id(), contribute.version(),
+                "Stop sharing", UUID.randomUUID());
+        mvc.perform(get(trainerPath).with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/nutrition/strategy/proposals/{proposalId}", proposalId)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/nutrition/strategy/proposals/{proposalId}", proposalId)
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
 
     @Test void studentPublishesVersionAndFirstLogFreezesTargetWithoutChangingActual() throws Exception {
         UUID student = student();
@@ -248,6 +386,40 @@ class NutritionStrategyIntegrationTest {
         days.chooseDayType(student, day, new NutritionTargetDayService.DayTypeInput("Etc/UTC", "REST_DAY", "rest-" + student));
         assertThat(days.preview(student, day, "Etc/UTC").dayType()).isEqualTo("REST_DAY");
         assertThat(goal.versions()).hasSize(1);
+    }
+
+    @Test void frozenCorrectionIsAppendOnlyReplayableAndNeverRewritesActual() throws Exception {
+        UUID student = student();
+        LocalDate day = today().plusDays(2);
+        strategy.confirmChange(student, change("NEW_GOAL", null, null, null,
+                day, "correction-goal-" + student, targets("2000", "100")));
+        var food = basic.createFood(student, new NutritionBasicService.FoodInput("Oats", "bowl",
+                new BigDecimal("100"), null, null, null, null, "correction-food-" + student));
+        basic.addItem(student, day, new NutritionBasicService.ItemInput("Etc/UTC",
+                day.atTime(12, 0).toInstant(ZoneOffset.UTC), "LUNCH", null,
+                food.id(), BigDecimal.ONE, "correction-log-" + student));
+        var input = new NutritionTargetDayService.FrozenCorrectionInput("Etc/UTC", energy(),
+                new BigDecimal("1800"), 0, "Clinical review", "target-correction-" + student);
+        var corrected = days.correctFrozen(student, day, input);
+        assertThat(corrected.targets().getFirst().originalTargetAmount()).isEqualByComparingTo("2000");
+        assertThat(corrected.targets().getFirst().targetAmount()).isEqualByComparingTo("1800");
+        assertThat(corrected.targets().getFirst().correctionVersion()).isEqualTo(1);
+        assertThat(days.correctFrozen(student, day, input).targets().getFirst().targetAmount())
+                .isEqualByComparingTo("1800");
+        assertThat(basic.readMine(student, day, "Etc/UTC").nutrients().getFirst().total())
+                .isEqualByComparingTo("100");
+        assertThat(jdbc.queryForObject("SELECT target_amount FROM fitness.resolved_daily_nutrition_targets "
+                + "WHERE student_id=? AND target_date=? AND nutrient_id=?", BigDecimal.class,
+                student, day, energy())).isEqualByComparingTo("2000");
+        assertThat(days.correctionHistory(student, student, day)).hasSize(1);
+        assertThatThrownBy(() -> days.correctFrozen(student, day,
+                new NutritionTargetDayService.FrozenCorrectionInput("Etc/UTC", energy(),
+                        new BigDecimal("1700"), 0, "Other", "target-correction-other-" + student)))
+                .isInstanceOf(NutritionFailure.class).extracting("code").isEqualTo("NUTRITION_VERSION_STALE");
+        mvc.perform(get("/api/v1/nutrition/strategy/days/{day}/frozen-target-corrections", day)
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].beforeAmount").value(2000))
+                .andExpect(jsonPath("$[0].afterAmount").value(1800));
     }
 
     @Test void explicitRestChoiceDoesNotSilentlyMoveToANewCalendarTimezone() {

@@ -14,6 +14,7 @@ jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('@/services/coachingApi', () => ({ createCommandKey: jest.fn() }));
 jest.mock('@/features/nutrition/nutritionApi', () => ({ nutritionApi: {
   foods: jest.fn(), day: jest.fn(), trainerDay: jest.fn(), createFood: jest.fn(), addItem: jest.fn(),
+  catalogFoods: jest.fn(), addCatalogItem: jest.fn(),
   correct: jest.fn(), confirm: jest.fn(), updateFood: jest.fn(), corrections: jest.fn(),
 } }));
 
@@ -40,7 +41,7 @@ describe('B07 nutrition screens', () => {
       capabilities: { hasStudentProfile: true } }, activeCapability: 'STUDENT' });
     (useQueryClient as jest.Mock).mockReturnValue({ invalidateQueries: refresh, removeQueries: jest.fn() });
     (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
-      data: queryKey.includes('foods') ? [{ id: 'food-1', name: 'Oats', servingLabel: 'bowl', source: 'USER_REPORTED', quantificationStatus: 'LOGGABLE' }] : day,
+      data: queryKey.includes('nutrition-catalog') ? [] : queryKey.includes('foods') ? [{ id: 'food-1', name: 'Oats', servingLabel: 'bowl', source: 'USER_REPORTED', quantificationStatus: 'LOGGABLE' }] : day,
       isPending: false, isFetching: false, isError: false, error: null, refetch: jest.fn(),
     }));
     (createCommandKey as jest.Mock).mockReturnValue('same-key');
@@ -70,7 +71,7 @@ describe('B07 nutrition screens', () => {
 
   it('keeps all-unknown private food as draft and edits it before serving selection', async () => {
     (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
-      data: queryKey.includes('foods') ? [{ id: 'draft-1', name: 'Soup', servingLabel: 'bowl',
+      data: queryKey.includes('nutrition-catalog') ? [] : queryKey.includes('foods') ? [{ id: 'draft-1', name: 'Soup', servingLabel: 'bowl',
         source: 'USER_REPORTED', quantificationStatus: 'DRAFT', version: 2,
         energyKcal: null, proteinG: null, carbohydrateG: null, fatG: null }] : day,
       isPending: false, isFetching: false, isError: false, error: null, refetch: jest.fn(),
@@ -117,6 +118,39 @@ describe('B07 nutrition screens', () => {
     expect(refresh).toHaveBeenCalled();
     expect(JSON.stringify(tree.toJSON())).toContain('Hãy xem lại rồi xác nhận thao tác mới');
     expect(tree.root.findAll((node) => node.props.label === 'Thử lại cùng lệnh')).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('only enables evidenced catalog units and sends the pinned revision with a stable retry key', async () => {
+    const catalogFood = { id: 'catalog-food', fdcId: 12345, name: 'Foundation oats',
+      sourceName: 'USDA FoodData Central', sourceRelease: 'Foundation 2026-10',
+      revisionNumber: 1, revisionId: 'revision-id', status: 'PUBLISHED',
+      portions: [{ id: 'portion-id', label: 'cup', gramsPerServing: 40,
+        gramsPerMl: null, factorSource: 'USDA portion weight', mlFactorSource: null }] };
+    (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
+      data: queryKey.includes('nutrition-catalog') ? [catalogFood]
+        : queryKey.includes('foods') ? [] : day,
+      isPending: false, isFetching: false, isError: false, error: null, refetch: jest.fn(),
+    }));
+    (nutritionApi.addCatalogItem as jest.Mock).mockRejectedValueOnce(new Error('uncertain network'))
+      .mockResolvedValueOnce(day);
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<NutritionScreen />); });
+    input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
+    renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn Foundation oats, USDA FDC 12345' }).props.onPress());
+    expect(tree.root.findByProps({ accessibilityLabel: 'Đơn vị MILLILITRE' }).props.disabled).toBe(true);
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Đơn vị SERVING' }).props.onPress());
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Portion cup, nguồn USDA portion weight' }).props.onPress());
+    input(tree, 'Số lượng theo đơn vị đã chọn', '1.25');
+    await renderer.act(async () => { press(tree, 'Ghi thực phẩm catalog'); });
+    expect(nutritionApi.addCatalogItem).toHaveBeenCalledWith('2026-10-13',
+      expect.objectContaining({ catalogFoodId: 'catalog-food', expectedRevisionId: 'revision-id',
+        portionId: 'portion-id', quantityBasis: 'SERVING', quantity: 1.25,
+        commandKey: 'same-key' }));
+    await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
+    expect((nutritionApi.addCatalogItem as jest.Mock).mock.calls[1])
+      .toEqual((nutritionApi.addCatalogItem as jest.Mock).mock.calls[0]);
     renderer.act(() => tree.unmount());
   });
 

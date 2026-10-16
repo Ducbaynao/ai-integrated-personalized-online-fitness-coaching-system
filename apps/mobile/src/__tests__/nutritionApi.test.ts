@@ -49,4 +49,19 @@ describe('B07 basic nutrition contract', () => {
     expect(request).toHaveBeenNthCalledWith(1, '/nutrition/days/2026-10-13?timezone=Asia%2FHo_Chi_Minh');
     expect(request).toHaveBeenNthCalledWith(2, '/students/student-id/nutrition/days/2026-10-13?timezone=Asia%2FHo_Chi_Minh');
   });
+
+  it('logs a pinned catalog revision with explicit portion and preserves retry payload', async () => {
+    const body = { timezone: 'Asia/Ho_Chi_Minh', consumedAt: '2026-10-16T12:00:00Z',
+      mealType: 'LUNCH' as const, catalogFoodId: 'food-id', expectedRevisionId: 'revision-id',
+      portionId: 'portion-id', quantityBasis: 'SERVING' as const, quantity: 1.25,
+      commandKey: 'catalog-command' };
+    await nutritionApi.catalogFoods();
+    await nutritionApi.addCatalogItem('2026-10-16', body);
+    await nutritionApi.addCatalogItem('2026-10-16', body);
+    expect(request).toHaveBeenNthCalledWith(1, '/nutrition/catalog/foods');
+    expect(request).toHaveBeenNthCalledWith(2, '/nutrition/days/2026-10-16/catalog-items',
+      { method: 'POST', body });
+    expect(request).toHaveBeenNthCalledWith(3, '/nutrition/days/2026-10-16/catalog-items',
+      { method: 'POST', body });
+  });
 });
