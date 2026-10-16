@@ -18,7 +18,9 @@ type Command =
   | { kind: 'decision'; proposalId: string; body: { decision: 'ACCEPT' | 'REJECT'; expectedProposalVersion: number; commandKey: string } }
   | { kind: 'dayType'; day: string; body: { timezone: string; dayType: 'REST_DAY' | 'DEFAULT'; commandKey: string } }
   | { kind: 'override'; day: string; body: { timezone: string; goalVersionId: string; nutrientId: number; unitId: number;
-      targetAmount: number; reason: string; expectedOverrideVersion: number | null; commandKey: string } };
+      targetAmount: number; reason: string; expectedOverrideVersion: number | null; commandKey: string } }
+  | { kind: 'frozenCorrection'; day: string; body: { timezone: string; nutrientId: number;
+      targetAmount: number; expectedVersion: number; reason: string; commandKey: string } };
 
 const dayTypes = ['DEFAULT', 'TRAINING_DAY', 'REST_DAY'] as const;
 const dayTypeLabel: Record<string, string> = { DEFAULT: 'Ngày mặc định', TRAINING_DAY: 'Ngày tập', REST_DAY: 'Ngày nghỉ đã chọn' };
@@ -68,6 +70,10 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
   const [overrideNutrientId, setOverrideNutrientId] = useState<number | null>(null);
   const [overrideAmount, setOverrideAmount] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+  const [correctionNutrientId, setCorrectionNutrientId] = useState<number | null>(null);
+  const [correctionAmount, setCorrectionAmount] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [confirmCorrection, setConfirmCorrection] = useState(false);
   const [decision, setDecision] = useState<{ proposal: NutritionStrategyProposal; action: 'ACCEPT' | 'REJECT' } | null>(null);
   const [transition, setTransition] = useState<'PAUSE' | 'RESUME' | 'END' | null>(null);
 
@@ -90,10 +96,19 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
   const validDay = moment(day, 'YYYY-MM-DD', true).isValid() && Boolean(moment.tz.zone(timezone)) && dayConfirmed;
   const dayQuery = useQuery({ queryKey: strategyKeys.day(actor, day, timezone), queryFn: () => nutritionApi.targetDay(day, timezone),
     enabled: Boolean(!trainer && actor && validDay), retry: false });
+  const correctionHistoryQuery = useQuery({ queryKey: ['nutrition-strategy', actor, 'frozen-corrections', studentId ?? actor, day],
+    queryFn: () => trainer ? nutritionApi.trainerFrozenCorrections(studentId!, day) : nutritionApi.frozenCorrections(day),
+    enabled: Boolean(actor && validDay && (!trainer || (activeCapability === 'TRAINER' && studentId))), retry: false });
+  useEffect(() => {
+    if (trainer && correctionHistoryQuery.error instanceof ApiError
+        && [403, 404].includes(correctionHistoryQuery.error.status))
+      client.removeQueries({ queryKey: ['nutrition-strategy', actor, 'frozen-corrections', studentId] });
+  }, [actor, client, correctionHistoryQuery.error, studentId, trainer]);
 
   async function refresh() {
     await client.invalidateQueries({ queryKey: ownerKey });
     if (!trainer) await client.invalidateQueries({ queryKey: ['nutrition-strategy', actor, 'day'] });
+    await client.invalidateQueries({ queryKey: ['nutrition-strategy', actor, 'frozen-corrections'] });
   }
   async function send(command: Command) {
     if (submitting.current) return;
@@ -105,13 +120,15 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
       if (command.kind === 'decision') await nutritionApi.decideStrategy(command.proposalId, command.body);
       if (command.kind === 'dayType') await nutritionApi.chooseDayType(command.day, command.body);
       if (command.kind === 'override') await nutritionApi.overrideTarget(command.day, command.body);
-      setPending(null); setPreviewChange(null); setDecision(null); setTransition(null);
+      if (command.kind === 'frozenCorrection') await nutritionApi.correctFrozenTarget(command.day, command.body);
+      setPending(null); setPreviewChange(null); setDecision(null); setTransition(null); setConfirmCorrection(false);
       setMessage(trainer ? 'Đã gửi đề xuất. Học viên sẽ quyết định toàn bộ thay đổi.' : 'Đã lưu. Mục tiêu và nhật ký thực tế vẫn là hai dữ liệu riêng.');
       await refresh();
     } catch (error) {
       if (error instanceof ApiError && [403, 404].includes(error.status)) {
         setPending(null); setPreviewChange(null); setDecision(null);
         client.removeQueries({ queryKey: trainer ? ['nutrition-strategy', actor, 'trainer', studentId] : ['nutrition-strategy', actor] });
+        client.removeQueries({ queryKey: ['nutrition-strategy', actor, 'frozen-corrections', studentId ?? actor] });
         setMessage('Không còn quyền truy cập dữ liệu này.');
       } else if (error instanceof ApiError && error.status === 409) {
         setPending(null); setPreviewChange(null); setDecision(null); setTransition(null);
@@ -149,6 +166,17 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     send({ kind: 'override', day, body: { timezone, goalVersionId: data.goalVersionId, nutrientId: nutrient.id,
       unitId: nutrient.defaultUnitId, targetAmount: Number(raw), reason: overrideReason.trim(),
       expectedOverrideVersion: existing?.overrideVersion ?? null, commandKey: createCommandKey() } });
+  }
+  function correctFrozenTarget() {
+    const target = dayQuery.data?.targets.find((item) => item.nutrientId === correctionNutrientId);
+    const amount = correctionAmount.trim();
+    if (!dayQuery.data?.frozen || !target || target.correctionVersion === null
+        || !/^\d+(\.\d{1,6})?$/.test(amount) || !correctionReason.trim()) {
+      setMessage('Chọn nutrient của ngày đã chốt, nhập số hợp lệ và lý do sửa bắt buộc.'); return;
+    }
+    send({ kind: 'frozenCorrection', day, body: { timezone, nutrientId: target.nutrientId,
+      targetAmount: Number(amount), expectedVersion: target.correctionVersion,
+      reason: correctionReason.trim(), commandKey: createCommandKey() } });
   }
   const input = (label: string, value: string, onChangeText: (value: string) => void, numeric = false) =>
     <View style={{ marginBottom: 10 }}><Text style={[styles.label, { color: theme.textPrimary }]}>{label}</Text>
@@ -261,6 +289,27 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
         {dayQuery.data.targets.map((target) => <Text key={target.nutrientId} style={[styles.body, { color: theme.textPrimary }]}>
           {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient chưa có tên'}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'} · {target.source === 'OVERRIDE' ? 'Ghi đè' : target.source === 'DAY_TYPE' ? 'Theo loại ngày' : 'Mặc định'}
         </Text>)}
+        {dayQuery.data.frozen ? <>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>So sánh tiến độ dùng target sau correction. Target gốc và lượng ăn thực tế không bị ghi đè.</Text>
+          {dayQuery.data.targets.map((target) => <Text key={`original-${target.nutrientId}`} style={[styles.body, { color: theme.textSecondary }]}>
+            {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient'}: gốc {target.originalTargetAmount ?? 'chưa rõ'} → hiện tại {target.targetAmount} · phiên bản sửa {target.correctionVersion ?? 0}
+          </Text>)}
+          {dayQuery.data.targets.map((target) => <Pressable key={`correct-${target.nutrientId}`} accessibilityRole="radio"
+            accessibilityLabel={`Sửa target nutrient ${target.nutrientId}`}
+            accessibilityState={{ checked: correctionNutrientId === target.nutrientId }}
+            onPress={() => { setCorrectionNutrientId(target.nutrientId); setConfirmCorrection(false); }}
+            style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>{correctionNutrientId === target.nutrientId ? '◉' : '○'} Sửa {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'nutrient'}</Text>
+          </Pressable>)}
+          {input('Target sau correction', correctionAmount, (value) => { setCorrectionAmount(value); setConfirmCorrection(false); }, true)}
+          {input('Lý do correction', correctionReason, (value) => { setCorrectionReason(value); setConfirmCorrection(false); })}
+          {!confirmCorrection ? <WorkoutButton label="Xem lại correction target đã chốt" disabled={busy}
+            onPress={() => setConfirmCorrection(true)} /> : <>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>Chỉ sửa nutrient đã chọn của ngày {day}; target gốc và Food Log actual được giữ nguyên. Lý do: {correctionReason || 'chưa nhập'}.</Text>
+            <WorkoutButton label="Xác nhận correction" disabled={busy} onPress={correctFrozenTarget} />
+            <WorkoutButton label="Quay lại" secondary onPress={() => setConfirmCorrection(false)} />
+          </>}
+        </> : null}
         {!dayQuery.data.frozen && dayQuery.data.goalVersionId ? <>
           <View style={styles.row}>
             <WorkoutButton label="Chọn ngày nghỉ" secondary onPress={() => send({ kind: 'dayType', day, body: { timezone, dayType: 'REST_DAY', commandKey: createCommandKey() } })} />
@@ -276,6 +325,24 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
           <WorkoutButton label="Lưu ghi đè theo phiên bản Goal này" disabled={busy} onPress={chooseOverride} />
         </> : null}
       </> : null}
+    </WorkoutCard> : null}
+    {trainer ? <WorkoutCard>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử correction target đã chốt</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ đọc khi còn quyền NUTRITION_GOAL VIEW hiện hành; không có nút sửa.</Text>
+      {input('Ngày (YYYY-MM-DD)', day, (value) => { setDay(value); setDayConfirmed(false); })}
+      {input('Múi giờ IANA của target', timezone, (value) => { setTimezone(value); setDayConfirmed(false); })}
+      <WorkoutButton label="Xem lịch sử ngày này" secondary
+        disabled={!moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}
+        onPress={() => setDayConfirmed(true)} />
+    </WorkoutCard> : null}
+    {validDay ? <WorkoutCard>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử sửa target</Text>
+      {correctionHistoryQuery.isPending ? <WorkoutState title="Đang tải lịch sử" message="Vui lòng chờ." busy /> : null}
+      {correctionHistoryQuery.isError ? <WorkoutState title="Không xem được lịch sử" message="Quyền hoặc dữ liệu ngày này không còn khả dụng." onRetry={() => correctionHistoryQuery.refetch()} /> : null}
+      {correctionHistoryQuery.data?.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có correction cho ngày này.</Text> : null}
+      {correctionHistoryQuery.data?.map((entry) => <Text key={entry.id} style={[styles.body, { color: theme.textPrimary }]}>
+        {nutrientsQuery.data?.find((item) => item.id === entry.nutrientId)?.name ?? 'Nutrient'} · gốc {entry.originalAmount} · trước {entry.beforeAmount} → sau {entry.afterAmount} · {entry.reason} · người sửa {entry.actorId} · {entry.correctedAt}
+      </Text>)}
     </WorkoutCard> : null}
   </ScrollView>;
 }

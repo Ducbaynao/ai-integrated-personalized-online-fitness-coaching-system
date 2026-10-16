@@ -22,6 +22,7 @@ export function AdminLayout() {
         <nav className="sidebar" aria-label="Điều hướng quản trị">
           <NavLink to="/" end>Trang tổng quan</NavLink>
           {canManageCatalog ? <NavLink to="/exercises">Bài tập</NavLink> : null}
+          {canManageCatalog ? <NavLink to="/nutrition/catalog">Danh mục thực phẩm</NavLink> : null}
         </nav>
         <main className="main-content">
           <Outlet />

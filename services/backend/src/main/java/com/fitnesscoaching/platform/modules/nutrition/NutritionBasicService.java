@@ -37,14 +37,16 @@ public class NutritionBasicService {
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final NutritionTargetDayService targetDays;
+    private final NutritionCatalogService catalog;
 
     public NutritionBasicService(JdbcTemplate jdbc, UserAccountStatusQuery accounts,
                                  StudentCapabilityQuery students, CoachingAuthorityQuery coaching,
                                  AuditService audit, ObjectMapper mapper,
-                                 NutritionTargetDayService targetDays) {
+                                 NutritionTargetDayService targetDays, NutritionCatalogService catalog) {
         this.jdbc = jdbc; this.accounts = accounts; this.students = students;
         this.coaching = coaching; this.audit = audit; this.mapper = mapper;
         this.targetDays = targetDays;
+        this.catalog = catalog;
     }
 
     public record FoodInput(String name, String servingLabel, BigDecimal energyKcal,
@@ -56,6 +58,9 @@ public class NutritionBasicService {
                        BigDecimal fatG, long version) {}
     public record ItemInput(String timezone, Instant consumedAt, String mealType, String description,
                             UUID privateFoodId, BigDecimal servings, String commandKey) {}
+    public record CatalogItemInput(String timezone, Instant consumedAt, String mealType,
+                                   UUID catalogFoodId, UUID expectedRevisionId, UUID portionId,
+                                   String quantityBasis, BigDecimal quantity, String commandKey) {}
     public record CorrectionInput(long expectedVersion, String description, UUID privateFoodId,
                                   BigDecimal servings, boolean remove, String commandKey) {}
     public record ConfirmInput(String timezone, long expectedDayVersion, boolean noIntakeConfirmed,
@@ -64,7 +69,8 @@ public class NutritionBasicService {
                            int knownItems, int unknownItems) {}
     public record Item(UUID id, UUID mealId, String kind, String name, UUID privateFoodId,
                        BigDecimal servings, String servingLabel, Instant consumedAt, long version,
-                       boolean removed, List<Nutrient> nutrients) {}
+                       boolean removed, List<Nutrient> nutrients,
+                       UUID catalogRevisionId, UUID catalogPortionId, String quantityBasis) {}
     public record Day(UUID studentId, LocalDate date, String timezone, String completeness,
                       long version, boolean noIntakeConfirmed, List<Nutrient> nutrients,
                       List<Item> items) {}
@@ -148,6 +154,80 @@ public class NutritionBasicService {
     }
 
     @Transactional
+    public Day addCatalogItem(UUID actor, LocalDate day, CatalogItemInput input) {
+        requireStudent(actor);
+        if (input == null || input.catalogFoodId() == null || input.expectedRevisionId() == null
+                || input.consumedAt() == null || input.mealType() == null
+                || !List.of("BREAKFAST","LUNCH","DINNER","SNACK","OTHER").contains(input.mealType())
+                || input.quantity() == null || input.quantity().signum() <= 0
+                || input.quantity().scale() > 6 || input.quantity().precision() > 18
+                || !List.of("SERVING","GRAM","MILLILITRE").contains(input.quantityBasis()))
+            throw fail("VALIDATION_FAILED", 400);
+        ZoneId zone = zone(input.timezone());
+        if (!input.consumedAt().atZone(zone).toLocalDate().equals(day)) throw fail("VALIDATION_FAILED", 400);
+        lockStudent(actor);
+        return receipt(actor, input.commandKey(), "ADD_CATALOG_ITEM", List.of(day, input), Day.class, () -> {
+            NutritionCatalogService.Food food = catalog.publishedForLogging(input.catalogFoodId());
+            if (!food.revisionId().equals(input.expectedRevisionId()))
+                throw fail("NUTRITION_CATALOG_VERSION_CONFLICT", 409);
+            NutritionCatalogService.Portion portion = input.portionId() == null ? null : food.portions().stream()
+                    .filter(p -> p.id().equals(input.portionId())).findFirst().orElse(null);
+            BigDecimal grams;
+            if ("GRAM".equals(input.quantityBasis())) {
+                if (input.portionId() != null) throw fail("VALIDATION_FAILED", 400);
+                grams = input.quantity();
+            } else if ("SERVING".equals(input.quantityBasis()) && portion != null
+                    && portion.gramsPerServing() != null) {
+                grams = input.quantity().multiply(portion.gramsPerServing());
+            } else if ("MILLILITRE".equals(input.quantityBasis()) && portion != null
+                    && portion.gramsPerMl() != null) {
+                grams = input.quantity().multiply(portion.gramsPerMl());
+            } else throw fail("NUTRITION_CONVERSION_UNKNOWN", 409);
+            BigDecimal storedGrams = storedAmount(grams);
+            if (storedGrams.signum() <= 0) throw fail("NUTRITION_CONVERSION_UNKNOWN", 409);
+            ensureDay(actor, day, input.timezone());
+            targetDays.freezeInCurrentTransaction(actor, day, input.timezone(), "FIRST_LOG");
+            UUID mealId = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,created_by,log_date,timezone)
+                    VALUES (?,?,?::fitness.meal_type,?,NULL,?,?,?)
+                    """, mealId, actor, input.mealType(), java.sql.Timestamp.from(input.consumedAt()),
+                    actor, day, input.timezone());
+            UUID itemId = UUID.randomUUID();
+            String unitCode = switch (input.quantityBasis()) {
+                case "GRAM" -> "B07_GRAM";
+                case "MILLILITRE" -> "B07_ML";
+                default -> "B07_SERVING";
+            };
+            jdbc.update("""
+                    INSERT INTO fitness.food_log_items
+                      (id,meal_id,food_name_snapshot,quantity,unit_id,gram_weight,entry_source,
+                       confirmed_by_user,confirmed_at,entry_kind,nutrition_catalog_revision_id,
+                       nutrition_catalog_portion_id,quantity_basis,serving_label_snapshot)
+                    VALUES (?,?,?,?,?,?,'MANUAL',true,clock_timestamp(),'CATALOG_QUANTIFIED',?,?,?,?)
+                    """, itemId, mealId, food.name(), input.quantity(), unit(unitCode),
+                    storedGrams, food.revisionId(), input.portionId(), input.quantityBasis(),
+                    portion == null ? null : portion.label());
+            BigDecimal[] per100 = {food.energyKcalPer100g(), food.proteinGPer100g(),
+                    food.carbohydrateGPer100g(), food.fatGPer100g()};
+            for (int i = 0; i < NUTRIENTS.size(); i++) {
+                if (per100[i] == null) continue;
+                BigDecimal amount = storedAmount(per100[i].multiply(grams).movePointLeft(2));
+                jdbc.update("""
+                        INSERT INTO fitness.food_log_item_nutrients
+                          (food_log_item_id,nutrient_id,amount,unit_id,calculation_source)
+                        SELECT ?,n.id,?,n.default_unit_id,'CATALOG' FROM fitness.nutrients n WHERE n.code=?
+                        """, itemId, amount, NUTRIENTS.get(i));
+            }
+            recalculate(actor, day, false);
+            audit(actor, "NUTRITION_CATALOG_ITEM_LOGGED", "FOOD_LOG_ITEM", itemId,
+                    java.util.Map.of("catalogRevisionId", food.revisionId(),
+                            "quantityBasis", input.quantityBasis()));
+            return readMine(actor, day, input.timezone());
+        });
+    }
+
+    @Transactional
     public Day correctItem(UUID actor, UUID itemId, CorrectionInput input) {
         requireStudent(actor);
         if (input == null || input.commandKey() == null || input.commandKey().isBlank()
@@ -165,15 +245,24 @@ public class NutritionBasicService {
             String kind = input.remove() ? prior.kind() : food == null ? "DESCRIPTION_ONLY" : "PRIVATE_SERVING";
             String name = input.remove() ? prior.name() : food == null ? input.description().trim() : food.name();
             BigDecimal servings = input.remove() ? prior.servings() : input.servings();
-            int updated = jdbc.update("""
+            int updated = input.remove() ? jdbc.update("""
+                    UPDATE fitness.food_log_items
+                    SET item_version=item_version+1,deleted_at=clock_timestamp(),updated_at=clock_timestamp()
+                    WHERE id=? AND item_version=? AND deleted_at IS NULL
+                    """, itemId, input.expectedVersion()) : jdbc.update("""
                     UPDATE fitness.food_log_items SET entry_kind=?,food_name_snapshot=?,private_food_id=?,
                       private_food_version=?,serving_label_snapshot=?,quantity=?,unit_id=?,
+                      nutrition_catalog_revision_id=CASE WHEN ? THEN nutrition_catalog_revision_id ELSE NULL END,
+                      nutrition_catalog_portion_id=CASE WHEN ? THEN nutrition_catalog_portion_id ELSE NULL END,
+                      quantity_basis=CASE WHEN ? THEN quantity_basis ELSE NULL END,
+                      gram_weight=CASE WHEN ? THEN gram_weight ELSE NULL END,
                       item_version=item_version+1,deleted_at=CASE WHEN ? THEN clock_timestamp() ELSE NULL END,
                       updated_at=clock_timestamp()
                     WHERE id=? AND item_version=? AND deleted_at IS NULL
                     """, kind, name, food == null ? null : food.id(), food == null ? null : food.version(),
                     food == null ? null : food.servingLabel(), servings,
-                    food == null ? null : unit("B07_SERVING"), input.remove(), itemId, input.expectedVersion());
+                    food == null ? null : unit("B07_SERVING"), input.remove(), input.remove(),
+                    input.remove(), input.remove(), input.remove(), itemId, input.expectedVersion());
             if (updated != 1) throw fail("NUTRITION_VERSION_STALE", 409);
             // The correction record retains the old facts before replacing the current projection.
             jdbc.update("DELETE FROM fitness.food_log_item_nutrients WHERE food_log_item_id=?", itemId);
@@ -263,7 +352,8 @@ public class NutritionBasicService {
         Instant end = day.plusDays(1).atStartOfDay(zone(timezone)).toInstant();
         List<Item> items = jdbc.query("""
                 SELECT i.id,i.meal_id,i.entry_kind,i.food_name_snapshot,i.private_food_id,i.quantity,
-                  i.serving_label_snapshot,m.consumed_at,i.item_version,i.deleted_at
+                  i.serving_label_snapshot,m.consumed_at,i.item_version,i.deleted_at,
+                  i.nutrition_catalog_revision_id,i.nutrition_catalog_portion_id,i.quantity_basis
                 FROM fitness.meals m JOIN fitness.food_log_items i ON i.meal_id=m.id
                 WHERE m.student_id=? AND (m.log_date=? OR (m.log_date IS NULL
                     AND m.consumed_at>=? AND m.consumed_at<?))
@@ -272,7 +362,8 @@ public class NutritionBasicService {
                 """, (rs, n) -> new Item((UUID) rs.getObject(1), (UUID) rs.getObject(2), rs.getString(3),
                 rs.getString(4), (UUID) rs.getObject(5), rs.getBigDecimal(6), rs.getString(7),
                 rs.getTimestamp(8).toInstant(), rs.getLong(9), rs.getTimestamp(10) != null,
-                itemNutrients((UUID) rs.getObject(1))), student, day,
+                itemNutrients((UUID) rs.getObject(1)), (UUID) rs.getObject(11),
+                (UUID) rs.getObject(12), rs.getString(13)), student, day,
                 java.sql.Timestamp.from(start), java.sql.Timestamp.from(end));
         List<Nutrient> nutrients = jdbc.query("""
                 SELECT n.code,s.consumed_amount,s.known_subtotal,
@@ -404,12 +495,14 @@ public class NutritionBasicService {
 
     private ItemOwner itemOwner(UUID actor, UUID itemId) {
         var rows = jdbc.query("""
-                SELECT m.log_date,m.timezone,i.entry_kind,i.food_name_snapshot,i.quantity,i.item_version,i.deleted_at
+                SELECT m.log_date,m.timezone,i.entry_kind,i.food_name_snapshot,i.quantity,i.item_version,i.deleted_at,
+                       i.nutrition_catalog_revision_id,i.nutrition_catalog_portion_id,i.quantity_basis,i.gram_weight
                 FROM fitness.food_log_items i JOIN fitness.meals m ON m.id=i.meal_id
                 WHERE i.id=? AND m.student_id=?
                 """, (rs, n) -> new ItemOwner(rs.getObject(1, LocalDate.class), rs.getString(2),
                 rs.getString(3), rs.getString(4), rs.getBigDecimal(5), rs.getLong(6),
-                rs.getTimestamp(7) != null), itemId, actor);
+                rs.getTimestamp(7) != null, (UUID) rs.getObject(8), (UUID) rs.getObject(9),
+                rs.getString(10), rs.getBigDecimal(11)), itemId, actor);
         if (rows.isEmpty()) throw fail("NUTRITION_ITEM_NOT_FOUND", 404);
         return rows.getFirst();
     }
@@ -536,7 +629,9 @@ public class NutritionBasicService {
     private static NutritionFailure fail(String code, int status) { return new NutritionFailure(code, status); }
     private record DayState(String timezone, String completeness, long version, boolean noIntakeConfirmed) {}
     private record ItemOwner(LocalDate day, String timezone, String kind, String name,
-                             BigDecimal servings, long version, boolean removed) {}
+                             BigDecimal servings, long version, boolean removed,
+                             UUID catalogRevisionId, UUID catalogPortionId, String quantityBasis,
+                             BigDecimal gramWeight) {}
     private record ItemCorrectionSnapshot(ItemOwner item, List<Nutrient> nutrientFacts) {}
     private record Receipt(String command, String hash, String response) {}
 }

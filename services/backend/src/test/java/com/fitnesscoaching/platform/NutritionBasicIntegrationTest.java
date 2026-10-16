@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService.*;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionFailure;
+import com.fitnesscoaching.platform.modules.nutrition.NutritionCatalogService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -54,6 +55,7 @@ class NutritionBasicIntegrationTest {
     }
 
     @Autowired NutritionBasicService nutrition;
+    @Autowired NutritionCatalogService catalog;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired CoachingLifecycleUseCase lifecycle;
@@ -234,6 +236,89 @@ class NutritionBasicIntegrationTest {
         assertThat(nutrient(mixed, "B07_ENERGY_KCAL").knownSubtotal()).isEqualByComparingTo("100");
     }
 
+    @Test void adminCuratedFoundationRevisionAndApprovedConversionFreezeHistoricalActual() throws Exception {
+        UUID admin = admin(), student = student();
+        var firstRevision = new NutritionCatalogService.RevisionInput("USDA oats",
+                new BigDecimal("400"), BigDecimal.ZERO, null, null, "Foundation-2026",
+                "https://fdc.nal.usda.gov/food-details/12345/nutrients",
+                java.util.List.of(new NutritionCatalogService.PortionInput("cup",
+                        new BigDecimal("40"), null, "USDA portion weight", null)));
+        var draft = catalog.draft(admin, new NutritionCatalogService.DraftInput(12345,
+                "Foundation October 2026", DAY, firstRevision, "catalog-draft-" + admin));
+        assertThat(draft.status()).isEqualTo("DRAFT");
+        mvc.perform(post("/api/v1/admin/nutrition/catalog/foods")
+                .with(jwt().jwt(j -> j.subject(student.toString())))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("""
+                        {"fdcId":23456,"sourceRelease":"Foundation 2026","sourceDate":"2026-10-16",
+                         "revision":{"name":"Food","energyKcalPer100g":100,"proteinGPer100g":null,
+                           "carbohydrateGPer100g":null,"fatGPer100g":null,"sourceRecordVersion":"v1",
+                           "sourceUrl":"https://fdc.nal.usda.gov/food-details/23456/nutrients","portions":[]},
+                         "commandKey":"denied-student-catalog"}
+                        """))
+                .andExpect(status().isForbidden());
+        assertThatThrownBy(() -> nutrition.addCatalogItem(student, DAY,
+                new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH", draft.id(),
+                        draft.revisionId(), draft.portions().getFirst().id(), "SERVING",
+                        BigDecimal.ONE, "catalog-before-publish-" + student)))
+                .isInstanceOf(NutritionFailure.class).extracting("code")
+                .isEqualTo("NUTRITION_CATALOG_NOT_FOUND");
+        var published = catalog.transition(admin, draft.id(), 0, "PUBLISH", "Reviewed source",
+                "catalog-publish-" + admin);
+        var item = new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH",
+                published.id(), published.revisionId(), published.portions().getFirst().id(),
+                "SERVING", new BigDecimal("1.25"), "catalog-log-" + student);
+        var logged = nutrition.addCatalogItem(student, DAY, item);
+        assertThat(nutrient(logged, "B07_ENERGY_KCAL").total()).isEqualByComparingTo("200");
+        assertThat(nutrient(logged, "B07_PROTEIN_G").total()).isEqualByComparingTo("0");
+        assertThat(nutrient(logged, "B07_FAT_G").total()).isNull();
+        assertThat(logged.items().getFirst().catalogRevisionId()).isEqualTo(published.revisionId());
+        assertThat(nutrition.addCatalogItem(student, DAY, item).items()).hasSize(1);
+        assertThatThrownBy(() -> nutrition.addCatalogItem(student, DAY,
+                new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH", published.id(),
+                        published.revisionId(), published.portions().getFirst().id(), "MILLILITRE",
+                        BigDecimal.ONE, "catalog-no-density-" + student)))
+                .isInstanceOf(NutritionFailure.class).extracting("code")
+                .isEqualTo("NUTRITION_CONVERSION_UNKNOWN");
+        UUID gramStudent = student();
+        var grams = nutrition.addCatalogItem(gramStudent, DAY,
+                new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH", published.id(),
+                        published.revisionId(), null, "GRAM", new BigDecimal("25"),
+                        "catalog-grams-" + gramStudent));
+        assertThat(nutrient(grams, "B07_ENERGY_KCAL").total()).isEqualByComparingTo("100");
+        var nextRevision = new NutritionCatalogService.RevisionInput("USDA oats updated",
+                new BigDecimal("500"), BigDecimal.ZERO, null, null, "Foundation-2026-r2",
+                firstRevision.sourceUrl(), java.util.List.of(new NutritionCatalogService.PortionInput(
+                        "cup", new BigDecimal("40"), new BigDecimal("1.2"),
+                        "USDA portion weight", "Separate USDA density evidence")));
+        var revised = catalog.revise(admin, published.id(), 1, nextRevision, "catalog-revise-" + admin);
+        assertThat(nutrient(nutrition.readMine(student, DAY, "Etc/UTC"), "B07_ENERGY_KCAL").total())
+                .isEqualByComparingTo("200");
+        UUID mlStudent = student();
+        var mlDay = nutrition.addCatalogItem(mlStudent, DAY,
+                new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH", revised.id(),
+                        revised.revisionId(), revised.portions().getFirst().id(), "MILLILITRE",
+                        new BigDecimal("100"), "catalog-ml-" + mlStudent));
+        assertThat(nutrient(mlDay, "B07_ENERGY_KCAL").total()).isEqualByComparingTo("600");
+        assertThatThrownBy(() -> nutrition.addCatalogItem(student, DAY,
+                new NutritionBasicService.CatalogItemInput("Etc/UTC", AT, "LUNCH", published.id(),
+                        published.revisionId(), published.portions().getFirst().id(), "SERVING",
+                        BigDecimal.ONE, "catalog-stale-" + student)))
+                .isInstanceOf(NutritionFailure.class).extracting("code")
+                .isEqualTo("NUTRITION_CATALOG_VERSION_CONFLICT");
+        UUID loggedItemId = logged.items().getFirst().id();
+        nutrition.correctItem(student, loggedItemId, new NutritionBasicService.CorrectionInput(
+                0, null, null, null, true, "catalog-remove-" + student));
+        assertThat(nutrition.history(student, loggedItemId).getFirst().beforeJson())
+                .contains(published.revisionId().toString()).contains("200.000000");
+        mvc.perform(get("/api/v1/nutrition/catalog/foods")
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PUBLISHED"));
+        catalog.transition(admin, published.id(), 2, "RETIRE", "Source retired",
+                "catalog-retire-" + admin);
+        assertThat(catalog.published()).noneMatch(food -> food.id().equals(published.id()));
+    }
+
     @Test void trainerViewRequiresLivePeriodGrantAndHistoryWindow() {
         UUID student = student(), trainer = trainer();
         var pending = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
@@ -270,6 +355,18 @@ class NutritionBasicIntegrationTest {
         jdbc.update("""
                 INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
                 SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='STUDENT'
+                """, id, id);
+        return id;
+    }
+    private UUID admin() {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status,preferred_locale,timezone)
+                VALUES (?,?,'hash','Admin','ACTIVE','vi-VN','Etc/UTC')
+                """, id, id + "@example.com");
+        jdbc.update("""
+                INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
+                SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='ADMIN'
                 """, id, id);
         return id;
     }

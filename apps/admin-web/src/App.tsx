@@ -7,6 +7,7 @@ import { ProtectedRoute } from './features/auth/ProtectedRoute.tsx'
 import { ExerciseDetailPage } from './features/exercise/ExerciseDetailPage.tsx'
 import { ExerciseCreatePage, ExerciseEditPage } from './features/exercise/ExerciseDraftPages.tsx'
 import { ExerciseListPage } from './features/exercise/ExerciseListPage.tsx'
+import { NutritionCatalogPage } from './features/nutrition/NutritionCatalogPage.tsx'
 
 function App() {
   return (
@@ -26,6 +27,14 @@ function App() {
             element={
               <ProtectedRoute permission="CATALOG_MANAGE">
                 <ExerciseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nutrition/catalog"
+            element={
+              <ProtectedRoute permission="CATALOG_MANAGE">
+                <NutritionCatalogPage />
               </ProtectedRoute>
             }
           />

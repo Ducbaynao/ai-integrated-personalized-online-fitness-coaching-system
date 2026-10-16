@@ -9,10 +9,11 @@ import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
-import { nutritionApi, type CorrectionBody, type FoodBody, type ItemBody, type NutritionDay, type NutritionItem, type PrivateFood } from './nutritionApi';
+import { nutritionApi, type CatalogItemBody, type CorrectionBody, type FoodBody, type ItemBody, type NutritionDay, type NutritionItem, type PrivateFood } from './nutritionApi';
 
 type Pending = { kind: 'food'; body: FoodBody } | { kind: 'foodUpdate'; id: string; body: FoodBody } |
   { kind: 'item'; day: string; body: ItemBody } |
+  { kind: 'catalogItem'; day: string; body: CatalogItemBody } |
   { kind: 'correction'; id: string; body: CorrectionBody } |
   { kind: 'confirm'; day: string; body: { timezone: string; expectedDayVersion: number; noIntakeConfirmed: boolean; commandKey: string } };
 
@@ -47,6 +48,10 @@ export function NutritionScreen() {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [foodId, setFoodId] = useState('');
+  const [catalogFoodId, setCatalogFoodId] = useState('');
+  const [catalogPortionId, setCatalogPortionId] = useState('');
+  const [catalogBasis, setCatalogBasis] = useState<CatalogItemBody['quantityBasis']>('GRAM');
+  const [catalogQuantity, setCatalogQuantity] = useState('');
   const [editingFood, setEditingFood] = useState<PrivateFood | null>(null);
   const [description, setDescription] = useState('');
   const [servings, setServings] = useState('1');
@@ -64,6 +69,9 @@ export function NutritionScreen() {
     && moment.tz.zone(timezone) && confirmedContext);
   const dayQuery = useQuery({ queryKey: nutritionKeys.day(actor, day, timezone), queryFn: () => nutritionApi.day(day, timezone), enabled: validContext });
   const foodQuery = useQuery({ queryKey: nutritionKeys.foods(actor), queryFn: nutritionApi.foods, enabled: Boolean(actor && activeCapability === 'STUDENT') });
+  const catalogQuery = useQuery({ queryKey: ['nutrition-catalog', 'published'], queryFn: nutritionApi.catalogFoods,
+    enabled: Boolean(actor && activeCapability === 'STUDENT') });
+  const chosenCatalog = catalogQuery.data?.find((food) => food.id === catalogFoodId);
   const historyQuery = useQuery({ queryKey: ['nutrition', actor, 'corrections', editing?.id],
     queryFn: () => nutritionApi.corrections(editing!.id), enabled: Boolean(actor && editing) });
 
@@ -81,6 +89,7 @@ export function NutritionScreen() {
       if (command.kind === 'food') await nutritionApi.createFood(command.body);
       if (command.kind === 'foodUpdate') await nutritionApi.updateFood(command.id, command.body);
       if (command.kind === 'item') await nutritionApi.addItem(command.day, command.body);
+      if (command.kind === 'catalogItem') await nutritionApi.addCatalogItem(command.day, command.body);
       if (command.kind === 'correction') await nutritionApi.correct(command.id, command.body);
       if (command.kind === 'confirm') await nutritionApi.confirm(command.day, command.body);
       setPending(null);
@@ -90,6 +99,7 @@ export function NutritionScreen() {
       setConfirmDay(false);
       setMessage('Đã lưu. Dữ liệu trong ngày đã được cập nhật.');
       await refresh();
+      if (command.kind === 'catalogItem') await client.invalidateQueries({ queryKey: ['nutrition-catalog'] });
     } catch (error) {
       if (error instanceof ApiError && [403, 404].includes(error.status)) {
         setPending(null);
@@ -133,6 +143,23 @@ export function NutritionScreen() {
     send({ kind: 'item', day, body: { timezone, consumedAt: new Date(selected.instant).toISOString(), mealType,
       description: foodId ? null : description.trim(), privateFoodId: foodId || null,
       servings: foodId ? count : null, commandKey: createCommandKey() } });
+  };
+  const addCatalogItem = () => {
+    if (!validContext || !chosenCatalog) { setMessage('Hãy chọn ngày, múi giờ và thực phẩm đã công bố.'); return; }
+    const quantity = Number(catalogQuantity);
+    const portion = chosenCatalog.portions.find((item) => item.id === catalogPortionId);
+    const canConvert = catalogBasis === 'GRAM' || (catalogBasis === 'SERVING' && portion?.gramsPerServing != null)
+      || (catalogBasis === 'MILLILITRE' && portion?.gramsPerMl != null);
+    if (!/^(?:\d+)(?:\.\d{1,6})?$/.test(catalogQuantity) || !Number.isFinite(quantity) || quantity <= 0 || !canConvert) {
+      setMessage('Số lượng hoặc bằng chứng quy đổi chưa hợp lệ. Chỉ dùng đơn vị đã được xác nhận cho món này.'); return;
+    }
+    const offsets = validProposalOffsets(timezone, `${day}T${localTime}`);
+    const selected = offsets.length === 1 ? offsets[0] : offsets.find((option) => option.offset === chosenOffset);
+    if (!selected) { setMessage('Giờ địa phương không tồn tại hoặc bị lặp; hãy chọn UTC offset hợp lệ.'); return; }
+    send({ kind: 'catalogItem', day, body: { timezone, consumedAt: new Date(selected.instant).toISOString(),
+      mealType, catalogFoodId: chosenCatalog.id, expectedRevisionId: chosenCatalog.revisionId,
+      portionId: catalogBasis === 'GRAM' ? null : catalogPortionId,
+      quantityBasis: catalogBasis, quantity, commandKey: createCommandKey() } });
   };
   const correct = (remove: boolean) => {
     if (!editing) return;
@@ -180,6 +207,9 @@ export function NutritionScreen() {
       {dayQuery.data.items.length === 0 ? <WorkoutState title="Chưa có món trong ngày" message="Ngày chưa ghi không được tính là 0 kcal." /> : null}
       {dayQuery.data.items.map((item) => <WorkoutCard key={item.id}>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.name}</Text>
+        {item.kind === 'CATALOG_QUANTIFIED' ? <Text style={[styles.body, { color: theme.textSecondary }]}>
+          Nguồn catalog đã duyệt · {item.servings} {item.quantityBasis === 'GRAM' ? 'g' : item.quantityBasis === 'MILLILITRE' ? 'ml' : item.servingLabel ?? 'khẩu phần'} · revision đã chốt trong lịch sử
+        </Text> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{item.kind === 'DESCRIPTION_ONLY' ? 'Chưa định lượng' : `${item.servings ?? '?'} ${item.servingLabel ?? 'khẩu phần'}`}</Text>
         <WorkoutButton label={`Sửa ${item.name}`} secondary onPress={() => {
           setEditing(item); setConfirmRemove(false); setFoodId(item.privateFoodId ?? ''); setDescription(item.kind === 'DESCRIPTION_ONLY' ? item.name : '');
@@ -249,6 +279,41 @@ export function NutritionScreen() {
       {input('Carb (g)', carbs, setCarbs, 'decimal-pad')}{input('Chất béo (g)', fat, setFat, 'decimal-pad')}
       <WorkoutButton label={editingFood ? 'Lưu dinh dưỡng món nháp' : 'Lưu món riêng'} disabled={busy} onPress={createFood} />
       {editingFood ? <WorkoutButton label="Hủy chỉnh món nháp" secondary onPress={() => setEditingFood(null)} /> : null}
+    </WorkoutCard>
+    <WorkoutCard>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Thực phẩm catalog đã duyệt</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Tập nhỏ USDA Foundation Foods do quản trị viên công bố. Giá trị thiếu là chưa biết, không phải 0.</Text>
+      {catalogQuery.isPending ? <WorkoutState title="Đang tải catalog" message="Vui lòng chờ." busy /> : null}
+      {catalogQuery.isError ? <WorkoutState title="Không tải được catalog" message="Kiểm tra kết nối rồi thử lại." onRetry={() => catalogQuery.refetch()} /> : null}
+      {catalogQuery.data?.length === 0 ? <WorkoutState title="Chưa có thực phẩm được công bố" message="Bạn vẫn có thể ghi món riêng do mình khai báo." /> : null}
+      {catalogQuery.data?.map((food) => <Pressable key={food.id} accessibilityRole="radio"
+        accessibilityLabel={`Chọn ${food.name}, USDA FDC ${food.fdcId}`}
+        accessibilityState={{ checked: catalogFoodId === food.id }} onPress={() => { setCatalogFoodId(food.id); setCatalogPortionId(''); }}
+        style={{ minHeight: 44, justifyContent: 'center' }}>
+        <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogFoodId === food.id ? '◉' : '○'} {food.name} · USDA FDC {food.fdcId}</Text>
+      </Pressable>)}
+      {chosenCatalog ? <>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: {chosenCatalog.sourceName} · {chosenCatalog.sourceRelease} · revision {chosenCatalog.revisionNumber}</Text>
+        {(['GRAM', 'SERVING', 'MILLILITRE'] as const).map((basis) => {
+          const allowed = basis === 'GRAM' || chosenCatalog.portions.some((part) => basis === 'SERVING'
+            ? part.gramsPerServing != null : part.gramsPerMl != null);
+          return <Pressable key={basis} accessibilityRole="radio"
+            accessibilityLabel={`Đơn vị ${basis}`}
+            accessibilityState={{ checked: catalogBasis === basis, disabled: !allowed }} disabled={!allowed}
+            onPress={() => { setCatalogBasis(basis); setCatalogPortionId(''); }} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogBasis === basis ? '◉' : '○'} {basis === 'GRAM' ? 'Gram (g)' : basis === 'SERVING' ? 'Khẩu phần có khối lượng đã duyệt' : 'Mililít (ml) có bằng chứng quy đổi'}{allowed ? '' : ' · chưa có dữ liệu'}</Text>
+          </Pressable>;
+        })}
+        {catalogBasis !== 'GRAM' ? chosenCatalog.portions.filter((part) => catalogBasis === 'SERVING'
+          ? part.gramsPerServing != null : part.gramsPerMl != null).map((part) =>
+          <Pressable key={part.id} accessibilityRole="radio" accessibilityState={{ checked: catalogPortionId === part.id }}
+            accessibilityLabel={`Portion ${part.label}, nguồn ${catalogBasis === 'SERVING' ? part.factorSource ?? 'chưa rõ' : part.mlFactorSource ?? 'chưa rõ'}`}
+            onPress={() => setCatalogPortionId(part.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogPortionId === part.id ? '◉' : '○'} {part.label} · {catalogBasis === 'SERVING' ? part.factorSource : part.mlFactorSource}</Text>
+          </Pressable>) : null}
+        {input('Số lượng theo đơn vị đã chọn', catalogQuantity, setCatalogQuantity, 'decimal-pad')}
+        <WorkoutButton label="Ghi thực phẩm catalog" disabled={busy || !validContext} onPress={addCatalogItem} />
+      </> : null}
     </WorkoutCard>
   </ScrollView>;
 }

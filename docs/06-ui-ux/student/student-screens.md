@@ -87,6 +87,8 @@ Metric list hiển thị current valid value, trend, last measured time và sour
 
 Header hiển thị day type và target version. Summary: calories, protein, carbs, fat và logging completeness. Meals list, Add Food CTA và daily override marker. Target không được ghi đè bởi actual.
 
+B07 catalog mở từ cùng màn ghi món: chỉ thực phẩm Foundation đã công bố, nêu FDC/release/revision và chỉ cho chọn gram, serving hoặc ml khi phần conversion tương ứng đã được duyệt; không suy ml = gram. Food Log giữ nutrient snapshot của revision đã chọn. Nutrition Strategy cho Student sửa riêng nutrient target của một ngày đã frozen với reason/version/commandKey, trình bày target gốc → target sau sửa và lịch sử actor/lý do; so sánh tiến độ dùng target sau sửa, không sửa actual.
+
 ## ST-14 Food Photo Confirmation
 
 Ảnh, detected foods, portion estimate, confidence, nutrition estimate, source và warning. Student sửa food/portion hoặc xác nhận. Trạng thái lưu provenance `ESTIMATED`, sau xác nhận `CONFIRMED`, sau chỉnh sửa `CORRECTED`.

@@ -49,3 +49,7 @@ Search/filter actor, action, target, time và correlation ID. Detail hiển th�
 ## AD-15 Configuration and Flags
 
 Feature flag có environment, rollout strategy, audience, owner, status và history. Critical change yêu cầu validation, reason và audit; staged rollout cho Nutrition AI, AI Workout Generation, Pose Estimation và integrations.
+
+## AD-16 Governed Nutrition Catalog
+
+Route `/nutrition/catalog` chỉ dành cho Admin có `CATALOG_MANAGE`. Chọn tập nhỏ USDA Foundation Foods với FDC ID, release/date, URL bản ghi và nutrient trên 100 g; nutrient thiếu để trống, số 0 là giá trị xác nhận. Hệ số gram/serving hoặc gram/ml cần nguồn riêng. Tạo DRAFT, công bố, tạo revision và ngừng dùng bằng lệnh có audit; revision do Admin xác nhận trên food đang PUBLISHED có hiệu lực ngay cho lần ghi mới, nên UI cảnh báo trước khi gửi. Food Log cũ giữ snapshot. Form một portion không được âm thầm làm mất các portion khác khi tạo revision. Không có import hàng loạt hoặc API USDA live trong giao diện này.

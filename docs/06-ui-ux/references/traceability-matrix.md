@@ -14,7 +14,7 @@
 | Schedule change | Student direct detail/đổi lịch/hủy từng occurrence tại `/(app)/workouts/schedule/[occurrenceId]`, lineage và conflict review; Trainer TR-03 tạo một proposal RESCHEDULE/CANCEL, xem list/detail và rút PENDING tại `/(app)/coaching/[relationshipId]/change-proposals`; Student xem list/detail và ACCEPT/REJECT PENDING tại `/(app)/workout-change-proposals`. | Student/Trainer | `screen-inventory.md`, `navigation-architecture.md`, Student và Trainer flows |
 | Body measurement | Add measurement, history, provenance, quality | Student/Trainer | Student screens |
 | Progress | Current Goal và Lifetime tabs | Student/Trainer | Student screens |
-| Nutrition lifecycle | Goal, target, proposal, daily target, actual | Student/Trainer | Student screens |
+| Nutrition lifecycle | V39/V40 basic and strategy; V41 catalog uses Admin-selected pinned USDA Foundation revision and per-portion conversion evidence, while historical actual stays snapshotted. Student frozen target correction overlays current comparison without rewriting original target/actual; Trainer sees correction history only with current NUTRITION_GOAL VIEW. | Student/Trainer/Admin | ST-12/ST-13/ST-15, AD-16, B07 decision record and OpenAPI |
 | Nutrition AI | Photo result, confidence, confirmation/correction | Student | Student screens |
 | AI Assistance | Recommendation detail, evidence, missing data, review | Student/Trainer | Components và actor screens |
 | Attention Signal | Queue, filter, signal detail, resolution | Trainer/Admin | Trainer/Admin screens |

@@ -27,9 +27,9 @@
 | ST-10 | Measurements | Add/history/source/quality |
 | ST-11 | Progress Photos | Consent, visibility, comparison |
 | ST-12 | Nutrition Today | B07 basic route `/(app)/nutrition`: explicit local day/IANA timezone, completeness and nullable actual nutrient totals; target preview lives separately at `/(app)/nutrition/strategy` and never redefines actual intake |
-| ST-13 | Food Log Entry | Same route: private USER_REPORTED food per serving or unquantified description; all-unknown private food stays DRAFT and cannot be selected for a quantified serving until Student supplies at least one nutrient; versioned correction/removal, explicit day confirmation |
+| ST-13 | Food Log Entry | Same route: private USER_REPORTED food per serving, unquantified description, or a published USDA Foundation catalog revision with explicit supported gram/serving/ml evidence; all-unknown private food stays DRAFT. Catalog log pins its revision and nutrient snapshot; versioned correction/removal and explicit day confirmation remain Student-owned. |
 | ST-14 | Food Photo Confirmation | AI estimate, confidence, correction |
-| ST-15 | Nutrition Goal and Proposal | Route `/(app)/nutrition/strategy`: Student NEW_GOAL/CHANGE_TARGET with explicit effective date/timezone, target versions, pause/resume/end, Trainer proposal ACCEPT/REJECT, day-type preview/selection and version-bound override; 409 requires review again |
+| ST-15 | Nutrition Goal and Proposal | Route `/(app)/nutrition/strategy`: Student NEW_GOAL/CHANGE_TARGET with explicit effective date/timezone, target versions, pause/resume/end, Trainer proposal ACCEPT/REJECT, day-type preview/selection and version-bound override. Frozen nutrient/day correction shows original/current target and append-only reason/actor history; comparison uses corrected target, not altered actual. 409 requires review again. |
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
 | ST-17 | Coaching Profile | Route `/(app)/coaching`; relationship lifecycle, current period, history list, and Student-owned sharing permission management |
 | ST-18 | Reschedule Request | Conflict, accept/reject, workout independence |
@@ -76,6 +76,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | AD-13 | Jobs and Integrations | Status, retry/cancel subject to policy |
 | AD-14 | Audit Log | Immutable, search/export by permission |
 | AD-15 | Configuration and Flags | Staged rollout and critical-change audit |
+| AD-16 | Governed Nutrition Catalog | `/nutrition/catalog`: Admin with CATALOG_MANAGE selects a small pinned USDA Foundation subset, reviews source/portion evidence, publishes, revises, and retires with reason and audit; private Student foods never appear here. |
 
 ## Ưu tiên triển khai
 

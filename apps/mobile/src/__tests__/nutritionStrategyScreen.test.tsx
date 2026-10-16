@@ -16,6 +16,7 @@ jest.mock('@/features/nutrition/nutritionApi', () => ({ nutritionApi: {
   strategy: jest.fn(), trainerStrategy: jest.fn(), goalTypes: jest.fn(), targetNutrients: jest.fn(), targetDay: jest.fn(),
   changeStrategy: jest.fn(), proposeStrategy: jest.fn(), decideStrategy: jest.fn(), chooseDayType: jest.fn(),
   overrideTarget: jest.fn(), transitionGoal: jest.fn(),
+  frozenCorrections: jest.fn(), trainerFrozenCorrections: jest.fn(), correctFrozenTarget: jest.fn(),
 } }));
 
 const catalog = [{ id: 12, code: 'BALANCE', name: 'Cân bằng' }];
@@ -48,7 +49,7 @@ describe('B07 nutrition strategy Mobile', () => {
     (useQueryClient as jest.Mock).mockReturnValue({ invalidateQueries: refresh, removeQueries: jest.fn() });
     (useSharingSummary as jest.Mock).mockReturnValue({ data: null });
     (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
-      data: queryKey.includes('types') ? catalog : queryKey.includes('nutrients') ? nutrients
+      data: queryKey.includes('frozen-corrections') ? [] : queryKey.includes('types') ? catalog : queryKey.includes('nutrients') ? nutrients
         : queryKey.includes('day') ? undefined : { goal: null, proposals: [proposal] },
       isPending: false, isError: false, error: null, refetch: jest.fn(),
     }));
@@ -100,6 +101,40 @@ describe('B07 nutrition strategy Mobile', () => {
     });
     expect(tree.root.findAll((node) => node.props.label === 'Thử lại cùng lệnh')).toHaveLength(0);
     expect(refresh).toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('confirms one frozen nutrient correction with original/current target and keeps retry identity', async () => {
+    const frozenDay = { date: '2026-10-16', timezone: 'Asia/Ho_Chi_Minh', frozen: true,
+      dayType: 'DEFAULT', goalVersionId: 'goal-version', targets: [{ nutrientId: 41, unitId: 93,
+        targetAmount: 1800, originalTargetAmount: 2000, correctionVersion: 1,
+        source: 'CORRECTED', sourceTargetId: 'source-target', sourceOverrideId: null,
+        overrideVersion: null }] };
+    (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
+      data: queryKey.includes('frozen-corrections') ? [] : queryKey.includes('types') ? catalog
+        : queryKey.includes('nutrients') ? nutrients
+          : queryKey.includes('day') ? frozenDay : { goal: null, proposals: [] },
+      isPending: false, isError: false, error: null, refetch: jest.fn(),
+    }));
+    (nutritionApi.correctFrozenTarget as jest.Mock).mockRejectedValueOnce(new Error('uncertain network'))
+      .mockResolvedValueOnce(frozenDay);
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<NutritionStrategyScreen />); });
+    type(tree, 'Ngày (YYYY-MM-DD)', '2026-10-16');
+    renderer.act(() => press(tree, 'Xem ngày theo múi giờ đã chọn'));
+    expect(JSON.stringify(tree.toJSON())).toContain('gốc');
+    expect(JSON.stringify(tree.toJSON())).toContain('2000');
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Sửa target nutrient 41' }).props.onPress());
+    type(tree, 'Target sau correction', '1700');
+    type(tree, 'Lý do correction', 'Đánh giá lại');
+    renderer.act(() => press(tree, 'Xem lại correction target đã chốt'));
+    await renderer.act(async () => { press(tree, 'Xác nhận correction'); });
+    expect(nutritionApi.correctFrozenTarget).toHaveBeenCalledWith('2026-10-16',
+      expect.objectContaining({ nutrientId: 41, targetAmount: 1700, expectedVersion: 1,
+        reason: 'Đánh giá lại', commandKey: 'stable-key' }));
+    await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
+    expect((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[1])
+      .toEqual((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[0]);
     renderer.act(() => tree.unmount());
   });
 });

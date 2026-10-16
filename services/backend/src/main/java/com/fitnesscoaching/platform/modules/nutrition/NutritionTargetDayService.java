@@ -2,6 +2,10 @@ package com.fitnesscoaching.platform.modules.nutrition;
 
 import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutTrainingDaySignalQuery;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,16 +26,31 @@ public class NutritionTargetDayService {
     private final NutritionStrategyCommands commands;
     private final WorkoutTrainingDaySignalQuery workouts;
     private final MeasurementUnitReferenceQuery units;
+    private final CoachingAuthorityQuery coaching;
 
     public NutritionTargetDayService(JdbcTemplate jdbc, NutritionStrategyCommands commands,
-                                     WorkoutTrainingDaySignalQuery workouts, MeasurementUnitReferenceQuery units) {
+                                     WorkoutTrainingDaySignalQuery workouts, MeasurementUnitReferenceQuery units,
+                                     CoachingAuthorityQuery coaching) {
         this.jdbc = jdbc; this.commands = commands; this.workouts = workouts; this.units = units;
+        this.coaching = coaching;
     }
 
     public record ResolvedTarget(int nutrientId, int unitId, BigDecimal targetAmount, String source,
-                                 UUID sourceTargetId, UUID sourceOverrideId, Long overrideVersion) {}
+                                 UUID sourceTargetId, UUID sourceOverrideId, Long overrideVersion,
+                                 BigDecimal originalTargetAmount, Long correctionVersion) {
+        public ResolvedTarget(int nutrientId, int unitId, BigDecimal targetAmount, String source,
+                              UUID sourceTargetId, UUID sourceOverrideId, Long overrideVersion) {
+            this(nutrientId, unitId, targetAmount, source, sourceTargetId, sourceOverrideId,
+                    overrideVersion, null, null);
+        }
+    }
     public record TargetDay(LocalDate date, String timezone, boolean frozen, String dayType,
                             UUID goalVersionId, List<ResolvedTarget> targets) {}
+    public record FrozenCorrectionInput(String timezone, int nutrientId, BigDecimal targetAmount,
+                                        long expectedVersion, String reason, String commandKey) {}
+    public record FrozenCorrection(UUID id, LocalDate date, int nutrientId, int unitId, long version,
+                                   BigDecimal originalAmount, BigDecimal beforeAmount, BigDecimal afterAmount,
+                                   String reason, UUID actorId, java.time.Instant correctedAt) {}
     public record DayTypeInput(String timezone, String dayType, String commandKey) {}
     public record OverrideInput(String timezone, UUID goalVersionId, int nutrientId, int unitId,
                                 BigDecimal targetAmount, String reason, Long expectedOverrideVersion,
@@ -43,6 +62,72 @@ public class NutritionTargetDayService {
         commands.requireStudent(actor);
         validZone(timezone);
         return resolve(actor, day, timezone);
+    }
+
+    @Transactional
+    public TargetDay correctFrozen(UUID actor, LocalDate day, FrozenCorrectionInput input) {
+        commands.requireStudent(actor);
+        if (input == null || input.nutrientId() <= 0 || input.targetAmount() == null
+                || input.targetAmount().signum() < 0 || input.targetAmount().scale() > 6
+                || input.targetAmount().precision() > 18 || input.expectedVersion() < 0
+                || input.reason() == null || input.reason().isBlank() || input.reason().length() > 1000)
+            throw fail("VALIDATION_FAILED", 400);
+        validZone(input.timezone());
+        commands.lockStudent(actor);
+        return commands.receipt(actor, input.commandKey(), "NUTRITION_FROZEN_TARGET_CORRECTION",
+                List.of(day, input), TargetDay.class, () -> {
+                    TargetDay frozen = resolve(actor, day, input.timezone());
+                    if (!frozen.frozen()) throw fail("NUTRITION_TARGET_NOT_FROZEN", 409);
+                    var original = jdbc.query("""
+                            SELECT id,unit_id,target_amount FROM fitness.resolved_daily_nutrition_targets
+                            WHERE student_id=? AND target_date=? AND nutrient_id=?
+                            """, (rs, n) -> new OriginalTarget((UUID) rs.getObject(1), rs.getInt(2),
+                            rs.getBigDecimal(3)), actor, day, input.nutrientId());
+                    if (original.size() != 1) throw fail("NUTRITION_TARGET_NOT_FOUND", 404);
+                    OriginalTarget fact = original.getFirst();
+                    var previous = jdbc.query("""
+                            SELECT version,after_amount FROM fitness.nutrition_frozen_target_corrections
+                            WHERE student_id=? AND target_date=? AND nutrient_id=?
+                            ORDER BY version DESC LIMIT 1
+                            """, (rs, n) -> new PriorCorrection(rs.getLong(1), rs.getBigDecimal(2)),
+                            actor, day, input.nutrientId());
+                    long version = previous.isEmpty() ? 0 : previous.getFirst().version();
+                    if (version != input.expectedVersion()) throw fail("NUTRITION_VERSION_STALE", 409);
+                    BigDecimal before = previous.isEmpty() ? fact.amount() : previous.getFirst().amount();
+                    UUID id = UUID.randomUUID();
+                    jdbc.update("""
+                            INSERT INTO fitness.nutrition_frozen_target_corrections
+                              (id,student_id,target_date,nutrient_id,version,original_target_id,unit_id,
+                               before_amount,after_amount,reason,actor_id)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                            """, id, actor, day, input.nutrientId(), version + 1, fact.id(), fact.unitId(),
+                            before, input.targetAmount(), input.reason().trim(), actor);
+                    commands.audit(actor, "STUDENT", "NUTRITION_FROZEN_TARGET_CORRECTED",
+                            "NUTRITION_TARGET_CORRECTION", id,
+                            java.util.Map.of("date", day.toString(), "nutrientId", input.nutrientId(),
+                                    "before", before, "after", input.targetAmount(),
+                                    "reason", input.reason().trim()));
+                    return resolve(actor, day, input.timezone());
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public List<FrozenCorrection> correctionHistory(UUID actor, UUID student, LocalDate day) {
+        if (actor.equals(student)) commands.requireStudent(actor);
+        else if (!coaching.evaluateCurrent(new AuthorityRequest(actor, student,
+                DataScope.NUTRITION_GOAL, DataAccessLevel.VIEW)).allowed())
+            throw fail("NUTRITION_TARGET_NOT_FOUND", 404);
+        return jdbc.query("""
+                SELECT c.id,c.nutrient_id,c.unit_id,c.version,r.target_amount,
+                       c.before_amount,c.after_amount,c.reason,c.actor_id,c.corrected_at
+                FROM fitness.nutrition_frozen_target_corrections c
+                JOIN fitness.resolved_daily_nutrition_targets r ON r.id=c.original_target_id
+                WHERE c.student_id=? AND c.target_date=?
+                ORDER BY c.nutrient_id,c.version
+                """, (rs, n) -> new FrozenCorrection((UUID) rs.getObject(1), day, rs.getInt(2),
+                rs.getInt(3), rs.getLong(4), rs.getBigDecimal(5), rs.getBigDecimal(6),
+                rs.getBigDecimal(7), rs.getString(8), (UUID) rs.getObject(9),
+                rs.getTimestamp(10).toInstant()), student, day);
     }
 
     @Transactional
@@ -197,7 +282,25 @@ public class NutritionTargetDayService {
                     rs.getObject(5) != null ? "OVERRIDE" : "DEFAULT".equals(rs.getString(6))
                             ? "DEFAULT" : "DAY_TYPE",
                     (UUID) rs.getObject(4), (UUID) rs.getObject(5), null), student, day);
-            return new TargetDay(day, timezone, true, frozen.dayType(), frozen.versionId(), targets);
+            var corrections = jdbc.query("""
+                    SELECT DISTINCT ON (nutrient_id) nutrient_id,version,after_amount
+                    FROM fitness.nutrition_frozen_target_corrections
+                    WHERE student_id=? AND target_date=?
+                    ORDER BY nutrient_id,version DESC
+                    """, (rs, n) -> new CurrentCorrection(rs.getInt(1), rs.getLong(2), rs.getBigDecimal(3)),
+                    student, day);
+            Map<Integer, CurrentCorrection> current = new LinkedHashMap<>();
+            for (CurrentCorrection correction : corrections) current.put(correction.nutrientId(), correction);
+            List<ResolvedTarget> display = new ArrayList<>();
+            for (ResolvedTarget target : targets) {
+                CurrentCorrection corrected = current.get(target.nutrientId());
+                display.add(new ResolvedTarget(target.nutrientId(), target.unitId(),
+                        corrected == null ? target.targetAmount() : corrected.amount(),
+                        corrected == null ? target.source() : "CORRECTED",
+                        target.sourceTargetId(), target.sourceOverrideId(), target.overrideVersion(),
+                        target.targetAmount(), corrected == null ? 0L : corrected.version()));
+            }
+            return new TargetDay(day, timezone, true, frozen.dayType(), frozen.versionId(), display);
         }
         if (hasLegacyResolvedRows(student, day))
             throw fail("NUTRITION_LEGACY_TARGET_UNRESOLVED", 409);
@@ -279,4 +382,7 @@ public class NutritionTargetDayService {
     private record TargetCandidate(UUID id, int nutrientId, int unitId, BigDecimal amount, String dayType) {}
     private record OverrideRow(UUID id, long version, UUID goalVersionId, BigDecimal amount,
                                int unitId, String reason) {}
+    private record OriginalTarget(UUID id, int unitId, BigDecimal amount) {}
+    private record PriorCorrection(long version, BigDecimal amount) {}
+    private record CurrentCorrection(int nutrientId, long version, BigDecimal amount) {}
 }
