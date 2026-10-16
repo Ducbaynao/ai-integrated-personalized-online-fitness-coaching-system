@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.ai.application.service;
 
+import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.AiFeatureDisabledException;
 import com.fitnesscoaching.platform.common.exception.AiOutputValidationException;
 import com.fitnesscoaching.platform.common.exception.AiProviderException;
@@ -14,17 +15,24 @@ import com.fitnesscoaching.platform.modules.ai.application.port.in.CreateF01AiRu
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiProvenanceRepository;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F01AiServiceClient;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
+import com.fitnesscoaching.platform.modules.ai.domain.AiRunKnowledgeChunk;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 import com.fitnesscoaching.platform.modules.ai.domain.AiValidationResult;
 import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope;
+import com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeChunkRepository;
+import com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker;
+import com.fitnesscoaching.platform.modules.content.domain.KnowledgeChunk;
+import com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -40,6 +48,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
     private final AiRunF01UseCase aiRunUseCase;
     private final F01AiServiceClient aiServiceClient;
     private final AiProvenanceRepository provenanceRepository;
+    private final KnowledgeChunkRepository chunkRepository;
+    private final F01RunEvidenceTracker evidenceTracker;
     private final ObjectMapper objectMapper;
     private final AiServiceProperties aiProperties;
     private final F01RuntimeOutputValidator runtimeValidator;
@@ -48,6 +58,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
             AiRunF01UseCase aiRunUseCase,
             F01AiServiceClient aiServiceClient,
             AiProvenanceRepository provenanceRepository,
+            KnowledgeChunkRepository chunkRepository,
+            F01RunEvidenceTracker evidenceTracker,
             ObjectMapper objectMapper,
             AiServiceProperties aiProperties,
             F01RuntimeOutputValidator runtimeValidator
@@ -55,6 +67,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
         this.aiRunUseCase = aiRunUseCase;
         this.aiServiceClient = aiServiceClient;
         this.provenanceRepository = provenanceRepository;
+        this.chunkRepository = chunkRepository;
+        this.evidenceTracker = evidenceTracker;
         this.objectMapper = objectMapper;
         this.aiProperties = aiProperties;
         this.runtimeValidator = runtimeValidator;
@@ -79,151 +93,230 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
         AiRun run = runContext.run();
         F01InternalContextEnvelope envelope = runContext.envelope();
 
-        // 2. Transaction 2: Transition from QUEUED to RUNNING
-        Instant startedAt = Instant.now();
-        aiRunUseCase.transitionRunStatus(run.id(), AiRunStatus.QUEUED, AiRunStatus.RUNNING, startedAt, null);
-
-        // 3. Invoke external AI Service (OUTSIDE ANY DATABASE TRANSACTION)
-        long startMs = System.currentTimeMillis();
-        F01KnowledgeQueryResponse serviceResponse = null;
-        AiRunStatus terminalStatus = AiRunStatus.FAILED;
-        String errorCode = null;
-        String errorMessage = null;
-
         try {
-            serviceResponse = aiServiceClient.queryKnowledge(envelope);
-        } catch (AiTimeoutException ex) {
-            log.warn("AI service timeout for run {}: {}", run.id(), ex.getMessage());
-            terminalStatus = AiRunStatus.FAILED;
-            errorCode = "TIMEOUT";
-            errorMessage = ex.getMessage();
-        } catch (AiProviderException ex) {
-            log.warn("AI provider failure for run {}: {}", run.id(), ex.getMessage());
-            terminalStatus = AiRunStatus.FAILED;
-            errorCode = "MODEL_ERROR";
-            errorMessage = ex.getMessage();
-        } catch (AiOutputValidationException ex) {
-            log.warn("AI output validation failure for run {}: {}", run.id(), ex.getMessage());
-            terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
-            errorCode = "VALIDATION_FAILED";
-            errorMessage = ex.getMessage();
-        } catch (Exception ex) {
-            log.error("Unexpected failure during AI orchestration for run {}", run.id(), ex);
-            terminalStatus = AiRunStatus.FAILED;
-            errorCode = "PROCESSING_ERROR";
-            errorMessage = "An unexpected processing error occurred.";
-        }
+            // 2. Transaction 2: Transition from QUEUED to RUNNING
+            Instant startedAt = Instant.now();
+            aiRunUseCase.transitionRunStatus(run.id(), AiRunStatus.QUEUED, AiRunStatus.RUNNING, startedAt, null);
 
-        long latencyMs = System.currentTimeMillis() - startMs;
+            // 3. Invoke external AI Service (OUTSIDE ANY DATABASE TRANSACTION)
+            long startMs = System.currentTimeMillis();
+            F01KnowledgeQueryResponse serviceResponse = null;
+            AiRunStatus terminalStatus = AiRunStatus.FAILED;
+            String errorCode = null;
+            String errorMessage = null;
 
-        // 4. Validate AI service response against contract rules & allowed sources
-        boolean validationPassed = false;
-        String validationDetail = "PASSED";
-
-        if (serviceResponse != null) {
-            if (!run.id().equals(serviceResponse.runId())) {
-                log.error("AI service returned mismatched runId: expected {} but was {}", run.id(), serviceResponse.runId());
+            try {
+                serviceResponse = aiServiceClient.queryKnowledge(envelope);
+            } catch (AiTimeoutException ex) {
+                log.warn("AI service timeout for run {}: {}", run.id(), ex.getMessage());
+                terminalStatus = AiRunStatus.FAILED;
+                errorCode = "TIMEOUT";
+                errorMessage = ex.getMessage();
+            } catch (AiProviderException ex) {
+                log.warn("AI provider failure for run {}: {}", run.id(), ex.getMessage());
+                terminalStatus = AiRunStatus.FAILED;
+                errorCode = "MODEL_ERROR";
+                errorMessage = ex.getMessage();
+            } catch (AiOutputValidationException ex) {
+                log.warn("AI output validation failure for run {}: {}", run.id(), ex.getMessage());
+                terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                errorCode = "VALIDATION_FAILED";
+                errorMessage = ex.getMessage();
+            } catch (Exception ex) {
+                log.error("Unexpected failure during AI orchestration for run {}", run.id(), ex);
                 terminalStatus = AiRunStatus.FAILED;
                 errorCode = "PROCESSING_ERROR";
-                errorMessage = "Mismatched runId returned by AI service.";
-                serviceResponse = null;
-                validationPassed = false;
-                validationDetail = "Mismatched runId";
-            } else {
-                F01RuntimeOutputValidator.ValidationResult valResult = runtimeValidator.validate(serviceResponse, envelope);
-                if (!valResult.isValid()) {
-                    log.warn("AI service output failed contract invariants for run {}: {}", run.id(), valResult.failureReason());
-                    terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
-                    errorCode = "VALIDATION_FAILED";
-                    errorMessage = "AI service output violated contract invariants: " + valResult.failureReason();
+                errorMessage = "An unexpected processing error occurred.";
+            }
+
+            long latencyMs = System.currentTimeMillis() - startMs;
+
+            // 4. Validate AI service response against contract rules & allowed sources
+            boolean validationPassed = false;
+            String validationDetail = "PASSED";
+
+            if (serviceResponse != null) {
+                if (!run.id().equals(serviceResponse.runId())) {
+                    log.error("AI service returned mismatched runId: expected {} but was {}", run.id(), serviceResponse.runId());
+                    terminalStatus = AiRunStatus.FAILED;
+                    errorCode = "PROCESSING_ERROR";
+                    errorMessage = "Mismatched runId returned by AI service.";
                     serviceResponse = null;
                     validationPassed = false;
-                    validationDetail = valResult.failureReason();
+                    validationDetail = "Mismatched runId";
                 } else {
-                    terminalStatus = mapToTerminalStatus(serviceResponse.runStatus());
-                    validationPassed = true;
-                    validationDetail = "PASSED";
+                    F01RuntimeOutputValidator.ValidationResult valResult = runtimeValidator.validate(serviceResponse, envelope);
+                    if (!valResult.isValid()) {
+                        log.warn("AI service output failed contract invariants for run {}: {}", run.id(), valResult.failureReason());
+                        terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                        errorCode = "VALIDATION_FAILED";
+                        errorMessage = "AI service output violated contract invariants: " + valResult.failureReason();
+                        serviceResponse = null;
+                        validationPassed = false;
+                        validationDetail = valResult.failureReason();
+                    } else {
+                        terminalStatus = mapToTerminalStatus(serviceResponse.runStatus());
+                        validationPassed = true;
+                        validationDetail = "PASSED";
+
+                        // Strict evidence grounding: verify all citations against the original evidence set of THIS AI Run
+                        // and verify current database eligibility (active, technical verification passed, not deleted)
+                        if (serviceResponse.citations() != null && !serviceResponse.citations().isEmpty()) {
+                            List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(envelope.correlationId());
+
+                            for (F01KnowledgeQueryResponse.CitationDto citation : serviceResponse.citations()) {
+                                int sectionIdx = citation.locator() != null && citation.locator().sectionIndex() != null
+                                        ? citation.locator().sectionIndex()
+                                        : 0;
+                                Optional<RetrievedKnowledgeChunk> matchedEvidence = originalEvidence.stream()
+                                        .filter(c -> c.documentCode().equals(citation.documentId())
+                                                && c.versionLabel().equals(citation.version())
+                                                && c.sectionIndex() == sectionIdx)
+                                        .findFirst();
+
+                                if (matchedEvidence.isEmpty()) {
+                                    log.warn("AI response contained citation outside original run evidence set: run={}, doc={}, version={}, section={}",
+                                            run.id(), citation.documentId(), citation.version(), sectionIdx);
+                                    terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                                    errorCode = "UNVERIFIED_CITATION";
+                                    errorMessage = "Citation is not grounded in the original evidence set supplied for this run: "
+                                            + citation.documentId() + " (v" + citation.version() + ", section " + sectionIdx + ")";
+                                    serviceResponse = null;
+                                    validationPassed = false;
+                                    validationDetail = "UNGROUNDED_CITATION_NOT_IN_RUN_EVIDENCE: " + citation.documentId() + " v" + citation.version();
+                                    break;
+                                }
+
+                                Optional<KnowledgeChunk> currentEligible = chunkRepository.findByDocumentCodeAndVersionAndIndex(
+                                        citation.documentId(), citation.version(), sectionIdx);
+                                if (currentEligible.isEmpty()) {
+                                    log.warn("AI response citation matched run evidence but is no longer active/eligible in database: run={}, doc={}, version={}, section={}",
+                                            run.id(), citation.documentId(), citation.version(), sectionIdx);
+                                    terminalStatus = AiRunStatus.REJECTED_BY_VALIDATOR;
+                                    errorCode = "INELIGIBLE_CITATION";
+                                    errorMessage = "Citation references knowledge that is no longer active or eligible in database: "
+                                            + citation.documentId() + " (v" + citation.version() + ", section " + sectionIdx + ")";
+                                    serviceResponse = null;
+                                    validationPassed = false;
+                                    validationDetail = "CITATION_INELIGIBLE_IN_DATABASE: " + citation.documentId() + " v" + citation.version();
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
+            } else {
+                validationPassed = false;
+                validationDetail = errorCode != null ? errorCode : "FAILURE";
             }
-        } else {
-            validationPassed = false;
-            validationDetail = errorCode != null ? errorCode : "FAILURE";
-        }
 
-        // 5. Transaction 3: Complete AI Run and persist provenance
-        Instant completedAt = Instant.now();
-        if (serviceResponse != null) {
-            // Persist validation result
-            provenanceRepository.saveValidationResults(run.id(), List.of(
-                    new AiValidationResult(
-                            UUID.randomUUID(),
-                            run.id(),
-                            "F01_SCHEMA_DOMAIN_VALIDATOR",
-                            true,
-                            "INFO",
-                            "{\"result\": \"PASSED\"}",
-                            completedAt
-                    )
-            ));
+            // 5. Transaction 3: Complete AI Run and persist provenance
+            Instant completedAt = Instant.now();
+            if (serviceResponse != null) {
+                // Persist validation result
+                provenanceRepository.saveValidationResults(run.id(), List.of(
+                        new AiValidationResult(
+                                UUID.randomUUID(),
+                                run.id(),
+                                "F01_SCHEMA_DOMAIN_VALIDATOR",
+                                true,
+                                "INFO",
+                                "{\"result\": \"PASSED\"}",
+                                completedAt
+                        )
+                ));
 
-            String outputPayloadJson = toJson(serviceResponse);
-            aiRunUseCase.completeF01Run(new CompleteF01AiRunCommand(
-                    run.id(),
-                    terminalStatus,
-                    outputPayloadJson,
-                    null,
-                    null,
-                    serviceResponse.usage() != null ? serviceResponse.usage().promptTokens() : null,
-                    serviceResponse.usage() != null ? serviceResponse.usage().completionTokens() : null,
-                    serviceResponse.usage() != null ? serviceResponse.usage().totalTokens() : null,
-                    (int) latencyMs,
-                    completedAt
-            ));
+                // Persist knowledge chunk citations in ai_run_knowledge_chunks from original evidence
+                if (serviceResponse.citations() != null && !serviceResponse.citations().isEmpty()) {
+                    List<RetrievedKnowledgeChunk> originalEvidence = evidenceTracker.getRunEvidence(envelope.correlationId());
+                    List<AiRunKnowledgeChunk> chunkRefs = new ArrayList<>();
+                    int rank = 1;
+                    for (F01KnowledgeQueryResponse.CitationDto citation : serviceResponse.citations()) {
+                        int sectionIdx = citation.locator() != null && citation.locator().sectionIndex() != null
+                                ? citation.locator().sectionIndex()
+                                : 0;
+                        Optional<RetrievedKnowledgeChunk> matched = originalEvidence.stream()
+                                .filter(c -> c.documentCode().equals(citation.documentId())
+                                        && c.versionLabel().equals(citation.version())
+                                        && c.sectionIndex() == sectionIdx)
+                                .findFirst();
+                        if (matched.isPresent()) {
+                            chunkRefs.add(new AiRunKnowledgeChunk(
+                                    run.id(),
+                                    matched.get().chunkId(),
+                                    rank++,
+                                    BigDecimal.valueOf(matched.get().similarityScore())
+                            ));
+                        }
+                    }
+                    if (!chunkRefs.isEmpty()) {
+                        provenanceRepository.saveKnowledgeChunkReferences(run.id(), chunkRefs);
+                    }
+                }
 
-            return serviceResponse;
-        } else {
-            // Failure / Rejected completion
-            provenanceRepository.saveValidationResults(run.id(), List.of(
-                    new AiValidationResult(
-                            UUID.randomUUID(),
-                            run.id(),
-                            "F01_SCHEMA_DOMAIN_VALIDATOR",
-                            false,
-                            "HIGH",
-                            "{\"errorCode\": \"" + errorCode + "\", \"detail\": \"" + validationDetail + "\"}",
-                            completedAt
-                    )
-            ));
+                String outputPayloadJson = toJson(serviceResponse);
+                aiRunUseCase.completeF01Run(new CompleteF01AiRunCommand(
+                        run.id(),
+                        terminalStatus,
+                        outputPayloadJson,
+                        null,
+                        null,
+                        serviceResponse.usage() != null ? serviceResponse.usage().promptTokens() : null,
+                        serviceResponse.usage() != null ? serviceResponse.usage().completionTokens() : null,
+                        serviceResponse.usage() != null ? serviceResponse.usage().totalTokens() : null,
+                        (int) latencyMs,
+                        completedAt
+                ));
 
-            aiRunUseCase.completeF01Run(new CompleteF01AiRunCommand(
-                    run.id(),
-                    terminalStatus,
-                    null,
-                    errorCode,
-                    errorMessage,
-                    null,
-                    null,
-                    null,
-                    (int) latencyMs,
-                    completedAt
-            ));
+                return serviceResponse;
+            } else {
+                // Failure / Rejected completion
+                provenanceRepository.saveValidationResults(run.id(), List.of(
+                        new AiValidationResult(
+                                UUID.randomUUID(),
+                                run.id(),
+                                "F01_SCHEMA_DOMAIN_VALIDATOR",
+                                false,
+                                "HIGH",
+                                "{\"errorCode\": \"" + errorCode + "\", \"detail\": \"" + validationDetail + "\"}",
+                                completedAt
+                        )
+                ));
 
-            String asOf = Instant.now().truncatedTo(ChronoUnit.SECONDS).toString();
-            return new F01KnowledgeQueryResponse(
-                    run.id(),
-                    envelope.correlationId(),
-                    terminalStatus.name(),
-                    null, // resultType is not present when FAILED or REJECTED_BY_VALIDATOR without BLOCKED
-                    errorCode,
-                    null,
-                    null,
-                    null,
-                    null,
-                    asOf,
-                    null,
-                    new F01KnowledgeQueryResponse.ErrorDto(errorCode, errorMessage),
-                    null
-            );
+                aiRunUseCase.completeF01Run(new CompleteF01AiRunCommand(
+                        run.id(),
+                        terminalStatus,
+                        null,
+                        errorCode,
+                        errorMessage,
+                        null,
+                        null,
+                        null,
+                        (int) latencyMs,
+                        completedAt
+                ));
+
+                String asOf = Instant.now().truncatedTo(ChronoUnit.SECONDS).toString();
+                return new F01KnowledgeQueryResponse(
+                        run.id(),
+                        envelope.correlationId(),
+                        terminalStatus.name(),
+                        null, // resultType is not present when FAILED or REJECTED_BY_VALIDATOR without BLOCKED
+                        errorCode,
+                        null,
+                        null,
+                        null,
+                        null,
+                        asOf,
+                        null,
+                        new F01KnowledgeQueryResponse.ErrorDto(errorCode, errorMessage),
+                        null
+                );
+            }
+        } finally {
+            if (envelope.correlationId() != null) {
+                evidenceTracker.clearRunEvidence(envelope.correlationId());
+            }
         }
     }
 

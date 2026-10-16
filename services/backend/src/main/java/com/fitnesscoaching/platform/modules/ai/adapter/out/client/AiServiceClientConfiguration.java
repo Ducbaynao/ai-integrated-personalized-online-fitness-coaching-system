@@ -18,7 +18,10 @@ public class AiServiceClientConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "ai.service.mode", havingValue = "simulated", matchIfMissing = true)
-    public F01AiServiceClient simulatedAiServiceClient() {
-        return new SimulatedF01AiServiceClient();
+    public F01AiServiceClient simulatedAiServiceClient(
+            org.springframework.beans.factory.ObjectProvider<com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase> retrievalUseCaseProvider,
+            org.springframework.beans.factory.ObjectProvider<com.fitnesscoaching.platform.modules.content.application.service.F01RunEvidenceTracker> evidenceTrackerProvider
+    ) {
+        return new SimulatedF01AiServiceClient(retrievalUseCaseProvider.getIfAvailable(), evidenceTrackerProvider.getIfAvailable());
     }
 }

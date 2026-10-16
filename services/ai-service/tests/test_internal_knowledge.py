@@ -161,3 +161,19 @@ def test_disabled_mock_provider(monkeypatch):
     )
     assert response.status_code == 503
     assert "disabled" in response.json()["detail"]
+
+
+def test_retrieval_enabled_backend_unreachable_fails_without_fixture(monkeypatch):
+    monkeypatch.setattr(settings, "backend_internal_retrieval_enabled", True)
+    # Backend localhost:8080 is unreachable during isolated unit test
+    response = client.post(
+        "/internal/v1/knowledge/query",
+        headers=VALID_AUTH_HEADER,
+        json=VALID_ENVELOPE,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["runStatus"] == "FAILED"
+    assert data["error"]["code"] == "UPSTREAM_RETRIEVAL_FAILED"
+    assert "citations" not in data or data["citations"] is None
+

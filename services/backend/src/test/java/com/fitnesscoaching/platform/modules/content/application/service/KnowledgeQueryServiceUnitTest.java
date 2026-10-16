@@ -30,12 +30,13 @@ class KnowledgeQueryServiceUnitTest {
 
     @Mock private KnowledgeVersionRepository versionRepository;
     @Mock private KnowledgeDocumentRepository documentRepository;
+    @Mock private com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase retrievalUseCase;
 
     private KnowledgeQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new KnowledgeQueryService(versionRepository, documentRepository);
+        service = new KnowledgeQueryService(versionRepository, documentRepository, retrievalUseCase);
     }
 
     @Test

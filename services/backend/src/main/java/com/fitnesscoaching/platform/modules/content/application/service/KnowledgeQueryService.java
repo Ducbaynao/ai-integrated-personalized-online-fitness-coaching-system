@@ -3,11 +3,13 @@ package com.fitnesscoaching.platform.modules.content.application.service;
 import com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeQueryRequest;
 import com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeQueryResult;
 import com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeQueryUseCase;
+import com.fitnesscoaching.platform.modules.content.application.port.in.KnowledgeRetrievalUseCase;
 import com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeDocumentRepository;
 import com.fitnesscoaching.platform.modules.content.application.port.out.KnowledgeVersionRepository;
 import com.fitnesscoaching.platform.modules.content.domain.KnowledgeDocument;
 import com.fitnesscoaching.platform.modules.content.domain.KnowledgeStatus;
 import com.fitnesscoaching.platform.modules.content.domain.KnowledgeVersion;
+import com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk;
 import com.fitnesscoaching.platform.modules.content.domain.TechnicalReadiness;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,13 +35,16 @@ public class KnowledgeQueryService implements KnowledgeQueryUseCase {
 
     private final KnowledgeVersionRepository versionRepository;
     private final KnowledgeDocumentRepository documentRepository;
+    private final KnowledgeRetrievalUseCase retrievalUseCase;
 
     public KnowledgeQueryService(
             KnowledgeVersionRepository versionRepository,
-            KnowledgeDocumentRepository documentRepository
+            KnowledgeDocumentRepository documentRepository,
+            KnowledgeRetrievalUseCase retrievalUseCase
     ) {
         this.versionRepository = versionRepository;
         this.documentRepository = documentRepository;
+        this.retrievalUseCase = retrievalUseCase;
     }
 
     @Override
@@ -62,7 +67,31 @@ public class KnowledgeQueryService implements KnowledgeQueryUseCase {
             return new KnowledgeQueryResult(List.of());
         }
 
-        // Parameterized SQL query ensures no injection and retrieves only status = 'ACTIVE'
+        // 1. Try real vector retrieval first if a query string is present
+        String query = request.query();
+        if (query != null && !query.isBlank()) {
+            List<RetrievedKnowledgeChunk> retrievedChunks = retrievalUseCase.retrieveActiveKnowledge(
+                    query, authorizedSourceIds, request.limit()
+            );
+
+            if (!retrievedChunks.isEmpty()) {
+                List<KnowledgeQueryResult.KnowledgeCitationItem> citations = retrievedChunks.stream()
+                        .map(chunk -> new KnowledgeQueryResult.KnowledgeCitationItem(
+                                chunk.documentId(),
+                                chunk.documentCode(),
+                                chunk.versionLabel(),
+                                chunk.sourceId(),
+                                chunk.title(),
+                                chunk.contentPath(),
+                                chunk.snippet(),
+                                chunk.content()
+                        ))
+                        .toList();
+                return new KnowledgeQueryResult(citations);
+            }
+        }
+
+        // 2. Direct active versions query (strict fail-closed against non-ACTIVE / non-VERIFIED)
         List<KnowledgeVersion> activeVersions = versionRepository.findActiveBySourceIds(
                 authorizedSourceIds, Math.min(Math.max(request.limit(), 1), 50)
         );

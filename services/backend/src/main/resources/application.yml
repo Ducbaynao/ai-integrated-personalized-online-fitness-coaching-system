@@ -7,6 +7,7 @@ spring:
     password: ${DATABASE_PASSWORD:change-me}
     hikari:
       schema: fitness
+      connection-init-sql: SET search_path TO fitness, public;
   jpa:
     hibernate:
       ddl-auto: validate

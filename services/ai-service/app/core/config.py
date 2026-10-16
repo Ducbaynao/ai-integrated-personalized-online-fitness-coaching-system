@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     service_name: str = "fitness-coaching-ai-service"
     environment: str = "development"
     internal_service_key: str = "dev-ai-internal-key-change-me"
+    backend_base_url: str = "http://localhost:8080"
+    backend_internal_retrieval_enabled: bool = False
     f01_mock_enabled: bool = True
     f01_prompt_version: str = "v1.0"
     f01_rule_version: str = "f01-rule-v1"

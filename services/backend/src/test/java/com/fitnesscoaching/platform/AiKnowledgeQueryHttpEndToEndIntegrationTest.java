@@ -75,6 +75,7 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
     private static final AtomicReference<MockAiResponseScenario> currentScenario = new AtomicReference<>();
     private static final AtomicReference<String> receivedAuthHeader = new AtomicReference<>();
     private static final AtomicReference<String> receivedRequestBody = new AtomicReference<>();
+    private static final java.util.concurrent.atomic.AtomicInteger backendPort = new java.util.concurrent.atomic.AtomicInteger();
 
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
@@ -134,7 +135,30 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
                 String body = "";
 
                 switch (scenario) {
-                    case SUCCESS_INFORMATION -> body = """
+                    case SUCCESS_INFORMATION -> {
+                        if (backendPort.get() > 0) {
+                            try {
+                                java.net.URI uri = java.net.URI.create("http://localhost:" + backendPort.get() + "/internal/v1/knowledge/retrieval");
+                                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+                                String retrievalReqBody = """
+                                        {
+                                          "query": "%s",
+                                          "allowedSourceIds": ["ISSN-PROTEIN-EXERCISE-2017"],
+                                          "limit": 3
+                                        }
+                                        """.formatted(reqJson.path("question").asText("protein"));
+                                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                                        .uri(uri)
+                                        .header("Content-Type", "application/json")
+                                        .header("X-Internal-Service-Key", SERVICE_KEY)
+                                        .header("X-Correlation-ID", correlationId)
+                                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(retrievalReqBody))
+                                        .build();
+                                client.send(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        body = """
                             {
                               "runId": "%s",
                               "correlationId": "%s",
@@ -165,6 +189,7 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
                               }
                             }
                             """.formatted(requestId, correlationId, now);
+                    }
 
                     case SUCCESS_INSUFFICIENT_DATA -> body = """
                             {
@@ -288,6 +313,7 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET search_path TO fitness, public;");
 
         // Force HTTP mode calling real local mock HTTP server
         registry.add("ai.service.mode", () -> "http");
@@ -318,20 +344,86 @@ class AiKnowledgeQueryHttpEndToEndIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.fitnesscoaching.platform.modules.content.application.port.out.EmbeddingModelPort embeddingModelPort;
+
+    @org.springframework.boot.test.web.server.LocalServerPort
+    private int port;
+
     @BeforeEach
     void setUp() {
+        backendPort.set(port);
         receivedAuthHeader.set(null);
         receivedRequestBody.set(null);
         currentScenario.set(MockAiResponseScenario.SUCCESS_INFORMATION);
 
         jdbcTemplate.execute("DELETE FROM fitness.ai_runs");
         jdbcTemplate.execute("DELETE FROM fitness.user_roles");
-        jdbcTemplate.execute("DELETE FROM fitness.user_roles");
         jdbcTemplate.execute("DELETE FROM fitness.student_profiles");
         jdbcTemplate.execute("DELETE FROM fitness.trainer_profiles");
         jdbcTemplate.execute("DELETE FROM fitness.users");
+        jdbcTemplate.execute("TRUNCATE TABLE fitness.knowledge_documents, fitness.knowledge_processing_runs CASCADE");
 
         seedUser(STUDENT_USER_ID, "student@fitplatform.local", "STUDENT");
+        seedActiveKnowledgeDocument();
+    }
+
+    private void seedActiveKnowledgeDocument() {
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID chunkId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (
+                    id, title, source_name, document_type, document_code, source_id, language
+                ) VALUES (
+                    ?, 'ISSN Protein Timing', 'ISSN', 'GUIDELINE', 'ISSN-PROTEIN-EXERCISE-2017-VI-04', 'ISSN-PROTEIN-EXERCISE-2017', 'vi'
+                )
+                """, docId);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (
+                    id, knowledge_document_id, version_number, version_label, status, content_hash, technical_readiness, content_path, created_at
+                ) VALUES (
+                    ?, ?, 1, '1.0.0', 'ACTIVE', 'dummyhash123', 'TECHNICAL_VERIFICATION_PASSED', 'data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md', clock_timestamp()
+                )
+                """, versionId, docId);
+
+        UUID modelVersionId = jdbcTemplate.queryForObject("""
+                SELECT v.id FROM fitness.ai_model_versions v
+                JOIN fitness.ai_models m ON m.id = v.ai_model_id
+                WHERE m.is_active = true AND m.capability = 'EMBEDDING'
+                LIMIT 1
+                """, UUID.class);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (
+                    id, knowledge_version_id, run_type, status, model_version_id, statistics, operation_key, created_at
+                ) VALUES (
+                    ?, ?, 'REINDEX', 'SUCCEEDED', ?, '{"index_ready": true}'::jsonb, ?, clock_timestamp()
+                )
+                """, runId, versionId, modelVersionId, "OP-" + runId);
+
+        String chunkContent = "Làm sao để phân bổ protein tối ưu cho phát triển cơ bắp theo ISSN 2017.";
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (
+                    id, knowledge_version_id, chunk_index, heading_path, content, token_count, metadata, created_at
+                ) VALUES (
+                    ?, ?, 0, 'Protein Timing', ?, 20, '{}'::jsonb, clock_timestamp()
+                )
+                """, chunkId, versionId, chunkContent);
+
+        float[] vector = embeddingModelPort.generateEmbedding(chunkContent);
+        String vectorStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(vector);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (
+                    id, knowledge_chunk_id, embedding_model_version_id, embedding, created_at
+                ) VALUES (
+                    gen_random_uuid(), ?, ?, ?::vector, clock_timestamp()
+                )
+                """, chunkId, modelVersionId, vectorStr);
     }
 
     private void seedUser(UUID userId, String email, String roleCode) {
