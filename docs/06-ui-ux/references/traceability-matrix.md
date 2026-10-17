@@ -18,7 +18,7 @@
 | Nutrition AI | Photo result, confidence, confirmation/correction | Student | Student screens |
 | AI Assistance | Recommendation detail, evidence, missing data, review | Student/Trainer | Components và actor screens |
 | Attention Signal | Queue, filter, signal detail, resolution | Trainer/Admin | Trainer/Admin screens |
-| Chat | Conversation tied to relationship/context | Student/Trainer | Navigation và screen inventory |
+| B08 Chat and in-app notification | Period-scoped text chat from B03 relationship and `/(app)/chat`; Student history survives period transition, Trainer only current period; explicit delivery/read receipt and generic in-app inbox at `/(app)/notifications`. No attachments, external push, Attention Signal or Review Cycle. | Student/Trainer | `screen-inventory.md`, `navigation-architecture.md`, B08 decision record |
 | Admin governance | Permission-scoped modules and action workflows | Admin | Admin screens |
 | Privileged access | Reason, scope, expiry, step-up authentication | Admin | Admin flows |
 | Audit | Immutable event detail/search/export by permission | Admin | Admin screens |

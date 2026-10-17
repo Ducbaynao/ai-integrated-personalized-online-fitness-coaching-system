@@ -22,6 +22,10 @@ export function CoachingHubScreen() {
       <Text style={[styles.title, { color: theme.textPrimary }]}>Huấn luyện cá nhân</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{activeCapability === 'TRAINER' ? 'Yêu cầu, học viên và quyền dữ liệu hiện tại.' : 'Huấn luyện viên, trạng thái quan hệ và quyền chia sẻ của bạn.'}</Text>
     </View>
+    <View style={styles.row}>
+      <CoachingButton label="Tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
+      <CoachingButton label="Thông báo" secondary onPress={() => router.push('/notifications' as never)} />
+    </View>
     {activeCapability === 'STUDENT'
       ? <CoachingButton testID="browse-trainers-button" label="Tìm huấn luyện viên" onPress={() => router.push('/coaching/trainers' as never)} />
       : user?.capabilities?.canCoach

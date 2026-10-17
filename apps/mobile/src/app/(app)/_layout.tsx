@@ -66,6 +66,10 @@ export default function AppLayout() {
       <Stack.Screen name="nutrition/strategy" />
       <Stack.Screen name="coaching/[relationshipId]/nutrition" />
       <Stack.Screen name="coaching/[relationshipId]/nutrition-strategy" />
+      <Stack.Screen name="chat/index" />
+      <Stack.Screen name="chat/new" />
+      <Stack.Screen name="chat/[conversationId]" />
+      <Stack.Screen name="notifications/index" />
     </Stack>
   );
 }
