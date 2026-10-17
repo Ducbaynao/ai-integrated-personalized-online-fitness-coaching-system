@@ -46,6 +46,10 @@ tags:
     description: Student-confirmed Nutrition Goal, effective target versions, Trainer proposals and frozen daily targets.
   - name: Nutrition Catalog
     description: Admin-curated USDA Foundation subset, separate from Student USER_REPORTED private foods.
+  - name: Chat
+    description: Period-scoped Student–Trainer text messaging with durable REST history.
+  - name: In-App Notification
+    description: Generic, privacy-safe message notifications for currently authorized recipients.
   - name: AI General Knowledge (F01)
     description: >-
       [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
@@ -54,6 +58,123 @@ tags:
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
+  /chat/conversations:
+    get:
+      tags: [Chat]
+      operationId: listChatConversations
+      summary: List only conversations currently readable by the actor
+      description: Student retains their own old-period history; Trainer sees only the current effective period. No unauthorized count is returned.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Stable updatedAt DESC, conversationId DESC page
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatConversationPage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /chat/conversations/{id}:
+    get:
+      tags: [Chat]
+      operationId: getChatConversation
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Currently authorized conversation
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatConversation' } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+  /chat/conversations/{id}/messages:
+    get:
+      tags: [Chat]
+      operationId: listChatMessages
+      description: GET never marks messages READ. Reconnect always refetches this authoritative history.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 30 } }
+      responses:
+        '200':
+          description: Stable sentAt DESC, messageId DESC page
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessagePage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+  /chat/students/{studentId}/messages:
+    post:
+      tags: [Chat]
+      operationId: sendChatText
+      description: >-
+        Student or current Trainer sends text into the current ACTIVE human Coaching Period.
+        The first send creates the period conversation. An actor-scoped commandKey with the same
+        payload replays without a second message/notification; changed payload returns 409.
+        Authority is rechecked before replay. Message and generic IN_APP notification commit atomically.
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ChatSendRequest' } } }
+      responses:
+        '201':
+          description: Committed SENT message; exact replay returns the same identity
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+        '409': { $ref: '#/components/responses/ChatConflict' }
+  /chat/messages/{messageId}/receipts:
+    post:
+      tags: [Chat]
+      operationId: acknowledgeChatMessage
+      description: Recipient-only DELIVERED or READ acknowledgment, monotonic and idempotent per user. READ also sets deliveredAt.
+      parameters: [{ name: messageId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ChatReceiptRequest' } } }
+      responses:
+        '200':
+          description: Current message and recipient receipt state
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+  /chat/updates:
+    get:
+      tags: [Chat]
+      operationId: connectChatUpdates
+      summary: Authenticated WebSocket upgrade for post-commit invalidation only
+      description: >-
+        Bearer Authorization header is required. Client sends SUBSCRIBE with conversationId
+        or SUBSCRIBE_INBOX for authorized first-message/inbox invalidation;
+        server rechecks authority and sends only CHAT_UPDATED with conversationId after commit.
+        No message body or notification content is sent. On reconnect, fetch REST history.
+      responses:
+        '101': { description: WebSocket upgrade }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me:
+    get:
+      tags: [In-App Notification]
+      operationId: listMyInAppNotifications
+      description: Former Trainer cannot infer old-period notifications, including through pagination or count.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Stable createdAt DESC, notificationId DESC page
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatNotificationPage' } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/{id}/read:
+    post:
+      tags: [In-App Notification]
+      operationId: markInAppNotificationRead
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Idempotently marked read without marking the related message READ
+          content: { application/json: { schema: { $ref: '#/components/schemas/ChatNotification' } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
   /nutrition/catalog/foods:
     get:
       tags: [Nutrition Catalog]
@@ -3605,6 +3726,12 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    ChatConcealed:
+      description: Conversation, message, or notification absent or concealed; no old-period identity is exposed.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    ChatConflict:
+      description: CHAT_IDEMPOTENCY_CONFLICT; an actor reused a commandKey with a changed payload.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     NutritionForbidden:
       description: Authenticated actor lacks the Student capability for this operation (NUTRITION_ACCESS_DENIED).
       content:
@@ -3915,6 +4042,84 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    ChatConversation:
+      type: object
+      additionalProperties: false
+      required: [id, coachingPeriodId, studentId, trainerId, createdAt, updatedAt, sendAllowed]
+      properties:
+        id: { type: string, format: uuid }
+        coachingPeriodId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        sendAllowed: { type: boolean, description: Backend-derived snapshot; false for historical or no-longer-sendable periods. Command rechecks authority. }
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      required: [id, conversationId, senderId, body, status, sentAt, deliveredAt, readAt]
+      properties:
+        id: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid }
+        senderId: { type: string, format: uuid }
+        body: { type: string }
+        status: { type: string, enum: [SENT, DELIVERED, READ] }
+        sentAt: { type: string, format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        readAt: { type: [string, 'null'], format: date-time }
+    ChatSendRequest:
+      type: object
+      additionalProperties: false
+      required: [body, commandKey]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 4000 }
+        commandKey: { type: string, format: uuid }
+    ChatReceiptRequest:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [DELIVERED, READ] }
+    ChatConversationPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ChatConversation' } }
+        page: { type: integer }
+        size: { type: integer }
+        hasMore: { type: boolean }
+    ChatMessagePage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }
+        page: { type: integer }
+        size: { type: integer }
+        hasMore: { type: boolean }
+    ChatNotification:
+      type: object
+      additionalProperties: false
+      required: [id, eventType, title, body, messageId, coachingPeriodId, createdAt, readAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventType: { type: string, enum: [CHAT_MESSAGE] }
+        title: { type: string }
+        body: { type: string, enum: ['Bạn có tin nhắn mới'] }
+        messageId: { type: string, format: uuid }
+        coachingPeriodId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: [string, 'null'], format: date-time }
+    ChatNotificationPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ChatNotification' } }
+        page: { type: integer }
+        size: { type: integer }
+        hasMore: { type: boolean }
     NutritionGoalType:
       type: object
       additionalProperties: false

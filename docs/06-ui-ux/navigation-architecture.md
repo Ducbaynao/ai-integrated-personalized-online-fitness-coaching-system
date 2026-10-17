@@ -78,7 +78,7 @@ START/SKIP Planned Workout chỉ được nối vào Mobile khi read contract/ca
 
 Workout Plan query keys được scope theo Student identity và bị xóa cùng toàn bộ React Query cache khi logout/forced logout. Published history, archived Exercise và unavailable Exercise luôn read-only; canonical metadata chỉ để tham khảo, không remap historical reference.
 
-Chat, notification và AI Assistance mở theo icon hoặc từ context; không biến AI thành tab/coaching mode riêng.
+Chat và in-app notification B08 mở từ Coaching hub; gửi tin đầu tiên từ quan hệ HUMAN_COACH ACTIVE, rồi xem các conversation theo period ở `/(app)/chat` và inbox tại `/(app)/notifications`. Resume B03 tạo period và conversation mới; Student vẫn thấy lịch sử cũ, Trainer chỉ thấy period hiện hành. Notification chỉ có preview chung, không deep-link vào nội dung khi chưa refetch qua authority. AI Assistance mở theo context; không biến AI thành tab/coaching mode riêng.
 
 ## Trainer Mobile
 

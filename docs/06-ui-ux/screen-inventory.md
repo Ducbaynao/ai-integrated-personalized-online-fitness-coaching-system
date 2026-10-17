@@ -33,8 +33,8 @@
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
 | ST-17 | Coaching Profile | Route `/(app)/coaching`; relationship lifecycle, current period, history list, and Student-owned sharing permission management |
 | ST-18 | Reschedule Request | Conflict, accept/reject, workout independence |
-| ST-19 | Chat | Relationship-scoped messages |
-| ST-20 | Notification Center | Deep links and preferences |
+| ST-19 | Chat | `/(app)/chat`, `/(app)/chat/[conversationId]`, `/(app)/chat/new`: one text conversation per HUMAN_COACH period, Student reads own prior periods; recipient explicitly acknowledges DELIVERED/READ. Trainer sees only current authorized period. REST is authoritative and WebSocket only invalidates. |
+| ST-20 | Notification Center | `/(app)/notifications`: in-app message notice with generic preview only, explicit read, pagination. No push/email, quiet-hours or preferences in B08 first slice. |
 | ST-21 | Exercise Library | Browse, search/filter active Exercise catalog |
 | ST-22 | Exercise Detail | Route `/(app)/exercises/[exerciseId]`; instructions, muscle, equipment, variation and media state |
 

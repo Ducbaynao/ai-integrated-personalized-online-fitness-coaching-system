@@ -2,6 +2,8 @@
 
 This model is intentionally conceptual. Physical schemas must preserve these identities, lifecycles, effective dates, ownership rules, and historical references.
 
+V43 communication first slice adds `conversations.coaching_period_id` (unique when non-null), immutable Student/Trainer party identifiers, actor-scoped `chat_command_receipts`, and period/party identifiers on generic in-app message notifications. Legacy V8 rows retain nullable new fields; they do not gain B08 read authority by membership alone. One B03 resume creates a new HUMAN_COACH period and therefore a new conversation. Message receipt is recipient-owned and monotonic; GET is read-only. Retention/erasure remains a separate release decision.
+
 ## Identity and coaching
 
 ```mermaid
