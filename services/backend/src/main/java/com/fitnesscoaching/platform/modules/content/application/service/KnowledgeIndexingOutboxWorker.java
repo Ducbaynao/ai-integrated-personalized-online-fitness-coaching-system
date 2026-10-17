@@ -192,11 +192,13 @@ public class KnowledgeIndexingOutboxWorker {
             }
 
             // STEP 3: Build completion statistics with verified index readiness and model space
+            boolean realEmbeddings = !"simulated".equalsIgnoreCase(embeddingModelPort.provider());
             Map<String, Object> stats = new LinkedHashMap<>();
             stats.put("mode", "REAL_RETRIEVAL_INDEXING");
             stats.put("processor", "KnowledgeIndexingOutboxWorker");
             stats.put("workerId", effectiveWorkerId);
-            stats.put("real_embeddings", true);
+            stats.put("real_embeddings", realEmbeddings);
+            stats.put("embedding_mode", realEmbeddings ? "REAL_MODEL" : "SIMULATED_DETERMINISTIC");
             stats.put("embedding_provider", embeddingModelPort.provider());
             stats.put("embedding_model", embeddingModelPort.modelCode());
             stats.put("embedding_space", embeddingModelPort.modelSpace());
@@ -223,8 +225,10 @@ public class KnowledgeIndexingOutboxWorker {
 
                 if (!chunks.isEmpty()) {
                     chunkRepository.saveBatch(chunks);
-                    chunkRepository.deleteUnreferencedChunksBeyondIndex(version.id(), chunks.size());
+                }
+                chunkRepository.deleteUnreferencedChunksBeyondIndex(version.id(), chunks.size());
 
+                if (!chunks.isEmpty()) {
                     List<KnowledgeEmbeddingRecord> embeddingRecords = new ArrayList<>(chunks.size());
                     for (int i = 0; i < chunks.size(); i++) {
                         embeddingRecords.add(new KnowledgeEmbeddingRecord(
@@ -249,7 +253,8 @@ public class KnowledgeIndexingOutboxWorker {
             }
         } catch (Exception e) {
             log.error("Error processing knowledge indexing run {}: {}", run.id(), e.getMessage(), e);
-            markFailedInTx(run, "Execution error: " + e.getMessage(), true, Duration.ofSeconds(30), now);
+            boolean retryable = !(e instanceof com.fitnesscoaching.platform.common.exception.ContentConflictException);
+            markFailedInTx(run, "Execution error: " + e.getMessage(), retryable, retryable ? Duration.ofSeconds(30) : null, now);
         }
     }
 

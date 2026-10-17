@@ -54,7 +54,12 @@ public class F01RuntimeOutputValidator {
         // 2. Validate Allowed Source Scope for Citations
         Set<String> allowedSources = new HashSet<>();
         if (envelope.knowledgeScope() != null && envelope.knowledgeScope().allowedSourceIds() != null) {
-            allowedSources.addAll(envelope.knowledgeScope().allowedSourceIds());
+            for (String s : envelope.knowledgeScope().allowedSourceIds()) {
+                String canonical = com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.canonicalize(s);
+                if (canonical != null) {
+                    allowedSources.add(canonical);
+                }
+            }
         }
 
         if ("SUCCEEDED".equals(runStatus)) {
@@ -83,7 +88,8 @@ public class F01RuntimeOutputValidator {
                     if (c.sourceId() == null || !SOURCE_ID_PATTERN.matcher(c.sourceId()).matches()) {
                         return ValidationResult.invalid("Citation sourceId is invalid: " + c.sourceId());
                     }
-                    if (!allowedSources.contains(c.sourceId())) {
+                    String canonicalCitationSource = com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.canonicalize(c.sourceId());
+                    if (!allowedSources.contains(canonicalCitationSource)) {
                         return ValidationResult.invalid("Citation sourceId " + c.sourceId() + " is outside envelope allowedSourceIds scope: " + allowedSources);
                     }
                     if (c.locator() == null || c.locator().sourcePath() == null || c.locator().sourcePath().isBlank()) {

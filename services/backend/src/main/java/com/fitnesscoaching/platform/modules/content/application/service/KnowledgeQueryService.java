@@ -22,16 +22,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional(readOnly = true)
 public class KnowledgeQueryService implements KnowledgeQueryUseCase {
 
     // Server-owned canonical allowlist of sources approved for F01 general fitness knowledge
-    private static final Set<String> APPROVED_SOURCES = Set.of(
-            "WHO-PA-SB-2020",
-            "ISSN-PROTEIN-EXERCISE-2017",
-            "ODS-EXERCISE-SUPPLEMENTS-2024",
-            "NIDDK-WEIGHT-FACTORS-2023"
-    );
+    private static final Set<String> APPROVED_SOURCES =
+            com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.APPROVED_SOURCES;
 
     private final KnowledgeVersionRepository versionRepository;
     private final KnowledgeDocumentRepository documentRepository;
@@ -56,9 +51,10 @@ public class KnowledgeQueryService implements KnowledgeQueryUseCase {
 
         // Intersect client request with server-owned approved sources allowlist.
         // Client CANNOT expand scope beyond server-approved sources.
+        // Normalize incoming aliases to canonical representation before checking scope.
         List<String> authorizedSourceIds = request.allowedSourceIds().stream()
                 .filter(s -> s != null && !s.isBlank())
-                .map(String::trim)
+                .map(KnowledgeRetrievalService::canonicalizeSourceId)
                 .filter(APPROVED_SOURCES::contains)
                 .distinct()
                 .toList();
@@ -92,8 +88,12 @@ public class KnowledgeQueryService implements KnowledgeQueryUseCase {
         }
 
         // 2. Direct active versions query (strict fail-closed against non-ACTIVE / non-VERIFIED)
+        List<String> querySourceIds = new ArrayList<>(authorizedSourceIds);
+        if (querySourceIds.contains(KnowledgeRetrievalService.ODS_SOURCE_CANONICAL) && !querySourceIds.contains(KnowledgeRetrievalService.ODS_SOURCE_ALIAS)) {
+            querySourceIds.add(KnowledgeRetrievalService.ODS_SOURCE_ALIAS);
+        }
         List<KnowledgeVersion> activeVersions = versionRepository.findActiveBySourceIds(
-                authorizedSourceIds, Math.min(Math.max(request.limit(), 1), 50)
+                querySourceIds, Math.min(Math.max(request.limit(), 1), 50)
         );
 
         if (activeVersions.isEmpty()) {
@@ -124,18 +124,21 @@ public class KnowledgeQueryService implements KnowledgeQueryUseCase {
         List<KnowledgeQueryResult.KnowledgeCitationItem> citations = new ArrayList<>();
         for (KnowledgeVersion version : strictlyEligible) {
             KnowledgeDocument doc = docMap.get(version.knowledgeDocumentId());
-            if (doc != null && doc.deletedAt() == null && APPROVED_SOURCES.contains(doc.sourceId())) {
-                String snippet = extractSnippet(version.content(), 200);
-                citations.add(new KnowledgeQueryResult.KnowledgeCitationItem(
-                        doc.id(),
-                        doc.documentCode(),
-                        version.versionLabel(),
-                        doc.sourceId(),
-                        doc.title(),
-                        version.contentPath() != null ? version.contentPath() : "",
-                        snippet,
-                        version.content()
-                ));
+            if (doc != null && doc.deletedAt() == null) {
+                String canonicalSourceId = KnowledgeRetrievalService.canonicalizeSourceId(doc.sourceId());
+                if (APPROVED_SOURCES.contains(canonicalSourceId)) {
+                    String snippet = extractSnippet(version.content(), 200);
+                    citations.add(new KnowledgeQueryResult.KnowledgeCitationItem(
+                            doc.id(),
+                            doc.documentCode(),
+                            version.versionLabel(),
+                            canonicalSourceId,
+                            doc.title(),
+                            version.contentPath() != null ? version.contentPath() : "",
+                            snippet,
+                            version.content()
+                    ));
+                }
             }
         }
 

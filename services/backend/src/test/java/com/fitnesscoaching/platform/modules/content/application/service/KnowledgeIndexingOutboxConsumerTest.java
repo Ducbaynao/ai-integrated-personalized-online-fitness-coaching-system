@@ -137,7 +137,9 @@ class KnowledgeIndexingOutboxConsumerTest {
 
         String stats = statsCaptor.getValue();
         assertThat(stats).contains("REAL_RETRIEVAL_INDEXING");
-        assertThat(stats).contains("\"real_embeddings\":true");
+        assertThat(stats).contains("\"real_embeddings\":false");
+        assertThat(stats).contains("\"embedding_mode\":\"SIMULATED_DETERMINISTIC\"");
+        assertThat(stats).contains("\"embedding_provider\":\"simulated\"");
         assertThat(stats).contains("\"index_ready\":true");
     }
 
