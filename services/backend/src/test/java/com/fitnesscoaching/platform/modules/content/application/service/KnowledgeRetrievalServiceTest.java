@@ -33,7 +33,15 @@ class KnowledgeRetrievalServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new KnowledgeRetrievalService(jdbcTemplate, embeddingModelPort);
+        service = new KnowledgeRetrievalService(jdbcTemplate, embeddingModelPort, new TestTxManager());
+    }
+
+    @Test
+    @DisplayName("Constructor throws IllegalArgumentException when transactionManager is null")
+    void constructorThrowsOnNullTxManager() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                new KnowledgeRetrievalService(jdbcTemplate, embeddingModelPort, null)
+        ).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("transactionManager");
     }
 
     @Test
@@ -143,5 +151,132 @@ class KnowledgeRetrievalServiceTest {
         assertThat(service.isChunkEligible(null, "1.0.0", 0)).isFalse();
         assertThat(service.isChunkEligible("WHO", "  ", 0)).isFalse();
         verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Caller transaction is suspended during embedding generation so network I/O executes outside DB transaction")
+    void callerTransactionIsSuspendedDuringEmbedding() {
+        TestTxManager txManager = new TestTxManager();
+        KnowledgeRetrievalService txAwareService = new KnowledgeRetrievalService(jdbcTemplate, embeddingModelPort, txManager);
+
+        when(embeddingModelPort.modelVersionId()).thenReturn(UUID.randomUUID());
+        when(embeddingModelPort.generateEmbedding(anyString())).thenAnswer(inv -> {
+            // Assert that during embedding port invocation, the database transaction is NOT active!
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+                    .as("Embedding generation must execute outside database transaction")
+                    .isFalse();
+            return new float[1536];
+        });
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of());
+
+        org.springframework.transaction.support.TransactionTemplate callerTx =
+                new org.springframework.transaction.support.TransactionTemplate(txManager);
+
+        callerTx.execute(status -> {
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+                    .as("Caller transaction is active before service call")
+                    .isTrue();
+
+            txAwareService.retrieveActiveKnowledge("creatine safety", List.of("NIH-ODS-EXERCISE-SUPPLEMENTS"), 5);
+
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+                    .as("Caller transaction is still active after service call")
+                    .isTrue();
+            return null;
+        });
+
+        verify(embeddingModelPort).generateEmbedding("creatine safety");
+    }
+
+    @Test
+    @DisplayName("ODS canonical source and alias are both passed to DB query for backward and forward compatibility")
+    void odsCanonicalAndAliasBothPassedToDbQuery() {
+        when(embeddingModelPort.modelVersionId()).thenReturn(UUID.randomUUID());
+        when(embeddingModelPort.generateEmbedding(anyString())).thenReturn(new float[1536]);
+
+        // When caller requests canonical NIH-ODS-EXERCISE-SUPPLEMENTS
+        service.retrieveActiveKnowledge("protein", List.of("NIH-ODS-EXERCISE-SUPPLEMENTS"), 5);
+
+        org.mockito.ArgumentCaptor<Object[]> paramCaptor = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).query(anyString(), any(RowMapper.class), paramCaptor.capture());
+        List<Object> allValues = List.of(paramCaptor.getValue());
+        assertThat(allValues).contains("NIH-ODS-EXERCISE-SUPPLEMENTS", "ODS-EXERCISE-SUPPLEMENTS-2024");
+    }
+
+    @Test
+    @DisplayName("ODS legacy alias is normalized to canonical and queries both IDs")
+    void odsLegacyAliasIsNormalizedToCanonicalAndQueriesBothIds() {
+        when(embeddingModelPort.modelVersionId()).thenReturn(UUID.randomUUID());
+        when(embeddingModelPort.generateEmbedding(anyString())).thenReturn(new float[1536]);
+
+        // When caller requests legacy alias ODS-EXERCISE-SUPPLEMENTS-2024
+        service.retrieveActiveKnowledge("creatine", List.of("ODS-EXERCISE-SUPPLEMENTS-2024"), 5);
+
+        org.mockito.ArgumentCaptor<Object[]> paramCaptor = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).query(anyString(), any(RowMapper.class), paramCaptor.capture());
+        List<Object> allValues = List.of(paramCaptor.getValue());
+        assertThat(allValues).contains("NIH-ODS-EXERCISE-SUPPLEMENTS", "ODS-EXERCISE-SUPPLEMENTS-2024");
+    }
+
+    @Test
+    @DisplayName("canonicalizeSourceId correctly normalizes ODS identities and preserves others")
+    void canonicalizeSourceIdNormalizesCorrectly() {
+        assertThat(KnowledgeRetrievalService.canonicalizeSourceId("ODS-EXERCISE-SUPPLEMENTS-2024"))
+                .isEqualTo("NIH-ODS-EXERCISE-SUPPLEMENTS");
+        assertThat(KnowledgeRetrievalService.canonicalizeSourceId("NIH-ODS-EXERCISE-SUPPLEMENTS"))
+                .isEqualTo("NIH-ODS-EXERCISE-SUPPLEMENTS");
+        assertThat(KnowledgeRetrievalService.canonicalizeSourceId("ods-exercise-supplements-2024"))
+                .isEqualTo("NIH-ODS-EXERCISE-SUPPLEMENTS");
+        assertThat(KnowledgeRetrievalService.canonicalizeSourceId("WHO-PA-SB-2020"))
+                .isEqualTo("WHO-PA-SB-2020");
+        assertThat(KnowledgeRetrievalService.canonicalizeSourceId(null))
+                .isNull();
+    }
+
+    static class TestTx {
+        boolean active = true;
+    }
+
+    static class TestTxManager extends org.springframework.transaction.support.AbstractPlatformTransactionManager {
+        @Override
+        protected Object doGetTransaction() {
+            return new TestTx();
+        }
+
+        @Override
+        protected boolean isExistingTransaction(Object transaction) {
+            return transaction instanceof TestTx tx && tx.active;
+        }
+
+        @Override
+        protected void doBegin(Object transaction, org.springframework.transaction.TransactionDefinition definition) {
+            if (transaction instanceof TestTx tx) {
+                tx.active = true;
+            }
+        }
+
+        @Override
+        protected void doCommit(org.springframework.transaction.support.DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(org.springframework.transaction.support.DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected Object doSuspend(Object transaction) {
+            if (transaction instanceof TestTx tx) {
+                tx.active = false;
+            }
+            return transaction;
+        }
+
+        @Override
+        protected void doResume(Object transaction, Object suspendedResources) {
+            if (transaction instanceof TestTx tx) {
+                tx.active = true;
+            }
+        }
     }
 }

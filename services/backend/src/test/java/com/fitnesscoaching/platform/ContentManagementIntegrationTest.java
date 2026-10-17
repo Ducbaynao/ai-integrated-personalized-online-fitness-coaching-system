@@ -421,7 +421,9 @@ class ContentManagementIntegrationTest {
                 WHERE knowledge_version_id = ?
                 """, String.class, whoVersionId);
         JsonNode statsNode = objectMapper.readTree(statisticsJson);
-        assertThat(statsNode.path("real_embeddings").asBoolean()).isTrue();
+        assertThat(statsNode.path("real_embeddings").asBoolean()).isFalse();
+        assertThat(statsNode.path("embedding_provider").asText()).isEqualTo("simulated");
+        assertThat(statsNode.path("embedding_mode").asText()).isEqualTo("SIMULATED_DETERMINISTIC");
         assertThat(statsNode.path("mode").asText()).isEqualTo("REAL_RETRIEVAL_INDEXING");
         assertThat(statsNode.path("index_ready").asBoolean()).isTrue();
         assertThat(statsNode.path("indexed_chunks").asInt()).isGreaterThan(0);

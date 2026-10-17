@@ -15,26 +15,45 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-@Transactional(readOnly = true)
 public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
     // Server-owned canonical allowlist of sources approved for F01 general fitness knowledge
-    public static final Set<String> APPROVED_SOURCES = Set.of(
-            "WHO-PA-SB-2020",
-            "ISSN-PROTEIN-EXERCISE-2017",
-            "ODS-EXERCISE-SUPPLEMENTS-2024",
-            "NIDDK-WEIGHT-FACTORS-2023"
-    );
+    public static final Set<String> APPROVED_SOURCES =
+            com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.APPROVED_SOURCES;
+
+    public static final String ODS_SOURCE_CANONICAL =
+            com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.ODS_CANONICAL;
+    public static final String ODS_SOURCE_ALIAS =
+            com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.ODS_LEGACY_ALIAS;
+
+    public static String canonicalizeSourceId(String sourceId) {
+        return com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.canonicalize(sourceId);
+    }
 
     // Deterministic cosine similarity relevance cutoff: non-positively aligned neighbors (similarity <= 0.0) are discarded
     public static final double DEFAULT_MIN_SIMILARITY_THRESHOLD = 0.0;
 
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingModelPort embeddingModelPort;
+    private final org.springframework.transaction.support.TransactionTemplate notSupportedTxTemplate;
+    private final org.springframework.transaction.support.TransactionTemplate readOnlyTxTemplate;
 
-    public KnowledgeRetrievalService(JdbcTemplate jdbcTemplate, EmbeddingModelPort embeddingModelPort) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public KnowledgeRetrievalService(
+            JdbcTemplate jdbcTemplate,
+            EmbeddingModelPort embeddingModelPort,
+            org.springframework.transaction.PlatformTransactionManager transactionManager
+    ) {
+        if (transactionManager == null) {
+            throw new IllegalArgumentException("transactionManager must not be null");
+        }
         this.jdbcTemplate = jdbcTemplate;
         this.embeddingModelPort = embeddingModelPort;
+        this.notSupportedTxTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        this.notSupportedTxTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        this.readOnlyTxTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        this.readOnlyTxTemplate.setReadOnly(true);
+        this.readOnlyTxTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRED);
     }
 
     @Override
@@ -42,10 +61,8 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        String sanitizedQuery = query.trim();
-        if (sanitizedQuery.length() > 2000) {
-            sanitizedQuery = sanitizedQuery.substring(0, 2000);
-        }
+        String trimmed = query.trim();
+        final String effectiveQuery = trimmed.length() > 2000 ? trimmed.substring(0, 2000) : trimmed;
 
         if (allowedSourceIds == null || allowedSourceIds.isEmpty()) {
             return List.of();
@@ -53,9 +70,10 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
         // Intersect client request with server-owned approved sources allowlist.
         // Client CANNOT expand scope beyond server-approved sources.
+        // Canonicalize source IDs prior to scope checking so aliases are uniformly validated.
         List<String> authorizedSourceIds = allowedSourceIds.stream()
                 .filter(s -> s != null && !s.isBlank())
-                .map(String::trim)
+                .map(KnowledgeRetrievalService::canonicalizeSourceId)
                 .filter(APPROVED_SOURCES::contains)
                 .distinct()
                 .toList();
@@ -66,11 +84,25 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
         int effectiveLimit = Math.min(Math.max(limit, 1), 50);
 
-        // Generate query embedding in baseline embedding space
-        float[] queryEmbedding = embeddingModelPort.generateEmbedding(sanitizedQuery);
+        // Boundary: Remote embedding generation executed OUTSIDE database transaction.
+        // Suspends any caller transaction using PROPAGATION_NOT_SUPPORTED.
+        // Note on resource semantics: in standard single DataSource Spring JDBC,
+        // if a caller opened a transaction prior to calling retrieval, the underlying connection
+        // remains bound to the thread in suspended state. True zero-connection holding
+        // is guaranteed by initiating retrieval outside any caller transaction boundaries
+        // (as done in AiKnowledgeOrchestrationService and KnowledgeQueryService).
+        float[] queryEmbedding = notSupportedTxTemplate.execute(status ->
+                embeddingModelPort.generateEmbedding(effectiveQuery)
+        );
         String vectorParam = JdbcKnowledgeEmbeddingRepository.vectorToString(queryEmbedding);
 
-        String inSql = String.join(",", Collections.nCopies(authorizedSourceIds.size(), "?"));
+        // Query both canonical and legacy alias in database to match both current and historical documents
+        List<String> querySourceIds = new ArrayList<>(authorizedSourceIds);
+        if (querySourceIds.contains(ODS_SOURCE_CANONICAL) && !querySourceIds.contains(ODS_SOURCE_ALIAS)) {
+            querySourceIds.add(ODS_SOURCE_ALIAS);
+        }
+
+        String inSql = String.join(",", Collections.nCopies(querySourceIds.size(), "?"));
 
         String sql = """
                 SELECT
@@ -108,7 +140,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
         List<Object> params = new ArrayList<>();
         params.add(vectorParam);
-        params.addAll(authorizedSourceIds);
+        params.addAll(querySourceIds);
         params.add(embeddingModelPort.modelVersionId());
         params.add(vectorParam);
         params.add(DEFAULT_MIN_SIMILARITY_THRESHOLD);
@@ -117,6 +149,10 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
         params.add(vectorParam);
         params.add(effectiveLimit);
 
+        return readOnlyTxTemplate.execute(status -> executeRetrievalQuery(sql, params));
+    }
+
+    private List<RetrievedKnowledgeChunk> executeRetrievalQuery(String sql, List<Object> params) {
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             String content = rs.getString("content");
             String snippet = extractSnippet(content, 200);
@@ -125,7 +161,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                     (UUID) rs.getObject("document_id"),
                     rs.getString("document_code"),
                     rs.getString("version_label"),
-                    rs.getString("source_id"),
+                    canonicalizeSourceId(rs.getString("source_id")),
                     rs.getString("document_title"),
                     rs.getString("content_path") != null ? rs.getString("content_path") : "",
                     rs.getString("heading_path") != null ? rs.getString("heading_path") : "",
@@ -138,6 +174,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isChunkEligible(String documentCode, String versionLabel, int sectionIndex) {
         if (documentCode == null || documentCode.isBlank() || versionLabel == null || versionLabel.isBlank()) {
             return false;

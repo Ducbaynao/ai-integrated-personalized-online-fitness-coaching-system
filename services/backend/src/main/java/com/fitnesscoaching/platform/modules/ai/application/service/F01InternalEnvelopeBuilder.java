@@ -20,12 +20,8 @@ import java.util.UUID;
 public class F01InternalEnvelopeBuilder {
 
     // Server-approved canonical knowledge sources for F01 general fitness knowledge
-    public static final List<String> CANONICAL_APPROVED_SOURCES = List.of(
-            "ISSN-PROTEIN-EXERCISE-2017",
-            "WHO-PA-SB-2020",
-            "ODS-EXERCISE-SUPPLEMENTS-2024",
-            "NIDDK-WEIGHT-FACTORS-2023"
-    );
+    public static final List<String> CANONICAL_APPROVED_SOURCES =
+            com.fitnesscoaching.platform.modules.content.domain.KnowledgeSourceIdentity.CANONICAL_APPROVED_SOURCES_LIST;
 
     public F01InternalContextEnvelope build(
             UUID runId,

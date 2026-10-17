@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Deterministic unit-vector embedding generator for the baseline space (OpenAI text-embedding-3-small, 1536 dim).
+ * Deterministic unit-vector embedding generator for the test-double baseline space (simulated/deterministic-1536/1.0.0, 1536 dim).
  * Projects text n-grams and vocabulary into 1536 dimensions and applies L2 normalization.
  * Produces mathematically sound cosine distance behaviors for pgvector HNSW search without requiring paid API keys.
+ * This simulated adapter does not call the production OpenAI embedding model.
  */
 @Component
 public class DeterministicEmbeddingGenerator implements EmbeddingModelPort {
