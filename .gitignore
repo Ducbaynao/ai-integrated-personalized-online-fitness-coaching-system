@@ -32,4 +32,5 @@ Thumbs.db
 # Local runtime data
 infrastructure/data/
 uploads/
+reports/evaluation/runs/
 *.log
