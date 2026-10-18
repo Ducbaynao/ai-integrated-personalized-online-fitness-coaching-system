@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.chat.ChatFailure;
 import com.fitnesscoaching.platform.modules.chat.ChatService;
+import com.fitnesscoaching.platform.modules.chat.ChatUpdatesSocket;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import org.junit.jupiter.api.Test;
@@ -13,10 +14,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.UUID;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +60,69 @@ class ChatNotificationIntegrationTest {
     @Autowired CoachingLifecycleUseCase lifecycle;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired ChatUpdatesSocket socket;
+
+    @Test void httpChatNotificationAndPostCommitSignalRespectPeriodAuthority() throws Exception {
+        UUID student = student(), trainer = trainer();
+        UUID relationship = activate(student, trainer);
+        WebSocketSession device = mock(WebSocketSession.class);
+        when(device.getId()).thenReturn("b08-http-" + UUID.randomUUID());
+        when(device.getAttributes()).thenReturn(Map.<String, Object>of("actor", trainer));
+        when(device.isOpen()).thenReturn(true);
+        socket.afterConnectionEstablished(device);
+        try {
+            socket.handleMessage(device, new TextMessage("{\"type\":\"SUBSCRIBE_INBOX\"}"));
+            String sent = mvc.perform(post("/api/v1/chat/students/{id}/messages", student)
+                    .with(jwt().jwt(j -> j.subject(student.toString()))).contentType("application/json")
+                    .content("{\"body\":\"Xin chao\",\"commandKey\":\"" + UUID.randomUUID() + "\"}"))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SENT"))
+                    .andReturn().getResponse().getContentAsString();
+            UUID messageId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.id"));
+            UUID conversationId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.conversationId"));
+            var signals = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+            verify(device, times(2)).sendMessage(signals.capture());
+            assertThat(signals.getAllValues().get(1).getPayload()).contains("CHAT_UPDATED", conversationId.toString())
+                    .doesNotContain("Xin chao");
+
+            mvc.perform(get("/api/v1/notifications/me").with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].body").value("Bạn có tin nhắn mới"));
+            mvc.perform(post("/api/v1/chat/messages/{id}/receipts", messageId)
+                    .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                    .content("{\"kind\":\"DELIVERED\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DELIVERED"));
+            mvc.perform(post("/api/v1/chat/messages/{id}/receipts", messageId)
+                    .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                    .content("{\"kind\":\"READ\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("READ"));
+            mvc.perform(get("/api/v1/chat/conversations/{id}/messages", conversationId)
+                    .with(jwt().jwt(j -> j.subject(student.toString()))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].status").value("READ"));
+
+            lifecycle.relationshipAction(student, relationship, "PAUSE", 1, null, UUID.randomUUID());
+            mvc.perform(get("/api/v1/chat/conversations/{id}", conversationId)
+                    .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.errorCode").value("CHAT_CONVERSATION_NOT_FOUND"));
+            mvc.perform(get("/api/v1/notifications/me")
+                    .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+            mvc.perform(get("/api/v1/chat/conversations/{id}/messages", conversationId)
+                    .with(jwt().jwt(j -> j.subject(student.toString()))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(messageId.toString()));
+
+            var resume = lifecycle.createResume(student, relationship, 2, null, UUID.randomUUID());
+            lifecycle.resumeAction(trainer, relationship, resume.resume().id(), "ACCEPT", 2, 0, UUID.randomUUID());
+            String next = mvc.perform(post("/api/v1/chat/students/{id}/messages", student)
+                    .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                    .content("{\"body\":\"Period two\",\"commandKey\":\"" + UUID.randomUUID() + "\"}"))
+                    .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+            assertThat(UUID.fromString(com.jayway.jsonpath.JsonPath.read(next, "$.conversationId")))
+                    .isNotEqualTo(conversationId);
+            mvc.perform(get("/api/v1/chat/conversations/{id}", conversationId)
+                    .with(jwt().jwt(j -> j.subject(trainer.toString())))).andExpect(status().isNotFound());
+        } finally {
+            socket.afterConnectionClosed(device, CloseStatus.NORMAL);
+        }
+    }
 
     @Test void messageReceiptNotificationAndReplayAreAuthoritative() throws Exception {
         UUID student = student(), trainer = trainer();

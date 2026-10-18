@@ -19,6 +19,17 @@ Previously approved B03 closes the old `HUMAN_COACH` period on pause, opens a `S
 
 This is the direct consequence of B08's per-period conversation identity and B03's existing lifecycle, not a change to B03 or a new product policy. V8's relationship-only reference requires a forward migration to persist period identity. Attention/Review, attachments and push remain deferred for their separately stated reasons.
 
-## Implementation status in this branch
+## Post-merge M7 remainder audit (2026-10-18)
 
-The B08 first slice is being implemented in this branch through OpenAPI, V43, Spring Chat/Notification, and Expo Student/Trainer routes. This section is not a merge or release claim. PostgreSQL is authoritative; the Mobile WebSocket only invalidates cached REST data, with REST polling/reconnect as fallback. A message and its generic in-app notice share one database transaction. No retention/erasure operational policy, push/email, attachments, Attention Signal, or Review Cycle is implemented here.
+`origin/main@66227790427be8b3d81716c1013ab14b5ec03a6c` contains PR #85: OpenAPI, V43, Spring Chat/Notification and Expo Student/Trainer routes. GitHub CI run 39042940387 completed successfully. PostgreSQL is authoritative; Mobile WebSocket signals an invalidation after commit and refetches REST data. Message and generic in-app notice share one database transaction. Merge and CI do not prove a device connected to a disposable backend or complete the M7 Definition of Done.
+
+| M7/FR-CA obligation | Status after PR #85 | Evidence and limit |
+| --- | --- | --- |
+| Period-scoped text conversation, persistent messages and monotonic recipient receipts | `MERGED_VERIFIED` | OpenAPI Chat paths, V43, `ChatService`, `ChatUpdatesSocket`, Expo Chat screens and isolated PostgreSQL tests. Attachments and deletion are excluded. |
+| Generic in-app notice for a newly committed message | `MERGED_VERIFIED` | `InAppNotificationService`, notification REST and V43. Push, reminders, per-category preference commands and delivery service are absent. |
+| Attachment and policy-compliant deletion/export | `BLOCKED_DECISION` | FR-CA-001 includes them; approved B08 decision 3 excludes them from the first slice, and decision 7 leaves retention/account erasure unresolved. V8 table shape alone is not a deletion policy. |
+| Push/preference/reminder delivery | `BLOCKED_DECISION` | FR-CA-002 and M7 include these; B08 decisions 6–7 explicitly defer external channels and other events. V8 preference/delivery tables have no first-flow policy or executable read/write workflow. |
+| Deterministic Attention Signal and Coaching Review Cycle | `BLOCKED_DECISION` | FR-CA-003–005 and M7 require these. V8 has `attention_signals`, but approved B08 decision 8 defers rule/evidence/cadence and no production application flow exists. |
+| Retention and account erasure | `BLOCKED_DECISION` | Approved B08 decision 7 names a release gate; no operational duration, deletion/anonymization scope, or legal-hold policy has been approved. |
+
+The rows marked `BLOCKED_DECISION` are not implementation approvals. Source schemas and UX sketches do not supply severity thresholds, review cadence, notification recipients, Trainer authority, retention period or erasure behavior. The grouped product-decision table in the B08/M7 integration handoff must be approved before dependent contract or code is written.
