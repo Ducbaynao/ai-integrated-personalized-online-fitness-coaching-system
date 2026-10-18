@@ -80,6 +80,8 @@ Workout Plan query keys được scope theo Student identity và bị xóa cùng
 
 Chat và in-app notification B08 mở từ Coaching hub; gửi tin đầu tiên từ quan hệ HUMAN_COACH ACTIVE, rồi xem các conversation theo period ở `/(app)/chat` và inbox tại `/(app)/notifications`. Resume B03 tạo period và conversation mới; Student vẫn thấy lịch sử cũ, Trainer chỉ thấy period hiện hành. Notification chỉ có preview chung, không deep-link vào nội dung khi chưa refetch qua authority. AI Assistance mở theo context; không biến AI thành tab/coaching mode riêng.
 
+M7 review/attention mở từ Coaching hub ở `/(app)/attention` cho Student và từ TR-03 tại `/(app)/coaching/[relationshipId]/attention` cho Trainer hiện hành. Student xác nhận timezone IANA trước khi tạo review tasks; Trainer không xem task/signal period cũ sau pause/end/resume. Mỗi mutation dùng version và command key thật; 409 yêu cầu tải lại, không tự áp dụng lại quyết định cũ.
+
 ## Trainer Mobile
 
 Bottom navigation:

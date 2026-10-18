@@ -50,6 +50,8 @@ tags:
     description: Period-scoped Student–Trainer text messaging with durable REST history.
   - name: In-App Notification
     description: Generic, privacy-safe message notifications for currently authorized recipients.
+  - name: Attention and Review
+    description: Deterministic M7 signals and Student-confirmed, period-scoped coaching review tasks.
   - name: AI General Knowledge (F01)
     description: >-
       [PHASE 2 - CONTRACT ONLY / NOT YET IMPLEMENTED]
@@ -58,6 +60,147 @@ tags:
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
 
 paths:
+  /review-timezone/me:
+    get:
+      tags: [Attention and Review]
+      operationId: getMyConfirmedReviewTimezone
+      description: 204 means the Student has not explicitly confirmed a review timezone; the users.timezone default is not confirmation.
+      responses:
+        '200': { description: Student confirmation, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTimezoneConfirmation' } } } }
+        '204': { description: Not yet explicitly confirmed }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+    put:
+      tags: [Attention and Review]
+      operationId: confirmMyReviewTimezone
+      description: Student explicitly confirms an IANA zone. Existing tasks retain their stored zone/date; future tasks use the latest confirmation. Same actor/key/payload replays a stable response.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTimezoneRequest' } } } }
+      responses:
+        '200': { description: Confirmed zone, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTimezoneConfirmation' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+        '409': { $ref: '#/components/responses/AttentionConflict' }
+  /review-tasks/me:
+    get:
+      tags: [Attention and Review]
+      operationId: listMyReviewTasks
+      description: Student reads their own tasks across periods. GET never acknowledges a review.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: cycleStartDate DESC then id DESC, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTaskPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /students/{studentId}/review-tasks:
+    get:
+      tags: [Attention and Review]
+      operationId: listCurrentTrainerReviewTasks
+      description: Current active human-period Trainer only; previous periods are concealed even on reassignment.
+      parameters:
+        - { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: Current-period tasks only, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTaskPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /review-tasks/{id}:
+    get:
+      tags: [Attention and Review]
+      operationId: getReviewTask
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Authorized task, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTask' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /review-tasks/{id}/complete:
+    post:
+      tags: [Attention and Review]
+      operationId: completeReviewTask
+      description: Current-period Trainer only; summary/evidence/unknowns are factual. No Goal, Plan or Nutrition mutation. Optimistic version and actor-scoped command key are rechecked after authority.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CompleteReviewRequest' } } } }
+      responses:
+        '200': { description: Completed review, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTask' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+        '409': { $ref: '#/components/responses/AttentionConflict' }
+  /review-tasks/{id}/acknowledge:
+    post:
+      tags: [Attention and Review]
+      operationId: acknowledgeViewedReview
+      description: Student-only explicit viewed acknowledgement; completion never depends on this command.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionVersionedCommand' } } } }
+      responses:
+        '200': { description: Acknowledged review, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewTask' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+        '409': { $ref: '#/components/responses/AttentionConflict' }
+  /attention-signals/me:
+    get:
+      tags: [Attention and Review]
+      operationId: listMyAttentionSignals
+      description: Student reads own rule signals, including historical periods; no AI recommendation is represented as a rule signal.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: createdAt DESC then id DESC, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionSignalPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /students/{studentId}/attention-signals:
+    get:
+      tags: [Attention and Review]
+      operationId: listCurrentTrainerAttentionSignals
+      description: Current ACTIVE HUMAN_COACH period only. MISSED_PLANNED_V1 additionally requires WORKOUT_HISTORY VIEW. Unauthorized rows cannot affect pagination or count.
+      parameters:
+        - { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: Authorized page, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionSignalPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /attention-signals/{id}:
+    get:
+      tags: [Attention and Review]
+      operationId: getAttentionSignal
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Authorized signal, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionSignal' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /attention-signals/{id}/history:
+    get:
+      tags: [Attention and Review]
+      operationId: getAttentionSignalHistory
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Append-only transitions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AttentionSignalEvent' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /attention-signals/{id}/actions:
+    post:
+      tags: [Attention and Review]
+      operationId: actOnAttentionSignal
+      description: Current authorized Trainer only; ACK/RESOLVE/DISMISS. RESOLVE and DISMISS need reason. Authority rechecked before replay.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionSignalActionRequest' } } } }
+      responses:
+        '200': { description: Changed signal, content: { application/json: { schema: { $ref: '#/components/schemas/AttentionSignal' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+        '409': { $ref: '#/components/responses/AttentionConflict' }
   /chat/conversations:
     get:
       tags: [Chat]
@@ -3726,6 +3869,12 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    AttentionConcealed:
+      description: Review or signal absent or concealed; no former-period resource identity or count is exposed.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    AttentionConflict:
+      description: REVIEW_VERSION_CONFLICT, ATTENTION_VERSION_CONFLICT, or ATTENTION_IDEMPOTENCY_CONFLICT.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     ChatConcealed:
       description: Conversation, message, or notification absent or concealed; no old-period identity is exposed.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
@@ -4042,6 +4191,121 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    ReviewTimezoneConfirmation:
+      type: object
+      additionalProperties: false
+      required: [timezone, confirmedAt, version]
+      properties:
+        timezone: { type: string, description: Student-confirmed IANA zone; never inferred from device or account default. }
+        confirmedAt: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 0 }
+    ReviewTimezoneRequest:
+      type: object
+      additionalProperties: false
+      required: [timezone, commandKey]
+      properties:
+        timezone: { type: string, minLength: 3, maxLength: 64, description: IANA area/location identifier. }
+        commandKey: { type: string, format: uuid }
+    ReviewTask:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, trainerId, coachingPeriodId, cycleStartDate, dueDate, timezone, status, version, summary, evidenceRefs, missingData, completedAt, studentAcknowledgedAt]
+      description: >-
+        Cycle zero starts on the period start's date in the explicitly confirmed zone; later cycles
+        start every 14 calendar days. Due date is cycleStartDate plus 7 calendar days. Overdue
+        LOW begins at the start of dueDate plus 1 calendar day in this zone; MEDIUM begins at
+        the start of dueDate plus 7 calendar days. No 09:00 or device-zone boundary is implied.
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        coachingPeriodId: { type: string, format: uuid }
+        cycleStartDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        timezone: { type: string }
+        status: { type: string, enum: [OPEN, COMPLETED, CANCELLED] }
+        version: { type: integer, format: int64, minimum: 0 }
+        summary: { type: [string, 'null'] }
+        evidenceRefs: { type: array, items: { type: string, format: uuid }, description: Workout occurrence references validated through the Workout-owned query port in this slice. }
+        missingData: { type: array, items: { type: string }, description: Explicit unknown/missing data; never converted to zero. }
+        completedAt: { type: [string, 'null'], format: date-time }
+        studentAcknowledgedAt: { type: [string, 'null'], format: date-time }
+    ReviewTaskPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ReviewTask' } }
+        page: { type: integer }
+        size: { type: integer }
+        hasMore: { type: boolean }
+    CompleteReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey, summary, evidenceRefs, missingData]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+        summary: { type: string, minLength: 1, maxLength: 4000 }
+        evidenceRefs: { type: array, items: { type: string, format: uuid } }
+        missingData: { type: array, items: { type: string } }
+    AttentionVersionedCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, commandKey]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    AttentionSignalActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion, commandKey]
+      properties:
+        action: { type: string, enum: [ACK, RESOLVE, DISMISS] }
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+        reason: { type: [string, 'null'], maxLength: 2000, description: Required and nonblank for RESOLVE or DISMISS. }
+    AttentionSignal:
+      type: object
+      additionalProperties: false
+      required: [id, studentId, trainerId, coachingPeriodId, rule, severity, status, version, occurrenceId, occurrenceVersion, plannedStartAt, plannedEndAt, reviewTaskId, detectedAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
+        rule: { type: string, enum: [MISSED_PLANNED_V1, REVIEW_OVERDUE_V1] }
+        severity: { type: string, enum: [LOW, MEDIUM] }
+        status: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED] }
+        version: { type: integer, format: int64, minimum: 0 }
+        occurrenceId: { type: [string, 'null'], format: uuid }
+        occurrenceVersion: { type: [integer, 'null'], format: int64 }
+        plannedStartAt: { type: [string, 'null'], format: date-time }
+        plannedEndAt: { type: [string, 'null'], format: date-time }
+        reviewTaskId: { type: [string, 'null'], format: uuid }
+        detectedAt: { type: string, format: date-time }
+    AttentionSignalEvent:
+      type: object
+      additionalProperties: false
+      required: [eventType, previousSeverity, resultingSeverity, previousStatus, resultingStatus, resultingVersion, reason, occurredAt]
+      properties:
+        eventType: { type: string }
+        previousSeverity: { type: [string, 'null'] }
+        resultingSeverity: { type: string }
+        previousStatus: { type: [string, 'null'] }
+        resultingStatus: { type: string }
+        resultingVersion: { type: integer, format: int64 }
+        reason: { type: [string, 'null'] }
+        occurredAt: { type: string, format: date-time }
+    AttentionSignalPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, hasMore]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AttentionSignal' } }
+        page: { type: integer }
+        size: { type: integer }
+        hasMore: { type: boolean }
     ChatConversation:
       type: object
       additionalProperties: false

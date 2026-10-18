@@ -37,6 +37,7 @@
 | ST-20 | Notification Center | `/(app)/notifications`: in-app message notice with generic preview only, explicit read, pagination. No push/email, quiet-hours or preferences in B08 first slice. |
 | ST-21 | Exercise Library | Browse, search/filter active Exercise catalog |
 | ST-22 | Exercise Detail | Route `/(app)/exercises/[exerciseId]`; instructions, muscle, equipment, variation and media state |
+| ST-23 | Review and Attention | `/(app)/attention`: Student explicitly confirms an IANA timezone for human-period review cycles, reads own review tasks and rule signals across periods, acknowledges a completed review, and reads signal history. Missing evidence is not zero. |
 
 Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, không phải một Exercise Library khác. Historical plan có thể mở Exercise archived/unavailable ở read-only state.
 
@@ -47,11 +48,11 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | TR-01 | Trainer Overview | Sessions, review due, attention queue; B03 pending relationships are available from `/(app)/coaching` |
 | TR-02 | Student List | Needs attention, on track, inactive, review due |
 | TR-03 | Student Coaching Workspace | B03 relationship context at `/(app)/coaching/[relationshipId]`; B04 Program context at `/(app)/coaching/[relationshipId]/program` lists only backend-visible current/history plans and removes Student plan cache on authority loss. B06 Trainer reads confirmed occurrences at `/(app)/coaching/[relationshipId]/workout-schedule` with current WORKOUT_PLAN VIEW+, without START/SKIP or execution/history access. Trainer proposal list/detail use `/(app)/coaching/[relationshipId]/schedule-proposals`; PENDING withdrawal requires current CONTRIBUTE. Create route `/new` uses published source version/session and explicit Trainer-selected IANA timezone, local times and offsets; Student sees these before an all-or-nothing decision. B07 read-only nutrition day is `/(app)/coaching/[relationshipId]/nutrition`, authorized by current NUTRITION_LOGS VIEW and concealed after authority loss. |
-| TR-04 | Attention Signal Detail | Evidence, severity, acknowledge/resolve |
+| TR-04 | Attention Signal Detail | `/(app)/coaching/[relationshipId]/attention`: current ACTIVE HUMAN_COACH period only; rule evidence/severity/history, ACK, RESOLVE or DISMISS with reason and version. Workout evidence additionally requires current WORKOUT_HISTORY VIEW. |
 | TR-05 | Plan Builder | Trainer create/edit DRAFT at relationship/Student-scoped routes; detail/version history and significant complete-snapshot publication under `/(app)/students/[studentId]/workout-plans/[planId]`; occurrence-scoped minor change remains B05 |
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |
 | TR-07 | Nutrition Proposal Builder | Route `/(app)/coaching/[relationshipId]/nutrition-strategy`: current NUTRITION_GOAL VIEW read; CONTRIBUTE+ proposal only, Student publishes |
-| TR-08 | Coaching Review | Review data, request data, feedback, plan action |
+| TR-08 | Coaching Review | Same period-scoped route: Trainer completes an OPEN 14-day review task with summary, evidence references and explicitly missing/unknown data; Student acknowledgment is separate and optional. Review does not mutate strategy. |
 | TR-09 | Trainer Schedule | Appointment, availability, conflict |
 | TR-10 | Reschedule Request | Từ TR-03/Trainer calendar mở `/(app)/coaching/[relationshipId]/change-proposals`: Trainer VIEW+ xem proposal đổi/hủy một occurrence do chính mình tạo, lọc/trang/detail; CONTRIBUTE+ chọn occurrence thật, gửi RESCHEDULE với IANA timezone/local start-end/UTC offsets rõ ràng hoặc CANCEL với lý do tùy chọn, và rút PENDING bằng proposalVersion thật. Backend recheck quyền, seal, Appointment, thời gian và xung đột; Student ACCEPT/REJECT trên Mobile thuộc checkpoint tiếp theo. |
 | TR-11 | AI Insight Review | Accept/modify/reject for Trainer workflow |
