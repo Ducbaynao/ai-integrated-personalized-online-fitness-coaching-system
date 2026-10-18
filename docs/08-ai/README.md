@@ -21,6 +21,7 @@ NIH ODS snapshots. Read the [integration review](knowledge-corpus-review-2026-10
 [F01 FastAPI endpoint and HTTP client handoff (A-26)](f01-a26-fastapi-mock-handoff.md),
 [F01 runtime output validation and E2E verification handoff (A-25/A-31)](f01-a25-a31-runtime-validation-handoff.md),
 and [F01 real retrieval, chunking, and indexing handoff (A-27)](f01-a27-real-retrieval-handoff.md) before using it.
+Refer to [F01 evaluation runner guide (A-49)](f01-a49-evaluation-runner-guide.md) for offline retrieval and public query evaluation harness.
 Retrieval is supported through pgvector over published ACTIVE sources with index readiness verification. Held drafts (NIDDK 05/06) remain unindexed. Production LLM evaluation and release remain in subsequent milestones (A-49/A-52).
 
 ## Supported capabilities
