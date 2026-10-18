@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -40,7 +41,7 @@ export function ChatInboxScreen() {
   const concealed = query.isError && query.error instanceof ApiError && [403, 404].includes(query.error.status);
   const cache = useQueryClient();
   useEffect(() => { if (concealed) cache.removeQueries({ queryKey: ['chat', actor, role] }); }, [concealed, actor, role, cache]);
-  return <ScrollView testID="chat-inbox" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-inbox" style={styles.screen} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Tin nhắn</Text>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch sử được kiểm tra quyền khi tải. Tin nhắn mới chỉ đến từ kỳ huấn luyện hiện hành.</Text>
     <CoachingButton label="Thông báo" secondary onPress={() => router.push('/notifications' as never)} />
@@ -55,7 +56,7 @@ export function ChatInboxScreen() {
     </Pressable>)}
     {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary busy={query.isFetchingNextPage}
       disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }
 
 export function ConversationScreen({ conversationId, studentId }: { conversationId?: string; studentId?: string }) {
@@ -116,7 +117,7 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
     if (!body.body || body.body.length > 4000) return;
     setPending(body); send.mutate(body);
   };
-  return <ScrollView testID="chat-conversation" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-conversation" style={styles.screen} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Hội thoại</Text>
     <CoachingButton label="Quay lại tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
     {detail.isPending && conversationId ? <CoachingState busy title="Đang tải hội thoại" message="Vui lòng chờ." /> : null}
@@ -140,7 +141,7 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
         disabled={send.isPending || (!pending && !draft.trim())} onPress={submit} />
       {pending && send.isError ? <CoachingButton label="Sửa tin nhắn" secondary onPress={() => setPending(null)} /> : null}
     </View> : null}
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }
 
 export function NotificationsScreen() {
@@ -162,7 +163,7 @@ export function NotificationsScreen() {
   const rows = query.data?.pages.flatMap(page => page.items) ?? [];
   const concealed = query.isError && query.error instanceof ApiError && [403, 404].includes(query.error.status);
   useEffect(() => { if (concealed) cache.removeQueries({ queryKey: ['chat', actor, role] }); }, [concealed, actor, role, cache]);
-  return <ScrollView testID="chat-notifications" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-notifications" style={styles.screen} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Thông báo trong ứng dụng</Text>
     <CoachingButton label="Mở tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
     {query.isPending ? <CoachingState busy title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
@@ -175,5 +176,5 @@ export function NotificationsScreen() {
       {!item.readAt ? <CoachingButton label="Đánh dấu thông báo đã đọc" secondary onPress={() => read.mutate(item.id)} /> : null}
     </CoachingCard>)}
     {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary onPress={() => query.fetchNextPage()} /> : null}
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }

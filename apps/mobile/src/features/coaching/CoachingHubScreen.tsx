@@ -25,6 +25,8 @@ export function CoachingHubScreen() {
     <View style={styles.row}>
       <CoachingButton label="Tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
       <CoachingButton label="Thông báo" secondary onPress={() => router.push('/notifications' as never)} />
+      {activeCapability === 'STUDENT' ? <CoachingButton testID="open-attention-button" label="Đánh giá và tín hiệu chú ý" secondary
+        onPress={() => router.push('/attention' as never)} /> : null}
     </View>
     {activeCapability === 'STUDENT'
       ? <CoachingButton testID="browse-trainers-button" label="Tìm huấn luyện viên" onPress={() => router.push('/coaching/trainers' as never)} />

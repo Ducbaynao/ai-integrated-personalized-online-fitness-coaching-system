@@ -98,6 +98,10 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       <CoachingButton testID="open-student-nutrition-strategy-button" label="Mục tiêu dinh dưỡng học viên" secondary
         onPress={() => router.push(`/coaching/${relationship.id}/nutrition-strategy` as never)} /> : null}
     {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? <CoachingButton testID="open-program-button" label="Mở chương trình tập luyện" secondary onPress={() => router.push(`/coaching/${relationship.id}/program` as never)} /> : null}
+    {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE'
+      && query.data?.currentPeriod?.mode === 'HUMAN_COACH'
+      ? <CoachingButton testID="open-trainer-attention-button" label="Đánh giá và tín hiệu chú ý" secondary
+          onPress={() => router.push(`/coaching/${relationship.id}/attention` as never)} /> : null}
     <CoachingCard testID="relationship-history">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử quan hệ</Text>
       {historyQuery.isPending ? <CoachingState busy title="Đang tải lịch sử" message="Vui lòng chờ trong giây lát." /> : null}
