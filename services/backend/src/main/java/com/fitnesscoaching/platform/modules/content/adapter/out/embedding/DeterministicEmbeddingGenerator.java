@@ -1,7 +1,6 @@
 package com.fitnesscoaching.platform.modules.content.adapter.out.embedding;
 
 import com.fitnesscoaching.platform.modules.content.application.port.out.EmbeddingModelPort;
-import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -16,7 +15,6 @@ import java.util.UUID;
  * Produces mathematically sound cosine distance behaviors for pgvector HNSW search without requiring paid API keys.
  * This simulated adapter does not call the production OpenAI embedding model.
  */
-@Component
 public class DeterministicEmbeddingGenerator implements EmbeddingModelPort {
 
     private static final int HASH_FEATURES_PER_TOKEN = 6;
