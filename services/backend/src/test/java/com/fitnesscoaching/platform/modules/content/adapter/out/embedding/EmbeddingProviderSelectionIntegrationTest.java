@@ -21,8 +21,7 @@ class EmbeddingProviderSelectionIntegrationTest {
     }
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(TestConfig.class)
-            .withBean(RestClient.Builder.class, RestClient::builder);
+            .withUserConfiguration(TestConfig.class);
 
     @Test
     @DisplayName("Defaults to simulated provider when no provider property is specified")
@@ -50,7 +49,7 @@ class EmbeddingProviderSelectionIntegrationTest {
     }
 
     @Test
-    @DisplayName("Selects openai provider when configured with valid API key")
+    @DisplayName("Selects openai provider when configured with valid API key without manual RestClient.Builder bean")
     void selectsOpenAiWithKey() {
         contextRunner.withPropertyValues(
                         "ai.embedding.provider=openai",
@@ -59,9 +58,28 @@ class EmbeddingProviderSelectionIntegrationTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(EmbeddingModelPort.class);
+                    assertThat(context).hasSingleBean(RestClient.Builder.class);
                     EmbeddingModelPort port = context.getBean(EmbeddingModelPort.class);
                     assertThat(port).isInstanceOf(OpenAiEmbeddingAdapter.class);
                     assertThat(port.provider()).isEqualTo("openai");
+                });
+    }
+
+    @Test
+    @DisplayName("Respects user-supplied custom RestClient.Builder when provided")
+    void respectsCustomRestClientBuilder() {
+        RestClient.Builder customBuilder = RestClient.builder();
+        contextRunner.withBean(RestClient.Builder.class, () -> customBuilder)
+                .withPropertyValues(
+                        "ai.embedding.provider=openai",
+                        "ai.embedding.openai.api-key=sk-test-live-key-12345"
+                )
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(EmbeddingModelPort.class);
+                    assertThat(context.getBean(RestClient.Builder.class)).isSameAs(customBuilder);
+                    EmbeddingModelPort port = context.getBean(EmbeddingModelPort.class);
+                    assertThat(port).isInstanceOf(OpenAiEmbeddingAdapter.class);
                 });
     }
 

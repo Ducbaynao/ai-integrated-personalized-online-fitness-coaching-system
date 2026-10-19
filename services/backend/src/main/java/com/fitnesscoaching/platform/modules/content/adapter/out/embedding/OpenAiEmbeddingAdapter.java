@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +37,8 @@ public class OpenAiEmbeddingAdapter implements EmbeddingModelPort {
     public static final String OPENAI_MODEL_SPACE = "openai/text-embedding-3-small/1536";
     public static final UUID OPENAI_MODEL_VERSION_ID = UUID.fromString("e1000000-0000-0000-0000-000000000002");
     public static final int EXPECTED_DIMENSION = 1536;
-    private static final String EMBEDDINGS_PATH = "/v1/embeddings";
+    public static final String DEFAULT_BASE_URL = "https://api.openai.com";
+    public static final String EMBEDDINGS_PATH = "/v1/embeddings";
 
     @FunctionalInterface
     public interface Sleeper {
@@ -70,13 +72,55 @@ public class OpenAiEmbeddingAdapter implements EmbeddingModelPort {
         this.sleeper = sleeper != null ? sleeper : Thread::sleep;
     }
 
+    /**
+     * Normalizes the base URL by stripping trailing slashes and redundant '/v1' suffixes
+     * so that concatenation with {@link #EMBEDDINGS_PATH} ('/v1/embeddings') never duplicates '/v1'.
+     */
+    public static String normalizeBaseUrl(String rawBaseUrl) {
+        if (rawBaseUrl == null || rawBaseUrl.isBlank()) {
+            return DEFAULT_BASE_URL;
+        }
+        String normalized = rawBaseUrl.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+        }
+        if (normalized.endsWith("/v1")) {
+            normalized = normalized.substring(0, normalized.length() - "/v1".length()).trim();
+            while (normalized.endsWith("/")) {
+                normalized = normalized.substring(0, normalized.length() - 1).trim();
+            }
+        }
+        return normalized.isEmpty() ? DEFAULT_BASE_URL : normalized;
+    }
+
+    static void logResolvedEndpoint(String baseUrl, String path) {
+        try {
+            URI baseUri = URI.create(baseUrl);
+            String scheme = baseUri.getScheme();
+            String host = baseUri.getHost();
+            int port = baseUri.getPort();
+            String basePath = baseUri.getPath() != null ? baseUri.getPath() : "";
+            while (basePath.endsWith("/")) {
+                basePath = basePath.substring(0, basePath.length() - 1);
+            }
+            String fullPath = basePath + (path.startsWith("/") ? path : "/" + path);
+            String portPart = (port != -1 && port != 80 && port != 443) ? ":" + port : "";
+            log.info("Configured OpenAI embedding endpoint: {}://{}{}{}", scheme, host, portPart, fullPath);
+        } catch (Exception e) {
+            log.info("Configured OpenAI embedding endpoint: baseUrl='{}', path='{}'", baseUrl, path);
+        }
+    }
+
     private static RestClient createRestClient(EmbeddingProperties properties, RestClient.Builder builder) {
+        String normalizedBaseUrl = normalizeBaseUrl(properties.openai().baseUrl());
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(properties.openai().connectTimeoutMs()));
         factory.setReadTimeout(Duration.ofMillis(properties.openai().readTimeoutMs()));
 
+        logResolvedEndpoint(normalizedBaseUrl, EMBEDDINGS_PATH);
+
         return builder
-                .baseUrl(properties.openai().baseUrl())
+                .baseUrl(normalizedBaseUrl)
                 .requestFactory(factory)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.openai().apiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

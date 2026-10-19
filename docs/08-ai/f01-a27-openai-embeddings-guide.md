@@ -13,7 +13,14 @@ Theo quyết định DEC-A13-01 trong [docs/08-ai/f01-a13-provider-decision.md](
   - **AI Model ID (`ai_models.id`)**: `e0000000-0000-0000-0000-000000000002` (`provider = 'openai'`, `model_code = 'text-embedding-3-small'`, `capability = 'EMBEDDING'`, `is_active = false` mặc định).
   - **AI Model Version ID (`ai_model_versions.id`)**: `e1000000-0000-0000-0000-000000000002` (`version_label = '1.0.0'`, `configuration = {"dimension": 1536, "metric": "COSINE", "model_space": "openai/text-embedding-3-small/1536"}`).
   - **Quan hệ khóa ngoại cơ sở dữ liệu**: Bảng `fitness.knowledge_embeddings` có ràng buộc khóa ngoại `embedding_model_version_id uuid NOT NULL REFERENCES fitness.ai_model_versions(id)`. Do đó, `EmbeddingModelPort.modelVersionId()` trả về chính xác ID của bảng `ai_model_versions` (`e1000000-0000-0000-0000-000000000002`), không nhầm lẫn với ID của bảng cha `ai_models`.
-- **Dự toán chi phí**: ~$0.02 / 1M tokens. Tổng chi phí vector hóa toàn bộ corpus 11 bài derivative technical-ready chỉ khoảng $0.0007.
+- **Ước tính chi phí lý thuyết và phân biệt Token Usage**:
+  - **Quy tắc phân biệt token**: Số `tokenCount` trong bảng `fitness.knowledge_chunks` là **ước lượng heuristic nội bộ** (dựa trên thuật toán tách từ sơ bộ tiếng Việt trong `KnowledgeChunker.java`) dùng để phục vụ ngưỡng phân đoạn văn bản. Ngược lại, **token usage thực tế** tính cước do API của OpenAI xác định và trả về trong trường `usage.total_tokens` (dựa trên tokenizer BPE `cl100k_base`/`o200k_base`). Do đặc thù nguyên âm có dấu trong tiếng Việt, số token thực tế thường chênh lệch so với `tokenCount` ước lượng.
+  - **Chi phí thử nghiệm WHO-01 (1 bài)**: WHO-01 gồm 5 chunks với ~622 heuristic tokens. Với đơn giá `$0.02 / 1M tokens` ($0.00000002 / token), chi phí vector hóa ước tính chỉ khoảng `622 * 0.00000002 = $0.00001244 USD` (~`$0.000012 USD`). Một lượt truy vấn retrieval (~20 tokens) tốn thêm khoảng `$0.00000040 USD`. Tổng chi phí thử nghiệm WHO-01 ước tính ~`$0.000013 USD`.
+  - **Chi phí lý thuyết toàn bộ 9 bài derivative**: ~30,000 tokens ước lượng tương đương khoảng `~$0.0006 USD`. **Lưu ý**: Đây thuần túy là phép tính ước lượng số học lý thuyết, chi phí thực tế căn cứ vào trường `usage.total_tokens` từ phản hồi của OpenAI API.
+- **Hiện trạng Corpus Derivative**: Toàn bộ corpus có 11 bài derivative, trong đó:
+  - **9 bài đạt `TECHNICAL_VERIFICATION_PASSED`**: WHO 01, 02, 03, 05, 06; NIDDK 01, 02, 03, 04 (đủ điều kiện tham gia quy trình review xuất bản).
+  - **2 bài giữ `HELD_AS_DRAFT`**: NIDDK 05 (thuốc và tăng cân) và NIDDK 06 (tình trạng sức khỏe & rối loạn ăn uống) bị giữ lại do yêu cầu guardrail an toàn y tế/biên tập.
+  - **Tuyệt đối không mô tả cả 11 bài đều technical-ready.**
 
 > [!IMPORTANT]
 > **Cấm tự ý cập nhật Database dùng chung**:
@@ -21,18 +28,19 @@ Theo quyết định DEC-A13-01 trong [docs/08-ai/f01-a13-provider-decision.md](
 
 ---
 
-## 2. Kiểm soát Ngân sách và Giới hạn Chi tiêu (OpenAI Policy Alignment)
+## 2. Kiểm soát Ngân sách và Giới hạn Chi tiêu (Đối chiếu OpenAI Documentation)
 
-Đối chiếu tài liệu chính thức của OpenAI về Spend Limits và Alerts:
+Đối chiếu tài liệu chính thức hiện hành của OpenAI về *Usage Limits*, *Budgets* và *Spend Limits* ([OpenAI Platform Documentation](https://platform.openai.com/docs/guides/production-best-practices#setting-up-usage-limits)):
 
-1. **Phân biệt Cảnh báo (Alert) và Cơ chế Chặn (Hard Limit)**:
-   - **Soft email alert threshold** (đề xuất: `$5.00 / tháng`): Chỉ là thông báo qua email khi chi tiêu đạt ngưỡng, **hoàn toàn không có cơ chế chặn API request**.
-   - **Monthly spend limit** (đề xuất: `$10.00 / tháng`): Là cơ chế chặn cứng từ phía OpenAI. Khi kích hoạt, các API call tiếp theo sẽ bị từ chối với HTTP 429 (`insufficient_quota`, `organization_spend_limit_exceeded` hoặc `project_spend_limit_exceeded`).
-   - **Độ trễ thực thi (Enforcement Latency)**: Tài liệu OpenAI nêu rõ việc cập nhật mức sử dụng và áp dụng lệnh chặn có độ trễ tính bằng phút, do đó có thể phát sinh chi phí vượt nhẹ (minor overage) trước khi toàn bộ API call bị từ chối hoàn toàn.
-2. **Tình trạng Thực tế và Điều kiện Tiên quyết**:
-   - Hiện tại, tài khoản tổ chức OpenAI của dự án **chưa được cung cấp bằng chứng** đã thiết lập Hard limit $10 hay Soft alert $5 trên dashboard OpenAI.
-   - Theo quyết định A-13, các hạn mức này vẫn ở trạng thái **PROPOSED**.
-   - **Quy tắc An toàn**: Khi điều kiện tiên quyết về xác nhận hạn mức chưa được đáp ứng, **bước chạy gọi API trả phí thật bên ngoài vẫn được giữ ở trạng thái CHƯA THỰC HIỆN (PENDING PREREQUISITES)**. Toàn bộ kiểm thử hiện tại chạy 100% offline bằng mock server.
+1. **Phân biệt Cảnh báo (Alert) và Cơ chế Chặn Request Thực tế (Hard Limit)**:
+   - **Soft email alert threshold** (đề xuất & đã duyệt: `$5.00 / tháng`): Chỉ là thông báo tự động qua email khi chi tiêu tích lũy chạm ngưỡng. **Cơ chế này hoàn toàn không chặn hay tạm dừng request**, lưu lượng API vẫn tiếp tục hoạt động bình thường.
+   - **Hard spend limit** (đề xuất & đã duyệt: `$10.00 / tháng`): Là cấu hình giới hạn chi tiêu cứng cấp Organization hoặc Project. Khi kích hoạt và chi tiêu chạm trần, OpenAI sẽ thực sự từ chối các request tiếp theo với HTTP 429 (mã lỗi `insufficient_quota`, `organization_spend_limit_exceeded` hoặc `project_spend_limit_exceeded`).
+   - **Lưu ý về Project Budget**: Trong giao diện OpenAI Project, việc chỉ thiết lập budget hàng tháng mà không bật tính năng Hard Limit tương ứng thì mặc định chỉ hoạt động như một email alert, không có khả năng ngăn chặn phát sinh chi phí vượt mức.
+   - **Độ trễ thực thi (Enforcement Latency)**: Tài liệu chính thức của OpenAI nêu rõ việc ghi nhận mức sử dụng và áp dụng lệnh chặn có độ trễ tính bằng phút (*"can take several minutes to reflect in limits"*). Do đó, một lượng request gửi đồng thời với tốc độ cao có thể gây vượt nhẹ ngân sách (minor overage) trước khi hệ thống OpenAI ngắt toàn diện.
+2. **Tình trạng Phê duyệt và Khoảng trống Xác minh**:
+   - **Hạn mức đã phê duyệt**: Quyết định A-13 (**DEC-A13-03**) đã chính thức phê duyệt hạn mức thử nghiệm `$10.00 / tháng` (Hard Limit) và cảnh báo `$5.00 / tháng` (Email Alert). (DEC-A13-05 là mã quyết định về chiến lược dữ liệu reindex/rollback).
+   - **Khoảng trống thực tế (UNVERIFIED)**: Tài khoản OpenAI của dự án hiện **chưa có bằng chứng xác nhận** đã hoàn tất cấu hình Hard Limit $10 và Email Alert $5 trên bảng điều khiển quản trị (`platform.openai.com/settings/organization/limits`).
+   - **Điều kiện An toàn**: Khi cấu hình và cơ chế enforcement thực tế trên dashboard chưa được xác minh, **bước gọi API thật bên ngoài phải giữ ở trạng thái CHƯA THỰC HIỆN (PENDING PREREQUISITES)**. Không được tự ý nạp tiền hay chạy thử nghiệm live khi cơ chế chặn cứng chưa được bảo đảm.
 
 ---
 
@@ -84,7 +92,7 @@ ai:
 | :--- | :--- | :--- | :--- |
 | `ai.embedding.provider` | `AI_EMBEDDING_PROVIDER` | `simulated` | Chọn provider: `simulated` hoặc `openai`. Giá trị khác sẽ bị từ chối khi khởi động. |
 | `ai.embedding.openai.api-key` | `AI_EMBEDDING_API_KEY` / `OPENAI_API_KEY` | *(trống)* | API key OpenAI bí mật. Bắt buộc khi provider là `openai`. Không commit vào repo. |
-| `ai.embedding.openai.base-url` | `AI_EMBEDDING_BASE_URL` | `https://api.openai.com` | Base URL của API OpenAI (hoặc mock gateway). |
+| `ai.embedding.openai.base-url` | `AI_EMBEDDING_BASE_URL` | `https://api.openai.com` | Base URL của API OpenAI (hoặc mock gateway). Tự động chuẩn hóa: nếu cấu hình có hậu tố `/v1` hoặc trailing slash, adapter tự bóc tách để khi ghép với path `/v1/embeddings` không bao giờ bị lặp thành `/v1/v1/embeddings` (tránh lỗi HTTP 404). |
 | `ai.embedding.openai.model` | `AI_EMBEDDING_MODEL` | `text-embedding-3-small` | Tên model OpenAI (`text-embedding-3-small`). |
 | `ai.embedding.openai.model-space` | `AI_EMBEDDING_MODEL_SPACE` | `openai/text-embedding-3-small/1536` | Chuỗi định danh model space. |
 | `ai.embedding.openai.dimension` | `AI_EMBEDDING_DIMENSION` | `1536` | Số chiều vector bắt buộc (1536). |
@@ -105,10 +113,11 @@ ai:
    - Từ chối nếu có phần tử `null`, `index` trùng lặp, âm hoặc vượt ngoài khoảng `[0, size - 1]`.
    - Kiểm tra mọi vector phải đúng 1536 chiều.
    - Quét từng giá trị float: từ chối nếu chứa `NaN` hoặc `Infinity`.
-3. **Quản lý Deadline Tổng thể và Retry có Kiểm soát**:
-   - **Deadline tổng thể (Overall Deadline 15s)**: Bao trùm toàn bộ: connect timeout (5s), read timeout (10s), thời gian sleep backoff và các lần thử lại.
+3. **Quản lý Deadline Tổng thể và Retry có Kiểm soát (Ranh giới Chứng minh của Code & Test)**:
+   - **Deadline tổng thể (Overall Deadline 15s)**: Bao trùm toàn bộ: connect timeout (5s), read timeout (10s), thời gian sleep backoff và các lần thử lại. Cơ chế này được kiểm chứng qua `OpenAiEmbeddingAdapterTest` bằng việc tính toán hạn chót trước mỗi lần gọi và trước khi sleep backoff.
    - **Kiểm tra Deadline trước Retry**: Nếu thời gian còn lại trước deadline `<= 200ms`, adapter ngắt ngay với `AiTimeoutException` mà không retry vô ích.
    - **Xử lý header `Retry-After`**: Nếu OpenAI trả về header `Retry-After` với thời gian lớn hơn hoặc bằng thời gian còn lại của deadline, adapter ngắt ngay với `AiTimeoutException` thay vì chờ đợi vượt deadline.
+   - **Ranh giới kỹ thuật**: Cơ chế deadline được kiểm soát ở tầng ứng dụng (Java Adapter level). Adapter không thể bảo đảm thời gian ngắt tức thì nếu tầng transport socket bên dưới bị treo ở cấp hệ điều hành vượt quá read timeout cấp TCP.
    - **Phân loại Lỗi**:
      - *Không thử lại (Non-retryable - Fail Fast)*: HTTP 401 / 403 (sai key, hết quyền), HTTP 400 / 422 (payload sai), và **HTTP 429 Quota Exceeded** (`insufficient_quota` / `spend_limit_exceeded`). **Tuyệt đối không retry khi hết ngân sách**.
      - *Được thử lại (Retryable)*: HTTP 429 rate limit thông thường (requests/tokens limit) với exponential backoff kèm full jitter, HTTP 5xx (500, 502, 503, 504), và timeout mạng (tối đa 2 attempts).
@@ -201,17 +210,19 @@ Khi chuyển sang OpenAI, worker outbox cần tính toán lại vector cho các 
 
 ### Bước 5: Chạy Đánh giá Retrieval (A-49 Evaluation Runner)
 ```bash
-npm run eval:retrieval
+# Đánh giá tầng retrieval với internal service key
+npm run eval:f01 -- --mode=retrieval --endpoint=http://localhost:8080/internal/v1/knowledge/retrieval --key=your-internal-key --limit=10
 ```
 
 ---
 
 ## 8. Quy trình Rollback An Toàn về Simulated Provider
 
-Nếu phát sinh sự cố trong quá trình thử nghiệm live (vượt ngân sách, gián đoạn dịch vụ từ OpenAI, hoặc cần kiểm thử offline):
-
 > [!CAUTION]
-> **Lưu ý Bắt buộc về Rollback**:
+> **Hiện trạng Kiểm chứng Rollback**:
+> - **Nguyên lý kiến trúc & Quy trình**: Đã được thiết kế và đối chiếu với cơ chế xóa vector theo version của `KnowledgeIndexingOutboxWorker`.
+> - **Thực hành Diễn tập Rollback Thực tế (Live Rollback Drill)**: Hiện ở trạng thái **CHƯA ĐƯỢC XÁC MINH (UNVERIFIED)** trên môi trường live/testbed có chứa vector OpenAI thật, do chưa có phiên kích hoạt và reindex live nào với OpenAI.
+> - **Lưu ý Bắt buộc về Rollback**:
 > Do `KnowledgeIndexingOutboxWorker` xóa vector của version cũ khi thực hiện reindex, việc chỉ thay đổi cấu hình `AI_EMBEDDING_PROVIDER=simulated` **sẽ không tự động khôi phục** lại vector simulated cho các văn bản đã reindex bằng OpenAI.
 > **Bắt buộc phải kích hoạt Outbox Reindex lại toàn bộ corpus ACTIVE** sau khi chuyển cấu hình về `simulated`.
 

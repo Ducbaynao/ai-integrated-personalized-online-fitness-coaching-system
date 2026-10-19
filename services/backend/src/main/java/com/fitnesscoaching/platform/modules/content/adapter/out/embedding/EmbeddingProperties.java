@@ -39,7 +39,9 @@ public record EmbeddingProperties(
     ) {
         public OpenAiProperties {
             if (baseUrl == null || baseUrl.isBlank()) {
-                baseUrl = "https://api.openai.com/v1";
+                baseUrl = "https://api.openai.com";
+            } else {
+                baseUrl = baseUrl.trim();
             }
             if (model == null || model.isBlank()) {
                 model = "text-embedding-3-small";

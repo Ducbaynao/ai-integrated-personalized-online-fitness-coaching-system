@@ -544,4 +544,163 @@ class OpenAiEmbeddingAdapterTest {
                 .isInstanceOf(AiOutputValidationException.class)
                 .hasMessageContaining("null vector");
     }
+
+    @Test
+    @DisplayName("URI normalization helper strips trailing slashes and redundant /v1 suffixes")
+    void verifyNormalizeBaseUrl() {
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl(null)).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("   ")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("https://api.openai.com")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("https://api.openai.com/")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("https://api.openai.com/v1")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("https://api.openai.com/v1/")).isEqualTo("https://api.openai.com");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("http://127.0.0.1:8000")).isEqualTo("http://127.0.0.1:8000");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("http://127.0.0.1:8000/v1")).isEqualTo("http://127.0.0.1:8000");
+        assertThat(OpenAiEmbeddingAdapter.normalizeBaseUrl("http://127.0.0.1:8000/v1/")).isEqualTo("http://127.0.0.1:8000");
+    }
+
+    @Test
+    @DisplayName("Actual HTTP wire request path is /v1/embeddings when baseUrl ends with /v1")
+    void dispatchesToNormalizedWirePathWhenBaseUrlHasTrailingV1() throws Exception {
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+        int port = server.getAddress().getPort();
+        java.util.concurrent.atomic.AtomicReference<String> capturedPath = new java.util.concurrent.atomic.AtomicReference<>();
+
+        String responseJson = """
+                {"object": "list", "data": [{"object": "embedding", "index": 0, "embedding": %s}], "usage": {"prompt_tokens": 5, "total_tokens": 5}}
+                """.formatted(objectMapper.valueToTree(Collections.nCopies(1536, 0.025f)).toString());
+
+        server.createContext("/", exchange -> {
+            capturedPath.set(exchange.getRequestURI().toString());
+            byte[] bytes = responseJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            EmbeddingProperties props = new EmbeddingProperties(
+                    "openai",
+                    new EmbeddingProperties.OpenAiProperties(
+                            API_KEY,
+                            "http://127.0.0.1:" + port + "/v1",
+                            "text-embedding-3-small",
+                            "openai/text-embedding-3-small/1536",
+                            1536,
+                            3000,
+                            6000,
+                            2,
+                            15000
+                    )
+            );
+
+            OpenAiEmbeddingAdapter customAdapter = new OpenAiEmbeddingAdapter(props, RestClient.builder(), testSleeper);
+            float[] vector = customAdapter.generateEmbedding("Wire verification with /v1");
+
+            assertThat(vector).hasSize(1536);
+            assertThat(capturedPath.get()).isEqualTo("/v1/embeddings");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("Actual HTTP wire request path is /v1/embeddings when baseUrl has trailing slash and /v1/")
+    void dispatchesToNormalizedWirePathWhenBaseUrlHasTrailingSlash() throws Exception {
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+        int port = server.getAddress().getPort();
+        java.util.concurrent.atomic.AtomicReference<String> capturedPath = new java.util.concurrent.atomic.AtomicReference<>();
+
+        String responseJson = """
+                {"object": "list", "data": [{"object": "embedding", "index": 0, "embedding": %s}], "usage": {"prompt_tokens": 5, "total_tokens": 5}}
+                """.formatted(objectMapper.valueToTree(Collections.nCopies(1536, 0.025f)).toString());
+
+        server.createContext("/", exchange -> {
+            capturedPath.set(exchange.getRequestURI().toString());
+            byte[] bytes = responseJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            EmbeddingProperties props = new EmbeddingProperties(
+                    "openai",
+                    new EmbeddingProperties.OpenAiProperties(
+                            API_KEY,
+                            "http://127.0.0.1:" + port + "/v1/",
+                            "text-embedding-3-small",
+                            "openai/text-embedding-3-small/1536",
+                            1536,
+                            3000,
+                            6000,
+                            2,
+                            15000
+                    )
+            );
+
+            OpenAiEmbeddingAdapter customAdapter = new OpenAiEmbeddingAdapter(props, RestClient.builder(), testSleeper);
+            float[] vector = customAdapter.generateEmbedding("Wire verification with /v1/");
+
+            assertThat(vector).hasSize(1536);
+            assertThat(capturedPath.get()).isEqualTo("/v1/embeddings");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("Actual HTTP wire request path is /v1/embeddings with default baseUrl without /v1")
+    void dispatchesToNormalizedWirePathWithDefaultBaseUrl() throws Exception {
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+        int port = server.getAddress().getPort();
+        java.util.concurrent.atomic.AtomicReference<String> capturedPath = new java.util.concurrent.atomic.AtomicReference<>();
+
+        String responseJson = """
+                {"object": "list", "data": [{"object": "embedding", "index": 0, "embedding": %s}], "usage": {"prompt_tokens": 5, "total_tokens": 5}}
+                """.formatted(objectMapper.valueToTree(Collections.nCopies(1536, 0.025f)).toString());
+
+        server.createContext("/", exchange -> {
+            capturedPath.set(exchange.getRequestURI().toString());
+            byte[] bytes = responseJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            EmbeddingProperties props = new EmbeddingProperties(
+                    "openai",
+                    new EmbeddingProperties.OpenAiProperties(
+                            API_KEY,
+                            "http://127.0.0.1:" + port,
+                            "text-embedding-3-small",
+                            "openai/text-embedding-3-small/1536",
+                            1536,
+                            3000,
+                            6000,
+                            2,
+                            15000
+                    )
+            );
+
+            OpenAiEmbeddingAdapter customAdapter = new OpenAiEmbeddingAdapter(props, RestClient.builder(), testSleeper);
+            float[] vector = customAdapter.generateEmbedding("Wire verification with root host");
+
+            assertThat(vector).hasSize(1536);
+            assertThat(capturedPath.get()).isEqualTo("/v1/embeddings");
+        } finally {
+            server.stop(0);
+        }
+    }
 }

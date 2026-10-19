@@ -19,3 +19,9 @@ auth:
   jwt:
     issuer: fitness-coaching-backend-test
     secret: test-only-jwt-secret-1234567890-abcdefghijklmnopqrstuvwxyz
+
+ai:
+  embedding:
+    provider: simulated
+    openai:
+      base-url: https://api.openai.com
