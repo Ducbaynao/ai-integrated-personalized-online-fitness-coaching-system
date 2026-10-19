@@ -9,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/features/auth/AuthContext';
 import { CapabilitySwitcher } from '@/components/CapabilitySwitcher';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
@@ -47,10 +48,11 @@ export function TrainerHomeScreen() {
   const canCoach = Boolean(user?.capabilities?.canCoach);
 
   return (
+    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: themeColors.canvas }]}>
     <ScrollView
       testID="trainer-home-screen"
       contentContainerStyle={styles.scrollContent}
-      style={[styles.container, { backgroundColor: themeColors.canvas }]}>
+      style={styles.container}>
       {/* Capability Switcher for Dual-Role */}
       {isDualRole && <CapabilitySwitcher />}
 
@@ -205,6 +207,7 @@ export function TrainerHomeScreen() {
         </Pressable>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

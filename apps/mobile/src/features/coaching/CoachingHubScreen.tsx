@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationships } from './coachingQueries';
@@ -16,7 +17,7 @@ export function CoachingHubScreen() {
     activeCapability === 'TRAINER' ? relationship.trainerId === user?.id : relationship.studentId === user?.id
   );
 
-  return <ScrollView testID="coaching-hub-screen" style={[styles.screen, { backgroundColor: theme.canvas }]}
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="coaching-hub-screen" style={styles.screen}
     contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}>
     <View>
       <Text style={[styles.title, { color: theme.textPrimary }]}>Huấn luyện cá nhân</Text>
@@ -46,6 +47,6 @@ export function CoachingHubScreen() {
       </CoachingCard>
     </Pressable>)}
     {query.hasNextPage ? <CoachingButton label={query.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm'} busy={query.isFetchingNextPage} disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} secondary /> : null}
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }
 
