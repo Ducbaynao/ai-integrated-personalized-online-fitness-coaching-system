@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CoachingHubScreen } from '@/features/coaching/CoachingHubScreen';
 import { RelationshipDetailScreen } from '@/features/coaching/RelationshipDetailScreen';
@@ -56,6 +57,7 @@ describe('coaching screens', () => {
   it('renders loading, empty, and retryable relationship states with accessible roles', () => {
     (useRelationships as jest.Mock).mockReturnValue({ data: undefined, isPending: true, isError: false, isRefetching: false, refetch: jest.fn() });
     let tree = renderWithQueryClient(<CoachingHubScreen />);
+    expect(tree.root.findByType(SafeAreaView).props.edges).toEqual(['top']);
     expect(tree.root.findByProps({ accessibilityRole: 'progressbar' })).toBeTruthy();
     renderer.act(() => tree.unmount());
 
@@ -145,6 +147,7 @@ describe('coaching screens', () => {
       isPending: false, isError: false, refetch: jest.fn(),
     });
     const tree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
+    expect(tree.root.findByType(SafeAreaView).props.edges).toEqual(['top']);
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Kết thúc huấn luyện' }).props.onPress());
     let confirm = tree.root.findByProps({ accessibilityLabel: 'Xác nhận' });
     expect(confirm.props.accessibilityState.disabled).toBe(true);

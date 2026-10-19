@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Modal, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -72,7 +73,7 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
   const requiresReason = pendingAction?.kind === 'relationship' && pendingAction.action === 'end';
   const submitDisabled = mutation.isPending || (requiresReason && !reason.trim());
   const history = historyQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  return <ScrollView testID="relationship-detail-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="relationship-detail-screen" style={styles.screen} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>{relationship.counterparty.displayName}</Text>
     <CoachingCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Trạng thái quan hệ</Text>
@@ -124,6 +125,6 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
         </CoachingCard>
       </View>
     </Modal>
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }
 

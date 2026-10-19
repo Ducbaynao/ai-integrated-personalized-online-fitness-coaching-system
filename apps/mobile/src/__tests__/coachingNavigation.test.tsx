@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { HomeScreen } from '@/features/auth/HomeScreen';
 import { TrainerHomeScreen } from '@/features/trainer/TrainerHomeScreen';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -31,6 +32,7 @@ describe('coaching navigation entries', () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { ...user, roles: ['TRAINER'], capabilities: { hasStudentProfile: false, hasTrainerProfile: true, canCoach: false } }, logout: jest.fn() });
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<TrainerHomeScreen />); });
+    expect(tree.root.findByType(SafeAreaView).props.edges).toEqual(['top']);
     const entry = tree.root.findByProps({ testID: 'trainer-view-coaching-button' });
     expect(entry.props.accessibilityRole).toBe('button');
     renderer.act(() => entry.props.onPress());
