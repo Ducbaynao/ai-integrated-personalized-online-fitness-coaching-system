@@ -52,3 +52,15 @@ ai:
     internal-service-key: ${AI_INTERNAL_SERVICE_KEY:dev-ai-internal-key-change-me}
     connect-timeout-ms: ${AI_CONNECT_TIMEOUT_MS:5000}
     read-timeout-ms: ${AI_READ_TIMEOUT_MS:10000}
+  embedding:
+    provider: ${AI_EMBEDDING_PROVIDER:simulated} # 'simulated' or 'openai'
+    openai:
+      api-key: ${AI_EMBEDDING_API_KEY:${OPENAI_API_KEY:}}
+      base-url: ${AI_EMBEDDING_BASE_URL:https://api.openai.com}
+      model: ${AI_EMBEDDING_MODEL:text-embedding-3-small}
+      model-space: ${AI_EMBEDDING_MODEL_SPACE:openai/text-embedding-3-small/1536}
+      dimension: ${AI_EMBEDDING_DIMENSION:1536}
+      connect-timeout-ms: ${AI_EMBEDDING_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${AI_EMBEDDING_READ_TIMEOUT_MS:10000}
+      max-attempts: ${AI_EMBEDDING_MAX_ATTEMPTS:2}
+      overall-deadline-ms: ${AI_EMBEDDING_OVERALL_DEADLINE_MS:15000}
