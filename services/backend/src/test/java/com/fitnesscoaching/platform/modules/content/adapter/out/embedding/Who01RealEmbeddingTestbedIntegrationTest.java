@@ -18,6 +18,7 @@ import com.fitnesscoaching.platform.modules.content.domain.TechnicalReadiness;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,11 +48,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Isolated Testbed Integration Test for WHO-01.
  * Targets the local isolated testbed database at localhost:5433 (digital-fitness-postgres).
- * - Part 1: Offline chunking & readiness verification (always runs, 100% offline).
- * - Part 2: Controlled Live Indexing & Retrieval (runs ONLY if OpenAI API key is supplied).
+ *
+ * <p>Execution Guard:
+ * This class requires {@code RUN_LIVE_OPENAI_TESTS=true} via {@link EnabledIfEnvironmentVariable}.
+ * By applying this condition at class level, JUnit Jupiter disables the container before
+ * Spring TestContext framework attempts to boot {@link SpringBootTest} or connect to
+ * {@code localhost:5433}. This ensures 100% CI isolation while preserving local testbed execution.
+ *
+ * <p>Offline chunking verification has also been extracted to {@link Who01KnowledgeChunkingOfflineTest}
+ * which runs unconditionally in standard CI builds.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
+@EnabledIfEnvironmentVariable(named = "RUN_LIVE_OPENAI_TESTS", matches = "(?i)true")
 @DisplayName("WHO-01 Real Embedding Testbed Integration Test")
 class Who01RealEmbeddingTestbedIntegrationTest {
 

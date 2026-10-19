@@ -170,6 +170,49 @@ cd services/backend
 ./mvnw.cmd test -Dtest=EmbeddingProviderSelectionIntegrationTest
 ```
 
+### 6.3 Spring Context Offline Regression (`OpenAiEmbeddingContextRegressionTest`)
+Kiểm chứng ngữ cảnh Spring Boot production khởi động thành công với `ai.embedding.provider=openai` mà không cần gọi mạng bên ngoài:
+- Xác nhận bean `RestClient.Builder` được cung cấp tự động bởi `@ConditionalOnMissingBean` trong `EmbeddingConfiguration`.
+- Nạp đầy đủ cấu hình adapter `OpenAiEmbeddingAdapter`, timeouts và endpoint.
+- Hoàn toàn offline (dùng H2 in-memory của test profile, dummy API key).
+
+Lệnh chạy:
+```bash
+cd services/backend
+./mvnw.cmd test -Dtest=OpenAiEmbeddingContextRegressionTest
+```
+
+### 6.4 WHO-01 Offline Chunking Verification (`Who01KnowledgeChunkingOfflineTest`)
+Kiểm thử thuần túy cấp đơn vị (POJO unit test, không cần Spring Boot Context, không kết nối database hay gọi API):
+- Chạy tự động trong mọi lần build Maven mặc định (`./mvnw test`) và trên GitHub CI.
+- Xác thực tính toàn vẹn SHA-256 của file nguồn `WHO-PA-SB-2020-VI-01` (`5d191d97...339840`).
+- Kiểm chứng thuật toán tách đoạn `KnowledgeChunker` tạo ra chính xác 5 chunks, cấu trúc heading paths, token count và tính tất định (determinism).
+
+Lệnh chạy:
+```bash
+cd services/backend
+./mvnw.cmd test -Dtest=Who01KnowledgeChunkingOfflineTest
+```
+
+### 6.5 Controlled Local Testbed Integration (`Who01RealEmbeddingTestbedIntegrationTest`)
+Kiểm thử tích hợp đầu-cuối trên testbed local độc lập:
+- **Cơ chế cô lập CI/CD:** Sử dụng `@EnabledIfEnvironmentVariable(named = "RUN_LIVE_OPENAI_TESTS", matches = "(?i)true")` ở cấp độ Class. Khi chạy trong CI hoặc khi không bật cờ, JUnit 5 bỏ qua toàn bộ test class trước khi Spring Boot TestContext được khởi tạo, tuyệt đối không cố kết nối tới `localhost:5433` và không gây lỗi runner.
+- **Yêu cầu môi trường khi chủ động opt-in:**
+  - Database testbed: PostgreSQL 18.6 với pgvector đang chạy tại `localhost:5433` (container `digital-fitness-postgres`).
+  - Biến môi trường: `RUN_LIVE_OPENAI_TESTS=true` và `OPENAI_API_KEY` (hoặc `AI_EMBEDDING_API_KEY`).
+  - Tuyệt đối không lưu khóa API thật vào file mã nguồn hoặc cấu hình mặc định.
+
+Lệnh PowerShell để chạy thử nghiệm testbed cục bộ có kiểm soát:
+```powershell
+cd services/backend
+$env:RUN_LIVE_OPENAI_TESTS="true"
+$env:OPENAI_API_KEY="sk-proj-..."
+./mvnw.cmd test -Dtest=Who01RealEmbeddingTestbedIntegrationTest
+# Sau khi hoàn tất, luôn dọn dẹp biến môi trường trong phiên PowerShell:
+Remove-Item Env:\RUN_LIVE_OPENAI_TESTS
+Remove-Item Env:\OPENAI_API_KEY
+```
+
 ---
 
 ## 7. Hướng dẫn Thử nghiệm Live (Khi Điều kiện Tiên quyết Đã Được Phê duyệt)
