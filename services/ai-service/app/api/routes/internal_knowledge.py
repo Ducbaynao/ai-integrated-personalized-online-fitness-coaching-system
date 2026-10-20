@@ -2,7 +2,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from app.core.config import settings
 from app.core.security import verify_internal_service_key
+from app.integrations.openai_provider import OpenAiKnowledgeProvider
 from app.integrations.provider_interface import F01KnowledgeProvider
 from app.integrations.simulated_provider import SimulatedF01KnowledgeProvider
 from app.schemas.f01_schemas import F01InternalContextEnvelope, F01KnowledgeQueryResult
@@ -15,6 +17,8 @@ router = APIRouter(
 
 
 def get_f01_provider() -> F01KnowledgeProvider:
+    if settings.f01_provider.lower() == "openai":
+        return OpenAiKnowledgeProvider()
     return SimulatedF01KnowledgeProvider()
 
 

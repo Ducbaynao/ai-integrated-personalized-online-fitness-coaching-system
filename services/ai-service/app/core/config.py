@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     f01_model: str = "simulated-f01-v1"
     f01_provider: str = "simulated"
 
+    # OpenAI Settings for F01 Generation (DEC-A13-02)
+    openai_api_key: str = ""
+    openai_api_url: str = "https://api.openai.com/v1/chat/completions"
+    openai_model: str = "gpt-4o-mini-2024-07-18"
+    openai_store: bool = False
+    openai_connect_timeout_seconds: float = 5.0
+    openai_read_timeout_seconds: float = 12.0
+    openai_max_retries: int = 1
+    openai_overall_timeout_seconds: float = 22.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
