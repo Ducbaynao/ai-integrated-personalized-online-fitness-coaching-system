@@ -593,6 +593,11 @@ test('runEvaluation aborts and throws when filter matches 0 cases', async () => 
   );
 });
 
+test('parseCliArgs supports comma-separated multi-source filtering', () => {
+  const args = parseCliArgs(['--source=WHO-PA-SB-2020,NIDDK-WEIGHT-FACTORS-2023']);
+  assert.deepEqual(args.sourceFilter, ['WHO-PA-SB-2020', 'NIDDK-WEIGHT-FACTORS-2023']);
+});
+
 test('tier=VERIFIED without proof is downgraded to DECLARED', () => {
   const fakeVerifiedSnapshot = new CoverageSnapshot({
     tier: 'VERIFIED',
@@ -804,3 +809,106 @@ test('schema validator fails closed when schema file is malformed JSON', (t) => 
     /Schema configuration error: failed to parse citation schema JSON/
   );
 });
+
+test('partial coverage cases are evaluable with full expected documents in recall denominator, aggregateMetrics sets dynamic denominator and CALCULATED status', () => {
+  // Case with 2 expected documents: DOC-A and DOC-B
+  const caseDef = {
+    case_key: 'SRC:E01',
+    source_id: 'SRC',
+    case_id: 'E01',
+    case_type: 'DIRECT_KNOWLEDGE',
+    expected_documents: [
+      { document_id: 'DOC-A', target_version: '1.0.0' },
+      { document_id: 'DOC-B', target_version: '1.0.0' },
+    ],
+  };
+
+  // Verified snapshot where ONLY DOC-A is active (PARTIAL_COVERAGE)
+  const covPartialVerified = {
+    status: 'PARTIAL_COVERAGE',
+    snapshot_tier: 'VERIFIED',
+    active_count: 1,
+    total_expected: 2,
+  };
+
+  // Chunks returned contain DOC-A at rank 1
+  const chunks = [
+    { documentCode: 'DOC-A', version: '1.0.0' },
+  ];
+
+  const score = scoreRetrievalCase(chunks, caseDef, 5, covPartialVerified);
+
+  // Assertions on case scoring:
+  assert.equal(score.evaluable, true, 'Partial coverage with verified snapshot must be evaluable');
+  assert.equal(score.exclusion_reason, null);
+  assert.equal(score.hit, 1, 'DOC-A was retrieved so hit must be 1');
+  // Crucial invariant: Recall denominator must be 2 (all expected documents), NOT 1 (active count)
+  assert.equal(score.recall, 0.5, 'Recall must be 1/2 = 0.5 (penalizing missing expected doc DOC-B)');
+  assert.equal(score.first_rank, 1);
+  assert.deepEqual(score.expected_doc_ids, ['DOC-A', 'DOC-B']);
+  assert.deepEqual(score.exact_matched_doc_ids, ['DOC-A']);
+
+  // Case with NO_COVERAGE (for contrast)
+  const covNoCoverage = {
+    status: 'NO_COVERAGE',
+    snapshot_tier: 'VERIFIED',
+  };
+  const scoreNoCov = scoreRetrievalCase(chunks, caseDef, 5, covNoCoverage);
+  assert.equal(scoreNoCov.evaluable, false);
+  assert.equal(scoreNoCov.exclusion_reason, 'VERIFIED_CORPUS_COVERAGE_MISSING');
+
+  // Case with FULL_COVERAGE
+  const caseFull = {
+    case_key: 'SRC:E02',
+    source_id: 'SRC',
+    case_id: 'E02',
+    case_type: 'DIRECT_KNOWLEDGE',
+    expected_documents: [
+      { document_id: 'DOC-A', target_version: '1.0.0' },
+    ],
+  };
+  const covFullVerified = {
+    status: 'FULL_COVERAGE',
+    snapshot_tier: 'VERIFIED',
+  };
+  const scoreFull = scoreRetrievalCase(chunks, caseFull, 5, covFullVerified);
+  assert.equal(scoreFull.evaluable, true);
+  assert.equal(scoreFull.hit, 1);
+  assert.equal(scoreFull.recall, 1.0);
+
+  // Aggregate metrics: 1 full coverage + 1 partial coverage + 1 no coverage
+  const results = [
+    { source_id: 'SRC', case_type: 'DIRECT_KNOWLEDGE', coverage_evidence: covFullVerified, retrieval_scoring: scoreFull },
+    { source_id: 'SRC', case_type: 'DIRECT_KNOWLEDGE', coverage_evidence: covPartialVerified, retrieval_scoring: score },
+    { source_id: 'SRC', case_type: 'DIRECT_KNOWLEDGE', coverage_evidence: covNoCoverage, retrieval_scoring: scoreNoCov },
+  ];
+
+  const summary = aggregateMetrics(results, 5, 'retrieval');
+
+  // Evaluable denominator must be exactly 2 (1 full + 1 partial)
+  assert.equal(summary.counts.total_cases, 3);
+  assert.equal(summary.coverage_summary.full_coverage, 1);
+  assert.equal(summary.coverage_summary.partial_coverage, 1);
+  assert.equal(summary.coverage_summary.no_coverage, 1);
+  assert.equal(summary.counts.evaluable_retrieval_cases, 2);
+  assert.equal(summary.counts.verified_coverage_missing_exclusions, 1);
+
+  // Metrics checks
+  const hitMetric = summary.metrics.document_hit_at_k;
+  assert.equal(hitMetric.status, 'CALCULATED');
+  assert.equal(hitMetric.denominator, 2);
+  assert.equal(hitMetric.hits, 2);
+  assert.equal(hitMetric.value, 1.0);
+
+  const recallMetric = summary.metrics.document_recall_at_k;
+  assert.equal(recallMetric.status, 'CALCULATED');
+  assert.equal(recallMetric.denominator, 2);
+  assert.equal(recallMetric.sum_recall, 1.5); // 1.0 from full + 0.5 from partial
+  assert.equal(recallMetric.value, 0.75); // 1.5 / 2 = 0.75
+
+  const mrrMetric = summary.metrics.mean_reciprocal_rank_at_k;
+  assert.equal(mrrMetric.status, 'CALCULATED');
+  assert.equal(mrrMetric.denominator, 2);
+  assert.equal(mrrMetric.value, 1.0); // (1/1 + 1/1) / 2 = 1.0
+});
+

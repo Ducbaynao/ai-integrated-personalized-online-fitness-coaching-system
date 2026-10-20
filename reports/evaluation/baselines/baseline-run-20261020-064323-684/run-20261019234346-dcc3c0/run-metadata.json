@@ -1,0 +1,34 @@
+{
+  "run_id": "run-20261019234346-dcc3c0",
+  "timestamp": "2026-10-19T23:43:46.639Z",
+  "mode": "retrieval",
+  "endpoint": "http://localhost:8080/internal/v1/knowledge/retrieval",
+  "git_sha": "9279057cbf45d21b3b6677f8f4a99a6785b8e6a8",
+  "working_tree_clean": false,
+  "status_summary": "DIRTY",
+  "dataset_name": "F01 General Fitness Knowledge Candidate Dataset",
+  "dataset_version": "1.0.0-candidate",
+  "dataset_hash": "0bdb6c6ebb24b4fc50c2104dc2315309cb7eb667e40e09639b46f40bec84b970",
+  "manifest_verified": true,
+  "holdout_status": "NO_INDEPENDENT_HOLDOUT_YET",
+  "top_k": 5,
+  "timeout_ms": 10000,
+  "coverage_snapshot": {
+    "status": "SNAPSHOT_PROVIDED",
+    "source": "LOCAL_POSTGRESQL_RUNTIME_AUDIT",
+    "path": "D:\\Projects\\ai-integrated-personalized-online-fitness-coaching-system\\data\\evaluation\\coverage-snapshot-testbed-9docs.json"
+  },
+  "model_space": {
+    "model_space": "UNKNOWN",
+    "source": "UNKNOWN"
+  },
+  "filters_applied": {
+    "source": [
+      "WHO-PA-SB-2020",
+      "NIDDK-WEIGHT-FACTORS-2023"
+    ],
+    "case_id": null,
+    "limit": null
+  },
+  "selected_case_count": 42
+}
