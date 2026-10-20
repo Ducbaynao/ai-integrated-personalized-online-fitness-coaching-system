@@ -35,6 +35,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -85,14 +89,33 @@ class F01ReindexRollbackDrillIntegrationTest {
         }
     }
 
+    static final Set<Integer> FORBIDDEN_PORTS = Set.of(5432, 5433);
+    private static final Pattern JDBC_URL_PATTERN = Pattern.compile("^jdbc:postgresql://([^:/]+):(\\d+)/([^?]+)(?:\\?.*)?$");
+
+    public static void validateDrillJdbcUrl(String jdbcUrl) {
+        if (jdbcUrl == null || jdbcUrl.isBlank()) {
+            throw new IllegalArgumentException("SAFETY GUARD: DRILL_DATABASE_URL cannot be null or blank");
+        }
+        Matcher matcher = JDBC_URL_PATTERN.matcher(jdbcUrl.trim());
+        if (!matcher.matches()) {
+            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL does not match expected format jdbc:postgresql://host:port/database! Attempted: " + jdbcUrl);
+        }
+        int port = Integer.parseInt(matcher.group(2));
+        String dbName = matcher.group(3);
+
+        if (FORBIDDEN_PORTS.contains(port)) {
+            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL targets forbidden port " + port + "! (Port 5432 is default Postgres, port 5433 is baseline testbed). Attempted: " + jdbcUrl);
+        }
+        if (!dbName.toLowerCase().contains("drill") || "digital_fitness".equalsIgnoreCase(dbName) || "postgres".equalsIgnoreCase(dbName) || "fitness".equalsIgnoreCase(dbName)) {
+            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL must target an isolated drill database! Attempted DB: " + dbName);
+        }
+    }
+
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         String drillDbUrl = System.getenv("DRILL_DATABASE_URL");
         if (drillDbUrl != null && !drillDbUrl.isBlank()) {
-            // Guardrail: must target port 5435 and digital_fitness_drill
-            if (!drillDbUrl.contains("5435") || !drillDbUrl.contains("drill")) {
-                throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL must target isolated port 5435 and drill database! Attempted: " + drillDbUrl);
-            }
+            validateDrillJdbcUrl(drillDbUrl);
             registry.add("spring.datasource.url", () -> drillDbUrl);
             registry.add("spring.datasource.username", () -> System.getenv().getOrDefault("DRILL_DATABASE_USER", "fitness_drill_app"));
             registry.add("spring.datasource.password", () -> System.getenv().getOrDefault("DRILL_DATABASE_PASSWORD", "drill_pass_123"));
@@ -193,10 +216,32 @@ class F01ReindexRollbackDrillIntegrationTest {
     @Autowired private DrillEmbeddingModelPort drillEmbeddingPort;
     @Autowired private ObjectMapper objectMapper;
 
+    private void verifyTargetDatabaseSafety() {
+        String currentDb = jdbcTemplate.queryForObject("SELECT current_database()", String.class);
+        if (currentDb == null || !currentDb.toLowerCase().contains("drill")) {
+            throw new IllegalStateException("SAFETY GUARD: Refusing destructive fixture reset on non-drill database: " + currentDb);
+        }
+        if ("digital_fitness".equalsIgnoreCase(currentDb) || "fitness".equalsIgnoreCase(currentDb) || "postgres".equalsIgnoreCase(currentDb)) {
+            throw new IllegalStateException("SAFETY GUARD: Refusing destructive fixture reset on protected database: " + currentDb);
+        }
+
+        String drillDbUrl = System.getenv("DRILL_DATABASE_URL");
+        if (drillDbUrl != null && !drillDbUrl.isBlank()) {
+            try (Connection conn = jdbcTemplate.getDataSource().getConnection()) {
+                String metaUrl = conn.getMetaData().getURL();
+                validateDrillJdbcUrl(metaUrl);
+            } catch (SQLException e) {
+                throw new IllegalStateException("SAFETY GUARD: Failed to inspect JDBC connection metadata: " + e.getMessage(), e);
+            }
+        }
+    }
+
     @BeforeEach
     void setUp() {
         drillEmbeddingPort.reset();
         outboxConsumer.setExecutionInspectionHook(null);
+
+        verifyTargetDatabaseSafety();
 
         jdbcTemplate.execute("DELETE FROM fitness.ai_run_knowledge_chunks");
         jdbcTemplate.execute("DELETE FROM fitness.ai_runs");
@@ -559,7 +604,9 @@ class F01ReindexRollbackDrillIntegrationTest {
                     id, knowledge_version_id, run_type, status, operation_key, statistics, created_at
                 ) VALUES (?, ?, 'REINDEX', 'QUEUED', ?, '{}'::jsonb, clock_timestamp())
                 """, rollbackRunId, versionId, "OP:ROLLBACK-TO-A:" + rollbackRunId);
+        long startReindexRecoveryNs = System.nanoTime();
         assertThat(outboxConsumer.processNextRun("drill-worker")).isTrue();
+        long reindexRecoveryDurationMs = (System.nanoTime() - startReindexRecoveryNs) / 1_000_000;
 
         // Post-rollback verification: Model A vectors are back and Model B vectors are deleted
         Integer postRollbackCountA = jdbcTemplate.queryForObject("""
@@ -594,12 +641,16 @@ class F01ReindexRollbackDrillIntegrationTest {
         assertThat(retrievalService.retrieveActiveKnowledge("nguyên tắc dinh dưỡng và vận động", List.of("WHO-PA-SB-2020"), 5)).isEmpty();
 
         // Perform fast snapshot restore of embeddings and runs
+        long startSnapshotRecoveryNs = System.nanoTime();
         jdbcTemplate.update("DELETE FROM fitness.knowledge_embeddings WHERE knowledge_chunk_id IN (SELECT id FROM fitness.knowledge_chunks WHERE knowledge_version_id = ?)", versionId);
         jdbcTemplate.execute("INSERT INTO fitness.knowledge_embeddings SELECT * FROM fitness.drill_backup_embeddings");
         jdbcTemplate.execute("""
                 INSERT INTO fitness.knowledge_processing_runs SELECT * FROM fitness.drill_backup_runs
                 ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, statistics = EXCLUDED.statistics
                 """);
+        long snapshotRecoveryDurationMs = (System.nanoTime() - startSnapshotRecoveryNs) / 1_000_000;
+
+        System.out.println("[DRILL_METRICS] outbox_reindex_recovery_ms=" + reindexRecoveryDurationMs + " snapshot_restore_recovery_ms=" + snapshotRecoveryDurationMs);
 
         // Retrieval is immediately restored via snapshot
         List<RetrievedKnowledgeChunk> snapshotRestored = retrievalService.retrieveActiveKnowledge("nguyên tắc dinh dưỡng và vận động", List.of("WHO-PA-SB-2020"), 5);
