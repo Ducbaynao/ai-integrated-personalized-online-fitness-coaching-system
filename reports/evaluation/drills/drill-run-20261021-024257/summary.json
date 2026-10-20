@@ -1,0 +1,69 @@
+﻿{
+    "drill_run_id":  "drill-f01-20261021-024257",
+    "branch":  "chore/f01-reindex-rollback-drill",
+    "base_commit":  "1f01da75bd83de3f37a6987b04264f805be75a20",
+    "started_at":  "2026-10-20T19:43:11.4598516Z",
+    "completed_at":  "2026-10-20T19:43:36.0458547Z",
+    "duration_seconds":  24.59,
+    "isolation_environment":  {
+                                  "container_name":  "digital-fitness-postgres-drill",
+                                  "network":  "digital-fitness-drill-net",
+                                  "port":  5435,
+                                  "database":  "digital_fitness_drill",
+                                  "scheduling_disabled":  true,
+                                  "scheduling_config":  "APP_SCHEDULING_ENABLED=false, ATTENTION_REVIEW_CRON=\u0027-\u0027"
+                              },
+    "scenarios":  [
+                      {
+                          "scenario_id":  "A",
+                          "name":  "Idempotent Reindex",
+                          "status":  "PASS",
+                          "observed_interruption":  "Retrieval before/after verified; continuous downtime: NOT_MEASURED",
+                          "identity_preservation":  "100% (deterministic chunk UUIDs and SHA-256 content hashes unchanged)",
+                          "anti_duplication":  "Verified (chunk and vector counts remained constant)",
+                          "retrieval_consistency":  "Identical rank and similarity scores before and after",
+                          "fixture_note":  "Fixture WHO-01 2 chunks (minimal representative fixture, distinct from 5 chunks in expanded testbed)"
+                      },
+                      {
+                          "scenario_id":  "B1",
+                          "name":  "Midway failure: Boundary 2 Embedding Exception",
+                          "status":  "PASS",
+                          "observed_interruption":  "Retrieval before/after verified; continuous downtime: NOT_MEASURED (Boundary 3 unopened; old vectors retained)",
+                          "fault_type":  "Simulated programmatic RuntimeException (mocking provider 503; distinct from physical OS network disconnect)",
+                          "atomicity":  "Verified (Boundary 3 was never entered, old vectors retained)",
+                          "unready_exposure":  "Verified (failed run did not report index_ready=true)",
+                          "recovery":  "Verified (retry succeeded after clearing simulated fault)"
+                      },
+                      {
+                          "scenario_id":  "B2",
+                          "name":  "Midway failure: Boundary 3 Claim Fencing Rejection",
+                          "status":  "PASS",
+                          "observed_interruption":  "Retrieval before/after verified; continuous downtime: NOT_MEASURED (Boundary 3 transaction rolled back; old vectors retained)",
+                          "fault_type":  "Database-level claim token update during inspection (fencing collision; distinct from network failure)",
+                          "atomicity":  "Verified (single REQUIRES_NEW transaction rolled back completely)",
+                          "unready_exposure":  "Zero partial chunks or embeddings committed"
+                      },
+                      {
+                          "scenario_id":  "C",
+                          "name":  "Rollback after vector replacement (DEC-A13-05)",
+                          "status":  "PASS",
+                          "vector_replacement_behavior":  "Reindexing with new model space deletes previous vectors",
+                          "config_only_switch_result":  "Retrieval returned 0 chunks (proves config change alone is insufficient)",
+                          "recovery_mechanism_1":  "Outbox Reindex back to target model regenerated vectors and fully restored retrieval (~0.12s testbed operation time)",
+                          "recovery_mechanism_2":  "Table-level restore in drill environment restored vectors immediately (~0.03s testbed operation time; not full DB disaster recovery)",
+                          "observed_downtime":  "Query availability lost for Model A from replacement until reindex/restore completed; continuous downtime: NOT_MEASURED; testbed timings cannot be extrapolated to live provider or production",
+                          "model_space_mode":  "Simulated test double (metadata OpenAI text-embedding-3-small/1536 but vectors generated via DeterministicEmbeddingGenerator,  spend)"
+                      },
+                      {
+                          "scenario_id":  "D",
+                          "name":  "Citation history, locator, and provenance preservation",
+                          "status":  "PASS",
+                          "historical_citation_resolution":  "AI run citations in ai_run_knowledge_chunks resolved chunk content and locators exactly",
+                          "mutation_prevention":  "ContentConflictException thrown when mutating cited chunk content or provenance (sourceId, hash, locator)",
+                          "retention_vs_eligibility":  "Uncited chunks pruned; cited chunks preserved without embeddings and excluded from retrieval (isChunkEligible=false)",
+                          "draft_ineligible_isolation":  "HELD_AS_DRAFT (NIDDK 05/06 fixture) rejected from indexing; zero chunks in retrieval"
+                      }
+                  ],
+    "overall_status":  "PASS",
+    "verification_scope":  "Simulated offline testbed; live provider calls: PENDING PREREQUISITES / UNVERIFIED"
+}
