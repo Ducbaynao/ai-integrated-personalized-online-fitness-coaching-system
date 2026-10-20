@@ -1,0 +1,157 @@
+{
+  "k": 5,
+  "mode": "retrieval",
+  "coverage_summary": {
+    "total_cases": 42,
+    "full_coverage": 21,
+    "partial_coverage": 5,
+    "no_coverage": 16,
+    "coverage_unknown": 0,
+    "no_expected_docs": 0
+  },
+  "counts": {
+    "total_cases": 42,
+    "evaluable_retrieval_cases": 26,
+    "evaluable_public_cases": 0,
+    "infrastructure_errors": 0,
+    "execution_failures": 0,
+    "schema_violations": 0,
+    "coverage_unknown_exclusions": 0,
+    "coverage_not_verified_exclusions": 0,
+    "verified_coverage_missing_exclusions": 16,
+    "declared_coverage_missing_exclusions": 0,
+    "no_expected_docs_exclusions": 0,
+    "other_exclusions": 0
+  },
+  "metrics": {
+    "document_hit_at_k": {
+      "value": 0.8846,
+      "hits": 23,
+      "denominator": 26,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "document_recall_at_k": {
+      "value": 0.8077,
+      "sum_recall": 21,
+      "denominator": 26,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "mean_reciprocal_rank_at_k": {
+      "value": 0.6744,
+      "denominator": 26,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "chunk_hit_at_k": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Chunk-level ground truth labels not present in candidate dataset (labels exist at document level only)"
+    },
+    "chunk_recall_at_k": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Chunk-level ground truth labels not present in candidate dataset (labels exist at document level only)"
+    },
+    "citation_document_match_rate": {
+      "value": null,
+      "hits": 0,
+      "denominator": 0,
+      "status": "NOT_EVALUATED",
+      "reason": "Applicable only in public-f01 mode"
+    },
+    "false_refusal_rate": {
+      "value": null,
+      "false_refusals": 0,
+      "denominator": 0,
+      "status": "NOT_EVALUATED",
+      "reason": "Coverage not verified: declared coverage cannot produce verified false refusal metric (see exploratory_declared_metrics)"
+    },
+    "correct_abstention_rate": {
+      "value": null,
+      "correct_abstentions": 0,
+      "denominator": 0,
+      "status": "NOT_EVALUATED",
+      "reason": "No refusal/guardrail cases"
+    },
+    "citation_contract_validity": {
+      "value": null,
+      "valid_responses": 0,
+      "denominator": 0,
+      "status": "NOT_EVALUATED",
+      "reason": "No evaluated responses with citations"
+    },
+    "citation_support_and_faithfulness": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Automated claim-level groundedness requires specialist rubric review (Milestone A-52); automated keyword heuristics prohibited"
+    }
+  },
+  "exploratory_declared_metrics": {
+    "status": "NOT_EVALUATED",
+    "tier": "DECLARED",
+    "disclaimer": "Computed from unverified user-declared coverage (CLI or unverified inventory); strictly excluded from verified quality metrics",
+    "document_hit_at_k": {
+      "value": null,
+      "hits": null,
+      "denominator": null
+    },
+    "document_recall_at_k": {
+      "value": null,
+      "sum_recall": null,
+      "denominator": null
+    },
+    "mean_reciprocal_rank_at_k": {
+      "value": null,
+      "denominator": null
+    },
+    "false_refusal_rate": {
+      "value": null,
+      "false_refusals": null,
+      "denominator": null
+    }
+  },
+  "breakdown_by_source": {
+    "WHO-PA-SB-2020": {
+      "total": 24,
+      "evaluable": 16,
+      "hits": 13,
+      "infra_errors": 0
+    },
+    "NIDDK-WEIGHT-FACTORS-2023": {
+      "total": 18,
+      "evaluable": 10,
+      "hits": 10,
+      "infra_errors": 0
+    }
+  },
+  "breakdown_by_case_type": {
+    "DIRECT_KNOWLEDGE": {
+      "total": 20,
+      "evaluable": 14,
+      "hits": 13
+    },
+    "OUT_OF_SCOPE_REFUSAL": {
+      "total": 5,
+      "evaluable": 5,
+      "hits": 5
+    },
+    "SPECIALIZED_POPULATION": {
+      "total": 8,
+      "evaluable": 2,
+      "hits": 2
+    },
+    "POLICY_GUARDRAIL": {
+      "total": 5,
+      "evaluable": 2,
+      "hits": 1
+    },
+    "EVIDENCE_LIMITATION": {
+      "total": 4,
+      "evaluable": 3,
+      "hits": 2
+    }
+  },
+  "failed_or_flagged_cases": []
+}

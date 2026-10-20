@@ -97,8 +97,14 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
     else if (a === '--top-k' && argv[i + 1]) args.topK = Number(argv[++i]);
     else if (a.startsWith('--timeout-ms=')) args.timeoutMs = Number(a.split('=')[1]);
     else if (a === '--timeout-ms' && argv[i + 1]) args.timeoutMs = Number(argv[++i]);
-    else if (a.startsWith('--source=')) args.sourceFilter = canonicalizeSourceId(a.split('=')[1]);
-    else if (a === '--source' && argv[i + 1]) args.sourceFilter = canonicalizeSourceId(argv[++i]);
+    else if (a.startsWith('--source=')) {
+      const rawSources = a.split('=')[1].split(',').map((s) => s.trim()).filter(Boolean);
+      args.sourceFilter = rawSources.map(canonicalizeSourceId);
+    }
+    else if (a === '--source' && argv[i + 1]) {
+      const rawSources = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+      args.sourceFilter = rawSources.map(canonicalizeSourceId);
+    }
     else if (a.startsWith('--case-id=')) args.caseIdFilter = a.split('=')[1].trim();
     else if (a === '--case-id' && argv[i + 1]) args.caseIdFilter = argv[++i].trim();
     else if (a.startsWith('--limit=')) args.limit = Number(a.split('=')[1]);
@@ -589,8 +595,9 @@ export async function runEvaluation(options = {}) {
   // Filter cases
   let casesToRun = manifest.cases || [];
   if (args.sourceFilter) {
-    casesToRun = casesToRun.filter((c) => c.source_id === args.sourceFilter);
-    console.log(`Filtered by source ${args.sourceFilter}: ${casesToRun.length} cases`);
+    const filterList = Array.isArray(args.sourceFilter) ? args.sourceFilter : [args.sourceFilter];
+    casesToRun = casesToRun.filter((c) => filterList.includes(c.source_id));
+    console.log(`Filtered by source(s) ${filterList.join(', ')}: ${casesToRun.length} cases`);
   }
   if (args.caseIdFilter) {
     casesToRun = casesToRun.filter((c) => c.case_id === args.caseIdFilter);

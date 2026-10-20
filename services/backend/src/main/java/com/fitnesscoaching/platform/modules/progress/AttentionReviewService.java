@@ -97,7 +97,7 @@ public class AttentionReviewService {
     }
 
     /** Public for deterministic integration tests; scheduler invokes the same transactional command. */
-    @Scheduled(cron="0 */5 * * * *")
+    @Scheduled(cron="${app.scheduling.attention-review.cron:0 */5 * * * *}")
     @Transactional
     public void evaluate() {
         Timestamp dbTime = jdbc.queryForObject("SELECT clock_timestamp()",Timestamp.class);
