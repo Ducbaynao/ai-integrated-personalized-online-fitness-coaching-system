@@ -256,6 +256,10 @@ powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.ps1 -K
 
 # 4. Chạy kiểm thử rào chắn an toàn kịch bản PowerShell
 powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.test.ps1
+
+# 5. Chạy unit tests kiểm tra database safety guard (thuần JVM ~0.3s, không khởi động Docker hay Spring)
+cd services/backend
+./mvnw test "-Dtest=F01DrillSafetyGuardTest"
 ```
 
 ### 5.2. Các Rào Chắn An Toàn Hạ Tầng Đã Được Gia Cố
@@ -283,3 +287,7 @@ powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.test.p
    - Kết quả từng test scenario được đọc trực tiếp từ Surefire XML report của Maven (`TEST-*.xml`), kiểm tra timestamp report tươi mới và phản ánh đúng `failures`, `errors`, `skipped`.
    - Thời gian khôi phục của Outbox Reindex và Table Restore được đo trực tiếp tại thời điểm thực thi testbed cục bộ (`[DRILL_METRICS]`), không điền cố định.
    - Các chỉ số thời gian mạng của live provider ngoài Internet và kiểm thử tải liên tục tiếp tục được ghi nhận chính xác là **`NOT_MEASURED`**.
+6. **Cô lập Unit Tests Guard & Xử Lý An Toàn Trạng Thái Git:**
+   - Logic kiểm tra an toàn JDBC URL và Database Target được tách biệt độc lập vào [`F01DrillSafetyValidator`](../../services/backend/src/test/java/com/fitnesscoaching/platform/modules/content/adapter/out/embedding/F01DrillSafetyValidator.java).
+   - `F01DrillSafetyGuardTest` chạy thuần JVM không phụ thuộc Testcontainers, Docker daemon hay Spring context (~0.3s).
+   - Helper [`f01-reindex-rollback-drill-common.ps1`](../../tools/f01-reindex-rollback-drill-common.ps1) xử lý an toàn trạng thái Git porcelain (trả về đúng `working_tree_clean=true` khi sạch, `false` khi có thay đổi, và ném lỗi rõ ràng khi Git thất bại, không bị lỗi null method call).

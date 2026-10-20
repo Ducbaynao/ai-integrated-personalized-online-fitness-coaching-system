@@ -4,11 +4,13 @@
 
 .DESCRIPTION
     Verifies that:
-    1. Branch safety rejects 'main' and 'master'.
-    2. Port safety strictly blocks forbidden ports (5432 and 5433).
+    1. Branch safety rejects 'main', 'master', and blank branch via shared helper.
+    2. Port safety strictly blocks forbidden ports (5432 and 5433) via shared helper.
     3. Resource collision guard halts when container or network already exists, without deleting it.
     4. Environment variable backup & restoration restores pre-existing vs non-existing variables under error.
     5. Surefire test report parser handles test counts, skipped/failed scenarios, and rejects missing/stale reports.
+    6. Git operations (working tree status, branch detection, error handling) behave correctly on clean, single-change,
+       multi-change, and failed Git invocations without throwing null reference exceptions.
 #>
 
 [CmdletBinding()]
@@ -17,6 +19,8 @@ param()
 $ErrorActionPreference = "Stop"
 $failures = 0
 $passed = 0
+
+. (Join-Path $PSScriptRoot "f01-reindex-rollback-drill-common.ps1")
 
 function Assert-Throws {
     param(
@@ -57,34 +61,26 @@ Write-Host "=================================================================" -
 Write-Host "  RUNNING F01 DRILL SAFETY SCRIPT UNIT TESTS" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
-# Test 1: Branch guard logic
+# Test 1: Branch guard logic via shared Assert-DrillBranchSafety implementation
 Assert-Throws -TestName "Branch safety rejects 'main'" -ExpectedPattern "dedicated working branch" -Action {
-    $branch = "main"
-    if ($branch -eq "main" -or $branch -eq "master" -or [string]::IsNullOrWhiteSpace($branch)) {
-        throw "SAFETY GUARD: Drill script must run on a dedicated working branch, not directly on '$branch'."
-    }
+    Assert-DrillBranchSafety -Branch "main"
 }
 
 Assert-Throws -TestName "Branch safety rejects 'master'" -ExpectedPattern "dedicated working branch" -Action {
-    $branch = "master"
-    if ($branch -eq "main" -or $branch -eq "master" -or [string]::IsNullOrWhiteSpace($branch)) {
-        throw "SAFETY GUARD: Drill script must run on a dedicated working branch, not directly on '$branch'."
-    }
+    Assert-DrillBranchSafety -Branch "master"
 }
 
-# Test 2: Port safety guard
+Assert-Throws -TestName "Branch safety rejects blank branch" -ExpectedPattern "dedicated working branch" -Action {
+    Assert-DrillBranchSafety -Branch ""
+}
+
+# Test 2: Port safety guard via shared Assert-DrillPortSafety implementation
 Assert-Throws -TestName "Port safety blocks default port 5432" -ExpectedPattern "cannot be 5432" -Action {
-    $port = 5432
-    if ($port -eq 5432 -or $port -eq 5433) {
-        throw "SAFETY GUARD: DrillPort ($port) cannot be 5432 (default postgres) or 5433 (active baseline testbed)."
-    }
+    Assert-DrillPortSafety -Port 5432
 }
 
 Assert-Throws -TestName "Port safety blocks testbed port 5433" -ExpectedPattern "5433" -Action {
-    $port = 5433
-    if ($port -eq 5432 -or $port -eq 5433) {
-        throw "SAFETY GUARD: DrillPort ($port) cannot be 5432 (default postgres) or 5433 (active baseline testbed)."
-    }
+    Assert-DrillPortSafety -Port 5433
 }
 
 # Test 3: Environment variable backup and restore under try/finally
@@ -156,6 +152,57 @@ Assert-Throws -TestName "Missing Surefire report file triggers error" -ExpectedP
     $nonExistent = "target/surefire-reports/DOES_NOT_EXIST.xml"
     if (-not (Test-Path $nonExistent)) {
         throw "TEST REPORT MISSING: Expected Surefire XML report not found at $nonExistent."
+    }
+}
+
+# Test 6: Git operations and working tree status (testing Get-DrillGitWorkingTreeStatus and Get-DrillGitCurrentBranch)
+$tempRepo = Join-Path ([System.IO.Path]::GetTempPath()) ("f01-drill-test-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tempRepo -Force | Out-Null
+
+try {
+    # Initialize temporary repository outside project workspace
+    git -C $tempRepo init -b chore/test-drill-branch 2>&1 | Out-Null
+
+    # Case A: Git succeeds, clean working tree -> IsClean = true, no exception
+    $statusA = Get-DrillGitWorkingTreeStatus -RepositoryRoot $tempRepo
+    Assert-True -TestName "Clean working tree returns IsClean=true" -Condition ($statusA.IsClean -eq $true)
+    Assert-True -TestName "Clean working tree has 0 lines" -Condition ($statusA.LineCount -eq 0)
+
+    # Branch check succeeds on custom branch
+    $branchA = Get-DrillGitCurrentBranch -RepositoryRoot $tempRepo
+    Assert-True -TestName "Get-DrillGitCurrentBranch returns active branch" -Condition ($branchA -eq "chore/test-drill-branch")
+
+    # Case B: Git succeeds, 1 untracked file -> IsClean = false, LineCount = 1
+    Set-Content -Path (Join-Path $tempRepo "file1.txt") -Value "sample content 1"
+    $statusB = Get-DrillGitWorkingTreeStatus -RepositoryRoot $tempRepo
+    Assert-True -TestName "Single change returns IsClean=false" -Condition ($statusB.IsClean -eq $false)
+    Assert-True -TestName "Single change has LineCount=1" -Condition ($statusB.LineCount -eq 1)
+
+    # Case C: Git succeeds, multiple untracked/modified files -> IsClean = false, LineCount = 2
+    Set-Content -Path (Join-Path $tempRepo "file2.txt") -Value "sample content 2"
+    $statusC = Get-DrillGitWorkingTreeStatus -RepositoryRoot $tempRepo
+    Assert-True -TestName "Multiple changes return IsClean=false" -Condition ($statusC.IsClean -eq $false)
+    Assert-True -TestName "Multiple changes have LineCount=2" -Condition ($statusC.LineCount -eq 2)
+
+    # Case D: Git failure on non-git directory -> throws clear error, never reports fake clean
+    $nonGitDir = Join-Path ([System.IO.Path]::GetTempPath()) ("f01-non-git-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $nonGitDir -Force | Out-Null
+    try {
+        Assert-Throws -TestName "Git status on non-git directory throws error" -ExpectedPattern "Git status check failed" -Action {
+            Get-DrillGitWorkingTreeStatus -RepositoryRoot $nonGitDir
+        }
+        Assert-Throws -TestName "Git branch on non-git directory throws error" -ExpectedPattern "Git branch check failed" -Action {
+            Get-DrillGitCurrentBranch -RepositoryRoot $nonGitDir
+        }
+    } finally {
+        Remove-Item -LiteralPath $nonGitDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} finally {
+    if (Test-Path -LiteralPath $tempRepo) {
+        Get-ChildItem -LiteralPath $tempRepo -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
+            $_.Attributes = "Normal"
+        }
+        Remove-Item -LiteralPath $tempRepo -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 

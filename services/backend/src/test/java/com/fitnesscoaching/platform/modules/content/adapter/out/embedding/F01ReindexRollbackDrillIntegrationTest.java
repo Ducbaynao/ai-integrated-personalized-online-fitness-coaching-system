@@ -89,26 +89,8 @@ class F01ReindexRollbackDrillIntegrationTest {
         }
     }
 
-    static final Set<Integer> FORBIDDEN_PORTS = Set.of(5432, 5433);
-    private static final Pattern JDBC_URL_PATTERN = Pattern.compile("^jdbc:postgresql://([^:/]+):(\\d+)/([^?]+)(?:\\?.*)?$");
-
     public static void validateDrillJdbcUrl(String jdbcUrl) {
-        if (jdbcUrl == null || jdbcUrl.isBlank()) {
-            throw new IllegalArgumentException("SAFETY GUARD: DRILL_DATABASE_URL cannot be null or blank");
-        }
-        Matcher matcher = JDBC_URL_PATTERN.matcher(jdbcUrl.trim());
-        if (!matcher.matches()) {
-            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL does not match expected format jdbc:postgresql://host:port/database! Attempted: " + jdbcUrl);
-        }
-        int port = Integer.parseInt(matcher.group(2));
-        String dbName = matcher.group(3);
-
-        if (FORBIDDEN_PORTS.contains(port)) {
-            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL targets forbidden port " + port + "! (Port 5432 is default Postgres, port 5433 is baseline testbed). Attempted: " + jdbcUrl);
-        }
-        if (!dbName.toLowerCase().contains("drill") || "digital_fitness".equalsIgnoreCase(dbName) || "postgres".equalsIgnoreCase(dbName) || "fitness".equalsIgnoreCase(dbName)) {
-            throw new IllegalStateException("SAFETY GUARD: DRILL_DATABASE_URL must target an isolated drill database! Attempted DB: " + dbName);
-        }
+        F01DrillSafetyValidator.validateDrillJdbcUrl(jdbcUrl);
     }
 
     @DynamicPropertySource
@@ -218,18 +200,13 @@ class F01ReindexRollbackDrillIntegrationTest {
 
     private void verifyTargetDatabaseSafety() {
         String currentDb = jdbcTemplate.queryForObject("SELECT current_database()", String.class);
-        if (currentDb == null || !currentDb.toLowerCase().contains("drill")) {
-            throw new IllegalStateException("SAFETY GUARD: Refusing destructive fixture reset on non-drill database: " + currentDb);
-        }
-        if ("digital_fitness".equalsIgnoreCase(currentDb) || "fitness".equalsIgnoreCase(currentDb) || "postgres".equalsIgnoreCase(currentDb)) {
-            throw new IllegalStateException("SAFETY GUARD: Refusing destructive fixture reset on protected database: " + currentDb);
-        }
+        F01DrillSafetyValidator.validateTargetDatabase(currentDb);
 
         String drillDbUrl = System.getenv("DRILL_DATABASE_URL");
         if (drillDbUrl != null && !drillDbUrl.isBlank()) {
             try (Connection conn = jdbcTemplate.getDataSource().getConnection()) {
                 String metaUrl = conn.getMetaData().getURL();
-                validateDrillJdbcUrl(metaUrl);
+                F01DrillSafetyValidator.validateDrillJdbcUrl(metaUrl);
             } catch (SQLException e) {
                 throw new IllegalStateException("SAFETY GUARD: Failed to inspect JDBC connection metadata: " + e.getMessage(), e);
             }
