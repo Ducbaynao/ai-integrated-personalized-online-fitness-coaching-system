@@ -239,18 +239,47 @@ SET status = EXCLUDED.status,
 
 ---
 
-## 5. Script Diễn Tập Tự Động Hóa (Drill Automation Tool)
+## 5. Script Diễn Tập Tự Động Hóa & Rào Chắn An Toàn (Drill Automation & Safety Guards)
 
-Repository cung cấp công cụ tự động hóa diễn tập:
+Repository cung cấp công cụ tự động hóa diễn tập tại [`tools/f01-reindex-rollback-drill.ps1`](../../tools/f01-reindex-rollback-drill.ps1):
+
+### 5.1. Các Lệnh Thực Thi
 ```powershell
-# Chạy toàn bộ 5 kịch bản trong container cô lập port 5435 và tự động dọn dẹp
+# 1. Chạy diễn tập tiêu chuẩn trên branch làm việc riêng (container tự tạo, kiểm thử, xuất artifacts và tự dọn dẹp)
 powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.ps1
 
-# Chạy và giữ lại container để kiểm tra thủ công
+# 2. Chạy với cổng tùy chọn khác (ví dụ: port 5436)
+powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.ps1 -DrillPort 5436
+
+# 3. Chạy và giữ lại container để truy vấn/kiểm tra thủ công bằng psql
 powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.ps1 -KeepContainer
+
+# 4. Chạy kiểm thử rào chắn an toàn kịch bản PowerShell
+powershell -ExecutionPolicy Bypass -File tools/f01-reindex-rollback-drill.test.ps1
 ```
 
-Các artifact sinh ra sau mỗi lần chạy được lưu tại:
-`reports/evaluation/drills/drill-run-<timestamp>/` bao gồm:
-- `summary.json`: Dữ liệu máy đọc chi tiết từng kịch bản.
-- `report.md`: Báo cáo tóm tắt kết quả kiểm chứng.
+### 5.2. Các Rào Chắn An Toàn Hạ Tầng Đã Được Gia Cố
+1. **Kiểm tra nhánh (Branch Safety Guard):**
+   - Script cho phép chạy trên bất kỳ nhánh làm việc riêng nào (`feat/*`, `chore/*`, `fix/*`).
+   - Script **tuyệt đối từ chối** thực thi nếu đang đứng trực tiếp tại nhánh `main` hoặc `master`.
+2. **Bảo vệ tài nguyên & Chống xóa nhầm (Resource Collision Protection):**
+   - Khi phát hiện container `digital-fitness-postgres-drill` hoặc network `digital-fitness-drill-net` đã tồn tại, script **lập tức dừng lại với thông báo lỗi rõ ràng**, không tự ý `stop` hay `remove` container/network có sẵn.
+   - Script chỉ dọn dẹp đúng container ID và network ID do chính phiên chạy hiện tại tạo ra.
+   - Khi sử dụng `-KeepContainer`, script in hướng dẫn lệnh thủ công để dọn dẹp sau khi kiểm tra:
+     ```powershell
+     docker stop digital-fitness-postgres-drill
+     docker rm digital-fitness-postgres-drill
+     docker network rm digital-fitness-drill-net
+     ```
+3. **Bảo toàn và khôi phục biến môi trường (Environment Preservation):**
+   - Trước khi cấu hình môi trường chạy test, script sao lưu toàn bộ trạng thái tồn tại và giá trị ban đầu của 5 biến môi trường: `DRILL_DATABASE_URL`, `DRILL_DATABASE_USER`, `DRILL_DATABASE_PASSWORD`, `APP_SCHEDULING_ENABLED`, `ATTENTION_REVIEW_CRON`.
+   - Trong khối `finally` (bảo đảm luôn chạy kể cả khi có ngoại lệ), script khôi phục chính xác biến môi trường về trạng thái ban đầu (xóa nếu trước đó chưa tồn tại, gán lại giá trị cũ nếu đã có).
+4. **Kiểm tra cấu trúc JDBC Target (Structural Database Target Verification):**
+   - Thay vì kiểm tra chuỗi đơn thuần, script và test suite thực hiện parse cấu trúc URL (`jdbc:postgresql://<host>:<port>/<db>`).
+   - Chặn tuyệt đối port 5432 (default Postgres) và port 5433 (testbed baseline đang chạy).
+   - Kiểm tra `current_database()` và JDBC connection metadata trước khi thực thi bất kỳ lệnh dọn fixture (`TRUNCATE` / `DELETE`) nào, bảo đảm không bao giờ tác động lên database chính `digital_fitness`.
+5. **Dữ liệu Artifacts và Phép Đo Thời Gian Động:**
+   - Metadata (`summary.json` và `report.md`) được sinh mới hoàn toàn vào thư mục `reports/evaluation/drills/drill-run-<timestamp>/`.
+   - Kết quả từng test scenario được đọc trực tiếp từ Surefire XML report của Maven (`TEST-*.xml`), kiểm tra timestamp report tươi mới và phản ánh đúng `failures`, `errors`, `skipped`.
+   - Thời gian khôi phục của Outbox Reindex và Table Restore được đo trực tiếp tại thời điểm thực thi testbed cục bộ (`[DRILL_METRICS]`), không điền cố định.
+   - Các chỉ số thời gian mạng của live provider ngoài Internet và kiểm thử tải liên tục tiếp tục được ghi nhận chính xác là **`NOT_MEASURED`**.

@@ -1,12 +1,13 @@
 # Báo Cáo Nghiệm Thu Diễn Tập Reindex / Rollback F01 (DEC-A13-05)
 
-> **Mã công việc:** F01 Reindex & Rollback Runtime Verification Drill  
-> **Cơ sở quyết định:** [docs/08-ai/f01-a13-provider-decision.md](f01-a13-provider-decision.md) (Quyết định DEC-A13-05)  
-> **Tài liệu vận hành kèm theo:** [docs/08-ai/f01-reindex-rollback-runbook.md](f01-reindex-rollback-runbook.md)  
-> **Công cụ tự động hóa:** [`tools/f01-reindex-rollback-drill.ps1`](../../tools/f01-reindex-rollback-drill.ps1)  
-> **Test suite kiểm chứng:** [`F01ReindexRollbackDrillIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/modules/content/adapter/out/embedding/F01ReindexRollbackDrillIntegrationTest.java)  
-> **Thời điểm thực hiện:** 2026-10-21  
+> **Mã công việc:** F01 Reindex & Rollback Runtime Verification Drill
+> **Cơ sở quyết định:** [docs/08-ai/f01-a13-provider-decision.md](f01-a13-provider-decision.md) (Quyết định DEC-A13-05)
+> **Tài liệu vận hành kèm theo:** [docs/08-ai/f01-reindex-rollback-runbook.md](f01-reindex-rollback-runbook.md)
+> **Công cụ tự động hóa:** [`tools/f01-reindex-rollback-drill.ps1`](../../tools/f01-reindex-rollback-drill.ps1)
+> **Test suite kiểm chứng:** [`F01ReindexRollbackDrillIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/modules/content/adapter/out/embedding/F01ReindexRollbackDrillIntegrationTest.java)
+> **Thời điểm thực hiện lịch sử:** 2026-10-21 (Đã merge qua PR #95 tại commit `3a2d484518c6ddf6e64da65e26df1140be015e0d`)
 > **Trạng thái:** **PASSED (5/5 Kịch bản được kiểm chứng thành công bằng runtime evidence)**
+> **Lưu ý hồ sơ:** Đây là báo cáo nghiệm thu mốc lịch sử ban đầu tại thời điểm PR #95. Các cải tiến rào chắn an toàn, xử lý trùng tên tài nguyên, kiểm tra cấu trúc JDBC, khôi phục biến môi trường và đo lường thời gian động được bổ sung tiếp nối trên nhánh fix/f01-rollback-drill-safety.
 
 ---
 
@@ -16,7 +17,7 @@
 - **Remote `origin`:** `https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system.git`.
 - **Base commit tham chiếu lịch sử:** `1f01da75bd83de3f37a6987b04264f805be75a20` (Merge PR #94 trên `main`).
 - **Nhánh làm việc riêng:** `chore/f01-reindex-rollback-drill` (tạo trực tiếp từ `main` commit `1f01da75bd83de3f37a6987b04264f805be75a20`).
-- **Trạng thái Working Tree:** Sạch, không có file sửa đổi ngoài phạm vi. Chưa thực hiện `git add`, `git commit` hay `git push` (tuân thủ nguyên tắc Git Safety).
+- **Trạng thái Working Tree khi nghiệm thu mốc PR #95:** Đã được kiểm chứng và đóng gói đầy đủ.
 - **Bảo toàn Testbed gốc và Baseline gốc:**
   - Container testbed gốc `digital-fitness-postgres` (port 5433) được giữ nguyên vẹn (ở trạng thái Exited/không tác động trong suốt quá trình diễn tập).
   - Bộ artifact baseline gốc tại `reports/evaluation/baselines/baseline-run-20261020-064323-684/` không bị sửa đổi hồi tố.
@@ -113,7 +114,7 @@ Diễn tập được thực hiện độc lập qua 2 tầng môi trường cô
 ### 6.1. Chi Phí Thực Tế (Usage & Spend)
 - **Chi phí phát sinh thực tế trong lượt diễn tập:** **$0.00 USD** (0 tokens billed trên OpenAI dashboard).
 - **Lý do:** Tuân thủ quyết định DEC-A13-04 và giới hạn phạm vi, toàn bộ 5 kịch bản được thực thi hoàn toàn ngoại tuyến thông qua adapter test double và Testcontainers.
-- **Dự toán chi phí lý thuyết (DEC-A13-03):** Nếu thực hiện live reindex lại bài WHO-01 với model `text-embedding-3-small`, chi phí ước tính là `622 tokens * $0.00000002 = $0.000012 USD` (khoảng ~300 VNĐ).
+- **Dự toán chi phí lý thuyết (DEC-A13-03):** Nếu thực hiện live reindex lại bài WHO-01 với model text-embedding-3-small, chi phí ước tính là 622 tokens * $0.00000002 = $0.00001244 USD.
 
 ### 6.2. Các Giới Hạn và Đầu Việc Kế Tiếp
 1. **Chưa đo đạc live network latency:** Thời gian reindex với OpenAI provider thật trên môi trường mạng ngoài cần được đo lường khi có sự phê duyệt opt-in live test có credentials.
