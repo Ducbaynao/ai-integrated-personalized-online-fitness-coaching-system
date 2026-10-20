@@ -734,3 +734,116 @@ async def test_openai_with_exercise_context(monkeypatch):
     assert "Barbell Squat" in captured_prompt[0]
     assert "SQUAT" in captured_prompt[0]
 
+
+def test_get_f01_provider_invalid_raises_500(monkeypatch):
+    from fastapi import HTTPException
+    monkeypatch.setattr(settings, "f01_provider", "invalid_provider_name")
+    with pytest.raises(HTTPException) as exc_info:
+        get_f01_provider()
+    assert exc_info.value.status_code == 500
+    assert "Unsupported F01 knowledge provider" in exc_info.value.detail
+
+
+@pytest.mark.anyio
+async def test_openai_duplicate_citations_deduplicated(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        content = {
+            "status": "ANSWERED",
+            "answer": "Giải thích protein với trích dẫn lặp.",
+            "citations": [
+                {
+                    "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                    "version": "1.0.0",
+                    "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                    "locator": {
+                        "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                        "heading": "Khuyến nghị Leucine",
+                        "sectionIndex": 0,
+                    },
+                    "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+                },
+                {
+                    "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                    "version": "1.0.0",
+                    "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                    "locator": {
+                        "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                        "heading": "Khuyến nghị Leucine",
+                        "sectionIndex": 0,
+                    },
+                    "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+                },
+            ],
+            "limitations": [],
+            "missingData": [],
+            "refusalReason": "",
+        }
+        return httpx.Response(200, json=make_openai_response(content))
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert result.runStatus == "SUCCEEDED"
+    assert len(result.citations) == 1  # Successfully deduplicated!
+
+
+def test_openai_api_key_secret_str_masking():
+    from pydantic import SecretStr
+    secret = SecretStr("sk-super-secret-key-12345")
+    assert "sk-super-secret-key-12345" not in repr(secret)
+    assert "sk-super-secret-key-12345" not in str(secret)
+    assert secret.get_secret_value() == "sk-super-secret-key-12345"
+
+
+@pytest.mark.anyio
+async def test_openai_invalid_retry_after_handled_gracefully(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    call_count = 0
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return httpx.Response(
+                429,
+                headers={"Retry-After": "-10"},  # Negative / invalid Retry-After header
+                json={"error": {"message": "Rate limit", "type": "tokens"}},
+            )
+        content = {
+            "status": "ANSWERED",
+            "answer": "Thành công sau retry với retry-after âm.",
+            "citations": [
+                {
+                    "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                    "version": "1.0.0",
+                    "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                    "locator": {
+                        "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                        "heading": "Khuyến nghị Leucine",
+                        "sectionIndex": 0,
+                    },
+                    "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+                }
+            ],
+            "limitations": [],
+            "missingData": [],
+            "refusalReason": "",
+        }
+        return httpx.Response(200, json=make_openai_response(content))
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert call_count == 2
+    assert result.runStatus == "SUCCEEDED"
+
+

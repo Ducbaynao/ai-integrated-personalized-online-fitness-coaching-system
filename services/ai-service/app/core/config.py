@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
     f01_provider: str = "simulated"
 
     # OpenAI Settings for F01 Generation (DEC-A13-02)
-    openai_api_key: str = ""
+    openai_api_key: SecretStr = SecretStr("")
     openai_api_url: str = "https://api.openai.com/v1/chat/completions"
     openai_model: str = "gpt-4o-mini-2024-07-18"
     openai_store: bool = False

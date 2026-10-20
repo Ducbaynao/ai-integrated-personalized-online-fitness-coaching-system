@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.config import settings
 from app.core.security import verify_internal_service_key
@@ -17,9 +17,19 @@ router = APIRouter(
 
 
 def get_f01_provider() -> F01KnowledgeProvider:
-    if settings.f01_provider.lower() == "openai":
+    provider_name = settings.f01_provider.strip().lower()
+    if provider_name == "openai":
         return OpenAiKnowledgeProvider()
-    return SimulatedF01KnowledgeProvider()
+    if provider_name == "simulated":
+        return SimulatedF01KnowledgeProvider()
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=(
+            f"Unsupported F01 knowledge provider configured: '{settings.f01_provider}'. "
+            "Supported provider values are 'simulated' and 'openai'."
+        ),
+    )
 
 
 @router.post("/query", response_model=F01KnowledgeQueryResult)
