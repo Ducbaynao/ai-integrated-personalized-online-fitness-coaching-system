@@ -46,16 +46,14 @@ if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
     $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
 
+. (Join-Path $PSScriptRoot "f01-reindex-rollback-drill-common.ps1")
+
 # 1. Branch Safety Check: must run on a dedicated working branch, not directly on main or master
-$currentBranch = (git -C $RepositoryRoot branch --show-current).Trim()
-if ($currentBranch -eq "main" -or $currentBranch -eq "master" -or [string]::IsNullOrWhiteSpace($currentBranch)) {
-    throw "SAFETY GUARD: Drill script must run on a dedicated working branch, not directly on '$currentBranch'."
-}
+$currentBranch = Get-DrillGitCurrentBranch -RepositoryRoot $RepositoryRoot
+Assert-DrillBranchSafety -Branch $currentBranch
 
 # 2. Port Safety Check
-if ($DrillPort -eq 5432 -or $DrillPort -eq 5433) {
-    throw "SAFETY GUARD: DrillPort ($DrillPort) cannot be 5432 (default postgres) or 5433 (active baseline testbed). Use 5435 or another non-forbidden port."
-}
+Assert-DrillPortSafety -Port $DrillPort
 
 $ContainerName = "digital-fitness-postgres-drill"
 $NetworkName = "digital-fitness-drill-net"
@@ -133,7 +131,7 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not $containerId) {
         throw "Failed to start Docker container $ContainerName."
     }
-    $createdContainerId = $containerId.Trim()
+    $createdContainerId = ($containerId | Out-String).Trim()
 
     # Wait for Postgres readiness
     Write-Host "Waiting for database readiness..." -ForegroundColor Gray
@@ -295,9 +293,9 @@ try {
     $drillEndTime = Get-Date
     $totalScriptDurationSec = [Math]::Round(($drillEndTime - $drillStartTime).TotalSeconds, 2)
 
-    $headCommit = (git -C $RepositoryRoot rev-parse HEAD).Trim()
-    $workingTreeStatus = (git -C $RepositoryRoot status --porcelain).Trim()
-    $workingTreeClean = ($workingTreeStatus.Length -eq 0)
+    $headCommit = Get-DrillGitHeadCommit -RepositoryRoot $RepositoryRoot
+    $treeStatus = Get-DrillGitWorkingTreeStatus -RepositoryRoot $RepositoryRoot
+    $workingTreeClean = $treeStatus.IsClean
 
     $overallStatus = "FAIL"
     if ($totalTests -eq 5 -and $failures -eq 0 -and $errors -eq 0 -and $skipped -eq 0 -and $testExitCode -eq 0) {
