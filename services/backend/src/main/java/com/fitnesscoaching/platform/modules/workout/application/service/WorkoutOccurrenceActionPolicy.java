@@ -36,7 +36,7 @@ public class WorkoutOccurrenceActionPolicy {
                                  String supervisionRequirement, boolean hasValidOverride, boolean hasInProgress,
                                  Function<UUID, Boolean> appointmentCheck) {
         return canSkip(status, executionStartedAt) && !hasInProgress
-                && (!"COACH_REQUIRED".equals(supervisionRequirement) || hasValidOverride
+                && (!"COACH_REQUIRED".equals(supervisionRequirement)
                     || appointmentCheck.apply(occurrenceId));
     }
 }

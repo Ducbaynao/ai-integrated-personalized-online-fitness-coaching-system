@@ -11,8 +11,9 @@ export type ChatMessage = {
   deliveredAt: string | null; readAt: string | null;
 };
 export type ChatNotification = {
-  id: string; eventType: 'CHAT_MESSAGE'; title: string; body: string;
-  messageId: string; coachingPeriodId: string; createdAt: string; readAt: string | null;
+  id: string; eventType: string; title: string; body: string;
+  messageId: string | null; relatedEntityType: string | null; relatedEntityId: string | null;
+  coachingPeriodId: string | null; createdAt: string; readAt: string | null;
 };
 export type SendChatBody = { body: string; commandKey: string };
 

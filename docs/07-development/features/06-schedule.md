@@ -1,5 +1,24 @@
 # B06 Schedule and Planned Workout Occurrence Decisions
 
+## 2026-10-20 — Coaching Appointment and supervision decisions (APPROVED)
+
+Person B approved the following product scope for the combined B06/B08 checkpoint. This is a **decision record**, not evidence that the Appointment contract, A01 schema change, backend commands, Mobile screens, or notification events are executable. Existing Planned Workout and B05 START/SKIP implementations remain the runtime baseline until their guards are reconciled and tested.
+
+1. Coaching Appointment and Planned Workout are independent lifecycles with an explicit ID link. An Appointment change or cancellation never silently creates, moves, or cancels a Planned Workout occurrence.
+2. Either Student or Trainer in the current Coaching Period can request an Appointment; the other party accepts or rejects. Pause/end blocks new commands. The Student retains own history; a former Trainer cannot read live Appointment data. Authority is rechecked at decision time and before an idempotent replay result is disclosed.
+3. Store IANA timezone and explicit UTC offsets. Acceptance rechecks both Student and Trainer interval conflicts in one transaction. Missing legacy time data is an explicit error, never an inferred interval.
+4. A `COACH_REQUIRED` Planned Workout may be confirmed or executed only with a confirmed Appointment matching Student, Trainer, Coaching Period and the contract-published qualifying interval. A linked Appointment change/cancellation must not make the occurrence invalid. No implicit conversion to self-performed training is allowed.
+5. This flow changes one specific Appointment. Automatic recurrence remains unfinished B06 work.
+
+### 2026-10-20 qualifying and change addendum (APPROVED)
+
+6. For a new `COACH_REQUIRED` confirmation or START, only a `CONFIRMED` Appointment qualifies; `COMPLETED` is history only. The Appointment must match Student, Trainer and the **current** Coaching Period. The complete workout interval `[plannedStartAt, plannedEndAt)` must fit inside the Appointment interval `[startAt,endAt)`. A missing end or identity never qualifies, including for legacy rows. At START, PostgreSQL time must be inside the Appointment interval, with no grace period. This rule does not retroactively make a legacy link qualifying or backfill missing fields.
+7. Moving a confirmed Appointment is a bilateral reschedule request; the other party ACCEPTs or REJECTs. The request and its ACCEPT must be before the Appointment's current `startAt` according to PostgreSQL time. Either party may cancel before that start with a reason and notification to the other party, **except** when a `COACH_REQUIRED` occurrence still depends on it. Neither command changes the occurrence implicitly. No reschedule/cancel command is available at or after start. Completion and no-show are not approved for new runtime.
+
+The previously approved rule that an occurrence with **any** linked Appointment cannot use the first-flow direct reschedule/cancel command remains in force until an Appointment-coordination command explicitly handles both invariants. A V5 foreign key or V16 trigger alone does not establish qualifying actor, period or interval. On merged main, V16 and B05 still accept `COMPLETED` without pair, period or containment. The unmerged V45 candidate and Schedule-owned B05 query in this worktree narrow START to decision 6; this worktree also extends **Student direct batch confirmation only** with an explicit `appointmentId` per `COACH_REQUIRED` item. Workout locks and validates the separate confirmed Appointment through a Schedule-owned port and links it to the newly inserted occurrence in the same transaction; failure rolls back the batch and link. Trainer schedule proposals still reject this supervision mode because V32 does not persist an Appointment ID. SKIP is unchanged. The A01 Schema Change Request records the schema review gate.
+
+An initial review-only YAML draft was superseded and is excluded from the PR; `contracts/openapi/openapi.yaml` is the sole executable Appointment contract. This worktree implements the matching Schedule-owned commands/read path and Mobile entry as **local, unmerged changes**, not deployment evidence. V45 remains a forward migration **candidate** awaiting A01 independent schema review before merge. Focused integration tests, rather than YAML lint or the decision record alone, determine which runtime invariants have been verified. Automatic recurrence and Appointment completion/no-show remain outside this checkpoint.
+
 ## 1. Decision record
 
 - **Checkpoint:** `B06-PLANNED-OCCURRENCE-DOMAIN-DECISIONS`.
@@ -95,7 +114,7 @@ Person B approved the following additional product decisions for the Student cal
 
 1. A confirmed `SCHEDULED` occurrence survives a source plan transition to `PAUSED`, `COMPLETED`, or `ARCHIVED`. That transition alone does not remove Student START/SKIP eligibility; occurrence-level guards still decide.
 2. Once execution has started, the occurrence remains sealed even while `SCHEDULED`. Neither START nor SKIP is offered again; COMPLETE/ABORT belongs to the existing execution flow.
-3. For a legacy unstarted `COACH_REQUIRED` occurrence, SKIP needs no Appointment. START requires the qualifying Appointment or accountable override already defined by the executable V16 database predicate. Calendar actions and the B05 START guard must use the same condition; neither invents another Appointment/override rule.
+3. For a legacy unstarted `COACH_REQUIRED` occurrence, SKIP needs no Appointment. At this record's approval date, START required the then-qualifying Appointment or accountable override from V16. The later 2026-10-20 decision above **supersedes this START allowance**: a new START now requires the current `CONFIRMED` Appointment with matching parties/period, interval containment and PostgreSQL-time guard, regardless of an old override. Calendar actions and B05 START must use the same current condition. This historical line is retained to explain the earlier runtime, not to authorize an alternative new START path.
 
 The calendar read is a snapshot. START/SKIP continue to recheck actor, occurrence version, and all command guards at mutation time. Other `COACH_REQUIRED` scheduling and Appointment creation remain deferred.
 

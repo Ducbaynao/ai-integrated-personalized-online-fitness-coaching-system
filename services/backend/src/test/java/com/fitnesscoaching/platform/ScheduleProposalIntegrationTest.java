@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.Outcome;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -65,6 +66,7 @@ class ScheduleProposalIntegrationTest {
     @Autowired CoachingSharingUseCase sharing;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired InAppNotificationService notifications;
 
     @Test void trainerProposalListRequiresCurrentViewAndScopesOwnStudentAndStatus() throws Exception {
         Fixture f = fixture(), other = fixture();
@@ -72,6 +74,10 @@ class ScheduleProposalIntegrationTest {
         UUID second = proposals.create(command(f, "read-own-second", at(12))).proposal().proposalId();
         UUID otherProposal = proposals.create(command(other, "read-other", at(10))).proposal().proposalId();
         proposals.decide(new Decide(f.student(), first, 0, "REJECT", null, "read-reject"));
+        assertThat(notifications.list(f.student(), 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("WORKOUT_SCHEDULE_PROPOSAL_PENDING"));
+        assertThat(notifications.list(f.trainer(), 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("WORKOUT_SCHEDULE_PROPOSAL_REJECTED"));
         sharing.grantOrReplace(f.student(), f.relationship(), DataScope.WORKOUT_PLAN,
                 SharingDecision.ALLOW, DataAccessLevel.VIEW, null, null, null, 0L, UUID.randomUUID());
 
@@ -121,6 +127,8 @@ class ScheduleProposalIntegrationTest {
 
         sharing.revoke(revoked.student(), revoked.relationship(), revoked.permission(), 0,
                 "Revoked schedule access", UUID.randomUUID());
+        assertThat(notifications.list(revoked.trainer(), 0, 20).items())
+                .noneMatch(item -> item.eventType().startsWith("WORKOUT_SCHEDULE_PROPOSAL_"));
         lifecycle.relationshipAction(paused.student(), paused.relationship(), "PAUSE", 1,
                 null, UUID.randomUUID());
         lifecycle.relationshipAction(ended.student(), ended.relationship(), "END", 1,

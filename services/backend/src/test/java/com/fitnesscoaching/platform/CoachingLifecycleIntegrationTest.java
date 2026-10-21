@@ -7,6 +7,7 @@ import com.fitnesscoaching.platform.modules.coaching.application.port.in.Coachin
 import com.fitnesscoaching.platform.modules.coaching.application.port.out.CoachingStore;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.Outcome;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerAvailabilityQuery;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +77,7 @@ class CoachingLifecycleIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired InAppNotificationService notifications;
     @MockitoSpyBean AuditService audit;
     @MockitoSpyBean CoachingStore coachingStore;
     @MockitoSpyBean TrainerAvailabilityQuery availability;
@@ -134,7 +136,11 @@ class CoachingLifecycleIntegrationTest {
         UUID requestKey = UUID.randomUUID();
         Outcome requested = lifecycle.initiate(student, student, trainer, requestKey);
         assertThat(requested.relationship().directionFor(student)).isEqualTo("OUTGOING");
+        assertThat(notifications.list(trainer, 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("COACHING_REQUEST_PENDING"));
         assertThat(lifecycle.initiate(student, student, trainer, requestKey)).isEqualTo(requested);
+        assertThat(notifications.list(trainer, 0, 20).items())
+                .filteredOn(item -> item.eventType().equals("COACHING_REQUEST_PENDING")).hasSize(1);
         UUID anotherTrainer = person("TRAINER");
         assertThatThrownBy(() -> lifecycle.initiate(student, student, anotherTrainer, requestKey))
                 .isInstanceOf(CoachingFailure.class).extracting("code")
@@ -151,6 +157,7 @@ class CoachingLifecycleIntegrationTest {
         Outcome paused = lifecycle.relationshipAction(student, requested.relationship().id(),
                 "PAUSE", 1, null, UUID.randomUUID());
         assertThat(paused.currentPeriod().mode()).isEqualTo("SELF_DIRECTED");
+        assertThat(notifications.list(trainer, 0, 20).items()).isEmpty();
         Outcome resume = lifecycle.createResume(trainer, requested.relationship().id(), 2, null, UUID.randomUUID());
         assertThat(resume.relationship().status()).isEqualTo("PAUSED");
         assertThat(resume.resume().status()).isEqualTo("PENDING");

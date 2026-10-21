@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.schedule.application.service;
 
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
@@ -41,13 +42,16 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
     private final UserAccountStatusQuery accounts;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final LifecycleNotificationWriter notifications;
 
     public ScheduleChangeProposalService(ScheduleChangeProposalStore store, WorkoutScheduleChangeUseCase workout,
                                          WorkoutScheduleProposalSourceQuery sources, CoachingAuthorityQuery coaching,
                                          StudentCapabilityQuery students, UserAccountStatusQuery accounts,
-                                         AuditService audit, ObjectMapper mapper) {
+                                         AuditService audit, ObjectMapper mapper,
+                                         LifecycleNotificationWriter notifications) {
         this.store=store; this.workout=workout; this.sources=sources; this.coaching=coaching;
         this.students=students; this.accounts=accounts; this.audit=audit; this.mapper=mapper;
+        this.notifications=notifications;
     }
 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -78,6 +82,7 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
                 c.destination(), c.reason(), at, null, null, null, null);
         store.save(proposal, c.commandKey());
         audit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_CHANGE_PROPOSAL_CREATED", proposal.proposalId(), at);
+        notice(proposal, "PENDING", c.trainerId(), c.studentId());
         CommandResult result = new CommandResult(proposal, false);
         store.saveReceipt(c.trainerId(), c.commandKey(), "PROPOSE", hash, proposal.proposalId(), json(result), at);
         return result;
@@ -131,6 +136,7 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
         Proposal changed = transition(locked, "WITHDRAWN", null, null, at, c.trainerId());
         store.transition(changed, "PENDING", c.trainerId(), c.commandKey(), null, at);
         audit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_CHANGE_PROPOSAL_WITHDRAWN", locked.proposalId(), at);
+        notice(changed, "WITHDRAWN", c.trainerId(), changed.studentId());
         CommandResult result = new CommandResult(changed, false);
         store.saveReceipt(c.trainerId(), c.commandKey(), "WITHDRAW", hash, locked.proposalId(), json(result), at);
         return result;
@@ -180,6 +186,7 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
                 applied == null ? null : locked.occurrenceId(), at);
         audit(c.studentId(), "STUDENT", "WORKOUT_SCHEDULE_CHANGE_PROPOSAL_" + changed.status(),
                 locked.proposalId(), at);
+        notice(changed, changed.status(), c.studentId(), changed.trainerId());
         DecisionResult result = new DecisionResult(changed, applied, false);
         store.saveReceipt(c.studentId(), c.commandKey(), "DECIDE", hash, locked.proposalId(), json(result), at);
         return result;
@@ -225,6 +232,13 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
         audit.recordAudit(AuditRecord.builder().actorUserId(actor).actorRole(role).action(action)
                 .targetType("WORKOUT_SCHEDULE_CHANGE_PROPOSAL").targetId(target)
                 .beforeDataJson("{}").afterDataJson("{}").occurredAt(at).build());
+    }
+    private void notice(Proposal proposal, String transition, UUID actor, UUID recipient) {
+        notifications.committed(LifecycleNotificationWriter.transitionId("WORKOUT_CHANGE_PROPOSAL",
+                        proposal.proposalId(), proposal.proposalVersion(), transition),
+                "WORKOUT_CHANGE_PROPOSAL_" + transition, "WORKOUT_CHANGE_PROPOSAL",
+                proposal.proposalId(), proposal.studentId(), proposal.trainerId(),
+                proposal.coachingPeriodId(), actor, recipient);
     }
     private static String key(String value) {
         if (value == null || value.isBlank() || value.length() > 120)

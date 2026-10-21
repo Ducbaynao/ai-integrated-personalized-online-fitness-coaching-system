@@ -1,5 +1,7 @@
 package com.fitnesscoaching.platform.modules.chat;
 
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -19,7 +21,8 @@ import static org.mockito.Mockito.*;
 class ChatUpdatesSocketTest {
     @Test void inboxSignalContainsNoMessageBodyAndRechecksAuthority() throws Exception {
         ChatService chat = mock(ChatService.class);
-        ChatUpdatesSocket socket = new ChatUpdatesSocket(chat, new ObjectMapper());
+        InAppNotificationService notifications = mock(InAppNotificationService.class);
+        ChatUpdatesSocket socket = new ChatUpdatesSocket(chat, notifications, new ObjectMapper());
         UUID student = UUID.randomUUID(), trainer = UUID.randomUUID();
         UUID period = UUID.randomUUID(), conversation = UUID.randomUUID();
         WebSocketSession session = mock(WebSocketSession.class);
@@ -38,6 +41,13 @@ class ChatUpdatesSocketTest {
                 .doesNotContain("body", "secret");
         verify(chat).detail(student, conversation);
 
+        UUID notificationId = UUID.randomUUID();
+        when(notifications.canReadNotice(student, notificationId)).thenReturn(true);
+        socket.lifecycleChanged(new LifecycleNotificationWriter.Changed(student, notificationId));
+        verify(session, times(3)).sendMessage(sent.capture());
+        assertThat(sent.getAllValues().getLast().getPayload()).isEqualTo("{\"type\":\"INBOX_UPDATED\"}");
+        verify(notifications).canReadNotice(student, notificationId);
+
         when(chat.detail(student, conversation)).thenThrow(new ChatFailure("CHAT_CONVERSATION_NOT_FOUND", 404));
         socket.changed(new ChatService.Changed(student, trainer, period, conversation));
         verify(session).close(CloseStatus.POLICY_VIOLATION);
@@ -48,5 +58,9 @@ class ChatUpdatesSocketTest {
         var listener = method.getAnnotation(TransactionalEventListener.class);
         assertThat(listener).isNotNull();
         assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+        var lifecycle = ChatUpdatesSocket.class.getMethod("lifecycleChanged", LifecycleNotificationWriter.Changed.class)
+                .getAnnotation(TransactionalEventListener.class);
+        assertThat(lifecycle).isNotNull();
+        assertThat(lifecycle.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
 }

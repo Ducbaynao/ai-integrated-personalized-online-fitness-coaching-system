@@ -310,7 +310,7 @@ class WorkoutScheduleChangeIntegrationTest {
                 "WORKOUT_SCHEDULE_OVERLAP");
         jdbc.update("UPDATE fitness.planned_workouts SET status='CANCELLED',version=version+1 WHERE id=?", overlap);
         UUID appointment = UUID.randomUUID();
-        jdbc.update("""
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments(id,student_id,planned_workout_id,start_at,end_at,
                     display_timezone,status,created_by)
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)
@@ -389,7 +389,7 @@ class WorkoutScheduleChangeIntegrationTest {
         catch (WorkoutScheduleFailure failure) { return failure.code(); }
     }
     private void insertAppointment(Fixture f, UUID occurrence, UUID appointment) {
-        jdbc.update("""
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments(id,student_id,planned_workout_id,start_at,end_at,
                     display_timezone,status,created_by)
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)

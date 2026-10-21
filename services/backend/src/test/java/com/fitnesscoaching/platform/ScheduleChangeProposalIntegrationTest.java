@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
@@ -75,6 +76,7 @@ class ScheduleChangeProposalIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired InAppNotificationService notifications;
 
     @Test void createListDetailWithdrawAndReplayThroughHttp() throws Exception {
         Fixture f = fixture();
@@ -91,6 +93,8 @@ class ScheduleChangeProposalIntegrationTest {
                 .andExpect(jsonPath("$.proposal.sourceSessionName").value("Session"))
                 .andReturn().getResponse().getContentAsString();
         UUID id = UUID.fromString(response.split("\\\"proposalId\\\":\\\"")[1].split("\\\"")[0]);
+        assertThat(notifications.list(f.student(), 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("WORKOUT_CHANGE_PROPOSAL_PENDING"));
         mvc.perform(post(path, f.student()).contentType("application/json").content(body)
                 .with(jwt().jwt(t -> t.subject(f.trainer().toString()))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.replayed").value(true));
@@ -106,6 +110,8 @@ class ScheduleChangeProposalIntegrationTest {
                 .contentType("application/json").content("{\"expectedProposalVersion\":0,\"commandKey\":\"withdraw-http\"}")
                 .with(jwt().jwt(t -> t.subject(f.trainer().toString()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.proposal.status").value("WITHDRAWN"));
+        assertThat(notifications.list(f.student(), 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("WORKOUT_CHANGE_PROPOSAL_WITHDRAWN"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_change_proposal_history WHERE proposal_id=?",
                 Integer.class, id)).isEqualTo(2);
     }
@@ -177,7 +183,7 @@ class ScheduleChangeProposalIntegrationTest {
         Proposal linkedProposal = proposals.create(new Create(linked.trainer(), linked.student(), old, 0,
                 "CANCEL", null, null, "linked-propose-" + old)).proposal();
         UUID appointment = UUID.randomUUID();
-        jdbc.update("""
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments(id,student_id,planned_workout_id,start_at,end_at,
                     display_timezone,status,created_by)
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)
@@ -398,7 +404,7 @@ class ScheduleChangeProposalIntegrationTest {
         } catch (Exception failure) { throw new IllegalStateException(failure); }
     }
     private void insertAppointment(UUID student, UUID occurrence, UUID appointment) {
-        jdbc.update("""
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments(id,student_id,planned_workout_id,start_at,end_at,
                     display_timezone,status,created_by)
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)

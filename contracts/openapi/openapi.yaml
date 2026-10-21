@@ -297,14 +297,18 @@ paths:
     get:
       tags: [In-App Notification]
       operationId: listMyInAppNotifications
-      description: Former Trainer cannot infer old-period notifications, including through pagination or count.
+      description: >-
+        Mixed Chat and implemented Appointment lifecycle facts. Source-object authority is
+        checked before pagination and again on read/deep link; former Trainers cannot infer
+        old-period notifications. Other proposal/coaching-request producers remain deferred
+        until their source-specific authority hooks are executable.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
       responses:
         '200':
           description: Stable createdAt DESC, notificationId DESC page
-          content: { application/json: { schema: { $ref: '#/components/schemas/ChatNotificationPage' } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/InAppNotificationPage' } } }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
   /notifications/me/{id}/read:
@@ -315,7 +319,7 @@ paths:
       responses:
         '200':
           description: Idempotently marked read without marking the related message READ
-          content: { application/json: { schema: { $ref: '#/components/schemas/ChatNotification' } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/InAppNotification' } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/ChatConcealed' }
   /nutrition/catalog/foods:
@@ -2830,8 +2834,12 @@ paths:
         The authenticated Student confirms every item atomically after plan activation. The backend locks and
         rechecks the plan, requires sourcePlanVersionId to be the published version effective at the authoritative
         confirmation boundary, validates every session reference and time, and either creates the complete batch or
-        creates no occurrences. Plan activation never invokes this operation. COACH_REQUIRED sessions are rejected
-        by the first flow, and no Appointment is created or changed. Matching actor commandKey and logical payload
+        creates no occurrences. Plan activation never invokes this operation. A COACH_REQUIRED item must supply the
+        ID of a separate, already CONFIRMED and unlinked Appointment. In the same transaction, the backend locks it,
+        requires the current Student/Trainer/Coaching Period and full [start,end) containment, then links it to the
+        newly created occurrence. A missing or nonqualifying Appointment rejects the entire batch; confirmation never
+        creates or moves an Appointment. Trainer schedule proposals still reject COACH_REQUIRED in this flow.
+        Matching actor commandKey and logical payload
         replay the original batch; reuse with another payload conflicts. A schedule-occupying occurrence for this
         Student with an unknown plannedEndAt rejects the entire batch with WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN
         (409), without disclosing that occurrence's identity or timing.
@@ -3310,6 +3318,14 @@ paths:
       tags: [Workout Execution]
       operationId: startWorkoutExecution
       summary: Start one Planned Workout execution from an immutable frozen snapshot
+      description: >-
+        For a COACH_REQUIRED occurrence, START requires a currently CONFIRMED
+        Appointment linked to the occurrence, with matching Student, Trainer
+        and effective HUMAN_COACH period. The complete planned workout interval
+        must fit inside the Appointment interval, and PostgreSQL time at START
+        must be inside that Appointment interval. Missing legacy identity/end,
+        a COMPLETED Appointment or an old supervision override alone cannot
+        authorize a new START. SKIP remains a separate occurrence command.
       parameters: [{ $ref: '#/components/parameters/WorkoutExecutionOccurrenceId' }]
       requestBody:
         required: true
@@ -3760,6 +3776,178 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/KnowledgeQueryApiResponse' }
 
+  /students/{studentId}/appointment-requests:
+    post:
+      tags: [Coaching Appointment]
+      operationId: requestCoachingAppointment
+      summary: Student or current Trainer requests one Appointment
+      description: >-
+        The path identifies the Student. The authenticated Student or the
+        currently authorized Trainer in that Student's active HUMAN_COACH period
+        submits a request; the other party decides. A request does not reserve
+        either calendar and does not create a Planned Workout. Same actor/key/body
+        replays the original result only after current read authority succeeds;
+        same key with a different body conflicts.
+      parameters: [{ $ref: '#/components/parameters/AppointmentStudentId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppointmentCreateRequest' }
+      responses:
+        '201': { description: Pending request, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequestCommandResult' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+        '409': { $ref: '#/components/responses/AppointmentConflict' }
+  /appointment-requests/me:
+    get:
+      tags: [Coaching Appointment]
+      operationId: listMyAppointmentRequests
+      description: >-
+        Student sees own request history. Trainer sees only requests attached
+        to the currently authorized human period; former Trainer cannot infer
+        old requests through page count or direct ID. Stable createdAt DESC,
+        requestId DESC ordering; GET has no side effect.
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [PENDING, ACCEPTED, REJECTED] } }
+        - { $ref: '#/components/parameters/AppointmentPage' }
+        - { $ref: '#/components/parameters/AppointmentSize' }
+      responses:
+        '200': { description: Authorized page, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequestPage' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+  /appointment-requests/{requestId}:
+    get:
+      tags: [Coaching Appointment]
+      operationId: getAppointmentRequest
+      parameters: [{ $ref: '#/components/parameters/AppointmentRequestId' }]
+      responses:
+        '200': { description: Authorized request, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequest' } } } }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+  /appointment-requests/{requestId}/decisions:
+    post:
+      tags: [Coaching Appointment]
+      operationId: decideAppointmentRequest
+      description: >-
+        Only the counterparty may ACCEPT or REJECT a PENDING request. ACCEPT
+        obtains PostgreSQL time, rechecks actor/period/version, IANA local time
+        and supplied offset mapping, then both Student and Trainer half-open
+        interval conflicts inside one transaction. It creates an independent
+        CONFIRMED Appointment; no occurrence is created. If a real
+        plannedWorkoutId was explicitly requested, lock and validate the
+        occurrence, pair, period and contained interval before linking it;
+        neither lifecycle mutates the other implicitly. REJECT has no calendar
+        conflict check. Domain fact, audit, receipt and eligible-recipient
+        notification commit atomically; exact replay emits no new notification.
+      parameters: [{ $ref: '#/components/parameters/AppointmentRequestId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentDecisionInput' } } } }
+      responses:
+        '200': { description: Decided request or authorized replay, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequestCommandResult' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+        '409': { $ref: '#/components/responses/AppointmentConflict' }
+  /appointments/me:
+    get:
+      tags: [Coaching Appointment]
+      operationId: listMyAppointments
+      description: >-
+        Student reads own Appointment history; Trainer reads only current-period
+        Appointments with current authority. Sort startAt ASC, appointmentId ASC.
+        The [from,until) window and pagination apply after authority filtering.
+      parameters:
+        - { $ref: '#/components/parameters/AppointmentFrom' }
+        - { $ref: '#/components/parameters/AppointmentUntil' }
+        - { $ref: '#/components/parameters/AppointmentPage' }
+        - { $ref: '#/components/parameters/AppointmentSize' }
+      responses:
+        '200': { description: Authorized page, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentPage' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+  /appointments/{appointmentId}:
+    get:
+      tags: [Coaching Appointment]
+      operationId: getAppointment
+      parameters: [{ $ref: '#/components/parameters/AppointmentAppointmentId' }]
+      responses:
+        '200': { description: Authorized Appointment, content: { application/json: { schema: { $ref: '#/components/schemas/CoachingAppointment' } } } }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+  /appointments/{appointmentId}/history:
+    get:
+      tags: [Coaching Appointment]
+      operationId: getAppointmentHistory
+      description: Student owns historical read; Trainer requires current-period authority.
+      parameters:
+        - { $ref: '#/components/parameters/AppointmentAppointmentId' }
+        - { $ref: '#/components/parameters/AppointmentPage' }
+        - { $ref: '#/components/parameters/AppointmentSize' }
+      responses:
+        '200': { description: Append-only history, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentEventPage' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+  /appointments/{appointmentId}/reschedule-requests:
+    post:
+      tags: [Coaching Appointment]
+      operationId: requestAppointmentReschedule
+      description: >-
+        Either current party proposes a new interval for one CONFIRMED
+        Appointment; the other decides. Creation and acceptance both require
+        PostgreSQL time strictly before the existing startAt. No occurrence
+        is moved. Any dependent COACH_REQUIRED occurrence must remain qualifying
+        after acceptance; otherwise reject without partial writes.
+      parameters: [{ $ref: '#/components/parameters/AppointmentAppointmentId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRescheduleInput' } } } }
+      responses:
+        '201': { description: Pending reschedule request, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequestCommandResult' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+        '409': { $ref: '#/components/responses/AppointmentConflict' }
+  /appointment-reschedule-requests/{requestId}/decisions:
+    post:
+      tags: [Coaching Appointment]
+      operationId: decideAppointmentReschedule
+      description: >-
+        Counterparty ACCEPT/REJECT with expected request and Appointment
+        versions. ACCEPT rechecks both calendars, current-period authority,
+        interval/DST and dependent COACH_REQUIRED occurrence; REJECT never
+        changes Appointment or occurrence. The operation is one transaction.
+      parameters: [{ $ref: '#/components/parameters/AppointmentRequestId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRescheduleDecisionInput' } } } }
+      responses:
+        '200': { description: Decided request, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentRequestCommandResult' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+        '409': { $ref: '#/components/responses/AppointmentConflict' }
+  /appointments/{appointmentId}/cancel:
+    post:
+      tags: [Coaching Appointment]
+      operationId: cancelAppointment
+      description: >-
+        Either current party cancels before PostgreSQL time reaches startAt,
+        with a reason. Reject while a COACH_REQUIRED occurrence still depends
+        on this Appointment. Do not cancel or reschedule an occurrence. Emit
+        one recipient notification on a committed cancellation, never replay.
+      parameters: [{ $ref: '#/components/parameters/AppointmentAppointmentId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCancelInput' } } } }
+      responses:
+        '200': { description: Cancelled Appointment, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCommandResult' } } } }
+        '400': { $ref: '#/components/responses/AppointmentInvalid' }
+        '401': { $ref: '#/components/responses/AppointmentUnauthenticated' }
+        '403': { $ref: '#/components/responses/AppointmentForbidden' }
+        '404': { $ref: '#/components/responses/AppointmentConcealed' }
+        '409': { $ref: '#/components/responses/AppointmentConflict' }
 components:
   securitySchemes:
     bearerAuth:
@@ -3768,6 +3956,13 @@ components:
       bearerFormat: JWT
 
   parameters:
+    AppointmentStudentId: { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
+    AppointmentRequestId: { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
+    AppointmentAppointmentId: { name: appointmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    AppointmentFrom: { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+    AppointmentUntil: { name: until, in: query, required: true, schema: { type: string, format: date-time } }
+    AppointmentPage: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    AppointmentSize: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
     WorkoutPlanId:
       name: planId
       in: path
@@ -3869,6 +4064,20 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    AppointmentInvalid: { description: VALIDATION_FAILED or APPOINTMENT_TIME_INVALID, including DST gap/offset mismatch, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    AppointmentUnauthenticated: { description: Authentication required, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    AppointmentForbidden: { description: Actor lacks current Student or Trainer capability, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    AppointmentConcealed: { description: APPOINTMENT_NOT_FOUND; absent or unauthorized direct-ID resource, with no count or timing leak, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    AppointmentConflict:
+      description: >-
+        APPOINTMENT_VERSION_STALE, APPOINTMENT_REQUEST_VERSION_STALE,
+        APPOINTMENT_IDEMPOTENCY_CONFLICT, APPOINTMENT_PERIOD_INACTIVE,
+        APPOINTMENT_START_PASSED, APPOINTMENT_STUDENT_CONFLICT,
+        APPOINTMENT_TRAINER_CONFLICT, APPOINTMENT_LEGACY_TIME_UNKNOWN,
+        APPOINTMENT_COACH_REQUIRED_DEPENDENCY, APPOINTMENT_REQUEST_ALREADY_PENDING,
+        APPOINTMENT_STATUS_CONFLICT, or APPOINTMENT_REQUEST_TERMINAL.
+        The envelope never identifies another party's conflicting Appointment.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     AttentionConcealed:
       description: Review or signal absent or concealed; no former-period resource identity or count is exposed.
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
@@ -3978,7 +4187,9 @@ components:
         WORKOUT_SCHEDULE_PROPOSAL_VERSION_CONFLICT, WORKOUT_SCHEDULE_PROPOSAL_STATE_CONFLICT,
         WORKOUT_SCHEDULE_PROPOSAL_INVALIDATED, WORKOUT_SCHEDULE_DUPLICATE,
         WORKOUT_SCHEDULE_OVERLAP, WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN,
-        WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED, and WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT.
+        WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED, WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING,
+        and WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT. The Appointment error never exposes another party's
+        Appointment identity or interval.
         WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN applies to direct confirmation and proposal ACCEPT when an existing
         schedule-occupying occurrence for the Student has no known end. It is a batch-level conflict with empty
         itemErrors, no occurrence creation, and no disclosure of the existing occurrence's identity or timing.
@@ -4191,6 +4402,161 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    AppointmentLocalInterval:
+      type: object
+      required: [localStart, localEnd, timezone, startUtcOffset, endUtcOffset]
+      description: >-
+        ISO local wall times without offset plus explicit IANA zone and one
+        chosen offset for each endpoint. Reject gaps, invalid offsets and
+        endAt <= startAt after mapping. Adjacent [startAt,endAt) intervals do
+        not overlap. No device-zone default or guessed duration is permitted.
+      properties:
+        localStart: { type: string, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?$', example: '2026-10-20T09:00:00' }
+        localEnd: { type: string, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?$', example: '2026-10-20T10:00:00' }
+        timezone: { type: string, minLength: 3, maxLength: 64, example: Asia/Ho_Chi_Minh }
+        startUtcOffset: { type: string, pattern: '^[+-](0\d|1[0-4]):[0-5]\d$', example: '+07:00' }
+        endUtcOffset: { type: string, pattern: '^[+-](0\d|1[0-4]):[0-5]\d$', example: '+07:00' }
+    AppointmentCreateRequest:
+      allOf:
+        - { $ref: '#/components/schemas/AppointmentLocalInterval' }
+        - type: object
+          required: [commandKey]
+          properties:
+            plannedWorkoutId: { type: [string, 'null'], format: uuid, description: Optional explicit link; it never mutates the occurrence. }
+            commandKey: { type: string, format: uuid }
+    AppointmentDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, expectedRequestVersion, commandKey]
+      properties:
+        decision: { type: string, enum: [ACCEPT, REJECT] }
+        expectedRequestVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    AppointmentRescheduleInput:
+      allOf:
+        - { $ref: '#/components/schemas/AppointmentLocalInterval' }
+        - type: object
+          required: [expectedAppointmentVersion, commandKey]
+          properties:
+            expectedAppointmentVersion: { type: integer, format: int64, minimum: 0 }
+            reason: { type: [string, 'null'], maxLength: 1000 }
+            commandKey: { type: string, format: uuid }
+    AppointmentRescheduleDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, expectedRequestVersion, expectedAppointmentVersion, commandKey]
+      properties:
+        decision: { type: string, enum: [ACCEPT, REJECT] }
+        expectedRequestVersion: { type: integer, format: int64, minimum: 0 }
+        expectedAppointmentVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { type: string, format: uuid }
+    AppointmentCancelInput:
+      type: object
+      additionalProperties: false
+      required: [expectedAppointmentVersion, reason, commandKey]
+      properties:
+        expectedAppointmentVersion: { type: integer, format: int64, minimum: 0 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        commandKey: { type: string, format: uuid }
+    CoachingAppointment:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, version, studentId, trainerId, coachingPeriodId, plannedWorkoutId, status, startAt, endAt, timezone, localStart, localEnd, startUtcOffset, endUtcOffset]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        version: { type: integer, format: int64, minimum: 0 }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
+        plannedWorkoutId: { type: [string, 'null'], format: uuid }
+        status:
+          type: string
+          enum: [SCHEDULED, CONFIRMED, COMPLETED, CANCELLED, ABSENT, RESCHEDULED]
+          description: V5 lifecycle read; new commands in this slice create CONFIRMED or move to CANCELLED. COMPLETED/ABSENT and historical RESCHEDULED are read-only here.
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        timezone: { type: string }
+        localStart: { type: [string, 'null'] }
+        localEnd: { type: [string, 'null'] }
+        startUtcOffset: { type: [string, 'null'] }
+        endUtcOffset: { type: [string, 'null'] }
+    AppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, kind, studentId, trainerId, coachingPeriodId, requestedBy, status, version, appointmentId, plannedWorkoutId, observedAppointmentVersion, interval, createdAt, decidedAt]
+      properties:
+        requestId: { type: string, format: uuid }
+        kind: { type: string, enum: [CREATE, RESCHEDULE] }
+        studentId: { type: string, format: uuid }
+        trainerId: { type: string, format: uuid }
+        coachingPeriodId: { type: string, format: uuid }
+        requestedBy: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, ACCEPTED, REJECTED] }
+        version: { type: integer, format: int64, minimum: 0 }
+        appointmentId: { type: [string, 'null'], format: uuid }
+        plannedWorkoutId: { type: [string, 'null'], format: uuid, description: Explicitly linked occurrence, when requested; not an implicit lifecycle mutation. }
+        observedAppointmentVersion: { type: [integer, 'null'], format: int64, description: Source version for RESCHEDULE; null on CREATE. }
+        interval:
+          description: Null only for a historical V5 request lacking verifiable local-time intent; it cannot be accepted as a new request.
+          oneOf:
+            - { $ref: '#/components/schemas/AppointmentLocalInterval' }
+            - { type: 'null' }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+    AppointmentRequestCommandResult:
+      type: object
+      additionalProperties: false
+      required: [request, appointment, replayed]
+      properties:
+        request: { $ref: '#/components/schemas/AppointmentRequest' }
+        appointment:
+          oneOf:
+            - { $ref: '#/components/schemas/CoachingAppointment' }
+            - { type: 'null' }
+        replayed: { type: boolean }
+    AppointmentCommandResult:
+      type: object
+      additionalProperties: false
+      required: [appointment, replayed]
+      properties:
+        appointment: { $ref: '#/components/schemas/CoachingAppointment' }
+        replayed: { type: boolean }
+    AppointmentEvent:
+      type: object
+      required: [eventId, appointmentId, eventType, actorId, reason, oldState, newState, occurredAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        appointmentId: { type: string, format: uuid }
+        eventType: { type: string }
+        actorId: { type: string, format: uuid }
+        reason: { type: [string, 'null'] }
+        oldState: { type: [object, 'null'], additionalProperties: true }
+        newState: { type: [object, 'null'], additionalProperties: true }
+        occurredAt: { type: string, format: date-time }
+    AppointmentPage:
+      type: object
+      required: [items, page, size, totalItems]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CoachingAppointment' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+    AppointmentRequestPage:
+      type: object
+      required: [items, page, size, totalItems]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AppointmentRequest' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+    AppointmentEventPage:
+      type: object
+      required: [items, page, size, totalItems]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AppointmentEvent' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
     ReviewTimezoneConfirmation:
       type: object
       additionalProperties: false
@@ -4362,25 +4728,27 @@ components:
         page: { type: integer }
         size: { type: integer }
         hasMore: { type: boolean }
-    ChatNotification:
+    InAppNotification:
       type: object
       additionalProperties: false
-      required: [id, eventType, title, body, messageId, coachingPeriodId, createdAt, readAt]
+      required: [id, eventType, title, body, messageId, relatedEntityType, relatedEntityId, coachingPeriodId, createdAt, readAt]
       properties:
         id: { type: string, format: uuid }
-        eventType: { type: string, enum: [CHAT_MESSAGE] }
+        eventType: { type: string, description: CHAT_MESSAGE or a committed lifecycle transition. }
         title: { type: string }
-        body: { type: string, enum: ['Bạn có tin nhắn mới'] }
-        messageId: { type: string, format: uuid }
-        coachingPeriodId: { type: string, format: uuid }
+        body: { type: string, description: Generic preview only, with no message, health or proposal details. }
+        messageId: { type: [string, 'null'], format: uuid, description: Present only for CHAT_MESSAGE. }
+        relatedEntityType: { type: [string, 'null'] }
+        relatedEntityId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
         createdAt: { type: string, format: date-time }
         readAt: { type: [string, 'null'], format: date-time }
-    ChatNotificationPage:
+    InAppNotificationPage:
       type: object
       additionalProperties: false
       required: [items, page, size, hasMore]
       properties:
-        items: { type: array, items: { $ref: '#/components/schemas/ChatNotification' } }
+        items: { type: array, items: { $ref: '#/components/schemas/InAppNotification' } }
         page: { type: integer }
         size: { type: integer }
         hasMore: { type: boolean }
@@ -5334,6 +5702,13 @@ components:
         localEnd: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
         startUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
         endUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+        appointmentId:
+          type: [string, 'null']
+          format: uuid
+          description: >-
+            Student direct confirmation only. Required for a COACH_REQUIRED item and forbidden for other
+            supervision modes or Trainer scheduling proposals. Refers to a separate confirmed Appointment;
+            the backend atomically links it to the new occurrence after checking current parties, period and interval.
     WorkoutScheduleBatchInput:
       type: object
       additionalProperties: false

@@ -6,6 +6,7 @@ import { ApiError } from '@/types/auth';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useWorkoutPlan, useWorkoutPlanVersion } from '@/features/workout-plan/workoutPlanQueries';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
+import { appointmentApi } from '@/services/appointmentApi';
 import { StudentConfirmBatchScreen } from '@/features/workout-schedule/StudentConfirmBatchScreen';
 import { suggestedSessionDate, validateDirectBatch } from '@/features/workout-schedule/directBatchValidation';
 import type { WorkoutSession } from '@/types/workoutPlan';
@@ -18,6 +19,7 @@ jest.mock('@/features/workout-plan/workoutPlanQueries', () => ({
   workoutPlanQueryKeys: { student: (id: string) => ['workout-plans', 'student', id] },
 }));
 jest.mock('@/services/workoutScheduleApi', () => ({ workoutScheduleApi: { confirmBatch: jest.fn() } }));
+jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { appointments: jest.fn() } }));
 
 const plan = { id: 'plan-1', name: 'Sức mạnh', status: 'ACTIVE', readContext: 'CURRENT',
   aggregateVersion: 7, currentVersionId: 'version-1' };
@@ -66,7 +68,11 @@ async function fill(tree: renderer.ReactTestRenderer, count = 1, monday = moment
 
 describe('Student direct scheduling', () => {
   jest.setTimeout(20_000);
-  beforeEach(() => { jest.resetAllMocks(); setup(); });
+  beforeEach(() => {
+    jest.resetAllMocks();
+    (appointmentApi.appointments as jest.Mock).mockResolvedValue({ items: [], page: 0, size: 20, totalItems: 0 });
+    setup();
+  });
   afterEach(() => clients.splice(0).forEach((client) => client.clear()));
 
   it('confirms multiple real plan sessions atomically and retains body/key on network retry', async () => {
@@ -89,16 +95,37 @@ describe('Student direct scheduling', () => {
     renderer.act(() => tree.unmount());
   });
 
-  it('blocks COACH_REQUIRED and missing supervision metadata', () => {
+  it('requires a confirmed Appointment for COACH_REQUIRED and blocks missing supervision metadata', async () => {
     setup('COACH_REQUIRED');
     const tree = render();
-    expect(tree.root.findByProps({ testID: 'select-session-session-1' }).props.disabled).toBe(true);
+    expect(tree.root.findByProps({ testID: 'select-session-session-1' }).props.disabled).toBe(false);
+    await fill(tree, 1, undefined, false);
+    expect(tree.root.findByProps({ testID: 'review-batch' }).props.disabled).toBe(true);
     renderer.act(() => tree.unmount());
     setup(undefined);
     (useWorkoutPlanVersion as jest.Mock).mockReturnValue({ data: { version, sessions: [{ ...session('session-1'), supervisionRequirement: null }] }, isPending: false, isError: false, refetch: jest.fn() });
     const legacy = render();
     expect(legacy.root.findByProps({ testID: 'select-session-session-1' }).props.disabled).toBe(true);
     renderer.act(() => legacy.unmount());
+  });
+
+  it('sends the real confirmed Appointment ID with a COACH_REQUIRED item', async () => {
+    setup('COACH_REQUIRED');
+    (appointmentApi.appointments as jest.Mock).mockResolvedValue({
+      items: [{ appointmentId: 'appointment-1', status: 'CONFIRMED', plannedWorkoutId: null,
+        coachingPeriodId: 'period-1', localStart: '2026-10-26T17:00', localEnd: '2026-10-26T20:00',
+        timezone: 'Asia/Ho_Chi_Minh', startAt: '2026-10-26T10:00:00Z', endAt: '2026-10-26T13:00:00Z' }],
+      page: 0, size: 20, totalItems: 1,
+    });
+    (workoutScheduleApi.confirmBatch as jest.Mock).mockResolvedValue({ batchId: 'batch-1', items: [{ occurrenceId: 'occurrence-1' }] });
+    const tree = render();
+    await fill(tree, 1, undefined, false);
+    await renderer.act(async () => { await Promise.resolve(); });
+    await press(tree, 'appointment-appointment-1');
+    await press(tree, 'review-batch');
+    await press(tree, 'confirm-batch');
+    expect((workoutScheduleApi.confirmBatch as jest.Mock).mock.calls[0][0].items[0].appointmentId).toBe('appointment-1');
+    renderer.act(() => tree.unmount());
   });
 
   it('drops stale command after 409, refetches source and requires fresh preview', async () => {

@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.ConfirmedAppointmentLinkPort;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleBatchUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleBatchPersistencePort;
@@ -26,10 +27,13 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
     private final WorkoutScheduleBatchPersistencePort batches;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final ConfirmedAppointmentLinkPort appointmentLinks;
 
     public WorkoutScheduleBatchService(WorkoutPlanPersistencePort plans, WorkoutScheduleBatchPersistencePort batches,
-                                       AuditService audit, ObjectMapper mapper) {
+                                       AuditService audit, ObjectMapper mapper,
+                                       ConfirmedAppointmentLinkPort appointmentLinks) {
         this.plans = plans; this.batches = batches; this.audit = audit; this.mapper = mapper;
+        this.appointmentLinks = appointmentLinks;
     }
 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -62,6 +66,8 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public Source inspectProposalSource(ConfirmBatch c) {
         validateBase(c);
+        if (c.items().stream().anyMatch(item -> item != null && item.appointmentId() != null))
+            throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409);
         UUID student = plans.findPlanStudent(c.planId());
         plans.lockStudentAndActor(student, c.actorId());
         var plan = plans.lockPlan(c.planId());
@@ -75,6 +81,8 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public ConfirmedBatch confirmProposal(ConfirmBatch c, UUID proposalId, UUID trainerId) {
         validateBase(c);
+        if (c.items().stream().anyMatch(item -> item != null && item.appointmentId() != null))
+            throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409);
         if (proposalId == null || trainerId == null) throw fail("VALIDATION_FAILED", 400);
         UUID student = plans.findPlanStudent(c.planId());
         if (!student.equals(c.actorId())) throw fail("WORKOUT_PLAN_NOT_FOUND", 404);
@@ -98,6 +106,19 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
             if (batches.hasScheduledOverlap(student, item.plannedStartAt(), item.plannedEndAt()))
                 throw fail("WORKOUT_SCHEDULE_OVERLAP", 409, item.clientItemId());
         }
+        Map<UUID, Item> sourceItems = new HashMap<>();
+        for (Item item : c.items()) sourceItems.put(item.clientItemId(), item);
+        List<ConfirmedItem> coached = created.stream()
+                .filter(item -> sourceItems.get(item.clientItemId()).appointmentId() != null)
+                .sorted(Comparator.comparing(item -> sourceItems.get(item.clientItemId()).appointmentId()))
+                .toList();
+        Set<UUID> appointmentIds = new HashSet<>();
+        for (ConfirmedItem item : coached) {
+            UUID appointmentId = sourceItems.get(item.clientItemId()).appointmentId();
+            if (!appointmentIds.add(appointmentId) || !appointmentLinks.lockQualifying(appointmentId, student,
+                    plan.coachingPeriodId(), item.plannedStartAt(), item.plannedEndAt()))
+                throw fail("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING", 409, item.clientItemId());
+        }
         ConfirmedBatch result = new ConfirmedBatch(UUID.randomUUID(), student, c.planId(), open.id(),
                 open.versionNumber(), c.weekAnchorDate(), c.timezone(), source, proposalId, c.actorId(),
                 at, List.copyOf(created), false);
@@ -112,6 +133,9 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
                     throw fail("WORKOUT_SCHEDULE_OVERLAP", 409, item.clientItemId());
                 throw race;
             }
+            UUID appointmentId = sourceItems.get(item.clientItemId()).appointmentId();
+            if (appointmentId != null && !appointmentLinks.link(appointmentId, item.occurrenceId()))
+                throw fail("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING", 409, item.clientItemId());
         }
         audit.recordAudit(AuditRecord.builder().actorUserId(c.actorId()).actorRole("STUDENT")
                 .action("WORKOUT_SCHEDULE_BATCH_CONFIRMED").targetType("WORKOUT_SCHEDULE_BATCH")
@@ -156,8 +180,10 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
             if (session == null || session.weekNumber() != item.weekNumber()
                     || session.dayNumber() != item.dayNumber() || session.sequenceNumber() != item.sequenceNumber())
                 throw fail("WORKOUT_SCHEDULE_SOURCE_MISMATCH", 409, item.clientItemId());
-            if ("COACH_REQUIRED".equals(session.supervision()))
+            if ("COACH_REQUIRED".equals(session.supervision()) && item.appointmentId() == null)
                 throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409, item.clientItemId());
+            if (!"COACH_REQUIRED".equals(session.supervision()) && item.appointmentId() != null)
+                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
             LocalDate weekStart;
             try { weekStart = c.weekAnchorDate().plusWeeks(item.weekNumber() - 1L); }
             catch (DateTimeException overflow) { throw fail("VALIDATION_FAILED", 400, item.clientItemId()); }

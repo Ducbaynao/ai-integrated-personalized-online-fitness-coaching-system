@@ -10,6 +10,7 @@ import com.fitnesscoaching.platform.modules.nutrition.NutritionFailure;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionStrategyService;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionStrategyService.*;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionTargetDayService;
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,6 +70,7 @@ class NutritionStrategyIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
+    @Autowired InAppNotificationService notifications;
 
     @Test void httpStudentBasicAndStrategyJourneyKeepsUnknownActualSeparateFromZeroTarget() throws Exception {
         UUID student = student();
@@ -181,6 +183,8 @@ class NutritionStrategyIntegrationTest {
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"))
                 .andReturn().getResponse().getContentAsString());
         String proposalId = proposal.get("id").asText();
+        assertThat(notifications.list(student, 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("NUTRITION_STRATEGY_PROPOSAL_PENDING"));
         String decisionPath = "/api/v1/nutrition/strategy/proposals/" + proposalId + "/decisions";
         String accept = """
                 {"decision":"ACCEPT","expectedProposalVersion":0,"commandKey":"accept-%s"}
@@ -192,9 +196,13 @@ class NutritionStrategyIntegrationTest {
                 .contentType(APPLICATION_JSON).content(accept))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
         assertThat(strategy.mine(student).goal().versions()).hasSize(2);
+        assertThat(notifications.list(trainer, 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("NUTRITION_STRATEGY_PROPOSAL_ACCEPTED"));
 
         sharing.revoke(student, active.relationship().id(), contribute.id(), contribute.version(),
                 "Stop sharing", UUID.randomUUID());
+        assertThat(notifications.list(trainer, 0, 20).items())
+                .noneMatch(item -> item.eventType().startsWith("NUTRITION_STRATEGY_PROPOSAL_"));
         mvc.perform(get(trainerPath).with(jwt().jwt(j -> j.subject(trainer.toString()))))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/nutrition/strategy/proposals/{proposalId}", proposalId)
