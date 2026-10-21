@@ -469,6 +469,70 @@ async def test_openai_429_quota_exceeded_non_retryable(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_openai_429_project_spend_limit_exceeded_non_retryable(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    call_count = 0
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(
+            429,
+            json={
+                "error": {
+                    "message": "The project hard spend limit has been exceeded.",
+                    "type": "project_spend_limit_exceeded",
+                    "code": "project_spend_limit_exceeded",
+                }
+            },
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert call_count == 1  # Must NOT retry hard project spend limit!
+    assert result.runStatus == "FAILED"
+    assert result.reasonCode == "PROVIDER_ERROR"
+    assert result.error.code == "QUOTA_EXCEEDED"
+
+
+@pytest.mark.anyio
+async def test_openai_429_organization_spend_limit_exceeded_non_retryable(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    call_count = 0
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(
+            429,
+            json={
+                "error": {
+                    "message": "The organization hard spend limit has been exceeded.",
+                    "type": "organization_spend_limit_exceeded",
+                    "code": "organization_spend_limit_exceeded",
+                }
+            },
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert call_count == 1  # Must NOT retry hard organization spend limit!
+    assert result.runStatus == "FAILED"
+    assert result.reasonCode == "PROVIDER_ERROR"
+    assert result.error.code == "QUOTA_EXCEEDED"
+
+
+@pytest.mark.anyio
 async def test_openai_429_rate_limit_retries_and_succeeds(monkeypatch):
     monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
 

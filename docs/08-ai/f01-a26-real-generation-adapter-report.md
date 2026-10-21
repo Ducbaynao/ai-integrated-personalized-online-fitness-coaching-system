@@ -8,6 +8,8 @@
 **Commits trên branch:**
 - `d56c3a1`: `feat(ai): implement real OpenAI generation adapter for F01 knowledge inquiry (DEC-A13-02)` (triển khai ban đầu).
 - `d5d70b5`: `fix(ai): harden OpenAI provider routing, deadline safety, prompt injection defense, and citation deduplication` (bản vá review độc lập).
+- `54f3a60`: `docs(ai): reconcile A-26 handoff report test metrics and smoke test corpus scope` (hiệu chỉnh số liệu và phạm vi corpus).
+- Commit bổ sung: `fix(ai): handle hard spend limit error codes and reconcile report` (chuẩn hóa xử lý 3 mã lỗi hard spend limit theo tài liệu OpenAI và đồng bộ tài liệu nghiệm thu).
 
 ---
 
@@ -20,8 +22,8 @@ Triển khai adapter sinh câu trả lời thật (`OpenAiKnowledgeProvider`) k�
    - Triển khai mã nguồn `OpenAiKnowledgeProvider`, Pydantic Settings, Provider routing với kiểm tra cấu hình nghiêm ngặt (trả về HTTP 500 khi cấu hình provider không hợp lệ, không fallback âm thầm).
    - Tích hợp rào chắn bảo mật dữ liệu (`store: false`), bảo vệ secret (`pydantic.SecretStr`), phòng chống prompt injection gián tiếp từ corpus nội dung.
    - Cài đặt cơ chế **Citation Integrity**: đối soát toàn diện mọi trích dẫn (documentId, version, sourceId, locator, sectionIndex, quote verbatim) với các evidence chunks được trả về từ Spring Boot pgvector retrieval. Khử trùng lặp trích dẫn trùng lặp chunk.
-   - Thiết lập timeout phân tầng và quản lý deadline tổng 22.0s, finite retry với exponential backoff & jitter trên HTTP 429/5xx, ngắt ngay không retry khi gặp `insufficient_quota`.
-   - Kiểm chứng tự động offline trên commit `d5d70b5`: 37/37 AI Service pytest PASS, 28/28 Spring Boot surefire PASS (qua 2 lệnh kiểm thử riêng biệt), và JSON Schema validator draft 2020-12 PASS.
+   - Thiết lập timeout phân tầng và quản lý deadline tổng 22.0s, finite retry với exponential backoff & jitter trên HTTP 429/5xx, ngắt ngay không retry khi gặp lỗi quota hoặc hard spend limit (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`).
+   - Kiểm chứng tự động offline trên commit `d5d70b5` và bản cập nhật hard spend limit: 39/39 AI Service pytest PASS, 28/28 Spring Boot surefire PASS (qua 2 lệnh kiểm thử riêng biệt), và JSON Schema validator draft 2020-12 PASS.
 2. **Phần CHƯA THỰC HIỆN và GIỚI HẠN HIỆN TẠI (Ghi nhận trung thực):**
    - **Live Smoke Test:** Chưa chạy do phiên làm việc local không có biến môi trường `OPENAI_API_KEY`. Toàn bộ kiểm thử hiện tại sử dụng mock transport và Testcontainers offline; chưa có dữ liệu gọi API OpenAI live.
    - **Xác minh Ngân sách Thực tế:** Quyết định DEC-A13-03 là chính sách nội bộ ($10 USD ceiling, $5 USD alert). Workspace hiện tại không có quyền truy cập bảng điều khiển OpenAI để xác nhận liệu rào chắn ngân sách này đã thực sự được cấu hình hay chưa.
@@ -61,7 +63,7 @@ Triển khai giao diện `F01KnowledgeProvider`:
   - Áp dụng `asyncio.timeout(22.0)` bao trùm toàn bộ các lần thử, thời gian backoff sleep và xử lý phản hồi.
   - Mỗi attempt tự động điều chỉnh timeout dựa trên thời gian còn lại của deadline (`remaining_time`).
   - Quản lý đóng kết nối HTTP client an toàn qua khối `finally`.
-  - Nhận diện `insufficient_quota` (HTTP 429) để ngắt ngay lập tức, không retry lặp lại.
+  - Nhận diện các mã lỗi hard spend limit và cạn kiệt quota (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded` trên HTTP 429) để ngắt ngay lập tức, không retry lặp lại.
   - Tôn trọng header `Retry-After` (xử lý an toàn giá trị âm hoặc phi số) kèm random jitter 0.1–0.4s.
 - **Xử lý phản hồi & Đối soát Citation Integrity:**
   - Kiểm tra `finish_reason` (`content_filter` -> `PROVIDER_REFUSAL`, `length` -> `INCOMPLETE_OUTPUT`).
@@ -82,40 +84,40 @@ Triển khai giao diện `F01KnowledgeProvider`:
 | **5. Cắt ngắn do token limit** | OpenAI `finish_reason: length` | `FAILED` | `null` | `PROCESSING_ERROR` | `INCOMPLETE_OUTPUT` |
 | **6. Lỗi mạng / Provider 5xx** | HTTP 500/502/503/504 sau khi retry | `FAILED` | `null` | `PROVIDER_ERROR` | `PROVIDER_ERROR` |
 | **7. Trích dẫn ảo giác / Không căn cứ** | Trích dẫn sai documentId, version, locator hoặc quote không có trong chunk | `REJECTED_BY_VALIDATOR` | `null` | `VALIDATION_FAILED` | `UNVERIFIED_CITATION` |
-| **Bổ sung: Quota Exceeded** | HTTP 429 với `insufficient_quota` (không retry) | `FAILED` | `null` | `PROVIDER_ERROR` | `QUOTA_EXCEEDED` |
+| **Bổ sung: Quota / Spend Limit Exceeded** | HTTP 429 với `insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded` (không retry) | `FAILED` | `null` | `PROVIDER_ERROR` | `QUOTA_EXCEEDED` |
 | **Bổ sung: Quá thời gian chờ (Timeout)** | Vượt quá 12s/attempt hoặc 22s deadline | `FAILED` | `null` | `TIMEOUT` | `TIMEOUT` |
 
 ---
 
-## 4. Chi Tiết Kết Quả Kiểm Thử Thực Tế (Commit `d5d70b5`)
+## 4. Chi Tiết Kết Quả Kiểm Thử Thực Tế
 
-Mọi con số dưới đây đều phản ánh kết quả thực thi kiểm thử trực tiếp trên commit `d5d70b5` trong môi trường phát triển hiện tại:
+Các con số dưới đây phản ánh kết quả thực thi kiểm thử trực tiếp trên commit `d5d70b5` và bản cập nhật bổ sung kiểm thử hard spend limit (39 tests AI service, 28 tests backend qua 2 lệnh độc lập, schema validator PASS):
 
 ### 4.1. Bộ Kiểm Thử Python FastAPI (`services/ai-service/tests/`)
 Lệnh thực thi:
 ```powershell
 & services/ai-service/.venv/Scripts/python -m pytest services/ai-service/tests
 ```
-Kết quả: **37/37 tests PASS** (0 failures, 0 errors, thời gian chạy: 6.59s).
+Kết quả: **39/39 tests PASS** (0 failures, 0 errors, thời gian chạy: ~6.6s).
 - `test_health.py`: 1/1 PASS.
 - `test_internal_knowledge.py`: 10/10 PASS (kiểm tra xác thực service key, simulated provider các nhánh).
-- `test_openai_provider.py`: 26/26 PASS:
+- `test_openai_provider.py`: 28/28 PASS:
   - Định tuyến provider (`simulated`, `openai`, từ chối giá trị không hợp lệ với HTTP 500).
   - Kiểm tra rào chắn `allowedSourceIds` rỗng và lỗi retrieval backend.
   - Kiểm tra xử lý thiếu `OPENAI_API_KEY`.
   - Kiểm tra tạo thành công `INFORMATION` với đầy đủ ràng buộc `store: false`, `model: gpt-4o-mini-2024-07-18`, strict schema và metadata.
   - Kiểm tra Citation Integrity: phát hiện và từ chối citation không có trong evidence chunks, từ chối trích dẫn sai lệch nội dung (`quoteOrExcerpt`), khử trùng lặp citations.
   - Kiểm tra xử lý trạng thái từ chối `REFUSED`, `content_filter`, và thiếu thông tin `INSUFFICIENT_EVIDENCE`.
-  - Kiểm tra retry với HTTP 429 (thành công ở lần 2), không retry đối với `insufficient_quota`, xử lý an toàn `Retry-After` âm/phi số.
+  - Kiểm tra retry với HTTP 429 (thành công ở lần 2), không retry đối với cả 3 mã lỗi hard spend limit/quota (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`), xử lý an toàn `Retry-After` âm/phi số.
   - Kiểm tra retry với HTTP 500.
   - Kiểm tra timeout tổng (`overall deadline`) và timeout từng lần gọi.
   - Kiểm tra che giấu secret trong `SecretStr`.
   - Kiểm tra tích hợp router qua FastAPI `TestClient` với provider `openai`.
 
-*Lưu ý:* Toàn bộ 37 tests trên chạy hoàn toàn offline sử dụng `httpx.MockTransport` và FastAPI `TestClient`, không thực hiện cuộc gọi mạng ra ngoài hay gọi API trả phí.
+*Lưu ý:* Toàn bộ 39 tests trên chạy hoàn toàn offline sử dụng `httpx.MockTransport` và FastAPI `TestClient`, không thực hiện cuộc gọi mạng ra ngoài hay gọi API trả phí.
 
 ### 4.2. Bộ Kiểm Thử Java Spring Boot (`services/backend/`)
-Được xác minh qua 2 lệnh Maven Surefire riêng biệt trên commit `d5d70b5`:
+Được xác minh qua 2 lệnh Maven Surefire riêng biệt:
 
 1. **Unit Tests (Không phụ thuộc Docker/Database):**
    ```powershell
@@ -147,16 +149,21 @@ Kết quả: **PASS** (100% schema JSON Draft 2020-12 hợp lệ và đồng b�
 ## 5. Rào Chắn Ngân Sách và Cơ Chế Giới Hạn Chi Phí (DEC-A13-03)
 
 ### 5.1. Cơ Sở Lý Thuyết và Tài Liệu Nền Tảng Chính Thức của OpenAI
-Dựa trên tài liệu chính thức của OpenAI ([OpenAI Usage Limits Guide](https://platform.openai.com/docs/guides/production-best-practices#set-usage-limits) và [OpenAI Spend Limits Documentation](https://developers.openai.com/api/docs/guides/spend-limits)):
-1. **Usage / Budget Limits:** OpenAI cho phép thiết lập giới hạn ngân sách hàng tháng (Monthly Budget Limit) theo từng Project hoặc Organization. Khi chi phí trong chu kỳ đạt đến ngưỡng này, các request API tiếp theo sẽ bị từ chối với mã lỗi HTTP 429 `insufficient_quota`.
-2. **Độ trễ Enforcement (Enforcement Latency):** Tài liệu của OpenAI chính thức cảnh báo rằng hệ thống theo dõi chi phí có độ trễ nhất định trong việc cập nhật số liệu. Do đó, các request đang trong quá trình xử lý (in-flight) hoặc phát sinh ngay tại thời điểm chạm ngưỡng vẫn có thể hoàn tất, dẫn đến việc chi phí thực tế có thể vượt một tỷ lệ nhỏ so với ngân sách đã đặt trước khi request bị chặn đứng.
-3. **Spend Alerts:** Các ngưỡng thông báo qua email (Email Notification Thresholds) chỉ mang tính chất cảnh báo, **hoàn toàn không có tác dụng dừng hoặc giới hạn lưu lượng truy cập API**.
+Dựa trên tài liệu chính thức của OpenAI ([OpenAI Spend Limits Documentation](https://developers.openai.com/api/docs/guides/spend-limits) và [OpenAI Usage Limits Guide](https://platform.openai.com/docs/guides/production-best-practices#set-usage-limits)):
+1. **Thiết lập Giới hạn Chi tiêu (Monthly Spend Limits):** OpenAI cho phép đặt giới hạn ngân sách hàng tháng theo Project hoặc Organization. Để thực sự chặn các request khi vượt ngưỡng, tùy chọn **'Enforce a hard limit'** (áp dụng giới hạn cứng) bắt buộc phải được kích hoạt (toggled ON). Nếu chỉ nhập số tiền mà không bật enforce hard limit, request sẽ không bị chặn tự động.
+2. **Các Mã Lỗi Trả Về (Rejection Error Codes):** Khi chạm ngưỡng hard limit hoặc cạn kiệt số dư trả trước, OpenAI trả về mã phản hồi HTTP 429 với một trong ba mã lỗi (`code` hoặc `type`):
+   - `insufficient_quota`: Hết hạn mức / số dư trả trước hoặc quota chung.
+   - `project_spend_limit_exceeded`: Đạt ngưỡng hard limit được thiết lập riêng cho Project.
+   - `organization_spend_limit_exceeded`: Đạt ngưỡng hard limit được thiết lập cho toàn bộ Organization.
+   Adapter xử lý cả 3 mã lỗi này dưới tập hợp `HARD_SPEND_LIMIT_CODES` và kết luận ngay `QUOTA_EXCEEDED` mà không thực hiện retry vô ích.
+3. **Độ trễ Áp dụng (Enforcement Latency):** OpenAI chính thức tài liệu hóa rằng hệ thống theo dõi và tính toán chi phí có độ trễ nhất định (enforcement latency). Do đó, các request đang bay (in-flight) hoặc phát sinh ngay tại thời điểm chạm ngưỡng vẫn có thể được xử lý xong trước khi toàn bộ hệ thống kích hoạt rào chắn 429. Vì vậy, số tiền thực tế ghi nhận trên hóa đơn có thể vượt nhẹ so với con số hard limit đã đặt.
+4. **Spend Alerts:** Các ngưỡng cảnh báo qua email (Spend Alerts) chỉ gửi email thông báo khi chi phí đạt tỷ lệ nhất định (ví dụ $5.00 USD), **hoàn toàn không dừng hoặc giới hạn lưu lượng truy cập API**.
 
 ### 5.2. Hiện Trạng Xác Minh Thực Tế Trong Dự Án
 - **Quyết định DEC-A13-03:** Là quyết định chính sách nội bộ của dự án đặt ra trần ngân sách thử nghiệm $10.00 USD/tháng và cảnh báo ở mức $5.00 USD.
-- **Trạng thái tài khoản OpenAI bên ngoài:** **CHƯA ĐƯỢC XÁC MINH (UNVERIFIED)**. Trong môi trường phát triển hiện tại, không có thông tin xác thực quản trị viên OpenAI để kiểm tra hoặc chứng minh rằng Budget Limit $10.00 USD đã được thiết lập trên dashboard.
-- **Cơ chế trong mã nguồn:** Đoạn code xử lý mã lỗi HTTP 429 `insufficient_quota` trong `openai_provider.py` chỉ có chức năng phản ứng khi OpenAI từ chối request và ngăn chặn retry vô ích; đoạn code này **không tự tạo ra rào chắn ngân sách $10** nếu tài khoản chưa được thiết lập.
-- **Điều kiện vận hành bắt buộc:** Trước khi cấu hình `OPENAI_API_KEY` vào bất kỳ môi trường thử nghiệm nào, quản trị viên bắt buộc phải truy cập OpenAI Dashboard (mục Settings > Limits), tạo Project riêng cho Digital Fitness và trực tiếp cài đặt Monthly Budget Limit.
+- **Trạng thái tài khoản OpenAI bên ngoài:** **CHƯA ĐƯỢC XÁC MINH (UNVERIFIED)**. Trong môi trường phát triển hiện tại, không có quyền truy cập bảng điều khiển OpenAI Dashboard để kiểm tra hoặc chứng minh rằng hard limit $10.00 USD và enforce toggle đã được thiết lập thực tế. Cần phân định rõ ràng: DEC-A13-03 là chính sách dự án đã duyệt, còn cấu hình trên tài khoản bên ngoài là trạng thái chưa được kiểm chứng trong mã nguồn local.
+- **Cơ chế trong mã nguồn:** Đoạn code xử lý mã lỗi HTTP 429 (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`) trong `openai_provider.py` chỉ có chức năng nhận diện khi OpenAI từ chối request và ngăn chặn retry vô ích; đoạn code này **không tự tạo ra rào chắn ngân sách $10** nếu tài khoản chưa được thiết lập và bật enforce trên dashboard.
+- **Điều kiện vận hành bắt buộc:** Trước khi cấu hình `OPENAI_API_KEY` vào bất kỳ môi trường thử nghiệm nào, quản trị viên bắt buộc phải truy cập OpenAI Dashboard (mục Settings > Limits), tạo Project riêng cho Digital Fitness, thiết lập Monthly Spend Limit $10.00 USD và kích hoạt tùy chọn **Enforce a hard limit**.
 
 ---
 

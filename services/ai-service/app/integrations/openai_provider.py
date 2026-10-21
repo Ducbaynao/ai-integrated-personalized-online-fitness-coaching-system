@@ -25,6 +25,12 @@ from app.schemas.f01_schemas import (
 
 logger = logging.getLogger(__name__)
 
+HARD_SPEND_LIMIT_CODES: frozenset[str] = frozenset({
+    "insufficient_quota",
+    "project_spend_limit_exceeded",
+    "organization_spend_limit_exceeded",
+})
+
 OPENAI_RESPONSE_SCHEMA: dict[str, Any] = {
     "name": "f01_knowledge_generation",
     "strict": True,
@@ -417,9 +423,13 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                         except Exception:
                             err_code, err_type = None, None
 
-                        # Non-retryable quota exhaustion
-                        if err_code == "insufficient_quota" or err_type == "insufficient_quota":
-                            logger.error("OpenAI hard spend limit or quota exceeded (429 insufficient_quota).")
+                        # Non-retryable quota or hard spend limit exhaustion
+                        if err_code in HARD_SPEND_LIMIT_CODES or err_type in HARD_SPEND_LIMIT_CODES:
+                            logger.error(
+                                "OpenAI hard spend limit or quota exceeded (code=%s, type=%s).",
+                                err_code,
+                                err_type,
+                            )
                             return F01KnowledgeQueryResult(
                                 runId=run_id,
                                 correlationId=correlation_id,
