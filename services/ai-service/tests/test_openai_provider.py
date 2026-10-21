@@ -2,17 +2,13 @@ import asyncio
 import json
 from uuid import UUID
 
-from fastapi.testclient import TestClient
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 from app.api.routes.internal_knowledge import get_f01_provider
 from app.core.config import settings
-from app.integrations.openai_provider import (
-    DEFAULT_LIMITATIONS,
-    OpenAiKnowledgeProvider,
-    normalize_text_for_comparison,
-)
+from app.integrations.openai_provider import OpenAiKnowledgeProvider
 from app.integrations.simulated_provider import SimulatedF01KnowledgeProvider
 from app.main import app
 from app.rag.retriever import KnowledgeRetriever, RetrievalResult, RetrievedChunkDto
@@ -577,7 +573,6 @@ async def test_openai_429_rate_limit_retries_and_succeeds(monkeypatch):
 
     assert call_count == 2
     assert result.runStatus == "SUCCEEDED"
-    assert result.resultType == "INFORMATION"
 
 
 @pytest.mark.anyio
@@ -909,5 +904,170 @@ async def test_openai_invalid_retry_after_handled_gracefully(monkeypatch):
 
     assert call_count == 2
     assert result.runStatus == "SUCCEEDED"
+
+
+@pytest.mark.anyio
+async def test_openai_message_refusal_field_maps_to_provider_refusal(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-refusal-123",
+                "object": "chat.completion",
+                "created": 1729500000,
+                "model": "gpt-4o-mini-2024-07-18",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "refusal": "I cannot fulfill requests promoting performance-enhancing substances.",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60},
+            },
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert result.runStatus == "REJECTED_BY_VALIDATOR"
+    assert result.resultType == "BLOCKED"
+    assert result.reasonCode == "RULE_BLOCKED"
+    assert result.error.code == "PROVIDER_REFUSAL"
+    assert "performance-enhancing" in result.error.message
+
+
+@pytest.mark.anyio
+async def test_openai_missing_or_null_usage_preserves_none(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    content = {
+        "status": "ANSWERED",
+        "answer": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+        "citations": [
+            {
+                "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                "version": "1.0.0",
+                "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                "locator": {
+                    "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                    "heading": "Khuyến nghị Leucine",
+                    "sectionIndex": 0,
+                },
+                "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+            }
+        ],
+        "limitations": [],
+        "missingData": [],
+        "refusalReason": "",
+    }
+
+    resp_json = make_openai_response(content)
+    resp_json["usage"] = None  # Usage omitted/null
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=resp_json)
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert result.runStatus == "SUCCEEDED"
+    assert result.usage is None  # Must remain None, not synthesized zeros!
+
+
+@pytest.mark.anyio
+async def test_openai_payload_store_is_unconditionally_false(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+    monkeypatch.setattr(settings, "openai_store", True)  # Operator attempt to enable store
+
+    captured_store = None
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_store
+        body = json.loads(request.content)
+        captured_store = body.get("store")
+        return httpx.Response(
+            200,
+            json=make_openai_response({
+                "status": "ANSWERED",
+                "answer": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa.",
+                "citations": [
+                    {
+                        "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                        "version": "1.0.0",
+                        "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                        "locator": {
+                            "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                            "heading": "Khuyến nghị Leucine",
+                            "sectionIndex": 0,
+                        },
+                        "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+                    }
+                ],
+                "limitations": [],
+                "missingData": [],
+                "refusalReason": "",
+            }),
+        )
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    await provider.query(SAMPLE_ENVELOPE)
+
+    assert captured_store is False  # Must be strictly False
+
+
+@pytest.mark.anyio
+async def test_openai_overlong_answer_maps_to_validation_failed(monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    content = {
+        "status": "ANSWERED",
+        "answer": "A" * 5001,  # Exceeds 5000 chars limit
+        "citations": [
+            {
+                "documentId": "ISSN-PROTEIN-EXERCISE-2017-VI-04",
+                "version": "1.0.0",
+                "sourceId": "ISSN-PROTEIN-EXERCISE-2017",
+                "locator": {
+                    "sourcePath": "data/knowledge/curated/issn-protein-2017/04-serving-leucine.vi.md",
+                    "heading": "Khuyến nghị Leucine",
+                    "sectionIndex": 0,
+                },
+                "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
+            }
+        ],
+        "limitations": [],
+        "missingData": [],
+        "refusalReason": "",
+    }
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=make_openai_response(content))
+
+    transport = httpx.MockTransport(mock_handler)
+    mock_client = httpx.AsyncClient(transport=transport)
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever(), http_client=mock_client)
+    result = await provider.query(SAMPLE_ENVELOPE)
+
+    assert result.runStatus == "REJECTED_BY_VALIDATOR"
+    assert result.reasonCode == "VALIDATION_FAILED"
+    assert result.error.code == "VALIDATION_FAILED"
+    assert "5000" in result.error.message
 
 

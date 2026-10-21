@@ -23,7 +23,7 @@ Triển khai adapter sinh câu trả lời thật (`OpenAiKnowledgeProvider`) k�
    - Tích hợp rào chắn bảo mật dữ liệu (`store: false`), bảo vệ secret (`pydantic.SecretStr`), phòng chống prompt injection gián tiếp từ corpus nội dung.
    - Cài đặt cơ chế **Citation Integrity**: đối soát toàn diện mọi trích dẫn (documentId, version, sourceId, locator, sectionIndex, quote verbatim) với các evidence chunks được trả về từ Spring Boot pgvector retrieval. Khử trùng lặp trích dẫn trùng lặp chunk.
    - Thiết lập timeout phân tầng và quản lý deadline tổng 22.0s, finite retry với exponential backoff & jitter trên HTTP 429/5xx, ngắt ngay không retry khi gặp lỗi quota hoặc hard spend limit (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`).
-   - Kiểm chứng tự động offline trên commit `d5d70b5` và bản cập nhật hard spend limit: 39/39 AI Service pytest PASS, 28/28 Spring Boot surefire PASS (qua 2 lệnh kiểm thử riêng biệt), và JSON Schema validator draft 2020-12 PASS.
+   - Kiểm chứng tự động offline trên commit `d5d70b5` và các bản cập nhật hoàn thiện: 43/43 AI Service pytest PASS, 28/28 Spring Boot surefire PASS (qua 2 lệnh kiểm thử riêng biệt), và JSON Schema validator draft 2020-12 PASS.
 2. **Phần CHƯA THỰC HIỆN và GIỚI HẠN HIỆN TẠI (Ghi nhận trung thực):**
    - **Live Smoke Test:** Chưa chạy do phiên làm việc local không có biến môi trường `OPENAI_API_KEY`. Toàn bộ kiểm thử hiện tại sử dụng mock transport và Testcontainers offline; chưa có dữ liệu gọi API OpenAI live.
    - **Xác minh Ngân sách Thực tế:** Quyết định DEC-A13-03 là chính sách nội bộ ($10 USD ceiling, $5 USD alert). Workspace hiện tại không có quyền truy cập bảng điều khiển OpenAI để xác nhận liệu rào chắn ngân sách này đã thực sự được cấu hình hay chưa.
@@ -91,30 +91,33 @@ Triển khai giao diện `F01KnowledgeProvider`:
 
 ## 4. Chi Tiết Kết Quả Kiểm Thử Thực Tế
 
-Các con số dưới đây phản ánh kết quả thực thi kiểm thử trực tiếp trên commit `d5d70b5` và bản cập nhật bổ sung kiểm thử hard spend limit (39 tests AI service, 28 tests backend qua 2 lệnh độc lập, schema validator PASS):
+Các con số dưới đây phản ánh kết quả thực thi kiểm thử trực tiếp trên commit `d5d70b5` và các bản cập nhật hoàn thiện (43 tests AI service, 28 tests backend qua 2 lệnh độc lập, schema validator PASS):
 
 ### 4.1. Bộ Kiểm Thử Python FastAPI (`services/ai-service/tests/`)
 Lệnh thực thi:
 ```powershell
 & services/ai-service/.venv/Scripts/python -m pytest services/ai-service/tests
 ```
-Kết quả: **39/39 tests PASS** (0 failures, 0 errors, thời gian chạy: ~6.6s).
+Kết quả: **43/43 tests PASS** (0 failures, 0 errors, thời gian chạy: ~6.1s).
 - `test_health.py`: 1/1 PASS.
-- `test_internal_knowledge.py`: 10/10 PASS (kiểm tra xác thực service key, simulated provider các nhánh).
-- `test_openai_provider.py`: 28/28 PASS:
+- `test_internal_knowledge.py`: 10/10 PASS (kiểm tra xác thực service key, simulated provider các nhánh, cô lập unit test khi backend unreachable).
+- `test_openai_provider.py`: 32/32 PASS:
   - Định tuyến provider (`simulated`, `openai`, từ chối giá trị không hợp lệ với HTTP 500).
   - Kiểm tra rào chắn `allowedSourceIds` rỗng và lỗi retrieval backend.
   - Kiểm tra xử lý thiếu `OPENAI_API_KEY`.
   - Kiểm tra tạo thành công `INFORMATION` với đầy đủ ràng buộc `store: false`, `model: gpt-4o-mini-2024-07-18`, strict schema và metadata.
   - Kiểm tra Citation Integrity: phát hiện và từ chối citation không có trong evidence chunks, từ chối trích dẫn sai lệch nội dung (`quoteOrExcerpt`), khử trùng lặp citations.
-  - Kiểm tra xử lý trạng thái từ chối `REFUSED`, `content_filter`, và thiếu thông tin `INSUFFICIENT_EVIDENCE`.
+  - Kiểm tra xử lý trạng thái từ chối `REFUSED`, `content_filter`, trường `message.refusal` của Structured Outputs, và thiếu thông tin `INSUFFICIENT_EVIDENCE`.
   - Kiểm tra retry với HTTP 429 (thành công ở lần 2), không retry đối với cả 3 mã lỗi hard spend limit/quota (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`), xử lý an toàn `Retry-After` âm/phi số.
   - Kiểm tra retry với HTTP 500.
   - Kiểm tra timeout tổng (`overall deadline`) và timeout từng lần gọi.
   - Kiểm tra che giấu secret trong `SecretStr`.
+  - Kiểm tra bảo toàn token usage rỗng/null (không tự sinh số 0 giả lập).
+  - Kiểm tra bắt buộc `store: false` vô điều kiện bất kể biến môi trường.
+  - Kiểm tra từ chối câu trả lời dài vượt quá 5000 ký tự với `VALIDATION_FAILED`.
   - Kiểm tra tích hợp router qua FastAPI `TestClient` với provider `openai`.
 
-*Lưu ý:* Toàn bộ 39 tests trên chạy hoàn toàn offline sử dụng `httpx.MockTransport` và FastAPI `TestClient`, không thực hiện cuộc gọi mạng ra ngoài hay gọi API trả phí.
+*Lưu ý:* Toàn bộ 43 tests trên chạy hoàn toàn offline sử dụng `httpx.MockTransport` và FastAPI `TestClient`, không thực hiện cuộc gọi mạng ra ngoài hay gọi API trả phí.
 
 ### 4.2. Bộ Kiểm Thử Java Spring Boot (`services/backend/`)
 Được xác minh qua 2 lệnh Maven Surefire riêng biệt:

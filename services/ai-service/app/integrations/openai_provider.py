@@ -1,14 +1,15 @@
 import asyncio
-from datetime import UTC, datetime
 import json
 import logging
 import math
 import random
 import re
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.integrations.provider_interface import F01KnowledgeProvider
@@ -259,7 +260,7 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                 "type": "json_schema",
                 "json_schema": OPENAI_RESPONSE_SCHEMA,
             },
-            "store": settings.openai_store,
+            "store": False,  # DEC-A13-02 mandatory privacy safeguard: provider-side storage unconditionally disabled
         }
 
         # 5. Execute OpenAI Chat Completions call with overall deadline & per-attempt retry
@@ -420,7 +421,7 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                             err_body = resp.json().get("error", {})
                             err_code = err_body.get("code")
                             err_type = err_body.get("type")
-                        except Exception:
+                        except (json.JSONDecodeError, ValueError, AttributeError):
                             err_code, err_type = None, None
 
                         # Non-retryable quota or hard spend limit exhaustion
@@ -607,17 +608,22 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
         latency_ms: int,
         now_str: str,
     ) -> F01KnowledgeQueryResult:
-        # Extract usage metrics
-        usage_raw = data.get("usage", {})
-        prompt_tokens = usage_raw.get("prompt_tokens", 0)
-        completion_tokens = usage_raw.get("completion_tokens", 0)
-        total_tokens = usage_raw.get("total_tokens", prompt_tokens + completion_tokens)
-        usage = UsageDto(
-            promptTokens=prompt_tokens,
-            completionTokens=completion_tokens,
-            totalTokens=total_tokens,
-            latencyMs=latency_ms,
-        )
+        # Extract usage metrics if present; missing or null usage remains unknown (None) per DEC-A13
+        usage_raw = data.get("usage")
+        usage: UsageDto | None = None
+        if isinstance(usage_raw, dict):
+            prompt_tokens = usage_raw.get("prompt_tokens")
+            completion_tokens = usage_raw.get("completion_tokens")
+            total_tokens = usage_raw.get("total_tokens")
+            if prompt_tokens is not None and completion_tokens is not None:
+                if total_tokens is None:
+                    total_tokens = prompt_tokens + completion_tokens
+                usage = UsageDto(
+                    promptTokens=prompt_tokens,
+                    completionTokens=completion_tokens,
+                    totalTokens=total_tokens,
+                    latencyMs=latency_ms,
+                )
 
         metadata = GenerationMetadataDto(
             schemaVersion="1.0.0",
@@ -678,8 +684,30 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                 generationMetadata=metadata,
             )
 
+        # Check Structured Outputs refusal field in choices[0].message
+        message_obj = choice.get("message", {})
+        message_refusal = message_obj.get("refusal")
+        if message_refusal:
+            logger.warning("OpenAI model refused request via message.refusal: %s", message_refusal)
+            return F01KnowledgeQueryResult(
+                runId=envelope.requestId,
+                correlationId=envelope.correlationId,
+                runStatus="REJECTED_BY_VALIDATOR",
+                resultType="BLOCKED",
+                reasonCode="RULE_BLOCKED",
+                limitations=[str(message_refusal)],
+                missingData=[],
+                error=ErrorDto(
+                    code="PROVIDER_REFUSAL",
+                    message=str(message_refusal),
+                ),
+                asOf=now_str,
+                usage=usage,
+                generationMetadata=metadata,
+            )
+
         # Parse JSON content from message
-        message_content = choice.get("message", {}).get("content", "")
+        message_content = message_obj.get("content", "")
         if not message_content:
             return F01KnowledgeQueryResult(
                 runId=envelope.requestId,
@@ -765,6 +793,22 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                     error=ErrorDto(
                         code="VALIDATION_FAILED",
                         message="Model marked status as ANSWERED but provided empty answer text.",
+                    ),
+                    asOf=now_str,
+                    usage=usage,
+                    generationMetadata=metadata,
+                )
+
+            if len(answer_text) > 5000:
+                logger.warning("Model generated overlong answer (%d chars > 5000 limit).", len(answer_text))
+                return F01KnowledgeQueryResult(
+                    runId=envelope.requestId,
+                    correlationId=envelope.correlationId,
+                    runStatus="REJECTED_BY_VALIDATOR",
+                    reasonCode="VALIDATION_FAILED",
+                    error=ErrorDto(
+                        code="VALIDATION_FAILED",
+                        message=f"Model answer length ({len(answer_text)}) exceeds maximum allowed limit of 5000 characters.",
                     ),
                     asOf=now_str,
                     usage=usage,
@@ -887,7 +931,7 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                     )
                     validated_citations.append(citation_dto)
                     seen_citations.add(cit_key)
-                except Exception as ex:
+                except (ValidationError, ValueError, TypeError) as ex:
                     logger.warning("Citation failed schema validation: %s", ex)
                     return F01KnowledgeQueryResult(
                         runId=envelope.requestId,
