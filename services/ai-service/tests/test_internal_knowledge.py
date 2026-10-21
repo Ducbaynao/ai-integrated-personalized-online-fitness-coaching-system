@@ -187,7 +187,8 @@ def test_disabled_mock_provider(monkeypatch):
 
 def test_retrieval_enabled_backend_unreachable_fails_without_fixture(monkeypatch):
     monkeypatch.setattr(settings, "backend_internal_retrieval_enabled", True)
-    # Backend localhost:8080 is unreachable during isolated unit test
+    monkeypatch.setattr(settings, "backend_base_url", "http://127.0.0.1:59999")
+    # Backend is unreachable during isolated unit test
     response = client.post(
         "/internal/v1/knowledge/query",
         headers=VALID_AUTH_HEADER,
