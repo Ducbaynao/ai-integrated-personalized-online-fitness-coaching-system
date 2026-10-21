@@ -6,6 +6,8 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutE
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleBatchUseCase.*;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutScheduleFailure;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
+import com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,12 +23,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.*;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,8 +70,11 @@ class WorkoutScheduleBatchIntegrationTest {
     @Autowired WorkoutScheduleBatchUseCase batches;
     @Autowired WorkoutScheduleCalendarQuery calendar;
     @Autowired WorkoutExecutionCommandUseCase executionCommands;
+    @Autowired CoachingLifecycleUseCase lifecycle;
+    @Autowired AppointmentService appointments;
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource dataSource;
     @MockitoSpyBean AuditService audit;
     @BeforeEach void resetAudit() { reset(audit); }
 
@@ -100,6 +108,213 @@ class WorkoutScheduleBatchIntegrationTest {
                 .isInstanceOf(WorkoutScheduleFailure.class)
                 .extracting("code").isEqualTo("WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT");
     }
+
+    @Test void coachRequiredDirectBatchAtomicallyLinksCurrentConfirmedAppointment() {
+        UUID trainer = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
+                trainer, trainer + "@example.com");
+        jdbc.update("""
+                INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
+                SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='TRAINER'
+                """, trainer, trainer);
+        jdbc.update("""
+                INSERT INTO fitness.trainer_profiles
+                (user_id,verification_status,verified_at,is_accepting_students,is_active)
+                VALUES (?,'VERIFIED',clock_timestamp(),true,true)
+                """, trainer);
+        final UUID[] period = new UUID[1];
+        Fixture f = fixture("COACH_REQUIRED", false, student -> {
+            jdbc.update("""
+                    INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
+                    SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='STUDENT'
+                    """, student, student);
+            var request = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
+            var active = lifecycle.relationshipAction(trainer, request.relationship().id(),
+                    "ACCEPT", 0, null, UUID.randomUUID());
+            period[0] = active.currentPeriod().id();
+            return period[0];
+        });
+        LocalDateTime start = startAtNextWeek();
+        var appointmentRequest = appointments.request(new AppointmentService.RequestCommand(
+                f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(start.minusHours(1), start.plusHours(2),
+                        "Etc/UTC", "+00:00", "+00:00"), UUID.randomUUID()));
+        var appointment = appointments.decide(new AppointmentService.DecisionCommand(trainer,
+                appointmentRequest.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        Item ordinary = item(f, start);
+        Item linked = new Item(ordinary.clientItemId(), ordinary.planSessionId(), ordinary.weekNumber(),
+                ordinary.dayNumber(), ordinary.sequenceNumber(), ordinary.localStart(), ordinary.localEnd(),
+                ordinary.startUtcOffset(), ordinary.endUtcOffset(), appointment.appointmentId());
+        Item unknown = new Item(ordinary.clientItemId(), ordinary.planSessionId(), ordinary.weekNumber(),
+                ordinary.dayNumber(), ordinary.sequenceNumber(), ordinary.localStart(), ordinary.localEnd(),
+                ordinary.startUtcOffset(), ordinary.endUtcOffset(), UUID.randomUUID());
+        assertThatThrownBy(() -> batches.confirmDirect(command(f, "coach-unknown", unknown)))
+                .isInstanceOf(WorkoutScheduleFailure.class).extracting("code")
+                .isEqualTo("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE student_id=?",
+                Integer.class, f.student())).isZero();
+        ConfirmBatch command = command(f, "coach-linked", linked);
+        ConfirmedBatch confirmed = batches.confirmDirect(command);
+        UUID occurrence = confirmed.items().getFirst().occurrenceId();
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment.appointmentId())).isEqualTo(occurrence);
+        assertThat(jdbc.queryForObject("SELECT coaching_period_id FROM fitness.planned_workouts WHERE id=?",
+                UUID.class, occurrence)).isEqualTo(period[0]);
+        assertThat(batches.confirmDirect(command).items().getFirst().occurrenceId()).isEqualTo(occurrence);
+        assertThatThrownBy(() -> batches.confirmDirect(command(f, "coach-reuse", linked)))
+                .isInstanceOf(WorkoutScheduleFailure.class).extracting("code")
+                .isEqualTo("WORKOUT_SCHEDULE_DUPLICATE");
+    }
+
+    @Test void coachRequiredBatchWinsAgainstAppointmentCancelWithoutOrphanLink() throws Exception {
+        raceCoachRequiredBatchAndCancel(true);
+    }
+
+    @Test void appointmentCancelWinsAgainstCoachRequiredBatchWithoutPartialWrite() throws Exception {
+        raceCoachRequiredBatchAndCancel(false);
+    }
+
+    private void raceCoachRequiredBatchAndCancel(boolean batchFirst) throws Exception {
+        UUID trainer = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
+                trainer, trainer + "@example.com");
+        jdbc.update("""
+                INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
+                SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='TRAINER'
+                """, trainer, trainer);
+        jdbc.update("""
+                INSERT INTO fitness.trainer_profiles
+                (user_id,verification_status,verified_at,is_accepting_students,is_active)
+                VALUES (?,'VERIFIED',clock_timestamp(),true,true)
+                """, trainer);
+        Fixture f = fixture("COACH_REQUIRED", false, student -> {
+            jdbc.update("""
+                    INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at)
+                    SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='STUDENT'
+                    """, student, student);
+            var request = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
+            return lifecycle.relationshipAction(trainer, request.relationship().id(),
+                    "ACCEPT", 0, null, UUID.randomUUID()).currentPeriod().id();
+        });
+        LocalDate week = anchor().plusWeeks(4);
+        LocalDateTime start = week.atTime(10, 0);
+        var request = appointments.request(new AppointmentService.RequestCommand(f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(start.minusHours(1), start.plusHours(2),
+                        "Etc/UTC", "+00:00", "+00:00"), UUID.randomUUID()));
+        var appointment = appointments.decide(new AppointmentService.DecisionCommand(trainer,
+                request.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        UUID appointmentId = appointment.appointmentId();
+        UUID cancelKey = UUID.randomUUID();
+        String batchKey = "coach-race-" + UUID.randomUUID();
+        String batchBody = """
+                {"planId":"%s","sourcePlanVersionId":"%s","expectedPlanAggregateVersion":1,
+                 "weekAnchorDate":"%s","timezone":"Etc/UTC","commandKey":"%s",
+                 "items":[{"clientItemId":"%s","planSessionId":"%s","weekNumber":1,
+                           "dayNumber":1,"sequenceNumber":1,"localStart":"%s","localEnd":"%s",
+                           "startUtcOffset":"+00:00","endUtcOffset":"+00:00","appointmentId":"%s"}]}
+                """.formatted(f.plan(), f.version(), week, batchKey, UUID.randomUUID(), f.session(),
+                start, start.plusHours(1), appointmentId);
+        String cancelBody = """
+                {"expectedAppointmentVersion":%d,"reason":"Không thể tham dự","commandKey":"%s"}
+                """.formatted(appointment.version(), cancelKey);
+        int initialEvents = count("SELECT count(*) FROM fitness.appointment_events_v2 WHERE appointment_id=?",
+                appointmentId);
+
+        try (Connection gate = dataSource.getConnection(); ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            gate.setAutoCommit(false);
+            try (var lock = gate.prepareStatement("SELECT id FROM fitness.appointments WHERE id=? FOR UPDATE")) {
+                lock.setObject(1, appointmentId);
+                assertThat(lock.executeQuery().next()).isTrue();
+            }
+            CountDownLatch firstStarted = new CountDownLatch(1), secondStarted = new CountDownLatch(1);
+            Callable<HttpResult> batch = () -> {
+                (batchFirst ? firstStarted : secondStarted).countDown();
+                var response = mvc.perform(post("/api/v1/planned-workout-batches")
+                                .contentType("application/json").content(batchBody)
+                                .with(jwt().jwt(token -> token.subject(f.student().toString()))))
+                        .andReturn().getResponse();
+                return new HttpResult(response.getStatus(), response.getContentAsString());
+            };
+            Callable<HttpResult> cancel = () -> {
+                (batchFirst ? secondStarted : firstStarted).countDown();
+                var response = mvc.perform(post("/api/v1/appointments/{appointmentId}/cancel", appointmentId)
+                                .contentType("application/json").content(cancelBody)
+                                .with(jwt().jwt(token -> token.subject(f.student().toString()))))
+                        .andReturn().getResponse();
+                return new HttpResult(response.getStatus(), response.getContentAsString());
+            };
+            Future<HttpResult> first = pool.submit(batchFirst ? batch : cancel);
+            try {
+                assertThat(firstStarted.await(10, TimeUnit.SECONDS)).isTrue();
+                awaitAppointmentLockWaiters(1);
+                Future<HttpResult> second = pool.submit(batchFirst ? cancel : batch);
+                assertThat(secondStarted.await(10, TimeUnit.SECONDS)).isTrue();
+                awaitAppointmentLockWaiters(2);
+                assertThat(first.isDone()).isFalse();
+                assertThat(second.isDone()).isFalse();
+                gate.commit();
+                HttpResult batchResult = (batchFirst ? first : second).get(30, TimeUnit.SECONDS);
+                HttpResult cancelResult = (batchFirst ? second : first).get(30, TimeUnit.SECONDS);
+                assertThat(batchResult.status()).isEqualTo(batchFirst ? 201 : 409);
+                assertThat(cancelResult.status()).isEqualTo(batchFirst ? 409 : 200);
+                assertThat(batchResult.body()).doesNotContain("SQLException", "deadlock detected");
+                assertThat(cancelResult.body()).doesNotContain("SQLException", "deadlock detected");
+                if (batchFirst) {
+                    assertThat(cancelResult.body()).contains("APPOINTMENT_VERSION_STALE");
+                } else {
+                    assertThat(batchResult.body()).contains("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING");
+                }
+            } finally {
+                gate.rollback(); // Also releases the test-only row lock if an assertion fails.
+            }
+        }
+
+        UUID linked = jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointmentId);
+        String status = jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?",
+                String.class, appointmentId);
+        assertThat(status).isEqualTo(batchFirst ? "CONFIRMED" : "CANCELLED");
+        assertThat(count("SELECT count(*) FROM fitness.planned_workouts WHERE student_id=?", f.student()))
+                .isEqualTo(batchFirst ? 1 : 0);
+        assertThat(count("SELECT count(*) FROM fitness.workout_schedule_batches WHERE student_id=?", f.student()))
+                .isEqualTo(batchFirst ? 1 : 0);
+        assertThat(count("SELECT count(*) FROM fitness.workout_schedule_command_receipts WHERE actor_id=? AND command_key=?",
+                f.student(), batchKey)).isEqualTo(batchFirst ? 1 : 0);
+        assertThat(count("SELECT count(*) FROM fitness.appointment_command_receipts_v2 WHERE actor_id=? AND command_key=?",
+                f.student(), cancelKey)).isEqualTo(batchFirst ? 0 : 1);
+        assertThat(count("SELECT count(*) FROM fitness.appointment_events_v2 WHERE appointment_id=?", appointmentId))
+                .isEqualTo(initialEvents + (batchFirst ? 0 : 1));
+        assertThat(count("SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id=? AND action='WORKOUT_SCHEDULE_BATCH_CONFIRMED'",
+                f.student())).isEqualTo(batchFirst ? 1 : 0);
+        if (batchFirst) {
+            assertThat(linked).isNotNull();
+            assertThat(count("SELECT count(*) FROM fitness.planned_workouts WHERE id=? AND student_id=? AND status='SCHEDULED'",
+                    linked, f.student())).isOne();
+        } else {
+            assertThat(linked).isNull();
+            assertThat(count("SELECT count(*) FROM fitness.notifications WHERE event_type='APPOINTMENT_CANCELLED' AND related_entity_id=?",
+                    appointmentId)).isOne();
+        }
+    }
+
+    private void awaitAppointmentLockWaiters(int expected) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            if (count("""
+                    SELECT count(*) FROM pg_stat_activity
+                    WHERE datname=current_database() AND wait_event_type='Lock'
+                      AND query ILIKE '%fitness.appointments%'
+                    """) >= expected) return;
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("Expected " + expected + " Appointment row-lock waiters");
+    }
+
+    private int count(String sql, Object... arguments) {
+        return jdbc.queryForObject(sql, Integer.class, arguments);
+    }
+
+    private record HttpResult(int status, String body) {}
 
     @Test void preservesNanosecondLocalIntentWhileInstantUsesDatabaseMicroseconds() {
         Fixture f = fixture();
@@ -419,7 +634,7 @@ class WorkoutScheduleBatchIntegrationTest {
         }
     }
 
-    @Test void legacyCoachRequiredNeedsAppointmentOrOverrideForStartButNotSkip() {
+    @Test void legacyCoachRequiredWithoutCurrentQualifyingAppointmentCannotStartButCanSkip() {
         Fixture f = fixture("COACH_REQUIRED", true);
         Instant start = startAtNextWeek().toInstant(ZoneOffset.UTC);
         UUID occurrence = legacyAt(f, start, "COACH_REQUIRED");
@@ -430,7 +645,7 @@ class WorkoutScheduleBatchIntegrationTest {
                 trainer, trainer + "@example.com");
         jdbc.update("INSERT INTO fitness.trainer_profiles(user_id) VALUES (?)", trainer);
         UUID appointment = UUID.randomUUID();
-        jdbc.update("""
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments
                 (id,trainer_id,student_id,planned_workout_id,start_at,end_at,display_timezone,status,created_by)
                 VALUES (?,?,?,?,?,?,'Etc/UTC','SCHEDULED',?)
@@ -440,15 +655,15 @@ class WorkoutScheduleBatchIntegrationTest {
                 .items().getFirst().availableActions()).containsExactly("SKIP");
         jdbc.update("UPDATE fitness.appointments SET status='CONFIRMED' WHERE id=?", appointment);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("START", "SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP");
         jdbc.update("UPDATE fitness.appointments SET status='COMPLETED' WHERE id=?", appointment);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("START", "SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP");
         jdbc.update("UPDATE fitness.appointments SET status='CANCELLED' WHERE id=?", appointment);
         jdbc.update("UPDATE fitness.planned_workouts SET supervision_override_by=?,supervision_override_reason='Approved override',version=version+1 WHERE id=?",
                 f.student(), occurrence);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("START", "SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP");
     }
 
     @Test void anotherInProgressExecutionSuppressesStartButKeepsSkip() {
@@ -530,14 +745,18 @@ class WorkoutScheduleBatchIntegrationTest {
     private Fixture fixture() { return fixture("SELF_ALLOWED", false); }
     private Fixture fixture(String supervision) { return fixture(supervision, false); }
     private Fixture fixture(String supervision, boolean withPrescription) {
+        return fixture(supervision, withPrescription, student -> null);
+    }
+    private Fixture fixture(String supervision, boolean withPrescription, Function<UUID, UUID> periodFactory) {
         UUID student = UUID.randomUUID(), plan = UUID.randomUUID(), version = UUID.randomUUID(), session = UUID.randomUUID();
         jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status,preferred_locale,timezone) VALUES (?,?, 'hash','Student','ACTIVE','vi-VN','Etc/UTC')",
                 student, student + "@example.com");
         jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", student);
+        UUID period = periodFactory.apply(student);
         jdbc.update("""
-                INSERT INTO fitness.workout_plans(id,student_id,name,source,status,created_by,decision_owner_type,decision_owner_id)
-                VALUES (?,?,'Plan','STUDENT','DRAFT',?,'STUDENT',?)
-                """, plan, student, student, student);
+                INSERT INTO fitness.workout_plans(id,student_id,name,source,status,created_by,decision_owner_type,decision_owner_id,coaching_period_id)
+                VALUES (?,?,'Plan','STUDENT','DRAFT',?,'STUDENT',?,?)
+                """, plan, student, student, student, period);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_versions
                 (id,workout_plan_id,version_number,change_level,created_by)

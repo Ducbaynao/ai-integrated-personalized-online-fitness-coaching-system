@@ -1,7 +1,9 @@
 import type { CreateWorkoutScheduleProposalRequest } from './workoutScheduleProposal';
 
-// Student confirmation and Trainer proposal share the published batch input schema.
-export type ConfirmWorkoutScheduleBatchRequest = CreateWorkoutScheduleProposalRequest;
+// Student direct confirmation may link an existing confirmed Appointment; Trainer proposals cannot persist this link.
+export type ConfirmWorkoutScheduleBatchRequest = Omit<CreateWorkoutScheduleProposalRequest, 'items'> & {
+  items: (CreateWorkoutScheduleProposalRequest['items'][number] & { appointmentId?: string | null })[];
+};
 
 export interface ConfirmedWorkoutScheduleBatch {
   batchId: string;

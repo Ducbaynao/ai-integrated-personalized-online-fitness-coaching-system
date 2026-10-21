@@ -4,6 +4,8 @@ import com.fitnesscoaching.platform.common.exception.*;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalProposalPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.*;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.FitnessGoalPersistencePort;
@@ -33,6 +35,8 @@ public class FitnessGoalProposalService implements
     private final FitnessGoalPersistencePort goalPort;
     private final GoalValidationHelper validationHelper;
     private final AuditService auditService;
+    private final CurrentCoachingContextQuery coachingContexts;
+    private final LifecycleNotificationWriter notifications;
 
     public FitnessGoalProposalService(
             GoalProposalPort proposalPort,
@@ -40,7 +44,9 @@ public class FitnessGoalProposalService implements
             GoalTrainerAuthorityPort trainerAuthorityPort,
             FitnessGoalPersistencePort goalPort,
             GoalValidationHelper validationHelper,
-            AuditService auditService
+            AuditService auditService,
+            CurrentCoachingContextQuery coachingContexts,
+            LifecycleNotificationWriter notifications
     ) {
         this.proposalPort = proposalPort;
         this.studentAuthorityPort = studentAuthorityPort;
@@ -48,6 +54,8 @@ public class FitnessGoalProposalService implements
         this.goalPort = goalPort;
         this.validationHelper = validationHelper;
         this.auditService = auditService;
+        this.coachingContexts = coachingContexts;
+        this.notifications = notifications;
     }
 
     @Override
@@ -175,6 +183,15 @@ public class FitnessGoalProposalService implements
                 .occurredAt(Instant.now())
                 .metadataJson("{\"goalId\":\"" + goal.id() + "\",\"studentId\":\"" + goal.studentId() + "\",\"proposalId\":\"" + saved.id() + "\",\"baseGoalVersionId\":\"" + goal.currentVersion().id() + "\"}")
                 .build());
+
+        coachingContexts.findEffectiveContext(goal.studentId(), false)
+                .filter(context -> context.mode() == CurrentCoachingContextQuery.Mode.HUMAN_COACH
+                        && command.trainerId().equals(context.trainerId()))
+                .ifPresent(context -> notifications.committed(
+                        LifecycleNotificationWriter.transitionId("FITNESS_GOAL_PROPOSAL", saved.id(), 0, "PENDING"),
+                        "FITNESS_GOAL_PROPOSAL_PENDING", "FITNESS_GOAL_PROPOSAL", saved.id(),
+                        saved.studentId(), command.trainerId(), context.periodId(),
+                        command.trainerId(), saved.studentId()));
 
         return saved;
     }
@@ -304,6 +321,8 @@ public class FitnessGoalProposalService implements
                     .occurredAt(Instant.now())
                     .metadataJson("{\"proposalId\":\"" + command.proposalId() + "\",\"goalId\":\"" + proposal.fitnessGoalId() + "\",\"decisionNote\":\"" + escapeJson(note) + "\"}")
                     .build());
+
+            notifyTrainerDecision(proposal, "REJECTED", command.studentId());
 
             return proposalPort.findById(command.proposalId())
                     .orElseThrow(() -> new IllegalStateException("Failed to load rejected proposal: " + command.proposalId()));
@@ -486,6 +505,8 @@ public class FitnessGoalProposalService implements
                         .metadataJson("{\"proposalId\":\"" + command.proposalId() + "\",\"goalId\":\"" + proposal.fitnessGoalId() + "\",\"newGoalId\":\"" + newGoalId + "\",\"decisionNote\":\"" + escapeJson(note) + "\"}")
                         .build());
 
+                notifyTrainerDecision(proposal, "ACCEPTED", command.studentId());
+
                 return proposalPort.findById(command.proposalId())
                         .orElseThrow(() -> new IllegalStateException("Failed to load accepted proposal: " + command.proposalId()));
             }
@@ -502,6 +523,8 @@ public class FitnessGoalProposalService implements
                     .occurredAt(Instant.now())
                     .metadataJson("{\"proposalId\":\"" + command.proposalId() + "\",\"goalId\":\"" + proposal.fitnessGoalId() + "\",\"decisionNote\":\"" + escapeJson(note) + "\",\"newVersionId\":\"" + newVersion.id() + "\"}")
                     .build());
+
+            notifyTrainerDecision(proposal, "ACCEPTED", command.studentId());
 
             auditService.recordAudit(AuditRecord.builder()
                     .actorUserId(command.studentId())
@@ -532,5 +555,14 @@ public class FitnessGoalProposalService implements
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+    private void notifyTrainerDecision(GoalProposal proposal, String transition, UUID student) {
+        if (proposal.createdBy() == null || proposal.source() != ProposalSource.TRAINER) return;
+        notifications.sourcePeriod("FITNESS_GOAL_PROPOSAL", proposal.id()).ifPresent(period ->
+                notifications.committed(LifecycleNotificationWriter.transitionId("FITNESS_GOAL_PROPOSAL",
+                                proposal.id(), 1, transition), "FITNESS_GOAL_PROPOSAL_" + transition,
+                        "FITNESS_GOAL_PROPOSAL", proposal.id(), student, proposal.createdBy(),
+                        period, student, proposal.createdBy()));
     }
 }

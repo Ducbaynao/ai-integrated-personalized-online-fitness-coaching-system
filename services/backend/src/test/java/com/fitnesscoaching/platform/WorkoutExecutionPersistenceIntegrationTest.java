@@ -153,7 +153,7 @@ class WorkoutExecutionPersistenceIntegrationTest {
     }
 
     @Test
-    void coachRequiredStartUsesV16AppointmentOrOverrideWhileSkipNeedsNeither() {
+    void coachRequiredStartNeedsCurrentConfirmedContainedAppointmentWhileSkipNeedsNeither() {
         Fixture noAppointment = fixture("COACH_REQUIRED");
         requireCoach(noAppointment);
         assertThatThrownBy(() -> commands.start(new StartCommand(noAppointment.occurrenceId(),
@@ -165,18 +165,42 @@ class WorkoutExecutionPersistenceIntegrationTest {
         assertThat(commands.skip(new SkipCommand(noAppointment.occurrenceId(), noAppointment.studentId(), 1,
                 "Skip without coached appointment", "coach-skip")).status()).isEqualTo("SKIPPED");
 
-        Fixture withAppointment = fixture("COACH_REQUIRED");
+        Fixture withAppointment = coachedFixture("COACH_REQUIRED");
         requireCoach(withAppointment);
-        UUID trainer = UUID.randomUUID();
-        jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
-                trainer, trainer + "@example.com");
-        jdbc.update("INSERT INTO fitness.trainer_profiles(user_id) VALUES (?)", trainer);
-        jdbc.update("""
+        UUID legacyAppointment = UUID.randomUUID();
+        LegacyAppointmentFixture.insert(jdbc, """
                 INSERT INTO fitness.appointments
                 (id,trainer_id,student_id,planned_workout_id,start_at,end_at,display_timezone,status,created_by)
                 VALUES (?,?,?,?,clock_timestamp(),clock_timestamp()+interval '1 hour','Etc/UTC','CONFIRMED',?)
-                """, UUID.randomUUID(), trainer, withAppointment.studentId(), withAppointment.occurrenceId(),
+                """, legacyAppointment, withAppointment.trainerId(), withAppointment.studentId(), withAppointment.occurrenceId(),
                 withAppointment.studentId());
+        assertThatThrownBy(() -> commands.start(new StartCommand(withAppointment.occurrenceId(),
+                withAppointment.studentId(), 1, "coach-legacy-appointment")))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE));
+
+        jdbc.update("""
+                UPDATE fitness.appointments SET coaching_period_id=?,
+                  start_at=clock_timestamp()-interval '10 minutes',
+                  end_at=clock_timestamp()+interval '10 minutes',
+                  local_start=(clock_timestamp() AT TIME ZONE 'UTC')-interval '10 minutes',
+                  local_end=(clock_timestamp() AT TIME ZONE 'UTC')+interval '10 minutes',
+                  start_utc_offset='+00:00',end_utc_offset='+00:00',guarded_v2=true
+                WHERE id=?
+                """, withAppointment.coachingPeriodId(), legacyAppointment);
+        jdbc.update("UPDATE fitness.appointments SET status='COMPLETED' WHERE id=?", legacyAppointment);
+        assertThatThrownBy(() -> commands.start(new StartCommand(withAppointment.occurrenceId(),
+                withAppointment.studentId(), 1, "coach-completed-appointment")))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE));
+        jdbc.update("UPDATE fitness.appointments SET status='CONFIRMED',start_at=clock_timestamp()-interval '1 minute' WHERE id=?",
+                legacyAppointment);
+        assertThatThrownBy(() -> commands.start(new StartCommand(withAppointment.occurrenceId(),
+                withAppointment.studentId(), 1, "coach-outside-interval")))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE));
+        jdbc.update("UPDATE fitness.appointments SET start_at=clock_timestamp()-interval '10 minutes' WHERE id=?",
+                legacyAppointment);
         assertThat(commands.start(new StartCommand(withAppointment.occurrenceId(), withAppointment.studentId(),
                 1, "coach-with-appointment")).id()).isNotNull();
 
@@ -186,8 +210,10 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 UPDATE fitness.planned_workouts SET supervision_override_by=?,
                     supervision_override_reason='Approved override',version=version+1 WHERE id=?
                 """, withOverride.studentId(), withOverride.occurrenceId());
-        assertThat(commands.start(new StartCommand(withOverride.occurrenceId(), withOverride.studentId(),
-                2, "coach-with-override")).id()).isNotNull();
+        assertThatThrownBy(() -> commands.start(new StartCommand(withOverride.occurrenceId(),
+                withOverride.studentId(), 2, "coach-with-override")))
+                .isInstanceOfSatisfying(WorkoutExecutionFailure.class, failure ->
+                        assertThat(failure.error()).isEqualTo(WorkoutExecutionError.PLANNED_WORKOUT_NOT_STARTABLE));
     }
 
     private void requireCoach(Fixture fixture) {
@@ -195,6 +221,20 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 UPDATE fitness.planned_workouts SET supervision_requirement='COACH_REQUIRED',version=version+1
                 WHERE id=?
                 """, fixture.occurrenceId());
+    }
+
+    @Test
+    void directSqlCannotBypassCurrentConfirmedAppointmentGuard() {
+        Fixture f = coachedFixture("COACH_REQUIRED");
+        requireCoach(f);
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO fitness.workout_session_logs
+                (student_id,planned_workout_id,performed_start_at,logged_by)
+                VALUES (?,?,clock_timestamp(),?)
+                """, f.studentId(), f.occurrenceId(), f.studentId()))
+                .hasMessageContaining("current qualifying confirmed Appointment");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                Integer.class, f.occurrenceId())).isZero();
     }
 
     @Test
@@ -245,22 +285,52 @@ class WorkoutExecutionPersistenceIntegrationTest {
         return fixture(null, null, supervision);
     }
 
+    private Fixture coachedFixture(String supervision) {
+        return fixture(null, null, supervision, true);
+    }
+
     private Fixture fixture(Short loadUnitId, Short distanceUnitId, String supervision) {
+        return fixture(loadUnitId, distanceUnitId, supervision, false);
+    }
+
+    private Fixture fixture(Short loadUnitId, Short distanceUnitId, String supervision, boolean human) {
         UUID student = person();
         UUID period = UUID.randomUUID();
-        jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',clock_timestamp()-interval '1 day',?)",
-                period, student, student);
+        UUID trainer = null;
+        if (human) {
+            trainer = UUID.randomUUID();
+            jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Trainer','ACTIVE')",
+                    trainer, trainer + "@example.com");
+            jdbc.update("INSERT INTO fitness.trainer_profiles(user_id,verification_status,activity_status) "
+                    + "VALUES (?,'VERIFIED','ACTIVE')", trainer);
+            UUID relationship = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO fitness.coaching_relationships
+                    (id,student_id,trainer_id,status,requested_by,requested_at,accepted_at,started_at)
+                    VALUES (?,?,?,'ACTIVE',?,clock_timestamp()-interval '2 days',
+                      clock_timestamp()-interval '1 day',clock_timestamp()-interval '1 day')
+                    """, relationship, student, trainer, student);
+            jdbc.update("""
+                    INSERT INTO fitness.coaching_periods
+                    (id,student_id,mode,coaching_relationship_id,trainer_id,started_at,created_by)
+                    VALUES (?,?,'HUMAN_COACH',?, ?,clock_timestamp()-interval '1 day',?)
+                    """, period, student, relationship, trainer, student);
+        } else {
+            jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',clock_timestamp()-interval '1 day',?)",
+                    period, student, student);
+        }
         UUID plan = UUID.randomUUID(), version = UUID.randomUUID(), session = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO fitness.workout_plans
                 (id,student_id,coaching_period_id,name,source,status,created_by,decision_owner_type,decision_owner_id)
-                VALUES (?,?,?,'B05','STUDENT','DRAFT',?,'STUDENT',?)
-                """, plan, student, period, student, student);
+                VALUES (?,?,?,'B05',?::fitness.plan_source,'DRAFT',?,?::fitness.workout_plan_decision_owner,?)
+                """, plan, student, period, human ? "TRAINER" : "STUDENT",
+                human ? trainer : student, human ? "TRAINER" : "STUDENT", human ? trainer : student);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_versions
                 (id,workout_plan_id,version_number,change_level,created_by)
                 VALUES (?,?,1,'INITIAL',?)
-                """, version, plan, student);
+                """, version, plan, human ? trainer : student);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_sessions
                 (id,workout_plan_version_id,week_number,day_number,sequence_number,name,supervision_requirement)
@@ -278,16 +348,19 @@ class WorkoutExecutionPersistenceIntegrationTest {
                 UPDATE fitness.workout_plan_versions
                 SET effective_from=clock_timestamp()-interval '1 day',locked_at=clock_timestamp(),
                     locked_by=?,lock_reason='ACTIVATED' WHERE id=?
-                """, student, version);
+                """, human ? trainer : student, version);
         jdbc.update("UPDATE fitness.workout_plans SET status='ACTIVE',version=version+1 WHERE id=?", plan);
         UUID occurrence = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO fitness.planned_workouts
                 (id,student_id,workout_plan_session_id,coaching_period_id,planned_start_at,
-                 original_planned_start_at,supervision_requirement,created_by)
-                VALUES (?,?,?, ?,clock_timestamp(),clock_timestamp(),?::fitness.supervision_requirement,?)
-                """, occurrence, student, session, period, supervision, student);
-        return new Fixture(student, occurrence, plan, version, session, period);
+                 planned_end_at,original_planned_start_at,supervision_requirement,created_by)
+                VALUES (?,?,?, ?,clock_timestamp()-? * interval '1 minute',
+                  CASE WHEN ? THEN clock_timestamp()+interval '5 minutes' ELSE NULL END,
+                  clock_timestamp()-? * interval '1 minute',?::fitness.supervision_requirement,?)
+                """, occurrence, student, session, period, human ? 5 : 0, human,
+                human ? 5 : 0, supervision, human ? trainer : student);
+        return new Fixture(student, occurrence, plan, version, session, period, trainer);
     }
 
     private UUID person() {
@@ -320,5 +393,5 @@ class WorkoutExecutionPersistenceIntegrationTest {
     }
 
     private record Fixture(UUID studentId, UUID occurrenceId, UUID planId, UUID planVersionId,
-                           UUID planSessionId, UUID coachingPeriodId) {}
+                           UUID planSessionId, UUID coachingPeriodId, UUID trainerId) {}
 }

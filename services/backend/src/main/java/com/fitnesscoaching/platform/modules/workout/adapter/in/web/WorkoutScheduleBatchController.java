@@ -40,8 +40,9 @@ public class WorkoutScheduleBatchController {
     public record InputItem(@NotNull UUID clientItemId, @NotNull UUID planSessionId,
                             int weekNumber, int dayNumber, int sequenceNumber,
                             @NotNull LocalDateTime localStart, @NotNull LocalDateTime localEnd,
-                            @NotBlank String startUtcOffset, @NotBlank String endUtcOffset) {
+                            @NotBlank String startUtcOffset, @NotBlank String endUtcOffset,
+                            UUID appointmentId) {
         Item toCommand() { return new Item(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
-                localStart, localEnd, startUtcOffset, endUtcOffset); }
+                localStart, localEnd, startUtcOffset, endUtcOffset, appointmentId); }
     }
 }

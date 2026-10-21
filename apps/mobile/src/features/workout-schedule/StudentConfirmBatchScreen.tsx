@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
+import { appointmentApi } from '@/services/appointmentApi';
 import { ApiError } from '@/types/auth';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { ConfirmWorkoutScheduleBatchRequest } from '@/types/workoutScheduleBatch';
@@ -50,31 +51,52 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
   const [stale, setStale] = useState(false);
   const [concealed, setConcealed] = useState(false);
   const [error, setError] = useState('');
+  const [appointmentWindow, setAppointmentWindow] = useState<{ from: string; until: string } | null>(null);
   const submitting = useRef(false);
+  useEffect(() => {
+    const initial = setTimeout(() => {
+      const now = Date.now();
+      setAppointmentWindow({ from: new Date(now - 86_400_000).toISOString(),
+        until: new Date(now + 91 * 86_400_000).toISOString() });
+    }, 0);
+    return () => clearTimeout(initial);
+  }, []);
+  const appointmentQuery = useInfiniteQuery({
+    queryKey: ['appointments', studentId, 'batch-candidates', appointmentWindow],
+    enabled: allowed && !!studentId && !!appointmentWindow && entries.some(entry => entry.session.supervisionRequirement === 'COACH_REQUIRED'),
+    gcTime: 0, initialPageParam: 0,
+    queryFn: ({ pageParam }) => appointmentApi.appointments(appointmentWindow!.from, appointmentWindow!.until, pageParam),
+    getNextPageParam: page => (page.page + 1) * page.size < page.totalItems ? page.page + 1 : undefined,
+  });
+  const appointmentCandidates = appointmentQuery.data?.pages.flatMap(page => page.items)
+    .filter(item => item.status === 'CONFIRMED' && !item.plannedWorkoutId && !!item.coachingPeriodId) ?? [];
   const zones = useMemo(() => proposalTimezones(timezoneSearch), [timezoneSearch]);
   const validation = useMemo(() => validateDirectBatch(anchor, timezone, entries), [anchor, timezone, entries]);
 
   useEffect(() => {
-    const denied = [planQuery.error, versionQuery.error].some((reason) => reason instanceof ApiError && [403, 404].includes(reason.status));
+    const denied = [planQuery.error, versionQuery.error, appointmentQuery.error].some((reason) => reason instanceof ApiError && [403, 404].includes(reason.status));
     if (!denied || !studentId || concealed) return;
     client.removeQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
     client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+    client.removeQueries({ queryKey: ['appointments', studentId] });
     queueMicrotask(() => setConcealed(true));
-  }, [client, concealed, planQuery.error, studentId, versionQuery.error]);
+  }, [appointmentQuery.error, client, concealed, planQuery.error, studentId, versionQuery.error]);
 
   const resetReview = () => { setPreview(false); setPending(null); setStale(false); setError(''); };
   const updateEntry = (id: string, patch: Partial<DirectBatchEntry>) => {
-    setEntries((current) => current.map((entry) => entry.session.id === id ? { ...entry, ...patch } : entry));
+    const timeChanged = ['localStart', 'localEnd', 'startOffset', 'endOffset'].some(key => key in patch);
+    setEntries((current) => current.map((entry) => entry.session.id === id
+      ? { ...entry, ...(timeChanged ? { appointmentId: undefined } : {}), ...patch } : entry));
     resetReview();
   };
   const selectSession = (session: WorkoutSession) => {
-    if (!['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement)) return;
+    if (!['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement)) return;
     setEntries((current) => current.some((entry) => entry.session.id === session.id)
       ? current.filter((entry) => entry.session.id !== session.id)
       : [...current, { session, localStart: '', localEnd: '', startOffset: '', endOffset: '' }]);
     resetReview();
   };
-  const refreshSource = async () => { await Promise.all([planQuery.refetch(), versionQuery.refetch()]); };
+  const refreshSource = async () => { await Promise.all([planQuery.refetch(), versionQuery.refetch(), ...(appointmentWindow ? [appointmentQuery.refetch()] : [])]); };
   const mutation = useMutation({
     mutationFn: (body: ConfirmWorkoutScheduleBatchRequest) => workoutScheduleApi.confirmBatch(body),
     onSuccess: async () => {
@@ -95,6 +117,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
         setPending(null); setPreview(false); setConcealed(true);
         client.removeQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
         client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+        client.removeQueries({ queryKey: ['appointments', studentId] });
       } else if (status === 409 || status === 400) {
         setPending(null); setPreview(false); setStale(true);
         if (status === 409) setEntries([]);
@@ -119,6 +142,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
         weekNumber: entry.session.weekNumber, dayNumber: entry.session.dayNumber, sequenceNumber: entry.session.sequenceNumber,
         localStart: entry.localStart, localEnd: entry.localEnd,
         startUtcOffset: entry.startOffset, endUtcOffset: entry.endOffset,
+        ...(entry.appointmentId ? { appointmentId: entry.appointmentId } : {}),
       })),
     };
     setPending(body); submitting.current = true; setError(''); mutation.mutate(body);
@@ -129,7 +153,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
   };
 
   if (!allowed) return <WorkoutState title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để tự lên lịch tập." />;
-  if (concealed || [planQuery.error, versionQuery.error].some((reason) => reason instanceof ApiError && [403, 404].includes(reason.status)))
+  if (concealed || [planQuery.error, versionQuery.error, appointmentQuery.error].some((reason) => reason instanceof ApiError && [403, 404].includes(reason.status)))
     return <WorkoutState title="Không thể mở kế hoạch" message="Kế hoạch không còn khả dụng hoặc bạn không còn quyền xem." />;
   if (planQuery.isPending || (currentVersion && versionQuery.isPending)) return <WorkoutState busy title="Đang tải kế hoạch" message="Vui lòng chờ." />;
   if (planQuery.isError || versionQuery.isError) return <WorkoutState title="Không thể tải kế hoạch" message="Kiểm tra kết nối rồi thử lại." onRetry={refreshSource} />;
@@ -157,12 +181,12 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
       {sessions.length === 0 ? <WorkoutState title="Phiên bản chưa có buổi tập" message="Hãy xem lại nội dung kế hoạch." /> : null}
       {sessions.map((session) => {
         const selected = entries.find((entry) => entry.session.id === session.id);
-        const eligible = ['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement);
+        const eligible = ['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement);
         return <WorkoutCard key={session.id} testID={`source-session-${session.id}`}>
           <Text style={[styles.label, { color: theme.textPrimary }]}>{session.name} · Tuần {session.weekNumber}, ngày {session.dayNumber}, thứ tự {session.sequenceNumber}</Text>
           {suggestedSessionDate(anchor, session) ? <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày gợi ý: {suggestedSessionDate(anchor, session)}; bạn có thể chọn ngày khác trong cùng tuần.</Text> : null}
           {session.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {session.focus}</Text> : null}
-          {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>{session.supervisionRequirement === 'COACH_REQUIRED' ? 'Buổi này cần huấn luyện viên giám sát; flow đầu chưa hỗ trợ tự xác nhận lịch.' : 'Thiếu thông tin giám sát hợp lệ; không thể chọn.'}</Text> : null}
+          {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Thiếu thông tin giám sát hợp lệ; không thể chọn.</Text> : null}
           <WorkoutButton testID={`select-session-${session.id}`} label={selected ? 'Bỏ buổi này' : 'Chọn buổi này'} secondary={!selected} disabled={!eligible} onPress={() => selectSession(session)} />
           {selected ? <>
             <Text style={[styles.body, { color: theme.textSecondary }]}>Nhập rõ ngày giờ địa phương YYYY-MM-DDTHH:mm. Giờ kết thúc không suy từ thời lượng dự kiến.</Text>
@@ -181,6 +205,20 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
                   onPress={() => updateEntry(session.id, part === 'Start' ? { startOffset: option.offset } : { endOffset: option.offset })} />)}</View>
               </View>;
             })}
+            {session.supervisionRequirement === 'COACH_REQUIRED' ? <View>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Lịch hẹn huấn luyện đã xác nhận</Text>
+              <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn lịch hẹn thật bao trùm toàn bộ buổi tập. Máy chủ kiểm lại đúng Học viên, Huấn luyện viên, Coaching Period và khoảng thời gian khi xác nhận.</Text>
+              {appointmentQuery.isPending ? <WorkoutState busy title="Đang tải lịch hẹn" message="Vui lòng chờ." /> : null}
+              {appointmentQuery.isError ? <WorkoutState title="Không thể tải lịch hẹn" message={batchError(appointmentQuery.error)} onRetry={() => appointmentQuery.refetch()} /> : null}
+              {!appointmentQuery.isPending && !appointmentQuery.isError && !appointmentCandidates.length
+                ? <WorkoutState title="Chưa có lịch hẹn phù hợp" message="Tạo yêu cầu lịch hẹn và chờ bên còn lại xác nhận trước khi lên lịch buổi này." /> : null}
+              {appointmentCandidates.map(candidate => <WorkoutButton key={candidate.appointmentId} testID={`appointment-${candidate.appointmentId}`}
+                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${candidate.timezone}`}
+                secondary={selected.appointmentId !== candidate.appointmentId}
+                onPress={() => updateEntry(session.id, { appointmentId: candidate.appointmentId })} />)}
+              {appointmentQuery.hasNextPage ? <WorkoutButton label="Tải thêm lịch hẹn" secondary
+                busy={appointmentQuery.isFetchingNextPage} onPress={() => appointmentQuery.fetchNextPage()} /> : null}
+            </View> : null}
           </> : null}
         </WorkoutCard>;
       })}
@@ -189,7 +227,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
       {preview && !validation ? <WorkoutCard testID="batch-preview">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận cả đợt lịch</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.name} · Phiên bản {version?.versionNumber} · {timezone} · Tuần bắt đầu {anchor}</Text>
-        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}</Text>)}
+        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Đã chọn lịch hẹn xác nhận' : ''}</Text>)}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Máy chủ sẽ kiểm tra quyền, phiên bản và xung đột. Hoặc toàn bộ buổi được tạo, hoặc không buổi nào được tạo.</Text>
         <WorkoutButton testID="confirm-batch" label="Xác nhận tạo toàn bộ lịch" busy={mutation.isPending} disabled={mutation.isPending || stale} onPress={confirm} />
       </WorkoutCard> : null}

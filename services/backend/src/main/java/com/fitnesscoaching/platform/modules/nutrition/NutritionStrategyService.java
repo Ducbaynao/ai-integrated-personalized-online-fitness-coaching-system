@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.Auth
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +29,15 @@ public class NutritionStrategyService {
     private final NutritionTargetDayService days;
     private final CoachingAuthorityQuery coaching;
     private final MeasurementUnitReferenceQuery units;
+    private final LifecycleNotificationWriter notifications;
 
     public NutritionStrategyService(JdbcTemplate jdbc, NutritionStrategyCommands commands,
                                     NutritionTargetDayService days, CoachingAuthorityQuery coaching,
-                                    MeasurementUnitReferenceQuery units) {
+                                    MeasurementUnitReferenceQuery units,
+                                    LifecycleNotificationWriter notifications) {
         this.jdbc = jdbc; this.commands = commands; this.days = days; this.coaching = coaching;
         this.units = units;
+        this.notifications = notifications;
     }
 
     public record GoalType(int id, String code, String name) {}
@@ -184,6 +188,7 @@ public class NutritionStrategyService {
                             input.targets());
                     commands.audit(trainer, "TRAINER", "NUTRITION_STRATEGY_PROPOSED",
                             "NUTRITION_PROPOSAL", proposalId, Map.of("studentId", student.toString()));
+                    notice(proposalId, 0, "PENDING", student, trainer, authority.periodId(), trainer, student);
                     return presentProposal(proposalRow(proposalId));
                 });
     }
@@ -258,8 +263,18 @@ public class NutritionStrategyService {
                             student, decidedGoalId, decidedVersionId, proposalId, proposal.version());
                     commands.audit(student, "STUDENT", "NUTRITION_PROPOSAL_" + input.decision(),
                             "NUTRITION_PROPOSAL", proposalId, Map.of("decision", input.decision()));
+                    notice(proposalId, proposal.version() + 1,
+                            "ACCEPT".equals(input.decision()) ? "ACCEPTED" : "REJECTED",
+                            student, proposal.trainer(), proposal.period(), student, proposal.trainer());
                     return presentProposal(proposalRow(proposalId));
                 });
+    }
+
+    private void notice(UUID proposalId, long version, String transition, UUID student, UUID trainer,
+                        UUID period, UUID actor, UUID recipient) {
+        notifications.committed(LifecycleNotificationWriter.transitionId("NUTRITION_STRATEGY_PROPOSAL",
+                        proposalId, version, transition), "NUTRITION_STRATEGY_PROPOSAL_" + transition,
+                "NUTRITION_STRATEGY_PROPOSAL", proposalId, student, trainer, period, actor, recipient);
     }
 
     private Goal applyChange(UUID student, ChangeInput input, UUID sourceProposal) {

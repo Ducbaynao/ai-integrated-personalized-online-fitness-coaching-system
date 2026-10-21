@@ -14,6 +14,7 @@ import com.fitnesscoaching.platform.common.exception.DataSharingAccessLevelInsuf
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.*;
 import com.fitnesscoaching.platform.modules.goal.domain.ObjectivePriority;
 import com.fitnesscoaching.platform.modules.goal.domain.ProposalDecision;
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,6 +117,9 @@ class FitnessGoalProposalIntegrationTest {
 
     @Autowired
     private CoachingSharingUseCase coachingSharing;
+
+    @Autowired
+    private InAppNotificationService notifications;
 
     @MockitoSpyBean
     private AuditService auditService;
@@ -331,6 +335,8 @@ class FitnessGoalProposalIntegrationTest {
 
         Map<String, Object> prop1 = objectMapper.readValue(create1Result.getResponse().getContentAsString(), Map.class);
         UUID proposal1Id = UUID.fromString((String) prop1.get("id"));
+        assertThat(notifications.list(studentId, 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("FITNESS_GOAL_PROPOSAL_PENDING"));
 
         // Verify active goal in DB remains untouched
         String goalTitle = jdbcTemplate.queryForObject("SELECT title FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
@@ -384,6 +390,8 @@ class FitnessGoalProposalIntegrationTest {
         // Verify proposal 1 status in DB and goal remains untouched
         String prop1DbStatus = jdbcTemplate.queryForObject("SELECT status::text FROM fitness.goal_proposals WHERE id = ?", String.class, proposal1Id);
         assertThat(prop1DbStatus).isEqualTo("REJECTED");
+        assertThat(notifications.list(trainerId, 0, 20).items())
+                .anySatisfy(item -> assertThat(item.eventType()).isEqualTo("FITNESS_GOAL_PROPOSAL_REJECTED"));
 
         Integer vCountAfterReject = jdbcTemplate.queryForObject("SELECT count(*) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ?", Integer.class, goalId);
         assertThat(vCountAfterReject).isEqualTo(1);

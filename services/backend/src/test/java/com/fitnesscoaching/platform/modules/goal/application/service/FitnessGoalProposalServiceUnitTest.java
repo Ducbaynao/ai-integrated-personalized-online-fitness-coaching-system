@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.goal.application.service;
 import com.fitnesscoaching.platform.common.exception.*;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalProposalPage;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalTransitionResult;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.*;
@@ -11,6 +12,7 @@ import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalPropos
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalStudentAuthorityPort;
 import com.fitnesscoaching.platform.modules.goal.application.port.out.GoalTrainerAuthorityPort;
 import com.fitnesscoaching.platform.modules.goal.domain.*;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,12 @@ class FitnessGoalProposalServiceUnitTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private CurrentCoachingContextQuery currentCoachingContextQuery;
+
+    @Mock
+    private LifecycleNotificationWriter lifecycleNotificationWriter;
+
     private FitnessGoalProposalService service;
 
     private UUID studentId;
@@ -71,7 +79,9 @@ class FitnessGoalProposalServiceUnitTest {
                 trainerAuthorityPort,
                 goalPort,
                 validationHelper,
-                auditService
+                auditService,
+                currentCoachingContextQuery,
+                lifecycleNotificationWriter
         );
 
         studentId = UUID.randomUUID();

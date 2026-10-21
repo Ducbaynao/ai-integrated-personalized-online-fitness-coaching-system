@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.common.exception.StudentCapabilityUnavailabl
 import com.fitnesscoaching.platform.common.exception.TrainerCapabilityUnavailableException;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.CoachingFailure;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
@@ -42,14 +43,17 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final LifecycleNotificationWriter notifications;
 
     public CoachingLifecycleService(CoachingStore store, UserAccountStatusQuery accounts, UserRoleQuery roles,
                                     StudentCapabilityQuery students, TrainerCoachingEligibilityQuery trainers,
                                     TrainerAvailabilityQuery availability, AuditService audit,
-                                    ObjectMapper mapper, Clock clock) {
+                                    ObjectMapper mapper, Clock clock,
+                                    LifecycleNotificationWriter notifications) {
         this.store = store; this.accounts = accounts; this.roles = roles; this.students = students;
         this.trainers = trainers; this.availability = availability; this.audit = audit;
         this.mapper = mapper; this.clock = clock;
+        this.notifications = notifications;
     }
 
     @Override @Transactional
@@ -80,6 +84,7 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
             Instant at = Instant.now(clock);
             Relationship rel = store.create(studentId, trainerId, actor, at);
             audit(actor, rel, command, null, "PENDING", at);
+            noticeRelationship(rel, "PENDING", actor, rel.counterparty(actor));
             return new Outcome(rel, null, null);
         }));
     }
@@ -149,6 +154,9 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
                 }
             }
             audit(actor, updated, command, current.status(), next, at);
+            if (List.of("ACCEPT", "REJECT", "CANCEL").contains(action))
+                noticeRelationship(updated, "CANCEL".equals(action) ? "WITHDRAWN" : next,
+                        actor, "CANCEL".equals(action) ? current.counterparty(actor) : current.requestedBy());
             return new Outcome(updated, null, null);
         }));
     }
@@ -172,6 +180,7 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
             Instant at = Instant.now(clock);
             Resume request = store.createResume(id, actor, normalized(reason), at);
             auditResume(actor, current, request, "RESUME_REQUEST", "NONE", "PENDING", at);
+            noticeResume(current, request, "PENDING", actor, current.counterparty(actor));
             return new Outcome(current, request, null);
         }));
     }
@@ -227,6 +236,8 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
                     }
                     audit(actor, updated, "RESUME_" + action, "PAUSED", updated.status(), at);
                     auditResume(actor, updated, decided, "RESUME_" + action, "PENDING", next, at);
+                    noticeResume(updated, decided, "CANCEL".equals(action) ? "WITHDRAWN" : next,
+                            actor, "CANCEL".equals(action) ? current.counterparty(actor) : request.requestedBy());
                     return new Outcome(updated, decided, null);
                 }));
     }
@@ -362,6 +373,21 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
         if (reason != null && reason.length() > 500) { throw failure(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED"); }
     }
     private static CoachingFailure failure(HttpStatus status, String code) { return new CoachingFailure(status, code); }
+
+    private void noticeRelationship(Relationship relationship, String transition, UUID actor, UUID recipient) {
+        notifications.committed(LifecycleNotificationWriter.transitionId("COACHING_REQUEST",
+                        relationship.id(), relationship.version(), transition),
+                "COACHING_REQUEST_" + transition, "COACHING_REQUEST", relationship.id(),
+                relationship.studentId(), relationship.trainerId(), null, actor, recipient);
+    }
+
+    private void noticeResume(Relationship relationship, Resume resume, String transition,
+                              UUID actor, UUID recipient) {
+        notifications.committed(LifecycleNotificationWriter.transitionId("COACHING_RESUME_REQUEST",
+                        resume.id(), resume.version(), transition),
+                "COACHING_RESUME_REQUEST_" + transition, "COACHING_RESUME_REQUEST", resume.id(),
+                relationship.studentId(), relationship.trainerId(), null, actor, recipient);
+    }
 
     private Instant closeIfSelfDirected(Period old, Instant at) {
         if (old == null) { return at; } // No fabricated pre-feature history.

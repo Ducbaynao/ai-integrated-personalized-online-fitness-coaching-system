@@ -1,5 +1,28 @@
 # B08 Chat and In-App Notification — approved first slice
 
+## 2026-10-20 — Lifecycle in-app notification extension (APPROVED)
+
+Person B approved in-app notifications for committed proposal, Appointment and coaching-request domain facts. The actor who performed an action never receives that action's notification. A notification is deduplicated by source event, recipient and event type; its preview is generic and contains no sensitive detail. A deep link must recheck current object authority. Notification persistence must share the source transaction or a reliable transactional outbox; realtime invalidation is emitted only after commit. This **extends** first-slice decision 6 below, which excluded non-message events at the time. The extension is product policy, not a claim that V43, `InAppNotificationService`, OpenAPI or Mobile already supports these events.
+
+Producer inventory on merged main: Coaching relationship request/invitation and resume-request commands; Goal-owned Fitness Goal proposal; Schedule-owned Trainer schedule-batch proposal and single-occurrence change proposal; Nutrition-owned Strategy proposal. This worktree adds the B06 Coaching Appointment producer. No separate executable B04 Workout Plan proposal producer was found; publishing a plan is not reclassified as a proposal. The exact committed transitions and recipients are in the matrix below. Existing `CHAT_MESSAGE` notification semantics and Student/Trainer Chat authority remain unchanged.
+
+### 2026-10-20 committed-event matrix (APPROVED)
+
+| Producer | Committed transition | Recipient |
+| --- | --- | --- |
+| Coaching relationship request/invitation and resume request | New pending request | The counterparty who must decide |
+| Coaching relationship or resume decision | ACCEPT or REJECT | The party who requested or invited |
+| Fitness Goal, B06 schedule-batch, B06 occurrence-change and B07 Nutrition Strategy proposal | New PENDING proposal | The party who must decide |
+| Those proposals | ACCEPT or REJECT | The proposing party |
+| Those proposal types that support WITHDRAW | WITHDRAW | The former deciding party, only while they still have read authority |
+| Coaching Appointment request or Appointment reschedule request | New pending request | The party who must decide |
+| Appointment or reschedule-request decision | ACCEPT or REJECT | The requesting party |
+| Valid Appointment cancellation | CANCEL | The other party |
+
+Do not emit on idempotent replay or to the acting user. Every recipient must be authorized at the source commit boundary; inbox reads and deep links recheck current object authority, and a former Trainer cannot inspect old live notifications. Preview text cannot contain message/proposal content, reasons, plan/health data or other sensitive detail. Deduplicate by immutable event identity, recipient and event type. Only an after-commit realtime **invalidation** may be broadcast. This matrix is approved policy. Producer hooks and mixed inbox filtering are implemented locally in this worktree but remain unmerged and subject to integration gates and independent review. A producer without a WITHDRAW transition does not gain one merely for notification symmetry. B04 Workout Plan publish is not a proposal event.
+
+The initial mixed-event inbox YAML review draft was superseded and is excluded from the PR; `contracts/openapi/openapi.yaml` is the executable contract. The executable OpenAPI and runtime extension are local to this worktree. V45 proposes event identity/dedupe storage for A01 review. Lifecycle notices are inserted in the source transaction and inbox reads recheck authority. Passing tests and A01 review are still required before this can be treated as merged behavior.
+
 **Decision status:** APPROVED by Person B on 2026-10-17. This record defines product policy; it does not claim the OpenAPI contract, Flyway migration, backend, Mobile, delivery service, or tests are already implemented. M7 remains broader than this slice.
 
 1. A Coaching Period has at most one direct conversation between exactly that period's Student and Trainer. The first message creates it; a later period uses a new conversation. No messaging outside the relationship.

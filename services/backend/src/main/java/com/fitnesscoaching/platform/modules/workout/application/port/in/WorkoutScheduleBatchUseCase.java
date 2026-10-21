@@ -23,7 +23,14 @@ public interface WorkoutScheduleBatchUseCase {
                         String timezone, List<Item> items, String commandKey) {}
     record Item(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
                 int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
-                String startUtcOffset, String endUtcOffset) {}
+                String startUtcOffset, String endUtcOffset, UUID appointmentId) {
+        public Item(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
+                    int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
+                    String startUtcOffset, String endUtcOffset) {
+            this(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
+                    localStart, localEnd, startUtcOffset, endUtcOffset, null);
+        }
+    }
     record ConfirmedItem(UUID clientItemId, UUID occurrenceId, long occurrenceVersion,
                          UUID planSessionId, int weekNumber, int dayNumber, int sequenceNumber,
                          LocalDateTime localStart, LocalDateTime localEnd,

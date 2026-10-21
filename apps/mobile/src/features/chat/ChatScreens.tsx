@@ -168,11 +168,27 @@ export function NotificationsScreen() {
     <CoachingButton label="Mở tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
     {query.isPending ? <CoachingState busy title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
     {query.isError ? <CoachingState title="Không thể tải thông báo" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
-    {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có thông báo" message="Tin nhắn mới sẽ xuất hiện ở đây." /> : null}
+    {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có thông báo" message="Tin nhắn và cập nhật lịch hẹn sẽ xuất hiện ở đây." /> : null}
     {!query.isError && rows.map(item => <CoachingCard key={item.id}>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.title}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.body}</Text>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
+      {item.relatedEntityType === 'APPOINTMENT_REQUEST' && item.relatedEntityId
+        ? <CoachingButton label="Xem yêu cầu lịch hẹn" secondary onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}
+      {item.relatedEntityType === 'APPOINTMENT' && item.relatedEntityId
+        ? <CoachingButton label="Xem lịch hẹn" secondary onPress={() => router.push(`/appointments/${item.relatedEntityId}` as never)} /> : null}
+      {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_SCHEDULE_PROPOSAL' && item.relatedEntityId
+        ? <CoachingButton label="Xem đề xuất lịch tập" secondary onPress={() => router.push(`/workout-schedule-proposals/${item.relatedEntityId}` as never)} /> : null}
+      {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_CHANGE_PROPOSAL' && item.relatedEntityId
+        ? <CoachingButton label="Xem đề xuất đổi lịch tập" secondary onPress={() => router.push(`/workout-change-proposals/${item.relatedEntityId}` as never)} /> : null}
+      {role === 'STUDENT' && item.relatedEntityType === 'NUTRITION_STRATEGY_PROPOSAL'
+        ? <CoachingButton label="Xem đề xuất dinh dưỡng" secondary onPress={() => router.push('/nutrition/strategy' as never)} /> : null}
+      {role === 'STUDENT' && item.relatedEntityType === 'FITNESS_GOAL_PROPOSAL' && item.relatedEntityId
+        ? <CoachingButton label="Xem đề xuất mục tiêu" secondary onPress={() => router.push(`/goal-proposals/${item.relatedEntityId}` as never)} /> : null}
+      {item.relatedEntityType === 'COACHING_REQUEST' && item.relatedEntityId
+        ? <CoachingButton label="Xem yêu cầu huấn luyện" secondary onPress={() => router.push(`/coaching/${item.relatedEntityId}` as never)} /> : null}
+      {item.relatedEntityType === 'COACHING_RESUME_REQUEST'
+        ? <CoachingButton label="Xem quan hệ huấn luyện" secondary onPress={() => router.push('/coaching' as never)} /> : null}
       {!item.readAt ? <CoachingButton label="Đánh dấu thông báo đã đọc" secondary onPress={() => read.mutate(item.id)} /> : null}
     </CoachingCard>)}
     {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary onPress={() => query.fetchNextPage()} /> : null}

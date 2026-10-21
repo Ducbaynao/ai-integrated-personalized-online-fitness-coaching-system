@@ -8,6 +8,7 @@ export interface DirectBatchEntry {
   localEnd: string;
   startOffset: string;
   endOffset: string;
+  appointmentId?: string;
 }
 
 const DAY = 86_400_000;
@@ -26,8 +27,12 @@ export function validateDirectBatch(anchor: string, timezone: string, entries: D
     const { session } = entry;
     if (sessions.has(session.id)) return 'Một buổi chỉ được chọn một lần trong cùng đợt lịch.';
     sessions.add(session.id);
-    if (!['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement))
+    if (session.supervisionRequirement === 'COACH_REQUIRED' && !entry.appointmentId)
+      return `Buổi ${session.name} cần chọn lịch hẹn huấn luyện đã xác nhận.`;
+    if (!['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement))
       return `Buổi ${session.name} chưa được hỗ trợ để tự lên lịch.`;
+    if (session.supervisionRequirement !== 'COACH_REQUIRED' && entry.appointmentId)
+      return `Buổi ${session.name} không cần liên kết lịch hẹn huấn luyện.`;
     if (!isInSessionWeek(anchor, session.weekNumber, entry.localStart))
       return `Ngày bắt đầu của ${session.name} phải nằm trong tuần ${session.weekNumber} tính từ thứ Hai đã chọn.`;
     const start = validProposalOffsets(timezone, entry.localStart).find((choice) => choice.offset === entry.startOffset);

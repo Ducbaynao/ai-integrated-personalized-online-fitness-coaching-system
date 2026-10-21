@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.modules.schedule.application.service;
 
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
@@ -38,12 +39,14 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
     private final UserAccountStatusQuery accounts;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final LifecycleNotificationWriter notifications;
 
     public ScheduleProposalService(ScheduleProposalStore store, WorkoutScheduleBatchUseCase workout,
                                    CoachingAuthorityQuery coaching, StudentCapabilityQuery students,
-                                   UserAccountStatusQuery accounts, AuditService audit, ObjectMapper mapper) {
+                                   UserAccountStatusQuery accounts, AuditService audit, ObjectMapper mapper,
+                                   LifecycleNotificationWriter notifications) {
         this.store = store; this.workout = workout; this.coaching = coaching; this.students = students;
-        this.accounts = accounts; this.audit = audit; this.mapper = mapper;
+        this.accounts = accounts; this.audit = audit; this.mapper = mapper; this.notifications = notifications;
     }
 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -71,6 +74,7 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
                 null, null, null, null, null);
         store.save(proposal, c.commandKey());
         recordAudit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_PROPOSAL_CREATED", proposal.proposalId(), at);
+        notice(proposal, "PENDING", c.trainerId(), c.studentId());
         CommandResult result = new CommandResult(proposal, false);
         store.saveReceipt(c.trainerId(), c.commandKey(), "PROPOSE", hash, proposal.proposalId(),
                 null, json(result), at);
@@ -129,6 +133,7 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
         Proposal changed = transitioned(locked, "WITHDRAWN", null, null, null, at, c.trainerId());
         store.transition(changed, "PENDING", c.trainerId(), c.commandKey(), at, null);
         recordAudit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_PROPOSAL_WITHDRAWN", locked.proposalId(), at);
+        notice(changed, "WITHDRAWN", c.trainerId(), changed.studentId());
         CommandResult result = new CommandResult(changed, false);
         store.saveReceipt(c.trainerId(), c.commandKey(), "WITHDRAW", hash, locked.proposalId(),
                 null, json(result), at);
@@ -170,6 +175,7 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
                 batch == null ? null : batch.batchId());
         recordAudit(c.studentId(), "STUDENT", "WORKOUT_SCHEDULE_PROPOSAL_" + changed.status(),
                 locked.proposalId(), at);
+        notice(changed, changed.status(), c.studentId(), changed.trainerId());
         DecisionResult result = new DecisionResult(changed, batch, false);
         store.saveReceipt(c.studentId(), c.commandKey(), "DECIDE", hash, locked.proposalId(),
                 batch == null ? null : batch.batchId(), json(result), at);
@@ -212,6 +218,13 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
         audit.recordAudit(AuditRecord.builder().actorUserId(actor).actorRole(role).action(action)
                 .targetType("WORKOUT_SCHEDULE_PROPOSAL").targetId(target)
                 .beforeDataJson("{}").afterDataJson("{}").occurredAt(at).build());
+    }
+    private void notice(Proposal proposal, String transition, UUID actor, UUID recipient) {
+        notifications.committed(LifecycleNotificationWriter.transitionId("WORKOUT_SCHEDULE_PROPOSAL",
+                        proposal.proposalId(), proposal.proposalVersion(), transition),
+                "WORKOUT_SCHEDULE_PROPOSAL_" + transition, "WORKOUT_SCHEDULE_PROPOSAL",
+                proposal.proposalId(), proposal.studentId(), proposal.trainerId(),
+                proposal.coachingPeriodId(), actor, recipient);
     }
     private static String key(String value) {
         if (value == null || value.isBlank() || value.length() > 120)

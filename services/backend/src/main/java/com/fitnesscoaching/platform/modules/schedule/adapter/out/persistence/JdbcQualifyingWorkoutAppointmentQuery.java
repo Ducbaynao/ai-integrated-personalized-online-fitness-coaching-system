@@ -14,18 +14,35 @@ public class JdbcQualifyingWorkoutAppointmentQuery implements QualifyingWorkoutA
 
     @Override public boolean existsForOccurrence(UUID occurrenceId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
-                SELECT EXISTS (SELECT 1 FROM fitness.appointments
-                WHERE planned_workout_id=? AND trainer_id IS NOT NULL
-                  AND status IN ('CONFIRMED', 'COMPLETED'))
+                SELECT EXISTS (
+                  SELECT 1 FROM fitness.appointments a
+                  JOIN fitness.planned_workouts p ON p.id=a.planned_workout_id
+                  JOIN fitness.coaching_periods cp ON cp.id=a.coaching_period_id
+                  WHERE p.id=? AND a.status='CONFIRMED'
+                    AND a.student_id=p.student_id AND a.student_id=cp.student_id
+                    AND a.trainer_id=cp.trainer_id AND p.coaching_period_id=cp.id
+                    AND cp.mode='HUMAN_COACH' AND cp.started_at<=clock_timestamp()
+                    AND (cp.ended_at IS NULL OR cp.ended_at>clock_timestamp())
+                    AND p.planned_end_at IS NOT NULL
+                    AND a.start_at<=p.planned_start_at AND a.end_at>=p.planned_end_at
+                    AND clock_timestamp()>=a.start_at AND clock_timestamp()<a.end_at)
                 """, Boolean.class, occurrenceId));
     }
 
     @Override public boolean lockForExecution(UUID occurrenceId) {
         return !jdbc.query("""
-                SELECT id FROM fitness.appointments
-                WHERE planned_workout_id=? AND trainer_id IS NOT NULL
-                  AND status IN ('CONFIRMED', 'COMPLETED')
-                ORDER BY id LIMIT 1 FOR SHARE
+                SELECT a.id FROM fitness.appointments a
+                JOIN fitness.planned_workouts p ON p.id=a.planned_workout_id
+                JOIN fitness.coaching_periods cp ON cp.id=a.coaching_period_id
+                WHERE p.id=? AND a.status='CONFIRMED'
+                  AND a.student_id=p.student_id AND a.student_id=cp.student_id
+                  AND a.trainer_id=cp.trainer_id AND p.coaching_period_id=cp.id
+                  AND cp.mode='HUMAN_COACH' AND cp.started_at<=clock_timestamp()
+                  AND (cp.ended_at IS NULL OR cp.ended_at>clock_timestamp())
+                  AND p.planned_end_at IS NOT NULL
+                  AND a.start_at<=p.planned_start_at AND a.end_at>=p.planned_end_at
+                  AND clock_timestamp()>=a.start_at AND clock_timestamp()<a.end_at
+                ORDER BY a.id LIMIT 1 FOR SHARE OF a
                 """, (rs, row) -> rs.getObject(1, UUID.class), occurrenceId).isEmpty();
     }
 }

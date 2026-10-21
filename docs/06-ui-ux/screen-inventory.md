@@ -32,9 +32,9 @@
 | ST-15 | Nutrition Goal and Proposal | Route `/(app)/nutrition/strategy`: Student NEW_GOAL/CHANGE_TARGET with explicit effective date/timezone, target versions, pause/resume/end, Trainer proposal ACCEPT/REJECT, day-type preview/selection and version-bound override. Frozen nutrient/day correction shows original/current target and append-only reason/actor history; comparison uses corrected target, not altered actual. 409 requires review again. |
 | ST-16 | AI Recommendation Detail | Evidence, missing data, authority-aware action |
 | ST-17 | Coaching Profile | Route `/(app)/coaching`; relationship lifecycle, current period, history list, and Student-owned sharing permission management |
-| ST-18 | Reschedule Request | Conflict, accept/reject, workout independence |
+| ST-18 | Appointment request and reschedule | Local candidate routes `/(app)/appointments`, `/new`, `/requests/[requestId]`, `/[appointmentId]` and `/[appointmentId]/reschedule`; explicit timezone/offset, bilateral decision, reasoned cancel and separate Planned Workout lifecycle. Backend remains authority for interval, version and current Coaching Period. |
 | ST-19 | Chat | `/(app)/chat`, `/(app)/chat/[conversationId]`, `/(app)/chat/new`: one text conversation per HUMAN_COACH period, Student reads own prior periods; recipient explicitly acknowledges DELIVERED/READ. Trainer sees only current authorized period. REST is authoritative and WebSocket only invalidates. |
-| ST-20 | Notification Center | `/(app)/notifications`: in-app message notice with generic preview only, explicit read, pagination. No push/email, quiet-hours or preferences in B08 first slice. |
+| ST-20 | Notification Center | `/(app)/notifications`: mixed Chat and local-candidate lifecycle notices with generic preview only, explicit read, pagination and authority-checked deep links. No push/email, quiet-hours or preferences. |
 | ST-21 | Exercise Library | Browse, search/filter active Exercise catalog |
 | ST-22 | Exercise Detail | Route `/(app)/exercises/[exerciseId]`; instructions, muscle, equipment, variation and media state |
 | ST-23 | Review and Attention | `/(app)/attention`: Student explicitly confirms an IANA timezone for human-period review cycles, reads own review tasks and rule signals across periods, acknowledges a completed review, and reads signal history. Missing evidence is not zero. |
@@ -53,7 +53,7 @@ Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, 
 | TR-06 | Goal Proposal Builder | Trainer proposes; Student decides |
 | TR-07 | Nutrition Proposal Builder | Route `/(app)/coaching/[relationshipId]/nutrition-strategy`: current NUTRITION_GOAL VIEW read; CONTRIBUTE+ proposal only, Student publishes |
 | TR-08 | Coaching Review | Same period-scoped route: Trainer completes an OPEN 14-day review task with summary, evidence references and explicitly missing/unknown data; Student acknowledgment is separate and optional. Review does not mutate strategy. |
-| TR-09 | Trainer Schedule | Appointment, availability, conflict |
+| TR-09 | Trainer Schedule | Same local-candidate Appointment routes as Student, opened from the current Student relationship; create/request/decision/cancel remain backend-authorized, with no implicit Planned Workout mutation or automatic recurrence. |
 | TR-10 | Reschedule Request | Từ TR-03/Trainer calendar mở `/(app)/coaching/[relationshipId]/change-proposals`: Trainer VIEW+ xem proposal đổi/hủy một occurrence do chính mình tạo, lọc/trang/detail; CONTRIBUTE+ chọn occurrence thật, gửi RESCHEDULE với IANA timezone/local start-end/UTC offsets rõ ràng hoặc CANCEL với lý do tùy chọn, và rút PENDING bằng proposalVersion thật. Backend recheck quyền, seal, Appointment, thời gian và xung đột; Student ACCEPT/REJECT trên Mobile thuộc checkpoint tiếp theo. |
 | TR-11 | AI Insight Review | Accept/modify/reject for Trainer workflow |
 | TR-12 | Student Data Permission | Route `/(app)/coaching/[relationshipId]/sharing`; authoritative allowed/denied/expired/revoked/not-configured states and VIEW/CONTRIBUTE/MANAGE levels |

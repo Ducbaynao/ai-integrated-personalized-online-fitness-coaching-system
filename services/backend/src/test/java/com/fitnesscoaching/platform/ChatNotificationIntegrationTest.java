@@ -135,8 +135,9 @@ class ChatNotificationIntegrationTest {
                 .isInstanceOf(ChatFailure.class).hasMessage("CHAT_IDEMPOTENCY_CONFLICT");
         assertThat(chat.conversations(student, 0, 20).items()).hasSize(1);
         assertThat(chat.conversations(trainer, 0, 20).items()).hasSize(1);
-        assertThat(notifications.list(trainer, 0, 20).items()).hasSize(1);
-        assertThat(notifications.list(trainer, 0, 20).items().getFirst().body()).isEqualTo("Bạn có tin nhắn mới");
+        assertThat(notifications.list(trainer, 0, 20).items())
+                .filteredOn(item -> item.eventType().equals("CHAT_MESSAGE"))
+                .singleElement().satisfies(item -> assertThat(item.body()).isEqualTo("Bạn có tin nhắn mới"));
         assertThat(chat.acknowledge(trainer, sent.id(), "DELIVERED").status()).isEqualTo("DELIVERED");
         assertThat(chat.acknowledge(trainer, sent.id(), "READ").status()).isEqualTo("READ");
         assertThat(chat.acknowledge(trainer, sent.id(), "DELIVERED").status()).isEqualTo("READ");

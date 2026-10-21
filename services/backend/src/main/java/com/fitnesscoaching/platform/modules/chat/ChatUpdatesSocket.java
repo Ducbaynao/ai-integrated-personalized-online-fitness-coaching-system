@@ -1,5 +1,7 @@
 package com.fitnesscoaching.platform.modules.chat;
 
+import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -19,12 +21,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class ChatUpdatesSocket extends TextWebSocketHandler {
     private final ChatService chat;
+    private final InAppNotificationService notifications;
     private final ObjectMapper mapper;
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, UUID> subscriptions = new ConcurrentHashMap<>();
     private final Set<String> inboxSubscriptions = ConcurrentHashMap.newKeySet();
 
-    public ChatUpdatesSocket(ChatService chat, ObjectMapper mapper) { this.chat = chat; this.mapper = mapper; }
+    public ChatUpdatesSocket(ChatService chat, InAppNotificationService notifications, ObjectMapper mapper) {
+        this.chat = chat; this.notifications = notifications; this.mapper = mapper;
+    }
 
     @Override public void afterConnectionEstablished(WebSocketSession session) { sessions.put(session.getId(), session); }
     @Override public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
@@ -67,6 +72,26 @@ public class ChatUpdatesSocket extends TextWebSocketHandler {
                             + changed.conversationId() + "\"}"));
                 }
             } catch (ChatFailure | IOException unavailable) {
+                subscriptions.remove(entry.getKey());
+                inboxSubscriptions.remove(entry.getKey());
+                try { session.close(CloseStatus.POLICY_VIOLATION); } catch (IOException ignored) { }
+            }
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void lifecycleChanged(LifecycleNotificationWriter.Changed changed) {
+        for (var entry : sessions.entrySet()) {
+            if (!inboxSubscriptions.contains(entry.getKey())) continue;
+            WebSocketSession session = entry.getValue();
+            UUID actor = (UUID) session.getAttributes().get("actor");
+            if (!session.isOpen() || !changed.recipient().equals(actor)) continue;
+            try {
+                if (!notifications.canReadNotice(actor, changed.notificationId())) continue;
+                synchronized (session) {
+                    if (session.isOpen()) session.sendMessage(new TextMessage("{\"type\":\"INBOX_UPDATED\"}"));
+                }
+            } catch (RuntimeException | IOException unavailable) {
                 subscriptions.remove(entry.getKey());
                 inboxSubscriptions.remove(entry.getKey());
                 try { session.close(CloseStatus.POLICY_VIOLATION); } catch (IOException ignored) { }

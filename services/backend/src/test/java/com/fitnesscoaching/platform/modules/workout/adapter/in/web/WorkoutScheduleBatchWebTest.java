@@ -35,7 +35,7 @@ class WorkoutScheduleBatchWebTest {
         var controller = new WorkoutScheduleBatchController(command);
         var request = new WorkoutScheduleBatchController.Request(plan, version, 7L, monday,
                 "Asia/Ho_Chi_Minh", List.of(new WorkoutScheduleBatchController.InputItem(itemId, session,
-                1, 1, 1, local, local.plusHours(1), "+07:00", "+07:00")), "stable-key");
+                1, 1, 1, local, local.plusHours(1), "+07:00", "+07:00", null)), "stable-key");
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject(student.toString()).build();
         var response = controller.confirm(jwt, request);
         assertThat(response.getStatusCode().value()).isEqualTo(201);
