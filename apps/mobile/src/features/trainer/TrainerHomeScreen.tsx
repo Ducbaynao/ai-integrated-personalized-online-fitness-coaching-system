@@ -159,6 +159,23 @@ export function TrainerHomeScreen() {
         </Pressable>
       </View>
 
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+        ]}>
+        <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Kiến thức thể hình (AI)</Text>
+        <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>Tra cứu nguyên tắc tập luyện, phục hồi và kỹ thuật từ kho tri thức đã kiểm định.</Text>
+        <Pressable
+          testID="trainer-view-ai-knowledge-button"
+          accessibilityRole="button"
+          accessibilityLabel="Tra cứu kiến thức thể hình AI"
+          onPress={() => router.push('/ai-knowledge' as any)}
+          style={[styles.secondaryButton, { borderColor: themeColors.primary }]}>
+          <Text style={[styles.secondaryButtonText, { color: themeColors.primary }]}>Tra cứu kiến thức thể hình</Text>
+        </Pressable>
+      </View>
+
       {/* Cross-activation Card (Trainer -> Student) */}
       {canCrossActivateStudent && (
         <View
