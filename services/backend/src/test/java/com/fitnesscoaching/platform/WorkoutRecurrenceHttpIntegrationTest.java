@@ -327,6 +327,34 @@ class WorkoutRecurrenceHttpIntegrationTest {
                 Boolean.class, legacy)).isTrue();
     }
 
+    @Test void finiteLegacyOverlapSkipsPeriodOutsideV46PartialExclusion() {
+        Fixture f = fixture();
+        UUID legacy = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,planned_start_at,planned_end_at,original_planned_start_at,created_by)
+                VALUES (?,?,?,?,?,?)
+                """, legacy, f.student(),
+                java.sql.Timestamp.from(anchor().atTime(10, 30).toInstant(ZoneOffset.UTC)),
+                java.sql.Timestamp.from(anchor().atTime(11, 30).toInstant(ZoneOffset.UTC)),
+                java.sql.Timestamp.from(anchor().atTime(10, 30).toInstant(ZoneOffset.UTC)), f.student());
+        var series = recurrence.confirmStudent(new Create(f.student(), f.student(), f.plan(), f.version(), 1,
+                anchor(), "Etc/UTC", List.of(new Item(f.session(), 1, 1, 1,
+                anchor().atTime(10, 0), anchor().atTime(11, 0))), "legacy-overlap-" + UUID.randomUUID()));
+
+        recurrence.materialize(series.seriesId());
+
+        assertThat(jdbc.queryForObject("SELECT outcome FROM fitness.workout_recurrence_periods "
+                + "WHERE series_id=?", String.class, series.seriesId())).isEqualTo("SKIPPED_OVERLAP");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts "
+                + "WHERE series_period_id IS NOT NULL AND student_id=?", Integer.class, f.student())).isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?",
+                String.class, legacy)).isEqualTo("SCHEDULED");
+        recurrence.materialize(series.seriesId());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_recurrence_periods "
+                + "WHERE series_id=?", Integer.class, series.seriesId())).isOne();
+    }
+
     @Test void pausedPlanDoesNotGenerateAndTerminalOccurrenceIsNeverRecreated() {
         Fixture f = fixture();
         var series = recurrence.confirmStudent(new Create(f.student(), f.student(), f.plan(), f.version(), 1,

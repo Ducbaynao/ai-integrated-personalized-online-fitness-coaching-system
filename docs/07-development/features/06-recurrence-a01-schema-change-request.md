@@ -1,6 +1,6 @@
 # A01 schema review request — B06 automatic Planned Workout recurrence
 
-Status: **V46 candidate in local B06 worktree; independent A01 review required before merge.** This is not the V5 Appointment recurrence table and does not alter V5/V31–V45 migration history.
+Status: **V46 merged in PR #102; independent Person A/A01 sign-off is not verified and remains a post-merge schema-review gate.** Merge-commit CI and Testcontainers checks do not substitute for that review. This is not the V5 Appointment recurrence table and does not alter V5/V31–V45 migration history.
 
 ## Proposed forward DDL
 
@@ -16,8 +16,16 @@ Student/Trainer command: Student row → actor/current Coaching authority → ac
 
 V46 is additive. Existing `planned_workouts.series_period_id` is null, no legacy intent or UTC end is guessed, and legacy V5 recurring Appointment rows remain untouched. Series and item tables are new, so no series-item version backfill is required. The new unique constraint on existing `workout_plan_sessions` uses its existing primary key plus non-null version ID; the FK from that column already exists. Clean-install and upgrade integration tests verify legacy nullable rows and the composite FKs; the HTTP/PostgreSQL test attempts both mismatched series-version and session-version inserts. Production upgrade should report existing duplicate or overlapping legacy rows separately, not silently delete or backfill them. A01 should check index build/lock impact and any existing orphan plan/session data before approval.
 
-## Required test evidence before merge
+## Migration and race evidence for post-merge A01 review
 
 Run V46 clean-install and V45→V46 upgrade on disposable PostgreSQL/pgvector; HTTP owner/concealment/replay; simultaneous jobs and competing direct batch/change writers; DST gap/ambiguous outcomes; unknown-end and overlap with legacy; plan pause/version change; changed/cancelled occurrence non-recreation; and full backend/contract/Mobile gates. A01 review concerns DDL and upgrade safety; it is distinct from Antigravity code review and CI.
 
-The focused PostgreSQL race test now holds the winner's transaction open and observes the losing writer in `pg_stat_activity`/`pg_blocking_pids` before release. It covers job→Student direct batch, batch→job, job→Student direct reschedule, and reschedule→job. The Student row is the common first lock; period identity and V46 source-instant/exclusion constraints backstop the transactional duplicate/overlap checks. The assertions cover one resulting instant, the period outcome, command receipt commit/rollback, terminal predecessor and rerun non-recreation. A01 should review that this lock order remains shared by all production Workout writers; these four races do not substitute for a production-data audit or HTTP/device end-to-end verification.
+The focused PostgreSQL race test holds the winner's transaction open and observes the losing writer in `pg_stat_activity`/`pg_blocking_pids` before release. It covers job→Student direct batch, batch→job, job→Student direct reschedule, and reschedule→job. The Student row is the common first lock; period identity and V46 source-instant/exclusion constraints backstop the transactional duplicate/overlap checks. The assertions cover one resulting instant, the period outcome, command receipt commit/rollback, terminal predecessor and rerun non-recreation. Post-merge Testcontainers verification on `origin/main@b18e752` passed 49/49 focused V46, recurrence, batch, Appointment and Chat/notification tests; a subsequent focused V46/recurrence rerun passed 13/13, including a new test proving a finite-end legacy overlap yields `SKIPPED_OVERLAP` rather than an occurrence. Merge-commit CI run 39802716672 completed successfully across all six jobs. A01 should review that this lock order remains shared by all production Workout writers; these four races do not substitute for a production-data audit or HTTP/device end-to-end verification.
+
+## A01 questions still requiring explicit confirmation
+
+1. Are the two supporting unique indexes and composite FKs safe for production upgrade size, lock duration and any pre-existing orphan plan/session data? The disposable V45→V46 test preserves a null-end legacy row but is not a production-data audit.
+2. Is the partial V46 source-instant/exclusion scope plus Student-row lock and transaction-level checks sufficient for every production writer, including future writers? The new legacy-overlap regression covers the current job path, not an unreviewed writer.
+3. Do the deferred period→occurrence FK, unique period identity and append-only triggers provide the intended rollback/replay/audit guarantees under the deployment's PostgreSQL settings? Review the four controlled race orders and the absence of silent legacy backfill.
+
+No independent A01 approval is present in PR #102's visible review/comment record. Record any later sign-off separately from merge and CI status.
