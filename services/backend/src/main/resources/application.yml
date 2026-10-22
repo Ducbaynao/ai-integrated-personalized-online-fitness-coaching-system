@@ -51,7 +51,7 @@ ai:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
     internal-service-key: ${AI_INTERNAL_SERVICE_KEY:dev-ai-internal-key-change-me}
     connect-timeout-ms: ${AI_CONNECT_TIMEOUT_MS:5000}
-    read-timeout-ms: ${AI_READ_TIMEOUT_MS:10000}
+    read-timeout-ms: ${AI_READ_TIMEOUT_MS:25000}
   embedding:
     provider: ${AI_EMBEDDING_PROVIDER:simulated} # 'simulated' or 'openai'
     openai:

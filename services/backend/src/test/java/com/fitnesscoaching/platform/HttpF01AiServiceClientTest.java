@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -167,6 +168,28 @@ class HttpF01AiServiceClientTest {
         assertThatThrownBy(() -> client.queryKnowledge(createSampleEnvelope()))
                 .isInstanceOf(AiProviderException.class)
                 .hasMessageContaining("FastAPI AI service provider error (502");
+
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("6. Verifies default read timeout aligns with FastAPI deadline hierarchy (25s)")
+    void defaultReadTimeoutAlignsWithFastApiDeadline() {
+        AiServiceProperties props = new AiServiceProperties(null, null, null, null, 0, 0);
+        assertThat(props.readTimeoutMs()).isEqualTo(25000);
+        assertThat(props.connectTimeoutMs()).isEqualTo(5000);
+    }
+
+    @Test
+    @DisplayName("7. Maps socket read timeout / ResourceAccessException to AiTimeoutException")
+    void mapsSocketTimeoutToAiTimeoutException() {
+        mockServer.expect(requestTo("http://localhost:8000/internal/v1/knowledge/query"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> client.queryKnowledge(createSampleEnvelope()))
+                .isInstanceOf(AiTimeoutException.class)
+                .hasMessageContaining("AI model invocation timed out: ");
 
         mockServer.verify();
     }

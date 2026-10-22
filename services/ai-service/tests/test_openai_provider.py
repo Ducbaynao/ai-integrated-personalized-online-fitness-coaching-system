@@ -1071,3 +1071,19 @@ async def test_openai_overlong_answer_maps_to_validation_failed(monkeypatch):
     assert "5000" in result.error.message
 
 
+@pytest.mark.anyio
+async def test_system_prompt_guidance_and_schema_quote_description():
+    """Verify system prompt and schema instruct exact verbatim quotes and insufficient evidence handling."""
+    from app.integrations.openai_provider import OPENAI_RESPONSE_SCHEMA
+
+    provider = OpenAiKnowledgeProvider(retriever=MockRetriever())
+    system_prompt = provider._build_system_prompt()
+
+    assert "quoteOrExcerpt BẮT BUỘC phải là chuỗi ký tự sao chép nguyên văn" in system_prompt
+    assert "INSUFFICIENT_EVIDENCE" in system_prompt
+    assert "missingData" in system_prompt
+
+    quote_desc = OPENAI_RESPONSE_SCHEMA["schema"]["properties"]["citations"]["items"]["properties"]["quoteOrExcerpt"]["description"]
+    assert "Exact continuous verbatim substring" in quote_desc
+
+
