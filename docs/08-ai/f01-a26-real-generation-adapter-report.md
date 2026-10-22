@@ -25,7 +25,7 @@ Triển khai adapter sinh câu trả lời thật (`OpenAiKnowledgeProvider`) k�
    - Thiết lập timeout phân tầng và quản lý deadline tổng 22.0s, finite retry với exponential backoff & jitter trên HTTP 429/5xx, ngắt ngay không retry khi gặp lỗi quota hoặc hard spend limit (`insufficient_quota`, `project_spend_limit_exceeded`, `organization_spend_limit_exceeded`).
    - Kiểm chứng tự động offline trên commit `d5d70b5` và các bản cập nhật hoàn thiện: 43/43 AI Service pytest PASS, 28/28 Spring Boot surefire PASS (qua 2 lệnh kiểm thử riêng biệt), và JSON Schema validator draft 2020-12 PASS.
 2. **Phần CHƯA THỰC HIỆN và GIỚI HẠN HIỆN TẠI (Ghi nhận trung thực):**
-   - **Live Smoke Test:** Chưa chạy do phiên làm việc local không có biến môi trường `OPENAI_API_KEY`. Toàn bộ kiểm thử hiện tại sử dụng mock transport và Testcontainers offline; chưa có dữ liệu gọi API OpenAI live.
+   - **Live Smoke Test:** Đã chạy một live smoke test opt-in đơn lẻ trên commit `015b0e5` (trên branch `feat/f01-real-generation-adapter`, xem `reports/evaluation/runs/a26-live-20261021-092722/report.md`), trích dẫn thành công `WHO-PA-SB-2020-VI-05` (v1.1.0); đây không phải bằng chứng kiểm thử live trên commit merge `5c2aa41`. Toàn bộ kiểm thử tự động của suite sử dụng mock transport và Testcontainers offline; chưa có đánh giá benchmark trả phí hàng loạt.
    - **Xác minh Ngân sách Thực tế:** Quyết định DEC-A13-03 là chính sách nội bộ ($10 USD ceiling, $5 USD alert). Workspace hiện tại không có quyền truy cập bảng điều khiển OpenAI để xác nhận liệu rào chắn ngân sách này đã thực sự được cấu hình hay chưa.
    - **Đánh giá Claim-level Groundedness:** Adapter bảo đảm **Citation Integrity** (tính toàn vẹn nguồn dẫn và trích dẫn nguyên văn từ chunk). Việc đánh giá mức độ trung thực ngữ nghĩa của toàn bộ nội dung câu trả lời (claim-level groundedness) và đo lường tỷ lệ ảo giác ngữ nghĩa thuộc phạm vi của đầu việc **A-52 (Quality Evaluation)** với holdout dataset và đánh giá của chuyên gia thể hình.
 
@@ -242,6 +242,6 @@ Khi môi trường đã được cấp `OPENAI_API_KEY` và thiết lập `F01_P
    curl -X GET http://localhost:8080/api/v1/ai/runs/{runId} \
      -H "Authorization: Bearer <STUDENT_TOKEN>"
    ```
-   *Xác nhận:* Trả về JSON chứa `runStatus = "SUCCEEDED"`, `resultType = "INFORMATION"`, `citations` trỏ đúng vào `WHO-PA-SB-2020-VI-01` và các số liệu token usage thực tế.
+   *Xác nhận:* Trả về JSON chứa `runStatus = "SUCCEEDED"`, `requestType = "F01_GENERAL_KNOWLEDGE"` cùng lifecycle metadata. Lưu ý: Endpoint `GET /api/v1/ai/runs/{runId}` trong cài đặt hiện tại chỉ trả về thông tin vòng đời (lifecycle metadata), không trả về toàn bộ payload câu trả lời, trích dẫn hay token usage (các dữ liệu chi tiết này được trả về qua phản hồi `POST /api/v1/ai/knowledge/query` và được lưu trong database tại `fitness.ai_runs.output_payload` và `fitness.ai_run_knowledge_chunks`). Trong live smoke test ngày 21/10/2026, câu trả lời thực tế trích dẫn tài liệu `WHO-PA-SB-2020-VI-05` (v1.1.0).
 
 *Cảnh báo chất lượng:* Việc kiểm tra citation hợp lệ chỉ xác nhận tính toàn vẹn nguồn dẫn (Citation Integrity). Nó không thay thế cho đánh giá chuyên môn sâu về tính chân thực ngữ nghĩa của toàn bộ các câu trong câu trả lời (Claim-level Groundedness), vốn sẽ được đo đạc chính thức tại **A-52**.
