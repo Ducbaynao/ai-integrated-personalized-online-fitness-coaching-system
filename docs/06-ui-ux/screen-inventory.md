@@ -41,6 +41,8 @@
 
 Exercise picker là contextual flow dùng lại ST-21/ST-22 trong Plan Builder, không phải một Exercise Library khác. Historical plan có thể mở Exercise archived/unavailable ở read-only state.
 
+**B06 automatic recurrence (local candidate, chưa merge):** ST-05 mở danh sách `/planned-workout-series`, detail `/{seriesId}` và form Student từ `/workout-plans/[planId]/series`; TR-03 mở danh sách `/coaching/[relationshipId]/planned-workout-series`, form `/new` và detail `/{seriesId}`. Form chọn thứ Hai, IANA timezone, session từ published version và local start/end; không tự gắn Appointment. Detail hiển thị outcome từng kỳ, Student quyết định đề xuất hoặc dừng, Trainer chỉ rút PENDING khi còn quyền. DST gap/ambiguous và overlap là kết quả có thể đọc lại, không phải lịch tập được tạo.
+
 ## Trainer Mobile
 
 | ID | Màn hình | Core capability |

@@ -2825,6 +2825,156 @@ paths:
         '404': { $ref: '#/components/responses/WorkoutPlanConcealed' }
         '409': { $ref: '#/components/responses/WorkoutPlanConflict' }
 
+  /planned-workout-series:
+    get:
+      tags: [Workout Schedule]
+      operationId: listMyPlannedWorkoutSeries
+      summary: List the authenticated Student's recurring Planned Workout series
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesStatus' } }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200': { description: Created-at descending series page, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesPage' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleForbidden' }
+    post:
+      tags: [Workout Schedule]
+      operationId: confirmPlannedWorkoutSeries
+      summary: Student confirms a published-version recurring series
+      description: >-
+        Student confirms one Monday anchor, IANA timezone and selected source sessions. The source published
+        version is checked at confirmation. A series does not create an Appointment or an occurrence immediately;
+        the daily PostgreSQL-time materializer processes eligible starts in [now, now + 30 days).
+        Matching actor commandKey and payload replay; different payload conflicts.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesCreate' } } }
+      responses:
+        '201': { description: Confirmed series or idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
+
+  /students/{studentId}/planned-workout-series:
+    get:
+      tags: [Workout Schedule]
+      operationId: listMyProposedWorkoutSeriesForStudent
+      summary: List this Trainer's own series proposals for one Student
+      description: Current WORKOUT_PLAN VIEW and effective Coaching Period are required before count or page queries.
+      parameters:
+        - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesStatus' } }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200': { description: Own proposals only, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesPage' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+    post:
+      tags: [Workout Schedule]
+      operationId: proposePlannedWorkoutSeries
+      summary: Trainer proposes a series; only the Student can confirm it
+      description: >-
+        Requires current WORKOUT_PLAN CONTRIBUTE for this Student and records the exact Coaching Period.
+        PENDING creates no occurrences. ACCEPT later rechecks Trainer authority, period, plan version and payload.
+      parameters: [{ $ref: '#/components/parameters/WorkoutScheduleStudentId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesCreate' } } }
+      responses:
+        '201': { description: Pending proposal or idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/WorkoutScheduleForbidden' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
+
+  /planned-workout-series/{seriesId}:
+    get:
+      tags: [Workout Schedule]
+      operationId: getPlannedWorkoutSeries
+      summary: Read one Student-owned series or current proposing-Trainer proposal
+      description: A former Trainer cannot read live series detail, including after a new Coaching Period begins.
+      parameters: [{ name: seriesId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Series detail, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+
+  /planned-workout-series/{seriesId}/periods:
+    get:
+      tags: [Workout Schedule]
+      operationId: listPlannedWorkoutSeriesPeriods
+      summary: Read stable per-period materialization outcomes
+      description: >-
+        Results include DST ambiguity/gap and skipped conflict reasons without exposing another occurrence's
+        identity or times. Student may schedule an unresolved period explicitly through the existing direct batch;
+        the job never silently retries a recorded period. Trainer read requires current WORKOUT_PLAN VIEW.
+      parameters:
+        - { name: seriesId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/WorkoutSchedulePage' }
+        - { $ref: '#/components/parameters/WorkoutScheduleSize' }
+      responses:
+        '200': { description: Periods ordered by block iteration then source session ID, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrencePeriodPage' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+
+  /planned-workout-series/{seriesId}/decisions:
+    post:
+      tags: [Workout Schedule]
+      operationId: decidePlannedWorkoutSeriesProposal
+      summary: Student accepts or rejects a pending Trainer series proposal
+      description: ACCEPT rechecks source and current proposing-Trainer authority; REJECT remains available after authority loss.
+      parameters: [{ name: seriesId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesDecision' } } }
+      responses:
+        '200': { description: Versioned decision or idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
+
+  /planned-workout-series/{seriesId}/stop:
+    post:
+      tags: [Workout Schedule]
+      operationId: stopPlannedWorkoutSeries
+      summary: Student stops future automatic periods without changing past occurrences
+      parameters: [{ name: seriesId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesVersionCommand' } } }
+      responses:
+        '200': { description: Stopped series or idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
+
+  /planned-workout-series/{seriesId}/withdraw:
+    post:
+      tags: [Workout Schedule]
+      operationId: withdrawPlannedWorkoutSeriesProposal
+      summary: Proposing Trainer withdraws a pending series proposal
+      description: Current WORKOUT_PLAN CONTRIBUTE and the original Coaching Period are required even on replay.
+      parameters: [{ name: seriesId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesVersionCommand' } } }
+      responses:
+        '200': { description: Withdrawn proposal or idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } } } }
+        '400': { $ref: '#/components/responses/WorkoutScheduleValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/WorkoutScheduleConcealed' }
+        '409': { $ref: '#/components/responses/WorkoutScheduleConflict' }
+
   /planned-workout-batches:
     post:
       tags: [Workout Schedule]
@@ -5742,6 +5892,142 @@ components:
           minItems: 1
           items: { $ref: '#/components/schemas/WorkoutScheduleBatchItemInput' }
         commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    WorkoutRecurrenceSeriesStatus:
+      type: string
+      enum: [PENDING, ACTIVE, PAUSED_SOURCE, STOPPED, REJECTED, WITHDRAWN]
+    WorkoutRecurrenceSeriesItemInput:
+      type: object
+      additionalProperties: false
+      required: [planSessionId, weekNumber, dayNumber, sequenceNumber, firstLocalStart, firstLocalEnd]
+      properties:
+        planSessionId: { type: string, format: uuid }
+        weekNumber: { type: integer, minimum: 1 }
+        dayNumber: { type: integer, minimum: 1, maximum: 7 }
+        sequenceNumber: { type: integer, minimum: 1 }
+        firstLocalStart:
+          allOf: [{ $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }]
+          description: Local start in the first block, on the selected source week/day relative to mondayAnchorDate.
+        firstLocalEnd:
+          allOf: [{ $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }]
+          description: Explicit local end in the first block; may be on the following date, never inferred from template duration.
+    WorkoutRecurrenceSeriesCreate:
+      type: object
+      additionalProperties: false
+      required: [planId, sourcePlanVersionId, expectedPlanAggregateVersion, mondayAnchorDate, timezone, items, commandKey]
+      properties:
+        planId: { type: string, format: uuid }
+        sourcePlanVersionId: { type: string, format: uuid }
+        expectedPlanAggregateVersion: { type: integer, format: int64, minimum: 0 }
+        mondayAnchorDate:
+          type: string
+          format: date
+          description: Student-confirmed Monday beginning block iteration zero.
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Explicit IANA timezone for every local time in this series; device timezone is not substituted.
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesItemInput' }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    WorkoutRecurrenceSeriesItem:
+      allOf: [{ $ref: '#/components/schemas/WorkoutRecurrenceSeriesItemInput' }]
+      description: Exact selected source session and first-block local intent, frozen with the series.
+    WorkoutRecurrenceSeries:
+      type: object
+      additionalProperties: false
+      required: [seriesId, studentId, planId, sourcePlanVersionId, sourcePlanVersionNumber,
+        observedPlanAggregateVersion, planWeeks, mondayAnchorDate, timezone, status, seriesVersion,
+        initiatedBy, proposingTrainerId, coachingPeriodId, confirmedBy, createdAt, confirmedAt, stoppedAt,
+        items, replayed]
+      properties:
+        seriesId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        planId: { type: string, format: uuid }
+        sourcePlanVersionId: { type: string, format: uuid }
+        sourcePlanVersionNumber: { type: integer, minimum: 1 }
+        observedPlanAggregateVersion: { type: integer, format: int64, minimum: 0 }
+        planWeeks:
+          type: integer
+          minimum: 1
+          description: Highest weekNumber in all sessions of the published version, including unselected sessions.
+        mondayAnchorDate: { type: string, format: date }
+        timezone: { type: string }
+        status: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesStatus' }
+        seriesVersion: { type: integer, format: int64, minimum: 0 }
+        initiatedBy: { type: string, format: uuid }
+        proposingTrainerId: { type: [string, 'null'], format: uuid }
+        coachingPeriodId: { type: [string, 'null'], format: uuid }
+        confirmedBy: { type: [string, 'null'], format: uuid }
+        createdAt: { type: string, format: date-time }
+        confirmedAt: { type: [string, 'null'], format: date-time }
+        stoppedAt: { type: [string, 'null'], format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WorkoutRecurrenceSeriesItem' }
+        replayed: { type: boolean }
+    WorkoutRecurrenceSeriesPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkoutRecurrenceSeries' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    WorkoutRecurrenceSeriesDecision:
+      type: object
+      additionalProperties: false
+      required: [expectedSeriesVersion, decision, commandKey]
+      properties:
+        expectedSeriesVersion: { type: integer, format: int64, minimum: 0 }
+        decision: { type: string, enum: [ACCEPT, REJECT] }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    WorkoutRecurrenceSeriesVersionCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedSeriesVersion, commandKey]
+      properties:
+        expectedSeriesVersion: { type: integer, format: int64, minimum: 0 }
+        commandKey: { $ref: '#/components/schemas/WorkoutScheduleCommandKey' }
+    WorkoutRecurrencePeriodOutcome:
+      type: string
+      enum: [CREATED, DST_GAP, DST_AMBIGUOUS, INVALID_INTERVAL,
+        SKIPPED_OVERLAP, SKIPPED_UNKNOWN_END, SKIPPED_DUPLICATE]
+    WorkoutRecurrencePeriod:
+      type: object
+      additionalProperties: false
+      required: [periodId, seriesId, blockIteration, planSessionId, localStart, localEnd,
+        timezone, startUtcOffset, endUtcOffset, plannedStartAt, plannedEndAt, outcome,
+        occurrenceId, processedAt]
+      properties:
+        periodId: { type: string, format: uuid }
+        seriesId: { type: string, format: uuid }
+        blockIteration: { type: integer, format: int64, minimum: 0 }
+        planSessionId: { type: string, format: uuid }
+        localStart: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+        localEnd: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
+        timezone: { type: string }
+        startUtcOffset: { type: [string, 'null'] }
+        endUtcOffset: { type: [string, 'null'] }
+        plannedStartAt: { type: [string, 'null'], format: date-time }
+        plannedEndAt: { type: [string, 'null'], format: date-time }
+        outcome: { $ref: '#/components/schemas/WorkoutRecurrencePeriodOutcome' }
+        occurrenceId: { type: [string, 'null'], format: uuid }
+        processedAt: { type: string, format: date-time }
+    WorkoutRecurrencePeriodPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkoutRecurrencePeriod' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
     ConfirmPlannedWorkoutBatchRequest:
       allOf:
         - { $ref: '#/components/schemas/WorkoutScheduleBatchInput' }
