@@ -216,4 +216,51 @@ describe('apiClient and authApi', () => {
     expect(JSON.parse(init.body)).toEqual({ refreshToken: 'refresh-to-revoke' });
     expect(await tokenStorage.getTokens()).toBeNull();
   });
+
+  it('re-throws AbortError when request signal is aborted, distinguishing it from network failure', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const abortError = new Error('The operation was aborted');
+    abortError.name = 'AbortError';
+    fetchMock.mockRejectedValueOnce(abortError);
+
+    await expect(
+      request('/users/me', { signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('aborts 401 retry if signal was aborted during refresh', async () => {
+    await tokenStorage.saveTokens('expired-access', 'valid-refresh');
+
+    const controller = new AbortController();
+
+    fetchMock
+      .mockImplementationOnce(async () => ({
+        ok: false,
+        status: 401,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ errorCode: 'UNAUTHENTICATED', message: 'Token expired' }),
+      }))
+      .mockImplementationOnce(async () => {
+        // Abort the controller while refresh is executing
+        controller.abort();
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/json' },
+          json: async () => ({
+            tokenType: 'Bearer',
+            accessToken: 'new-token',
+            accessTokenExpiresAt: '2026-10-22T10:00:00Z',
+            refreshToken: 'new-refresh',
+            refreshTokenExpiresAt: '2026-11-22T10:00:00Z',
+          }),
+        };
+      });
+
+    await expect(
+      request('/users/me', { signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });

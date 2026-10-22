@@ -77,6 +77,7 @@ export default function AppLayout() {
       <Stack.Screen name="appointments/[appointmentId]/reschedule" />
       <Stack.Screen name="attention/index" />
       <Stack.Screen name="coaching/[relationshipId]/attention" />
+      <Stack.Screen name="ai-knowledge/index" />
     </Stack>
   );
 }

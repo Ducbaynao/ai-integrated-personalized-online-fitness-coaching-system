@@ -41,19 +41,27 @@ async function parseResponse<T>(response: Response): Promise<T> {
     let errorResponse: ErrorResponse | undefined;
     let errorMessage = `Request failed with status ${response.status}`;
 
+    let rawData: unknown = undefined;
     if (isJson) {
       try {
         const data = await response.json();
-        if (data && typeof data === 'object' && 'errorCode' in data && 'message' in data) {
-          errorResponse = data as ErrorResponse;
-          errorMessage = errorResponse.message;
+        rawData = data;
+        if (data && typeof data === 'object') {
+          if ('errorCode' in data && 'message' in data) {
+            errorResponse = data as ErrorResponse;
+            errorMessage = errorResponse.message;
+          } else if ('error' in data && data.error && typeof data.error === 'object' && 'message' in data.error) {
+            errorMessage = String((data.error as any).message);
+          } else if ('message' in data && typeof data.message === 'string') {
+            errorMessage = data.message;
+          }
         }
       } catch {
         // Fallback to generic message
       }
     }
 
-    throw new ApiError(response.status, errorMessage, errorResponse);
+    throw new ApiError(response.status, errorMessage, errorResponse, rawData);
   }
 
   if (response.status === 204) {
@@ -129,12 +137,21 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       headers: requestHeaders,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  } catch {
+  } catch (err: unknown) {
+    if (rest.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
     throw new ApiError(0, 'Network connection failed. Please check your internet connection.');
   }
 
   // Intercept 401 for authenticated requests (and only if not already retried)
   if (response.status === 401 && requiresAuth && !_isRetry) {
+    if (rest.signal?.aborted) {
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      throw abortError;
+    }
+
     try {
       if (!refreshPromise) {
         refreshPromise = performTokenRefresh().finally(() => {
@@ -142,6 +159,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
         });
       }
       await refreshPromise;
+
+      if (rest.signal?.aborted) {
+        const abortError = new Error('The operation was aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
 
       // Retry request once with the new access token
       return await request<T>(path, {

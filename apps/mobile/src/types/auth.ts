@@ -109,12 +109,14 @@ export interface ErrorResponse {
 export class ApiError extends Error {
   readonly status: number;
   readonly errorResponse?: ErrorResponse;
+  readonly rawData?: unknown;
 
-  constructor(status: number, message: string, errorResponse?: ErrorResponse) {
+  constructor(status: number, message: string, errorResponse?: ErrorResponse, rawData?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.errorResponse = errorResponse;
+    this.rawData = rawData;
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }

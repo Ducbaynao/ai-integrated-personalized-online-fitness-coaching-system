@@ -5,6 +5,7 @@ import {
   canAccessStudentProfile,
   canAccessFitnessGoals,
   canAccessWorkoutPlans,
+  canAccessAiKnowledge,
   canAccessTrainerOnboarding,
   canAccessTrainerProfile,
   getAuthenticatedHomeRoute,
@@ -142,6 +143,25 @@ describe('Route Guard & Capability Resolution (PROFILE-04)', () => {
     expect(canAccessWorkoutPlans(studentOnly)).toBe(true);
     expect(canAccessWorkoutPlans(trainerOnly)).toBe(false);
     expect(canAccessWorkoutPlans(dualRole)).toBe(true);
+
+    // canAccessAiKnowledge: requires ACTIVE status and STUDENT or TRAINER capability
+    expect(canAccessAiKnowledge(null)).toBe(false);
+    expect(canAccessAiKnowledge(noProfiles)).toBe(false);
+    expect(canAccessAiKnowledge(studentOnly)).toBe(true);
+    expect(canAccessAiKnowledge(trainerOnly)).toBe(true);
+    expect(canAccessAiKnowledge(dualRole)).toBe(true);
+
+    // Non-ACTIVE account is rejected
+    const suspendedUser: CurrentUserResponse = { ...studentOnly, status: 'SUSPENDED' };
+    expect(canAccessAiKnowledge(suspendedUser)).toBe(false);
+
+    // Base ADMIN alone is forbidden
+    const adminOnly: CurrentUserResponse = {
+      ...noProfiles,
+      roles: ['ADMIN'],
+      capabilities: { hasStudentProfile: false, hasTrainerProfile: false, canCoach: false },
+    };
+    expect(canAccessAiKnowledge(adminOnly)).toBe(false);
 
     // canAccessTrainerProfile: requires trainer profile
     expect(canAccessTrainerProfile(null)).toBe(false);

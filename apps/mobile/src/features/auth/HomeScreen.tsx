@@ -189,6 +189,15 @@ export function HomeScreen() {
                 onPress={() => router.push('/coaching' as any)}>
                 <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Quan hệ huấn luyện →</Text>
               </Pressable>
+
+              <Pressable
+                testID="view-ai-knowledge-button"
+                accessibilityRole="button"
+                accessibilityLabel="Tra cứu kiến thức thể hình AI"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/ai-knowledge' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Kiến thức thể hình (AI) →</Text>
+              </Pressable>
             </>
           )}
 

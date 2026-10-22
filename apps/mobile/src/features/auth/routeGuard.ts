@@ -97,6 +97,17 @@ export function canAccessCoaching(user: CurrentUserResponse | null): boolean {
   return Boolean(user?.capabilities?.hasStudentProfile || user?.capabilities?.hasTrainerProfile);
 }
 
+export function canAccessAiKnowledge(user: CurrentUserResponse | null): boolean {
+  if (!user || user.status !== 'ACTIVE') return false;
+  const hasRole = Boolean(
+    user.roles?.includes('STUDENT') || user.roles?.includes('TRAINER')
+  );
+  const hasProfile = Boolean(
+    user.capabilities?.hasStudentProfile || user.capabilities?.hasTrainerProfile
+  );
+  return hasRole && hasProfile;
+}
+
 /**
  * Deep link guard: check if user can access trainer profile screen.
  */
