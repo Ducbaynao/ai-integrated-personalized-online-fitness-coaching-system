@@ -7,11 +7,13 @@ import com.fitnesscoaching.platform.modules.workout.application.port.out.Workout
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionSnapshotPersistencePort.*;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.domain.*;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.sql.SQLException;
 import java.util.*;
 
 @Service
@@ -39,7 +41,15 @@ public class WorkoutExecutionSnapshotService implements WorkoutExecutionSnapshot
     public long lockForExecutionMutation(UUID occurrenceId, UUID studentActorId) {
         if (occurrenceId == null || studentActorId == null)
             throw failure(WorkoutExecutionError.VALIDATION_FAILED);
-        var occurrence = planStore.lockOccurrence(occurrenceId);
+        SnapshotOccurrence occurrence;
+        try {
+            occurrence = store.lockOccurrence(occurrenceId);
+        } catch (CannotAcquireLockException concurrentUpdate) {
+            if (!isSerializationFailure(concurrentUpdate)) throw concurrentUpdate;
+            // A competing execution terminal command changed this already-sealed occurrence.
+            // The B04 schedule-lock classifier is only valid for schedule writers, not B05.
+            throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_VERSION_CONFLICT);
+        }
         requireStudent(occurrence.studentId(), studentActorId);
         if (occurrence.executionStartedAt() == null)
             throw new WorkoutPlanFailure(WorkoutPlanError.PLANNED_WORKOUT_NOT_STARTABLE,
@@ -142,6 +152,12 @@ public class WorkoutExecutionSnapshotService implements WorkoutExecutionSnapshot
     }
     private static WorkoutExecutionFailure failure(WorkoutExecutionError error) {
         return new WorkoutExecutionFailure(error, error.name());
+    }
+    private static boolean isSerializationFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
+        }
+        return false;
     }
 
     private static final class Resolved {

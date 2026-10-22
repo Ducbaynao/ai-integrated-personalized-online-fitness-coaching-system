@@ -224,27 +224,62 @@ class WorkoutExecutionConcurrencyIntegrationTest {
                 started.exercises().getFirst().id(), fixture.studentId(), 0, completedSet(UUID.randomUUID())));
         CountDownLatch completeReady = new CountDownLatch(1);
         CountDownLatch releaseComplete = new CountDownLatch(1);
-        CountDownLatch abortInvoked = new CountDownLatch(1);
+        CountDownLatch abortSnapshotReady = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             Future<WorkoutExecution> complete = pool.submit(() -> heldTransaction(() -> executions.complete(
                     new TerminalCommand(started.id(), fixture.studentId(), withSet.version(),
                             "race-complete-" + started.id(), null, "Complete wins")), completeReady, releaseComplete));
             assertThat(completeReady.await(10, TimeUnit.SECONDS)).isTrue();
-            Future<String> abort = pool.submit(() -> transactionOutcome(abortInvoked, () -> executions.abort(
+            Future<String> abort = pool.submit(() -> transactionOutcomeWithSnapshot(abortSnapshotReady, () -> executions.abort(
                     new TerminalCommand(started.id(), fixture.studentId(), withSet.version(),
                             "race-abort-" + started.id(), null, "Abort loses"))));
-            assertThat(abortInvoked.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(abortSnapshotReady.await(10, TimeUnit.SECONDS)).isTrue();
             releaseComplete.countDown();
 
             assertThat(complete.get(10, TimeUnit.SECONDS).status().name()).isEqualTo("COMPLETED");
-            assertThat(abort.get(10, TimeUnit.SECONDS)).isIn(
-                    "WORKOUT_EXECUTION_VERSION_CONFLICT", "WORKOUT_EXECUTION_TERMINAL");
+            assertThat(abort.get(10, TimeUnit.SECONDS)).isEqualTo("WORKOUT_EXECUTION_VERSION_CONFLICT");
+            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.workout_session_logs WHERE id=?",
+                    String.class, started.id())).isEqualTo("COMPLETED");
             assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_execution_status_history WHERE workout_execution_id=? AND from_status IS NOT NULL",
                     Integer.class, started.id())).isOne();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_execution_command_receipts WHERE workout_execution_id=? AND command_name IN ('COMPLETE','ABORT')",
                     Integer.class, started.id())).isOne();
             assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
                     String.class, fixture.occurrenceId())).isEqualTo("COMPLETED");
+        }
+    }
+
+    @Test
+    void abortWinningAgainstCompleteReportsExecutionConflictAndKeepsAttemptedOccurrence() throws Exception {
+        Fixture fixture = fixture();
+        WorkoutExecution started = executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
+                "start-abort-race-" + fixture.occurrenceId()));
+        CountDownLatch abortReady = new CountDownLatch(1);
+        CountDownLatch releaseAbort = new CountDownLatch(1);
+        CountDownLatch completeSnapshotReady = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<WorkoutExecution> abort = pool.submit(() -> heldTransaction(() -> executions.abort(
+                    new TerminalCommand(started.id(), fixture.studentId(), started.version(),
+                            "abort-race-" + started.id(), null, "Abort wins")), abortReady, releaseAbort));
+            assertThat(abortReady.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<String> complete = pool.submit(() -> transactionOutcomeWithSnapshot(completeSnapshotReady,
+                    () -> executions.complete(new TerminalCommand(started.id(), fixture.studentId(),
+                            started.version(), "complete-after-abort-" + started.id(), null, "Complete loses"))));
+            assertThat(completeSnapshotReady.await(10, TimeUnit.SECONDS)).isTrue();
+            releaseAbort.countDown();
+
+            assertThat(abort.get(10, TimeUnit.SECONDS).status().name()).isEqualTo("ABORTED");
+            assertThat(complete.get(10, TimeUnit.SECONDS)).isEqualTo("WORKOUT_EXECUTION_VERSION_CONFLICT");
+            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.workout_session_logs WHERE id=?",
+                    String.class, started.id())).isEqualTo("ABORTED");
+            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
+                    String.class, fixture.occurrenceId())).isEqualTo("ATTEMPTED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_execution_status_history "
+                            + "WHERE workout_execution_id=? AND from_status IS NOT NULL",
+                    Integer.class, started.id())).isOne();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_execution_command_receipts "
+                            + "WHERE workout_execution_id=? AND command_name IN ('COMPLETE','ABORT')",
+                    Integer.class, started.id())).isOne();
         }
     }
 
