@@ -113,6 +113,7 @@ export function StudentWorkoutScheduleScreen() {
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Lịch tập dự kiến</Text>
     <WorkoutButton label="Quay lại kế hoạch" secondary onPress={() => router.back()} />
     <WorkoutButton testID="open-student-change-proposals" label="Xem đề xuất đổi hoặc hủy lịch" secondary onPress={() => router.push('/workout-change-proposals' as never)} />
+    <WorkoutButton testID="open-student-recurrence" label="Xem lịch tập lặp và kết quả từng kỳ" secondary onPress={() => router.push('/planned-workout-series' as never)} />
     <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Cửa sổ 30 ngày</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{formatScheduleTime(range.from, null, user?.timezone)} → {formatScheduleTime(range.until, null, user?.timezone)}</Text>
