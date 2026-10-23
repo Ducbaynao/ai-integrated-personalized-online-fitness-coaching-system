@@ -458,4 +458,50 @@ class AiRunF01PersistenceIntegrationTest {
         AiRun finalRun = aiRunRepository.findById(run.id()).orElseThrow();
         assertThat(finalRun.isTerminal()).isTrue();
     }
+
+    @Test
+    @DisplayName("8. getF01Run revalidation: Deactivated account or revoked role blocks polling")
+    void getF01Run_revalidatesAccountStatusAndRoles() throws Exception {
+        CreateF01AiRunCommand cmd = new CreateF01AiRunCommand(
+                "Nguyên tắc khởi động trước khi tập tạ là gì?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        AiRun run = aiRunUseCase.createF01Run(STUDENT_USER_ID, cmd);
+
+        // 1. When student is ACTIVE and has STUDENT role -> 200 OK
+        mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId", is(run.id().toString())));
+
+        // 2. When student account is DEACTIVATED -> direct service call throws AccountUnavailableException
+        jdbcTemplate.update("UPDATE fitness.users SET status = 'DISABLED'::fitness.account_status WHERE id = ?", STUDENT_USER_ID);
+        assertThatThrownBy(() -> aiRunUseCase.getF01Run(STUDENT_USER_ID, run.id()))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.AccountUnavailableException.class)
+                .hasMessageContaining("not active");
+
+        // And HTTP polling returns 403 ACCOUNT_UNAVAILABLE
+        mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+
+        // Reactivate student account
+        jdbcTemplate.update("UPDATE fitness.users SET status = 'ACTIVE'::fitness.account_status WHERE id = ?", STUDENT_USER_ID);
+
+        // 3. When student role is revoked -> direct service call throws AiRunAccessDeniedException
+        jdbcTemplate.update("DELETE FROM fitness.user_roles WHERE user_id = ? AND role_id IN (SELECT id FROM fitness.roles WHERE code = 'STUDENT')", STUDENT_USER_ID);
+        assertThatThrownBy(() -> aiRunUseCase.getF01Run(STUDENT_USER_ID, run.id()))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException.class)
+                .hasMessageContaining("lacks STUDENT or TRAINER capability");
+
+        // And HTTP polling returns 403 AI_FORBIDDEN
+        mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
 }
