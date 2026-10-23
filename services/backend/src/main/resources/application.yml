@@ -64,10 +64,15 @@ ai:
       read-timeout-ms: ${AI_EMBEDDING_READ_TIMEOUT_MS:10000}
       max-attempts: ${AI_EMBEDDING_MAX_ATTEMPTS:2}
       overall-deadline-ms: ${AI_EMBEDDING_OVERALL_DEADLINE_MS:15000}
+  orphan-recovery:
+    enabled: ${AI_ORPHAN_RECOVERY_ENABLED:true}
+    timeout-threshold-seconds: ${AI_ORPHAN_RECOVERY_TIMEOUT_SECONDS:120}
+    fixed-delay-ms: ${AI_ORPHAN_RECOVERY_FIXED_DELAY_MS:60000}
+    initial-delay-ms: ${AI_ORPHAN_RECOVERY_INITIAL_DELAY_MS:10000}
+    batch-size: ${AI_ORPHAN_RECOVERY_BATCH_SIZE:50}
 
 app:
   scheduling:
     enabled: ${APP_SCHEDULING_ENABLED:true}
     attention-review:
       cron: ${ATTENTION_REVIEW_CRON:0 */5 * * * *}
-

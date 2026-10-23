@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -191,6 +192,57 @@ public class JdbcAiRunRepository implements AiRunRepository {
                 inputTokens,
                 outputTokens,
                 latencyMs,
+                completedAt != null ? Timestamp.from(completedAt) : null,
+                runId
+        );
+        return rows > 0;
+    }
+
+    @Override
+    public List<UUID> findStaleRunIds(Instant cutoff, int batchSize) {
+        if (cutoff == null || batchSize <= 0) {
+            return List.of();
+        }
+        String sql = """
+                SELECT id FROM fitness.ai_runs
+                WHERE status IN ('QUEUED', 'RUNNING')
+                  AND (
+                    (started_at IS NOT NULL AND started_at < ?)
+                    OR
+                    (started_at IS NULL AND queued_at < ?)
+                  )
+                ORDER BY queued_at ASC
+                LIMIT ?
+                FOR UPDATE SKIP LOCKED
+                """;
+        Timestamp cutoffTs = Timestamp.from(cutoff);
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) -> (UUID) rs.getObject("id"),
+                cutoffTs,
+                cutoffTs,
+                batchSize
+        );
+    }
+
+    @Override
+    public boolean reconcileStaleRun(UUID runId, String errorCode, String errorMessage, Instant completedAt) {
+        if (runId == null) {
+            return false;
+        }
+        String sql = """
+                UPDATE fitness.ai_runs
+                SET status = 'FAILED'::fitness.ai_run_status,
+                    error_code = ?,
+                    error_message = ?,
+                    completed_at = COALESCE(?, clock_timestamp())
+                WHERE id = ?
+                  AND status IN ('QUEUED', 'RUNNING')
+                """;
+        int rows = jdbcTemplate.update(
+                sql,
+                errorCode,
+                errorMessage,
                 completedAt != null ? Timestamp.from(completedAt) : null,
                 runId
         );

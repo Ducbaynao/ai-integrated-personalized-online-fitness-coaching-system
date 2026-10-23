@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,4 +48,18 @@ public interface AiRunRepository {
             Integer latencyMs,
             Instant completedAt
     );
+
+    /**
+     * Finds stale/orphaned non-terminal run IDs (status QUEUED or RUNNING) whose active timestamp
+     * is older than the specified cutoff, locking them with FOR UPDATE SKIP LOCKED.
+     */
+    List<UUID> findStaleRunIds(Instant cutoff, int batchSize);
+
+    /**
+     * Reconciles a stale/orphaned AI Run by transitioning it to FAILED with error code and message.
+     * Enforces conditional status check WHERE status IN ('QUEUED', 'RUNNING') to prevent
+     * overwriting valid terminal completions.
+     * Returns true if transition succeeded, false if run was already completed or not in non-terminal state.
+     */
+    boolean reconcileStaleRun(UUID runId, String errorCode, String errorMessage, Instant completedAt);
 }
