@@ -177,6 +177,8 @@ export function NotificationsScreen() {
         ? <CoachingButton label="Xem yêu cầu lịch hẹn" secondary onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'APPOINTMENT' && item.relatedEntityId
         ? <CoachingButton label="Xem lịch hẹn" secondary onPress={() => router.push(`/appointments/${item.relatedEntityId}` as never)} /> : null}
+      {role === 'TRAINER' && item.relatedEntityType === 'PLANNED_WORKOUT' && item.relatedEntityId
+        ? <CoachingButton label="Mở không gian Học viên để xem buổi tập đã hủy" secondary onPress={() => router.push('/coaching' as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_SCHEDULE_PROPOSAL' && item.relatedEntityId
         ? <CoachingButton label="Xem đề xuất lịch tập" secondary onPress={() => router.push(`/workout-schedule-proposals/${item.relatedEntityId}` as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_CHANGE_PROPOSAL' && item.relatedEntityId

@@ -7,6 +7,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { useCurrentWorkoutPlan, useWorkoutPlanVersion } from '@/features/workout-plan/workoutPlanQueries';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
+import { appointmentApi } from '@/services/appointmentApi';
 import { TrainerCreateScheduleProposalScreen } from '@/features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen';
 
 const mockReplace = jest.fn();
@@ -18,6 +19,7 @@ jest.mock('@/features/workout-plan/workoutPlanQueries', () => ({
   workoutPlanQueryKeys: { student: (id: string) => ['workout-plans', 'student', id] },
 }));
 jest.mock('@/services/workoutScheduleProposalApi', () => ({ workoutScheduleProposalApi: { create: jest.fn() } }));
+jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { appointments: jest.fn() } }));
 
 const plan = { id: 'plan-1', studentId: 'student-1', name: 'Sức mạnh', status: 'ACTIVE', aggregateVersion: 7,
   currentVersionId: 'version-1', currentVersionLockedAt: '2026-10-01T00:00:00Z' };
@@ -27,7 +29,8 @@ const session = { id: 'session-1', name: 'Upper body', weekNumber: 1, dayNumber:
 
 function setup(level = 'CONTRIBUTE', requirement = 'SELF_ALLOWED') {
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
-  (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } } }, isPending: false, isError: false, refetch: jest.fn() });
+  (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } }, currentPeriod: { id: 'period-1' } }, isPending: false, isError: false, refetch: jest.fn() });
+  (appointmentApi.appointments as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
   (useSharingSummary as jest.Mock).mockReturnValue({ data: { items: [{ dataScope: 'WORKOUT_PLAN', state: 'ALLOWED', accessLevel: level }] }, isPending: false, isError: false, refetch: jest.fn() });
   (useCurrentWorkoutPlan as jest.Mock).mockReturnValue({ data: { plan }, isPending: false, isError: false, refetch: jest.fn() });
   (useWorkoutPlanVersion as jest.Mock).mockReturnValue({ data: { version, sessions: [{ ...session, supervisionRequirement: requirement }] }, isPending: false, isError: false, refetch: jest.fn() });
@@ -68,16 +71,50 @@ describe('Trainer proposal create', () => {
   beforeEach(() => { jest.clearAllMocks(); setup(); });
   afterEach(() => clients.splice(0).forEach((client) => client.clear()));
 
-  it('does not expose submit to VIEW-only Trainer or COACH_REQUIRED session', async () => {
+  it('does not expose submit to VIEW-only Trainer and requires an Appointment for COACH_REQUIRED', async () => {
     setup('VIEW');
     const denied = render();
     expect(JSON.stringify(denied.toJSON())).toContain('Không thể tạo đề xuất');
     renderer.act(() => denied.unmount());
     setup('CONTRIBUTE', 'COACH_REQUIRED');
     const restricted = render();
-    expect(restricted.root.findByProps({ testID: 'select-session-session-1' }).props.disabled).toBe(true);
-    expect(JSON.stringify(restricted.toJSON())).toContain('Cần huấn luyện viên giám sát');
+    expect(restricted.root.findByProps({ testID: 'select-session-session-1' }).props.disabled).toBe(false);
+    await press(restricted, 'select-session-session-1');
+    expect(restricted.root.findByProps({ testID: 'review-proposal' }).props.disabled).toBe(true);
     renderer.act(() => restricted.unmount());
+  });
+
+  it('sends the selected confirmed Appointment ID for a coached proposal item', async () => {
+    setup('CONTRIBUTE', 'COACH_REQUIRED');
+    const monday = moment.utc().add(7, 'days').startOf('isoWeek').format('YYYY-MM-DD');
+    (appointmentApi.appointments as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 1, items: [{
+      appointmentId: 'appointment-1', version: 3, studentId: 'student-1', trainerId: 'trainer-1',
+      coachingPeriodId: 'period-1', plannedWorkoutId: null, status: 'CONFIRMED',
+      startAt: `${monday}T11:00:00Z`, endAt: `${monday}T13:00:00Z`, timezone: 'Asia/Ho_Chi_Minh',
+      localStart: `${monday}T18:00`, localEnd: `${monday}T20:00`,
+    }] });
+    (workoutScheduleProposalApi.create as jest.Mock).mockResolvedValue({ proposal: { proposalId: 'proposal-2' } });
+    const tree = render();
+    await fillValid(tree);
+    await renderer.act(async () => { await Promise.resolve(); });
+    await press(tree, 'proposal-appointment-appointment-1');
+    await press(tree, 'review-proposal');
+    await press(tree, 'confirm-create-proposal');
+    expect((workoutScheduleProposalApi.create as jest.Mock).mock.calls[0][1].items[0].appointmentId).toBe('appointment-1');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('can search older confirmed Appointments instead of silently excluding a long interval', async () => {
+    setup('CONTRIBUTE', 'COACH_REQUIRED');
+    const tree = render();
+    await press(tree, 'select-session-session-1');
+    await renderer.act(async () => { await Promise.resolve(); });
+    await press(tree, 'proposal-search-earlier-appointments');
+    await renderer.act(async () => { await Promise.resolve(); });
+    expect(appointmentApi.appointments).toHaveBeenCalledWith(
+      '1970-01-01T00:00:00.000Z', expect.any(String), 0,
+    );
+    renderer.act(() => tree.unmount());
   });
 
   it('uses real plan/session identities, explicit timezone and offsets, then keeps one payload/key on network retry', async () => {

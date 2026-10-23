@@ -41,6 +41,8 @@ export interface PlannedWorkoutOccurrence {
   planSummary: PlannedWorkoutPlanSummary | null;
   sessionSummary: PlannedWorkoutSessionSummary | null;
   availableActions: PlannedWorkoutAction[];
+  linkedAppointmentId: string | null;
+  linkedAppointmentVersion: number | null;
 }
 
 export interface PlannedWorkoutOccurrencePage {

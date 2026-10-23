@@ -3,6 +3,8 @@ package com.fitnesscoaching.platform.modules.workout.application.service;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery.Linked;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleChangePersistencePort;
@@ -21,6 +23,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -31,12 +34,15 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
     private final LinkedWorkoutAppointmentQuery appointments;
     private final AuditService audit;
     private final ObjectMapper mapper;
+    private final LifecycleNotificationWriter notifications;
 
     public WorkoutScheduleChangeService(WorkoutPlanPersistencePort plans, WorkoutScheduleChangePersistencePort changes,
                                         WorkoutExecutionAccessPolicy access, LinkedWorkoutAppointmentQuery appointments,
-                                        AuditService audit, ObjectMapper mapper) {
+                                        AuditService audit, ObjectMapper mapper,
+                                        LifecycleNotificationWriter notifications) {
         this.plans = plans; this.changes = changes; this.access = access;
         this.appointments = appointments; this.audit = audit; this.mapper = mapper;
+        this.notifications = notifications;
     }
 
     @Override public void lockStudentAndActor(UUID studentId, UUID actorId) {
@@ -57,7 +63,8 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         Instant at = changes.databaseNow();
         checkMutable(old, expectedOccurrenceVersion);
         if (!old.plannedStartAt().isAfter(at)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
-        if (appointments.hasAnyLinkedForMutation(old.id())) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        List<Linked> links = appointments.lockLinkedForChange(old.id());
+        if (links.size() > 1) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         if (changes.hasSuccessor(old.id())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
         if ("RESCHEDULE".equals(changeType)) {
             if (old.sessionId() == null || old.planVersionId() == null || old.localStart() == null
@@ -66,7 +73,7 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
                 throw fail("WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE", 409);
             try { LocalDateTime.parse(old.localStart()); LocalDateTime.parse(old.localEnd()); }
             catch (DateTimeException malformed) { throw fail("WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE", 409); }
-            if ("COACH_REQUIRED".equals(old.supervisionRequirement()))
+            if ("COACH_REQUIRED".equals(old.supervisionRequirement()) && links.isEmpty())
                 throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED", 409);
             if (destination == null || destination.localStart() == null || destination.localEnd() == null)
                 throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
@@ -76,10 +83,15 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
             if (!end.isAfter(start)) throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
             if (!start.isAfter(at) || start.isAfter(at.plus(90, ChronoUnit.DAYS)))
                 throw fail("WORKOUT_SCHEDULE_WINDOW_INVALID", 400);
+            if (!links.isEmpty() && !appointments.qualifiesForReplacement(links.getFirst(), studentId,
+                    old.coachingPeriodId(), start, end))
+                throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         } else if (destination != null) throw fail("WORKOUT_SCHEDULE_CHANGE_VALIDATION_FAILED", 400);
         return new ProposalSource(old.id(), old.studentId(), old.version(), old.planVersionId(), old.sessionId(),
                 old.plannedStartAt(), old.plannedEndAt(), old.originalPlannedStartAt(), old.timezone(),
-                old.localStart(), old.localEnd(), old.startUtcOffset(), old.endUtcOffset());
+                old.localStart(), old.localEnd(), old.startUtcOffset(), old.endUtcOffset(),
+                links.isEmpty() ? null : links.getFirst().appointmentId(),
+                links.isEmpty() ? null : links.getFirst().version());
     }
 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -91,7 +103,8 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         var student = student(c.occurrenceId(), c.actorId());
         plans.lockStudentAndActor(student, c.actorId());
         requireStudent(c.actorId(), student);
-        String hash = hash("RESCHEDULE", c.occurrenceId(), c.expectedOccurrenceVersion(), c.destination(), c.reason());
+        String hash = hash("RESCHEDULE", c.occurrenceId(), c.expectedOccurrenceVersion(), c.destination(), c.reason(),
+                c.expectedAppointmentVersion(), c.expectedAppointmentId());
         var receipt = changes.lockReceipt(c.actorId(), key);
         if (receipt.isPresent()) return replay(receipt.get(), "RESCHEDULE", hash);
 
@@ -103,9 +116,16 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
                 || old.localEnd() == null || old.timezone() == null || old.startUtcOffset() == null
                 || old.endUtcOffset() == null)
             throw fail("WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE", 409);
-        if ("COACH_REQUIRED".equals(old.supervisionRequirement()))
+        List<Linked> links = appointments.lockLinkedForChange(old.id());
+        if (links.size() > 1) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if (c.expectedAppointmentId() != null && (links.isEmpty()
+                || !links.getFirst().appointmentId().equals(c.expectedAppointmentId())))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if (c.expectedAppointmentVersion() != null && (links.isEmpty()
+                || links.getFirst().version() != c.expectedAppointmentVersion()))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if ("COACH_REQUIRED".equals(old.supervisionRequirement()) && links.isEmpty())
             throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED", 409);
-        if (appointments.hasAnyLinkedForMutation(old.id())) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         if (changes.hasSuccessor(old.id())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
         Destination dest = c.destination();
         if (dest == null || dest.localStart() == null || dest.localEnd() == null)
@@ -122,9 +142,14 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
             throw fail("WORKOUT_SCHEDULE_DUPLICATE", 409);
         if (changes.hasOtherScheduledOverlap(student, old.id(), start, end))
             throw fail("WORKOUT_SCHEDULE_OVERLAP", 409);
+        if (!links.isEmpty() && !appointments.qualifiesForReplacement(links.getFirst(), student,
+                old.coachingPeriodId(), start, end))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         UUID replacement = UUID.randomUUID(), change = UUID.randomUUID();
         try { changes.reschedule(old, replacement, change, c.actorId(), dest, start, end, at, c.reason()); }
         catch (DataIntegrityViolationException race) { throw databaseConflict(race); }
+        if (!links.isEmpty() && !appointments.transfer(links.getFirst(), old.id(), replacement, c.actorId()))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         ChangeResult result = new ChangeResult("RESCHEDULE", old.id(), old.version() + 1, "RESCHEDULED",
                 old.originalPlannedStartAt(), old.plannedStartAt(), old.plannedEndAt(), replacement, 0L,
                 start, end, old.id(), at, false);
@@ -142,7 +167,8 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         var student = student(c.occurrenceId(), c.actorId());
         plans.lockStudentAndActor(student, c.actorId());
         requireStudent(c.actorId(), student);
-        String hash = hash("CANCEL", c.occurrenceId(), c.expectedOccurrenceVersion(), c.reason());
+        String hash = hash("CANCEL", c.occurrenceId(), c.expectedOccurrenceVersion(), c.reason(),
+                c.expectedAppointmentVersion(), c.expectedAppointmentId());
         var receipt = changes.lockReceipt(c.actorId(), key);
         if (receipt.isPresent()) return replay(receipt.get(), "CANCEL", hash);
 
@@ -150,17 +176,31 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         Instant at = changes.databaseNow();
         checkMutable(old, c.expectedOccurrenceVersion());
         if (changes.hasSuccessor(old.id())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
-        if (appointments.hasAnyLinkedForMutation(old.id())) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        List<Linked> links = appointments.lockLinkedForChange(old.id());
+        if (links.size() > 1) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if (c.expectedAppointmentId() != null && (links.isEmpty()
+                || !links.getFirst().appointmentId().equals(c.expectedAppointmentId())))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
+        if (c.expectedAppointmentVersion() != null && (links.isEmpty()
+                || links.getFirst().version() != c.expectedAppointmentVersion()))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         if (!old.plannedStartAt().isAfter(at) && (c.reason() == null || c.reason().isBlank()))
             throw fail("WORKOUT_SCHEDULE_CHANGE_REASON_REQUIRED", 400);
         UUID change = UUID.randomUUID();
         try { changes.cancel(old, change, c.actorId(), at, c.reason()); }
         catch (DataIntegrityViolationException race) { throw databaseConflict(race); }
+        if (!links.isEmpty() && !appointments.release(links.getFirst(), old.id(), c.actorId()))
+            throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         ChangeResult result = new ChangeResult("CANCEL", old.id(), old.version() + 1, "CANCELLED",
                 old.originalPlannedStartAt(), old.plannedStartAt(), old.plannedEndAt(), null, null,
                 null, null, null, at, false);
         changes.saveReceipt(c.actorId(), key, "CANCEL", hash, change, result, at);
         record(c.actorId(), "PLANNED_WORKOUT_CANCELLED", old.id(), at);
+        if (!links.isEmpty()) {
+            Linked linked = links.getFirst();
+            notifications.committed(change, "LINKED_WORKOUT_CANCELLED", "PLANNED_WORKOUT", old.id(),
+                    old.studentId(), linked.trainerId(), linked.periodId(), c.actorId(), linked.trainerId());
+        }
         return result;
     }
 

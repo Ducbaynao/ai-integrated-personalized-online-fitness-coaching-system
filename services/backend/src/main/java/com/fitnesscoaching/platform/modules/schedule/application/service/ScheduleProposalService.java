@@ -70,7 +70,8 @@ public class ScheduleProposalService implements ScheduleProposalUseCase {
         Proposal proposal = new Proposal(UUID.randomUUID(), 0, "PENDING", c.studentId(), c.trainerId(),
                 authority.periodId(), c.planId(), inspected.planVersionId(), inspected.planVersionNumber(),
                 c.expectedPlanAggregateVersion(), c.weekAnchorDate(), c.timezone(),
-                c.items().stream().map(ProposalItem::fromWorkout).toList(), at,
+                c.items().stream().map(item -> ProposalItem.fromWorkout(item,
+                        inspected.observedAppointmentVersions().get(item.clientItemId()))).toList(), at,
                 null, null, null, null, null);
         store.save(proposal, c.commandKey());
         recordAudit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_PROPOSAL_CREATED", proposal.proposalId(), at);

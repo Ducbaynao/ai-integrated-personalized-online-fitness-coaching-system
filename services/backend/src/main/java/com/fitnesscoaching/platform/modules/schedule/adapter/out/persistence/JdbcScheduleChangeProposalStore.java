@@ -50,7 +50,8 @@ public class JdbcScheduleChangeProposalStore implements ScheduleChangeProposalSt
                 rs.getObject("source_plan_session_id", UUID.class), destination, rs.getString("reason"),
                 instant(rs, "proposed_at"), instant(rs, "decided_at"),
                 rs.getObject("decided_by", UUID.class), instant(rs, "withdrawn_at"),
-                rs.getObject("withdrawn_by", UUID.class));
+                rs.getObject("withdrawn_by", UUID.class), rs.getObject("appointment_id", UUID.class),
+                (Long) rs.getObject("observed_appointment_version"));
     }; }
     @Override public Instant databaseNow() {
         return jdbc.queryForObject("SELECT clock_timestamp()", Timestamp.class).toInstant();
@@ -107,15 +108,17 @@ public class JdbcScheduleChangeProposalStore implements ScheduleChangeProposalSt
                  change_type,old_planned_start_at,old_planned_end_at,original_planned_start_at,
                  old_timezone,old_local_start,old_local_end,old_start_utc_offset,old_end_utc_offset,
                  source_plan_id,source_plan_version_id,source_plan_session_id,
+                 appointment_id,observed_appointment_version,
                  destination_timezone,destination_local_start,destination_local_end,
                  destination_start_utc_offset,destination_end_utc_offset,reason,status,version,proposed_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING',0,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING',0,?)
                 """, p.proposalId(), p.studentId(), p.trainerId(), p.coachingPeriodId(), p.occurrenceId(),
                 p.observedOccurrenceVersion(), p.changeType(), ts(p.oldPlannedStartAt()),
                 ts(p.oldPlannedEndAt()), ts(p.originalPlannedStartAt()), p.oldTimezone(),
                 p.oldLocalStart() == null ? null : p.oldLocalStart().toString(),
                 p.oldLocalEnd() == null ? null : p.oldLocalEnd().toString(), p.oldStartUtcOffset(),
                 p.oldEndUtcOffset(), p.sourcePlanId(), p.sourcePlanVersionId(), p.sourcePlanSessionId(),
+                p.appointmentId(), p.observedAppointmentVersion(),
                 d == null ? null : d.timezone(), d == null ? null : d.localStart().toString(),
                 d == null ? null : d.localEnd().toString(), d == null ? null : d.startUtcOffset(),
                 d == null ? null : d.endUtcOffset(), p.reason(), ts(p.proposedAt()));

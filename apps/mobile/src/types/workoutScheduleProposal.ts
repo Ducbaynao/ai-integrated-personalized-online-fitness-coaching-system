@@ -7,7 +7,7 @@ export interface CreateWorkoutScheduleProposalRequest {
   expectedPlanAggregateVersion: number;
   weekAnchorDate: string;
   timezone: string;
-  items: Pick<WorkoutScheduleProposalItem, 'clientItemId' | 'planSessionId' | 'weekNumber' | 'dayNumber' | 'sequenceNumber' | 'localStart' | 'localEnd' | 'startUtcOffset' | 'endUtcOffset'>[];
+  items: (Pick<WorkoutScheduleProposalItem, 'clientItemId' | 'planSessionId' | 'weekNumber' | 'dayNumber' | 'sequenceNumber' | 'localStart' | 'localEnd' | 'startUtcOffset' | 'endUtcOffset'> & { appointmentId?: string | null })[];
   commandKey: string;
 }
 
@@ -21,6 +21,8 @@ export interface WorkoutScheduleProposalItem {
   localEnd: string;
   startUtcOffset: string;
   endUtcOffset: string;
+  appointmentId: string | null;
+  observedAppointmentVersion: number | null;
   sourceSessionName: string | null;
   sourceSessionFocus: string | null;
 }
@@ -88,7 +90,7 @@ export interface WorkoutScheduleProposalDecisionResult {
     sourceProposalId: string | null;
     confirmedBy: string;
     confirmedAt: string;
-    items: (Omit<WorkoutScheduleProposalItem, 'sourceSessionName' | 'sourceSessionFocus'> & {
+    items: (Omit<WorkoutScheduleProposalItem, 'sourceSessionName' | 'sourceSessionFocus' | 'observedAppointmentVersion'> & {
       occurrenceId: string;
       occurrenceVersion: number;
       plannedStartAt: string;

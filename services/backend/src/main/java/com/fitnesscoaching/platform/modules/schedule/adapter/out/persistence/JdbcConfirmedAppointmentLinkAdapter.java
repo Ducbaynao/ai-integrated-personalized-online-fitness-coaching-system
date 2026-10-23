@@ -44,4 +44,30 @@ public class JdbcConfirmedAppointmentLinkAdapter implements ConfirmedAppointment
                 WHERE id=? AND status='CONFIRMED' AND planned_workout_id IS NULL AND guarded_v2
                 """, occurrenceId, appointmentId) == 1;
     }
+
+    @Override public Long observeProposalCandidate(UUID appointmentId, UUID studentId, UUID trainerId,
+                                                    UUID periodId, Instant start, Instant end) {
+        if (appointmentId == null || studentId == null || trainerId == null || periodId == null
+                || start == null || end == null || !end.isAfter(start) || !trainers.canCoach(trainerId))
+            return null;
+        return jdbc.query("""
+                SELECT a.version FROM fitness.appointments a
+                JOIN fitness.coaching_periods cp ON cp.id=a.coaching_period_id
+                WHERE a.id=? AND a.student_id=? AND a.trainer_id=? AND a.coaching_period_id=?
+                  AND a.guarded_v2 AND a.status='CONFIRMED' AND a.planned_workout_id IS NULL
+                  AND cp.mode='HUMAN_COACH' AND cp.student_id=a.student_id
+                  AND cp.trainer_id=a.trainer_id AND cp.started_at<=clock_timestamp()
+                  AND (cp.ended_at IS NULL OR cp.ended_at>clock_timestamp())
+                  AND a.start_at<=? AND a.end_at>=?
+                FOR UPDATE OF a
+                """, (rs, row) -> rs.getLong(1), appointmentId, studentId, trainerId, periodId,
+                Timestamp.from(start), Timestamp.from(end)).stream().findFirst().orElse(null);
+    }
+
+    @Override public boolean lockQualifyingProposal(UUID appointmentId, long observedVersion,
+                                                    UUID studentId, UUID trainerId, UUID periodId,
+                                                    Instant start, Instant end) {
+        Long current = observeProposalCandidate(appointmentId, studentId, trainerId, periodId, start, end);
+        return current != null && current == observedVersion;
+    }
 }

@@ -189,11 +189,10 @@ class ScheduleChangeProposalIntegrationTest {
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)
                 """, appointment, linked.student(), old, Timestamp.from(start().toInstant(ZoneOffset.UTC)),
                 Timestamp.from(start().plusHours(1).toInstant(ZoneOffset.UTC)), linked.student());
-        assertCode("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", () -> proposals.decide(new Decide(
-                linked.student(), linkedProposal.proposalId(), 0, "ACCEPT", null, "linked-accept-" + old)));
-        assertThat(proposals.detail(linked.student(), linkedProposal.proposalId()).status()).isEqualTo("PENDING");
         assertThat(proposals.decide(new Decide(linked.student(), linkedProposal.proposalId(), 0,
-                "REJECT", null, "linked-reject-" + old)).proposal().status()).isEqualTo("REJECTED");
+                "ACCEPT", null, "linked-accept-" + old)).proposal().status()).isEqualTo("ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment)).isNull();
 
         Fixture unknown = fixture();
         UUID original = occurrence(unknown);
@@ -375,7 +374,7 @@ class ScheduleChangeProposalIntegrationTest {
             writer.get(20, TimeUnit.SECONDS);
             HttpOutcome response = accept.get(20, TimeUnit.SECONDS);
             assertThat(response.status()).isEqualTo(409);
-            assertThat(response.body()).contains("WORKOUT_SCHEDULE_APPOINTMENT_LINKED");
+            assertThat(response.body()).contains("WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STALE");
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointments WHERE id=? AND planned_workout_id=?",
                 Integer.class, appointment, old)).isOne();

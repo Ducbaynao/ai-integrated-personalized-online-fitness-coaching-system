@@ -2,6 +2,12 @@ package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
+import com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.QualifyingWorkoutAppointmentQuery;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.ScheduleChangeProposalUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.Outcome;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -17,6 +23,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -30,6 +39,10 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -67,6 +80,560 @@ class ScheduleProposalIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired InAppNotificationService notifications;
+    @Autowired AppointmentService appointments;
+    @Autowired WorkoutScheduleChangeUseCase changes;
+    @Autowired WorkoutExecutionCommandUseCase execution;
+    @Autowired WorkoutScheduleCalendarQuery calendar;
+    @Autowired ScheduleChangeProposalUseCase changeProposals;
+
+    @Test void linkedTrainerChangeProposalsPinAppointmentAndStudentDecidesBothTransitions() {
+        LinkedFixture linked = linkedPendingProposal("linked-change-proposal");
+        UUID old = proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0,
+                "ACCEPT", null, "linked-change-proposal-batch-accept"))
+                .confirmedBatch().items().getFirst().occurrenceId();
+        var movedProposal = changeProposals.create(new ScheduleChangeProposalUseCase.Create(
+                linked.fixture.trainer(), linked.fixture.student(), old, 0, "RESCHEDULE",
+                new WorkoutScheduleChangeUseCase.Destination(at(11), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                "Different time", "linked-change-proposal-move")).proposal();
+        assertThat(movedProposal.appointmentId()).isEqualTo(linked.appointmentId);
+        assertThat(movedProposal.observedAppointmentVersion()).isEqualTo(linked.appointmentVersion + 1);
+        var moved = changeProposals.decide(new ScheduleChangeProposalUseCase.Decide(linked.fixture.student(),
+                movedProposal.proposalId(), 0, "ACCEPT", null, "linked-change-proposal-move-accept"));
+        UUID successor = moved.appliedChange().replacementOccurrenceId();
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, linked.appointmentId)).isEqualTo(successor);
+        var cancelProposal = changeProposals.create(new ScheduleChangeProposalUseCase.Create(
+                linked.fixture.trainer(), linked.fixture.student(), successor, 0, "CANCEL", null,
+                "No workout", "linked-change-proposal-cancel")).proposal();
+        assertThat(cancelProposal.appointmentId()).isEqualTo(linked.appointmentId);
+        var cancelled = changeProposals.decide(new ScheduleChangeProposalUseCase.Decide(linked.fixture.student(),
+                cancelProposal.proposalId(), 0, "ACCEPT", null, "linked-change-proposal-cancel-accept"));
+        assertThat(cancelled.appliedChange().previousStatus()).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, linked.appointmentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?",
+                String.class, linked.appointmentId)).isEqualTo("CONFIRMED");
+        assertThat(changeProposals.decide(new ScheduleChangeProposalUseCase.Decide(linked.fixture.student(),
+                cancelProposal.proposalId(), 0, "ACCEPT", null, "linked-change-proposal-cancel-accept"))
+                .replayed()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=? "
+                + "AND event_type='LINKED_WORKOUT_CANCELLED' AND recipient_user_id=?", Integer.class,
+                successor, linked.fixture.trainer())).isOne();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointment_events_v2 "
+                + "WHERE appointment_id=? AND event_type='WORKOUT_LINK_RELEASED'", Integer.class,
+                linked.appointmentId)).isOne();
+        sharing.revoke(linked.fixture.student(), linked.fixture.relationship(), linked.fixture.permission(), 0,
+                "Revoke schedule access", UUID.randomUUID());
+        assertThat(notifications.list(linked.fixture.trainer(), 0, 20).items())
+                .noneMatch(item -> item.eventType().equals("LINKED_WORKOUT_CANCELLED"));
+    }
+    @Autowired QualifyingWorkoutAppointmentQuery qualifying;
+    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired tools.jackson.databind.ObjectMapper json;
+
+    @Test void linkedStartWinsAgainstReschedule() throws Exception { linkedStartRace(true, false); }
+    @Test void linkedRescheduleWinsAgainstStart() throws Exception { linkedStartRace(false, false); }
+    @Test void linkedStartWinsAgainstCancel() throws Exception { linkedStartRace(true, true); }
+    @Test void linkedCancelWinsAgainstStart() throws Exception { linkedStartRace(false, true); }
+
+    private void linkedStartRace(boolean startWins, boolean cancel) throws Exception {
+        String name = "linked-start-race-" + startWins + "-" + cancel;
+        LinkedFixture linked = linkedPendingProposal(name, true);
+        UUID old = proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0,
+                "ACCEPT", null, name + "-accept")).confirmedBatch().items().getFirst().occurrenceId();
+        // Model a confirmed Appointment whose start has passed while the workout
+        // remains well in the future. Both commands are then genuinely eligible;
+        // no fixture is placed close to a clock boundary.
+        jdbc.update("""
+                UPDATE fitness.appointments
+                SET start_at=clock_timestamp()-interval '2 hours',
+                    local_start=(clock_timestamp()-interval '2 hours') AT TIME ZONE 'UTC',
+                    version=version+1 WHERE id=?
+                """, linked.appointmentId);
+        assertThat(qualifying.existsForOccurrence(old)).isTrue();
+        String startKey = name + "-start", changeKey = name + "-change";
+        CountDownLatch firstFinished = new CountDownLatch(1), releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondEntered = new CountDownLatch(1);
+        AtomicInteger firstPid = new AtomicInteger(), secondPid = new AtomicInteger();
+        HttpOutcome first, second;
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<HttpOutcome> leading = pool.submit(() -> inHttpTransaction(startWins, () -> {
+                firstPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                HttpOutcome outcome;
+                try {
+                    outcome = workoutDirect(linked.fixture.student(), old, startWins ? "START" :
+                            cancel ? "CANCEL" : "RESCHEDULE", startWins ? startKey : changeKey);
+                    assertThat(outcome.status()).isEqualTo(startWins ? 201 : cancel ? 200 : 201);
+                } finally { firstFinished.countDown(); }
+                await(releaseFirst);
+                return outcome;
+            }));
+            assertThat(firstFinished.await(15, TimeUnit.SECONDS)).isTrue();
+            if (leading.isDone()) leading.get(1, TimeUnit.SECONDS);
+            assertThat(jdbc.queryForObject("SELECT state FROM pg_stat_activity WHERE pid=?",
+                    String.class, firstPid.get())).isEqualTo("idle in transaction");
+            Future<HttpOutcome> waiting = pool.submit(() -> inHttpTransaction(!startWins, () -> {
+                secondPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                secondEntered.countDown();
+                return workoutHttp(linked.fixture.student(), old, startWins ?
+                        cancel ? "CANCEL" : "RESCHEDULE" : "START", startWins ? changeKey : startKey);
+            }));
+            try {
+                assertThat(secondEntered.await(15, TimeUnit.SECONDS)).isTrue();
+                awaitBlockedBy(secondPid.get(), firstPid.get(), waiting);
+            } finally { releaseFirst.countDown(); }
+            first = leading.get(20, TimeUnit.SECONDS);
+            second = waiting.get(20, TimeUnit.SECONDS);
+        }
+        assertThat(first.status()).isEqualTo(startWins ? 201 : cancel ? 200 : 201);
+        assertThat(second.status()).isEqualTo(409);
+        assertThat(second.code()).isEqualTo(startWins
+                ? "WORKOUT_SCHEDULE_OCCURRENCE_VERSION_CONFLICT"
+                : "WORKOUT_EXECUTION_VERSION_CONFLICT");
+        String finalStatus = jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
+                String.class, old);
+        assertThat(finalStatus).isEqualTo(startWins ? "SCHEDULED" : cancel ? "CANCELLED" : "RESCHEDULED");
+        UUID successor = jdbc.query("SELECT id FROM fitness.planned_workouts WHERE rescheduled_from_id=?",
+                (rs, row) -> rs.getObject(1, UUID.class), old).stream().findFirst().orElse(null);
+        if (startWins || cancel) assertThat(successor).isNull();
+        else assertThat(successor).isEqualTo(first.replacement());
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, linked.appointmentId)).isEqualTo(startWins ? old : cancel ? null : successor);
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?",
+                String.class, linked.appointmentId)).isEqualTo("CONFIRMED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                Integer.class, old)).isEqualTo(startWins ? 1 : 0);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_execution_command_receipts "
+                + "WHERE actor_id=? AND command_key=?", Integer.class, linked.fixture.student(), startKey))
+                .isEqualTo(startWins ? 1 : 0);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_change_receipts "
+                + "WHERE actor_id=? AND command_key=?", Integer.class, linked.fixture.student(), changeKey))
+                .isEqualTo(startWins ? 0 : 1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointment_events_v2 WHERE appointment_id=? "
+                + "AND event_type=?", Integer.class, linked.appointmentId,
+                cancel ? "WORKOUT_LINK_RELEASED" : "WORKOUT_LINK_TRANSFERRED"))
+                .isEqualTo(startWins ? 0 : 1);
+        UUID auditTarget = startWins ? jdbc.queryForObject("SELECT id FROM fitness.workout_session_logs "
+                + "WHERE planned_workout_id=?", UUID.class, old) : old;
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE actor_user_id=? "
+                + "AND target_id=? AND action=?", Integer.class, linked.fixture.student(), auditTarget,
+                startWins ? "WORKOUT_EXECUTION_STARTED" : cancel ? "PLANNED_WORKOUT_CANCELLED"
+                        : "PLANNED_WORKOUT_RESCHEDULED")).isOne();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=? "
+                + "AND event_type='LINKED_WORKOUT_CANCELLED'", Integer.class, old))
+                .isEqualTo(!startWins && cancel ? 1 : 0);
+    }
+
+    private HttpOutcome inHttpTransaction(boolean start, java.util.function.Supplier<HttpOutcome> command) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setIsolationLevel(start
+                ? org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ
+                : org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        transaction.setTimeout(15);
+        return transaction.execute(status -> {
+            HttpOutcome outcome = command.get();
+            // MockMvc catches the domain exception to serialize its HTTP 409,
+            // while the joined command transaction is rollback-only. Complete
+            // the losing outer transaction as an explicit rollback.
+            if (outcome.status() >= 400) status.setRollbackOnly();
+            return outcome;
+        });
+    }
+
+    private HttpOutcome workoutDirect(UUID student, UUID occurrence, String action, String key) {
+        return switch (action) {
+            case "START" -> {
+                execution.start(new WorkoutExecutionCommandUseCase.StartCommand(occurrence, student, 0, key));
+                yield new HttpOutcome(201, null, null);
+            }
+            case "CANCEL" -> {
+                changes.cancel(new WorkoutScheduleChangeUseCase.Cancel(occurrence, student, 0,
+                        "Cancel linked workout", key));
+                yield new HttpOutcome(200, null, null);
+            }
+            case "RESCHEDULE" -> {
+                var result = changes.reschedule(new WorkoutScheduleChangeUseCase.Reschedule(occurrence,
+                        student, 0, new WorkoutScheduleChangeUseCase.Destination(at(11), at(12),
+                        "Etc/UTC", "+00:00", "+00:00"), null, key));
+                yield new HttpOutcome(201, null, result.replacementOccurrenceId());
+            }
+            default -> throw new IllegalArgumentException(action);
+        };
+    }
+
+    private HttpOutcome workoutHttp(UUID student, UUID occurrence, String action, String key) {
+        String url, body;
+        switch (action) {
+            case "START" -> {
+                url = "/api/v1/planned-workouts/{id}/executions";
+                body = "{\"expectedOccurrenceVersion\":0,\"commandKey\":\"" + key + "\"}";
+            }
+            case "CANCEL" -> {
+                url = "/api/v1/planned-workouts/{id}/cancel";
+                body = "{\"expectedOccurrenceVersion\":0,\"reason\":\"Cancel linked workout\","
+                        + "\"commandKey\":\"" + key + "\"}";
+            }
+            case "RESCHEDULE" -> {
+                url = "/api/v1/planned-workouts/{id}/reschedule";
+                body = """
+                        {"expectedOccurrenceVersion":0,"commandKey":"%s",
+                         "destination":{"localStart":"%s","localEnd":"%s","timezone":"Etc/UTC",
+                         "startUtcOffset":"+00:00","endUtcOffset":"+00:00"}}
+                        """.formatted(key, at(11), at(12));
+            }
+            default -> throw new IllegalArgumentException(action);
+        }
+        try {
+            var response = mvc.perform(post(url, occurrence).contentType(MediaType.APPLICATION_JSON)
+                    .content(body).with(jwt().jwt(token -> token.subject(student.toString()))))
+                    .andReturn().getResponse();
+            var tree = json.readTree(response.getContentAsString());
+            return new HttpOutcome(response.getStatus(), tree.has("errorCode")
+                    ? tree.get("errorCode").asText() : null,
+                    tree.has("replacementOccurrenceId")
+                            ? UUID.fromString(tree.get("replacementOccurrenceId").asText()) : null);
+        } catch (Exception failure) { throw new IllegalStateException(action + " HTTP command failed", failure); }
+    }
+
+    private void addStartablePrescription(UUID session) {
+        UUID exercise = UUID.randomUUID(), variation = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.exercises(id,code,name,admin_status,created_by) "
+                + "SELECT ?,?,'Race exercise','ACTIVE',student_id FROM fitness.workout_plans WHERE id="
+                + "(SELECT workout_plan_id FROM fitness.workout_plan_versions WHERE id="
+                + "(SELECT workout_plan_version_id FROM fitness.workout_plan_sessions WHERE id=?))",
+                exercise, "linked-race-exercise-" + exercise, session);
+        jdbc.update("INSERT INTO fitness.exercise_variations(id,exercise_id,code,name,is_active) "
+                + "VALUES (?,?,?,'Race variation',true)", variation, exercise, "linked-race-variation-" + variation);
+        jdbc.update("INSERT INTO fitness.workout_plan_session_exercises "
+                + "(id,workout_plan_session_id,exercise_variation_id,sequence_number,target_sets,target_reps_min,target_reps_max) "
+                + "VALUES (?,?,?,1,1,8,12)", UUID.randomUUID(), session, variation);
+    }
+
+    private void awaitBlockedBy(int waiter, int blocker, Future<HttpOutcome> waiting) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (waiting.isDone()) throw new AssertionError("Command finished before lock wait: "
+                    + waiting.get(1, TimeUnit.SECONDS));
+            Boolean blocked = jdbc.queryForObject("""
+                    SELECT EXISTS(SELECT 1 FROM pg_stat_activity a WHERE a.pid=?
+                    AND a.wait_event_type='Lock' AND ?=ANY(pg_blocking_pids(a.pid)))
+                    """, Boolean.class, waiter, blocker);
+            if (Boolean.TRUE.equals(blocked)) return;
+            Thread.onSpinWait();
+        }
+        String observed = jdbc.queryForObject("SELECT state || '/' || coalesce(wait_event_type,'none') "
+                + "|| '/' || coalesce(wait_event,'none') FROM pg_stat_activity WHERE pid=?", String.class, waiter);
+        throw new AssertionError("Expected PostgreSQL waiter " + waiter + " blocked by " + blocker
+                + "; observed " + observed);
+    }
+
+    private record HttpOutcome(int status, String code, UUID replacement) {}
+
+    @Test void guardedConfirmedAppointmentCannotDoubleLinkSameOccurrenceEvenWithoutTimeOverlap() {
+        LinkedFixture linked = linkedPendingProposal("unique-guarded-link");
+        UUID occurrence = proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0,
+                "ACCEPT", null, "unique-guarded-link-accept"))
+                .confirmedBatch().items().getFirst().occurrenceId();
+        // A second interval does not overlap the first one, so V45's time exclusion
+        // alone cannot protect the one-active-link identity.
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO fitness.appointments
+                (id,student_id,trainer_id,coaching_period_id,planned_workout_id,start_at,end_at,
+                 display_timezone,local_start,local_end,start_utc_offset,end_utc_offset,
+                 guarded_v2,status,created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,true,'CONFIRMED',?)
+                """, UUID.randomUUID(), linked.fixture.student(), linked.fixture.trainer(),
+                linked.fixture.period(), occurrence,
+                Timestamp.from(at(13).toInstant(ZoneOffset.UTC)),
+                Timestamp.from(at(14).toInstant(ZoneOffset.UTC)),
+                "Etc/UTC", at(13), at(14), "+00:00", "+00:00", linked.fixture.student()))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasRootCauseInstanceOf(org.postgresql.util.PSQLException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointments WHERE planned_workout_id=? "
+                + "AND status='CONFIRMED'", Integer.class, occurrence)).isOne();
+    }
+
+    @Test void acceptedProposalCommitsBeforeAppointmentCancelAndPreventsDoubleSuccess() throws Exception {
+        LinkedFixture linked = linkedPendingProposal("accept-first");
+        CountDownLatch acceptedInsideTransaction = new CountDownLatch(1), releaseCommit = new CountDownLatch(1);
+        CountDownLatch writerInvoked = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<?> accept = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0, "ACCEPT", null,
+                        "accept-first-decision"));
+                acceptedInsideTransaction.countDown();
+                await(releaseCommit);
+                return null;
+            }));
+            assertThat(acceptedInsideTransaction.await(15, TimeUnit.SECONDS)).isTrue();
+            Future<String> writer = pool.submit(() -> {
+                writerInvoked.countDown();
+                try {
+                    appointments.cancel(new AppointmentService.CancelCommand(linked.fixture.student(),
+                            linked.appointmentId, linked.appointmentVersion, "Cancel", UUID.randomUUID()));
+                    return "COMMITTED";
+                } catch (com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentFailure failure) {
+                    return failure.code();
+                }
+            });
+            assertThat(writerInvoked.await(15, TimeUnit.SECONDS)).isTrue();
+            releaseCommit.countDown();
+            accept.get(20, TimeUnit.SECONDS);
+            assertThat(writer.get(20, TimeUnit.SECONDS)).isIn("APPOINTMENT_VERSION_STALE", "APPOINTMENT_COACH_REQUIRED_DEPENDENCY");
+        }
+        assertThat(proposals.detail(linked.fixture.student(), linked.proposalId).status()).isEqualTo("ACCEPTED");
+        assertThat(countOccurrences(linked.fixture)).isOne();
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?", String.class,
+                linked.appointmentId)).isEqualTo("CONFIRMED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointments a JOIN fitness.planned_workouts p "
+                + "ON p.id=a.planned_workout_id WHERE a.id=? AND p.status='SCHEDULED'", Integer.class,
+                linked.appointmentId)).isOne();
+    }
+
+    @Test void cancelledAppointmentCommitsBeforeProposalAcceptAndLeavesNoPartialMaterialization() throws Exception {
+        LinkedFixture linked = linkedPendingProposal("writer-first");
+        CountDownLatch cancelledInsideTransaction = new CountDownLatch(1), releaseCommit = new CountDownLatch(1);
+        CountDownLatch acceptInvoked = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Future<?> writer = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                appointments.cancel(new AppointmentService.CancelCommand(linked.fixture.student(),
+                        linked.appointmentId, linked.appointmentVersion, "Cancel", UUID.randomUUID()));
+                cancelledInsideTransaction.countDown();
+                await(releaseCommit);
+                return null;
+            }));
+            assertThat(cancelledInsideTransaction.await(15, TimeUnit.SECONDS)).isTrue();
+            Future<String> accept = pool.submit(() -> {
+                acceptInvoked.countDown();
+                try {
+                    proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0,
+                            "ACCEPT", null, "writer-first-decision"));
+                    return "COMMITTED";
+                } catch (WorkoutScheduleFailure failure) {
+                    return failure.code();
+                }
+            });
+            assertThat(acceptInvoked.await(15, TimeUnit.SECONDS)).isTrue();
+            releaseCommit.countDown();
+            writer.get(20, TimeUnit.SECONDS);
+            assertThat(accept.get(20, TimeUnit.SECONDS)).isEqualTo("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING");
+        }
+        assertThat(proposals.detail(linked.fixture.student(), linked.proposalId).status()).isEqualTo("PENDING");
+        assertThat(countOccurrences(linked.fixture)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_command_receipts "
+                + "WHERE actor_id=? AND command_key='writer-first-decision'", Integer.class,
+                linked.fixture.student())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_batches "
+                + "WHERE source_proposal_id=?", Integer.class, linked.proposalId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=? "
+                + "AND event_type='WORKOUT_SCHEDULE_PROPOSAL_ACCEPTED'", Integer.class,
+                linked.proposalId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?", String.class,
+                linked.appointmentId)).isEqualTo("CANCELLED");
+    }
+
+    @Test void appointmentRescheduleAndLinkedWorkoutRescheduleSerializeInBothCommitOrders() throws Exception {
+        for (boolean workoutWins : List.of(true, false)) {
+            LinkedFixture linked = linkedPendingProposal("linked-reschedule-race-" + workoutWins);
+            UUID old = proposals.decide(new Decide(linked.fixture.student(), linked.proposalId, 0,
+                    "ACCEPT", null, "linked-reschedule-race-batch-" + workoutWins))
+                    .confirmedBatch().items().getFirst().occurrenceId();
+            long appointmentVersion = linked.appointmentVersion + 1;
+            var request = appointments.requestReschedule(new AppointmentService.RescheduleCommand(
+                    linked.fixture.student(), linked.appointmentId, appointmentVersion,
+                    new AppointmentService.LocalInterval(at(9), at(11), "Etc/UTC", "+00:00", "+00:00"),
+                    "Shorter appointment", UUID.randomUUID()));
+            var destination = new WorkoutScheduleChangeUseCase.Destination(at(11), at(12),
+                    "Etc/UTC", "+00:00", "+00:00");
+            CountDownLatch firstChanged = new CountDownLatch(1), releaseFirst = new CountDownLatch(1);
+            CountDownLatch secondInvoked = new CountDownLatch(1);
+            try (var pool = Executors.newFixedThreadPool(2)) {
+                Future<?> first = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                    if (workoutWins) changes.reschedule(new WorkoutScheduleChangeUseCase.Reschedule(old,
+                            linked.fixture.student(), 0, destination, null,
+                            "linked-reschedule-race-workout-" + workoutWins));
+                    else appointments.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                            linked.fixture.trainer(), request.request().requestId(), "ACCEPT", 0,
+                            appointmentVersion, UUID.randomUUID()));
+                    firstChanged.countDown();
+                    await(releaseFirst);
+                    return null;
+                }));
+                assertThat(firstChanged.await(15, TimeUnit.SECONDS)).isTrue();
+                Future<String> second = pool.submit(() -> {
+                    secondInvoked.countDown();
+                    try {
+                        if (workoutWins) appointments.decideReschedule(
+                                new AppointmentService.RescheduleDecisionCommand(linked.fixture.trainer(),
+                                        request.request().requestId(), "ACCEPT", 0, appointmentVersion,
+                                        UUID.randomUUID()));
+                        else changes.reschedule(new WorkoutScheduleChangeUseCase.Reschedule(old,
+                                linked.fixture.student(), 0, destination, null,
+                                "linked-reschedule-race-workout-" + workoutWins));
+                        return "COMMITTED";
+                    } catch (com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentFailure failure) {
+                        return failure.code();
+                    } catch (WorkoutScheduleFailure failure) {
+                        return failure.code();
+                    }
+                });
+                assertThat(secondInvoked.await(15, TimeUnit.SECONDS)).isTrue();
+                releaseFirst.countDown();
+                first.get(20, TimeUnit.SECONDS);
+                String loser = second.get(20, TimeUnit.SECONDS);
+                assertThat(loser).isNotEqualTo("COMMITTED");
+                if (workoutWins) assertThat(loser).isIn("APPOINTMENT_VERSION_STALE",
+                        "APPOINTMENT_COACH_REQUIRED_DEPENDENCY");
+                else assertThat(loser).isEqualTo("WORKOUT_SCHEDULE_APPOINTMENT_LINKED");
+            }
+            UUID active = jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                    UUID.class, linked.appointmentId);
+            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?",
+                    String.class, linked.appointmentId)).isEqualTo("CONFIRMED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?",
+                    Integer.class, old)).isEqualTo(workoutWins ? 1 : 0);
+            assertThat(active).isEqualTo(workoutWins ? jdbc.queryForObject(
+                    "SELECT id FROM fitness.planned_workouts WHERE rescheduled_from_id=?", UUID.class, old) : old);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_change_receipts "
+                    + "WHERE actor_id=? AND command_key=?", Integer.class, linked.fixture.student(),
+                    "linked-reschedule-race-workout-" + workoutWins)).isEqualTo(workoutWins ? 1 : 0);
+        }
+    }
+
+    private LinkedFixture linkedPendingProposal(String key) {
+        return linkedPendingProposal(key, false);
+    }
+
+    private LinkedFixture linkedPendingProposal(String key, boolean startable) {
+        Fixture f = fixture("COACH_REQUIRED", startable);
+        var request = appointments.request(new AppointmentService.RequestCommand(f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(at(9), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                UUID.randomUUID()));
+        var app = appointments.decide(new AppointmentService.DecisionCommand(f.trainer(),
+                request.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        Item item = new Item(UUID.randomUUID(), f.session(), 1, 1, 1, at(10), at(11),
+                "+00:00", "+00:00", app.appointmentId());
+        UUID proposal = proposals.create(new Create(f.trainer(), f.student(), f.plan(), f.version(), 1,
+                anchor(), "Etc/UTC", List.of(item), key + "-proposal")).proposal().proposalId();
+        return new LinkedFixture(f, app.appointmentId(), app.version(), proposal);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try { if (!latch.await(15, TimeUnit.SECONDS)) throw new AssertionError("transaction gate timed out"); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+    }
+    private record LinkedFixture(Fixture fixture, UUID appointmentId, long appointmentVersion, UUID proposalId) {}
+
+    @Test void coachRequiredProposalPinsConfirmedAppointmentAndAcceptsAtomically() throws Exception {
+        Fixture f = fixture("COACH_REQUIRED");
+        var requested = appointments.request(new AppointmentService.RequestCommand(f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(at(9), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                UUID.randomUUID()));
+        var appointment = appointments.decide(new AppointmentService.DecisionCommand(f.trainer(),
+                requested.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        Item item = new Item(UUID.randomUUID(), f.session(), 1, 1, 1, at(10), at(11),
+                "+00:00", "+00:00", appointment.appointmentId());
+        Create command = new Create(f.trainer(), f.student(), f.plan(), f.version(), 1, anchor(),
+                "Etc/UTC", List.of(item), "coached-propose");
+        var proposal = proposals.create(command).proposal();
+        assertThat(proposal.items().getFirst().appointmentId()).isEqualTo(appointment.appointmentId());
+        assertThat(proposal.items().getFirst().observedAppointmentVersion()).isEqualTo(appointment.version());
+        assertThat(countOccurrences(f)).isZero();
+        mvc.perform(get("/api/v1/planned-workout-schedule-proposals/{id}", proposal.proposalId())
+                .with(jwt().jwt(token -> token.subject(f.student().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].appointmentId").value(appointment.appointmentId().toString()))
+                .andExpect(jsonPath("$.items[0].observedAppointmentVersion").value((int) appointment.version()));
+        var accepted = proposals.decide(new Decide(f.student(), proposal.proposalId(), 0,
+                "ACCEPT", null, "coached-accept"));
+        UUID occurrence = accepted.confirmedBatch().items().getFirst().occurrenceId();
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment.appointmentId())).isEqualTo(occurrence);
+        var scheduled = calendar.detail(f.student(), occurrence);
+        assertThat(scheduled.linkedAppointmentId()).isEqualTo(appointment.appointmentId());
+        assertThat(scheduled.linkedAppointmentVersion()).isEqualTo(appointment.version() + 1);
+        assertThat(scheduled.availableActions()).contains("RESCHEDULE", "CANCEL");
+        assertThat(proposals.decide(new Decide(f.student(), proposal.proposalId(), 0,
+                "ACCEPT", null, "coached-accept")).replayed()).isTrue();
+        assertThat(countOccurrences(f)).isOne();
+    }
+
+    @Test void changedAppointmentKeepsCoachRequiredProposalPending() {
+        Fixture f = fixture("COACH_REQUIRED");
+        var request = appointments.request(new AppointmentService.RequestCommand(f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(at(9), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                UUID.randomUUID()));
+        var appointment = appointments.decide(new AppointmentService.DecisionCommand(f.trainer(),
+                request.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        Item item = new Item(UUID.randomUUID(), f.session(), 1, 1, 1, at(10), at(11),
+                "+00:00", "+00:00", appointment.appointmentId());
+        UUID proposalId = proposals.create(new Create(f.trainer(), f.student(), f.plan(), f.version(), 1,
+                anchor(), "Etc/UTC", List.of(item), "appointment-stale-propose")).proposal().proposalId();
+        var reschedule = appointments.requestReschedule(new AppointmentService.RescheduleCommand(f.student(),
+                appointment.appointmentId(), appointment.version(),
+                new AppointmentService.LocalInterval(at(8), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                "Move earlier", UUID.randomUUID()));
+        appointments.decideReschedule(new AppointmentService.RescheduleDecisionCommand(f.trainer(),
+                reschedule.request().requestId(), "ACCEPT", 0, appointment.version(), UUID.randomUUID()));
+        assertFailure("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING", () ->
+                proposals.decide(new Decide(f.student(), proposalId, 0, "ACCEPT", null, "stale-app-accept")));
+        assertThat(proposals.detail(f.student(), proposalId).status()).isEqualTo("PENDING");
+        assertThat(countOccurrences(f)).isZero();
+        assertThat(proposals.decide(new Decide(f.student(), proposalId, 0,
+                "REJECT", null, "stale-app-reject")).proposal().status()).isEqualTo("REJECTED");
+    }
+
+    @Test void linkedRescheduleTransfersActiveLinkAndCancelKeepsAppointment() {
+        Fixture f = fixture("COACH_REQUIRED");
+        var request = appointments.request(new AppointmentService.RequestCommand(f.student(), f.student(), null,
+                new AppointmentService.LocalInterval(at(9), at(13), "Etc/UTC", "+00:00", "+00:00"),
+                UUID.randomUUID()));
+        var appointment = appointments.decide(new AppointmentService.DecisionCommand(f.trainer(),
+                request.request().requestId(), "ACCEPT", 0, UUID.randomUUID())).appointment();
+        Item item = new Item(UUID.randomUUID(), f.session(), 1, 1, 1, at(10), at(11),
+                "+00:00", "+00:00", appointment.appointmentId());
+        UUID proposal = proposals.create(new Create(f.trainer(), f.student(), f.plan(), f.version(), 1,
+                anchor(), "Etc/UTC", List.of(item), "linked-change-source")).proposal().proposalId();
+        UUID old = proposals.decide(new Decide(f.student(), proposal, 0, "ACCEPT", null,
+                "linked-change-accept")).confirmedBatch().items().getFirst().occurrenceId();
+        assertFailure("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", () -> changes.reschedule(
+                new WorkoutScheduleChangeUseCase.Reschedule(old, f.student(), 0,
+                        new WorkoutScheduleChangeUseCase.Destination(at(12), at(14), "Etc/UTC", "+00:00", "+00:00"),
+                        null, "outside-linked-appointment")));
+        var moved = changes.reschedule(new WorkoutScheduleChangeUseCase.Reschedule(old, f.student(), 0,
+                new WorkoutScheduleChangeUseCase.Destination(at(11), at(12), "Etc/UTC", "+00:00", "+00:00"),
+                null, "inside-linked-appointment"));
+        UUID successor = moved.replacementOccurrenceId();
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment.appointmentId())).isEqualTo(successor);
+        assertThat(calendar.detail(f.student(), old).linkedAppointmentId()).isNull();
+        assertThat(calendar.detail(f.student(), successor).linkedAppointmentId()).isEqualTo(appointment.appointmentId());
+        assertThat(qualifying.existsForOccurrence(old)).isFalse();
+        // Execution qualification additionally requires DB time inside the future appointment.
+        assertThat(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.appointments a
+                  JOIN fitness.planned_workouts p ON p.id=a.planned_workout_id
+                  WHERE a.id=? AND p.id=? AND a.status='CONFIRMED'
+                    AND a.start_at<=p.planned_start_at AND a.end_at>=p.planned_end_at)
+                """, Boolean.class, appointment.appointmentId(), successor)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointment_events_v2 WHERE appointment_id=? AND event_type='WORKOUT_LINK_TRANSFERRED'",
+                Integer.class, appointment.appointmentId())).isOne();
+        var cancelled = changes.cancel(new WorkoutScheduleChangeUseCase.Cancel(successor, f.student(), 0,
+                "Không tập", "linked-successor-cancel"));
+        assertThat(cancelled.previousStatus()).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment.appointmentId())).isNull();
+        assertThat(calendar.detail(f.student(), successor).linkedAppointmentId()).isNull();
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.appointments WHERE id=?",
+                String.class, appointment.appointmentId())).isEqualTo("CONFIRMED");
+        assertThat(notifications.list(f.trainer(), 0, 20).items())
+                .anySatisfy(notice -> assertThat(notice.eventType()).isEqualTo("LINKED_WORKOUT_CANCELLED"));
+        long version = jdbc.queryForObject("SELECT version FROM fitness.appointments WHERE id=?",
+                Long.class, appointment.appointmentId());
+        assertThat(appointments.cancel(new AppointmentService.CancelCommand(f.student(),
+                appointment.appointmentId(), version, "Không còn buổi tập", UUID.randomUUID()))
+                .appointment().status()).isEqualTo("CANCELLED");
+    }
 
     @Test void trainerProposalListRequiresCurrentViewAndScopesOwnStudentAndStatus() throws Exception {
         Fixture f = fixture(), other = fixture();
@@ -613,6 +1180,13 @@ class ScheduleProposalIntegrationTest {
     private static LocalDateTime at(int hour) { return anchor().atTime(hour, 0); }
 
     private Fixture fixture() {
+        return fixture("SELF_ALLOWED");
+    }
+    private Fixture fixture(String supervision) {
+        return fixture(supervision, false);
+    }
+
+    private Fixture fixture(String supervision, boolean startable) {
         UUID student = person("STUDENT"), trainer = person("TRAINER");
         Outcome pending = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
         Outcome active = lifecycle.relationshipAction(trainer, pending.relationship().id(), "ACCEPT",
@@ -634,13 +1208,14 @@ class ScheduleProposalIntegrationTest {
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_sessions
                 (id,workout_plan_version_id,week_number,day_number,sequence_number,name,supervision_requirement)
-                VALUES (?,?,1,1,1,'Session','SELF_ALLOWED')
-                """, session, version);
+                 VALUES (?,?,1,1,1,'Session',?::fitness.supervision_requirement)
+                 """, session, version, supervision);
         jdbc.update("""
                 INSERT INTO fitness.workout_plan_sessions
                 (id,workout_plan_version_id,week_number,day_number,sequence_number,name,supervision_requirement)
                 VALUES (?,?,1,2,1,'Second','SELF_ALLOWED')
                 """, secondSession, version);
+        if (startable) addStartablePrescription(session);
         jdbc.update("""
                 UPDATE fitness.workout_plan_versions
                 SET effective_from=clock_timestamp(),locked_at=clock_timestamp(),locked_by=?,lock_reason='ACTIVATED'

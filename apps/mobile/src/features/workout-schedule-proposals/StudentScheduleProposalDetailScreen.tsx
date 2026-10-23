@@ -110,6 +110,9 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
         {item.sourceSessionFocus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {item.sourceSessionFocus}</Text> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc: {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}</Text>
+        {item.appointmentId ? <WorkoutButton label="Xem lịch hẹn đã chọn" secondary
+          onPress={() => router.push(`/appointments/${item.appointmentId}` as never)} /> : null}
+        {item.appointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi này cần lịch hẹn CONFIRMED. Máy chủ sẽ kiểm tra lại lịch hẹn và phiên bản đã ghi nhận khi bạn chấp nhận; nếu lịch hẹn đổi, đề xuất vẫn PENDING để bạn quyết định lại.</Text> : null}
       </WorkoutCard>)}
       {proposal.status === 'PENDING' ? <WorkoutCard>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bạn chỉ có thể chấp nhận hoặc từ chối toàn bộ đề xuất. Lịch tập chỉ được tạo sau khi máy chủ xác nhận thành công.</Text>
@@ -123,7 +126,7 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
         <Text accessibilityRole="alert" style={[styles.h2, { color: theme.textPrimary }]}>{confirmation === 'ACCEPT' ? 'Xác nhận chấp nhận toàn bộ lịch?' : 'Xác nhận từ chối toàn bộ đề xuất?'}</Text>
         {confirmation === 'ACCEPT' ? <>
           <Text style={[styles.body, { color: theme.textPrimary }]}>Múi giờ huấn luyện viên đã chọn cho đề xuất: {proposal.timezone}. Đây không phải múi giờ hồ sơ của bạn.</Text>
-          {proposal.items.map((item) => <Text key={item.clientItemId} style={[styles.body, { color: theme.textPrimary }]}>{item.sourceSessionName?.trim() || `Buổi ${item.sequenceNumber}`}: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)} → {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}</Text>)}
+          {proposal.items.map((item) => <Text key={item.clientItemId} style={[styles.body, { color: theme.textPrimary }]}>{item.sourceSessionName?.trim() || `Buổi ${item.sequenceNumber}`}: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)} → {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}{item.appointmentId ? ' · Yêu cầu lịch hẹn đã chọn còn CONFIRMED' : ''}</Text>)}
         </> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{confirmation === 'ACCEPT'
           ? `Nếu hợp lệ, cả ${proposal.items.length} buổi sẽ được tạo cùng lúc; nếu có xung đột, không buổi nào được tạo.`

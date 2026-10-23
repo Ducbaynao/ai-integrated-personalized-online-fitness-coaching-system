@@ -79,6 +79,11 @@ export function TrainerChangeProposalDetailScreen({ relationshipId, proposalId }
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc cũ: {proposal.oldPlannedEndAt ? formatChangeTime(proposal.oldPlannedEndAt, proposal.oldTimezone) : 'Chưa rõ trong bản ghi cũ'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất lúc: {formatChangeTime(proposal.proposedAt, proposal.oldTimezone)}</Text>
         {proposal.reason ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do Trainer nêu: {proposal.reason}</Text> : null}
+        {proposal.appointmentId ? <>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất gắn với một lịch hẹn đã xác nhận. Khi Học viên chấp nhận, máy chủ kiểm tra lại đúng lịch hẹn và phiên bản đã ghi nhận.</Text>
+          <WorkoutButton testID="trainer-change-open-appointment" label="Xem lịch hẹn liên kết" secondary onPress={() => router.push(`/appointments/${proposal.appointmentId}` as never)} />
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Đổi lịch phải nằm trọn trong cùng lịch hẹn; hủy buổi tập không hủy lịch hẹn.</Text>
+        </> : null}
         {proposal.decidedAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên quyết định lúc: {formatChangeTime(proposal.decidedAt, proposal.oldTimezone)}</Text> : null}
         {proposal.withdrawnAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đã rút lúc: {formatChangeTime(proposal.withdrawnAt, proposal.oldTimezone)}</Text> : null}
       </WorkoutCard>

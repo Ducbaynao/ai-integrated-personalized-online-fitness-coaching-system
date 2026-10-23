@@ -16,19 +16,31 @@ public interface WorkoutScheduleBatchUseCase {
     Source inspectProposalSource(ConfirmBatch proposed);
     ConfirmedBatch confirmProposal(ConfirmBatch proposed, UUID proposalId, UUID trainerId);
 
-    record Source(UUID planVersionId, int planVersionNumber) {}
+    record Source(UUID planVersionId, int planVersionNumber,
+                  java.util.Map<UUID, Long> observedAppointmentVersions) {
+        public Source(UUID planVersionId, int planVersionNumber) {
+            this(planVersionId, planVersionNumber, java.util.Map.of());
+        }
+    }
 
     record ConfirmBatch(UUID actorId, UUID planId, UUID sourcePlanVersionId,
                         long expectedPlanAggregateVersion, LocalDate weekAnchorDate,
                         String timezone, List<Item> items, String commandKey) {}
     record Item(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
                 int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
-                String startUtcOffset, String endUtcOffset, UUID appointmentId) {
+                String startUtcOffset, String endUtcOffset, UUID appointmentId,
+                Long observedAppointmentVersion) {
+        public Item(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
+                    int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
+                    String startUtcOffset, String endUtcOffset, UUID appointmentId) {
+            this(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
+                    localStart, localEnd, startUtcOffset, endUtcOffset, appointmentId, null);
+        }
         public Item(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
                     int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
                     String startUtcOffset, String endUtcOffset) {
             this(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
-                    localStart, localEnd, startUtcOffset, endUtcOffset, null);
+                    localStart, localEnd, startUtcOffset, endUtcOffset, null, null);
         }
     }
     record ConfirmedItem(UUID clientItemId, UUID occurrenceId, long occurrenceVersion,

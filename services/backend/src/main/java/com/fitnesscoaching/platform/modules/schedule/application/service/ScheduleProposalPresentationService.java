@@ -60,7 +60,8 @@ public class ScheduleProposalPresentationService {
                 var session = matchingSource == null ? null : matchingSource.sessions().get(item.planSessionId());
                 return new ItemView(item.clientItemId(), item.planSessionId(), item.weekNumber(),
                         item.dayNumber(), item.sequenceNumber(), item.localStart(), item.localEnd(),
-                        item.startUtcOffset(), item.endUtcOffset(),
+                        item.startUtcOffset(), item.endUtcOffset(), item.appointmentId(),
+                        item.observedAppointmentVersion(),
                         session == null ? null : session.name(), session == null ? null : session.focus());
             }).toList();
             UserDisplaySummary trainer = names.get(p.trainerId());
@@ -76,6 +77,7 @@ public class ScheduleProposalPresentationService {
     public record ItemView(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
                            int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
                            String startUtcOffset, String endUtcOffset,
+                           UUID appointmentId, Long observedAppointmentVersion,
                            String sourceSessionName, String sourceSessionFocus) {}
 
     public record ProposalView(UUID proposalId, long proposalVersion, String status,

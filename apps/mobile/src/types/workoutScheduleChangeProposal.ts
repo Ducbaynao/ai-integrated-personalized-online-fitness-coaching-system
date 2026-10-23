@@ -36,6 +36,8 @@ export interface WorkoutScheduleChangeProposal {
   sourcePlanSessionId: string | null;
   sourcePlanName: string | null;
   sourceSessionName: string | null;
+  appointmentId: string | null;
+  observedAppointmentVersion: number | null;
   destination: WorkoutScheduleChangeDestination | null;
   reason: string | null;
   proposedAt: string;

@@ -104,6 +104,8 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
 
     private Occurrence present(WorkoutScheduleCalendarReadPort.Row row, boolean includeStudentActions,
                                boolean hasInProgress, Instant now) {
+            var activeLinks = appointments.findActiveLinks(row.occurrenceId());
+            var activeLink = activeLinks.size() == 1 ? activeLinks.getFirst() : null;
             List<String> available = new ArrayList<>(2);
             // Legacy rows without a source session cannot pass the B05 snapshot/skip lookup.
             if (includeStudentActions && row.sessionSummary() != null) {
@@ -114,12 +116,13 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
                 if (actions.canSkip(row.status(), row.executionStartedAt())) available.add("SKIP");
             }
             if (includeStudentActions && "SCHEDULED".equals(row.status())
-                    && row.executionStartedAt() == null && !appointments.hasAnyLinked(row.occurrenceId())
+                    && row.executionStartedAt() == null && activeLinks.size() <= 1
                     && !changes.hasSuccessor(row.occurrenceId())) {
                 if (row.plannedStartAt().isAfter(now) && row.planSummary() != null && row.sessionSummary() != null
                         && row.timezone() != null && row.localStart() != null && row.localEnd() != null
                         && row.startUtcOffset() != null && row.endUtcOffset() != null
-                        && !"COACH_REQUIRED".equals(row.supervisionRequirement())
+                        && (activeLink == null || "CONFIRMED".equals(activeLink.status()))
+                        && (!"COACH_REQUIRED".equals(row.supervisionRequirement()) || activeLink != null)
                         && !changes.hasOtherScheduledUnknownEnd(row.studentId(), row.occurrenceId()))
                     available.add("RESCHEDULE");
                 available.add("CANCEL");
@@ -128,7 +131,9 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
                     row.plannedStartAt(), row.originalPlannedStartAt(), row.rescheduledFromOccurrenceId(),
                     row.replacementOccurrenceId(), row.plannedEndAt(), row.timezone(),
                     row.localStart(), row.localEnd(), row.startUtcOffset(), row.endUtcOffset(),
-                    row.planSummary(), presentedSession(row.sessionSummary()), List.copyOf(available));
+                    row.planSummary(), presentedSession(row.sessionSummary()), List.copyOf(available),
+                    activeLink == null ? null : activeLink.appointmentId(),
+                    activeLink == null ? null : activeLink.version());
     }
 
     private static SessionSummary presentedSession(SessionSummary source) {

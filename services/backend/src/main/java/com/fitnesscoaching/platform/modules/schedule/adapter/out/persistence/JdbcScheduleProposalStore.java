@@ -35,11 +35,13 @@ public class JdbcScheduleProposalStore implements ScheduleProposalStore {
         UUID id = rs.getObject("id", UUID.class);
         List<ProposalItem> items = jdbc.query("""
                 SELECT client_item_id,plan_session_id,week_number,day_number,sequence_number,
-                       local_start,local_end,start_utc_offset,end_utc_offset
+                       local_start,local_end,start_utc_offset,end_utc_offset,
+                       appointment_id,observed_appointment_version
                 FROM fitness.workout_schedule_proposal_items WHERE proposal_id=? ORDER BY client_item_id
                 """, (item, n) -> new ProposalItem(item.getObject(1, UUID.class), item.getObject(2, UUID.class),
                 item.getInt(3), item.getInt(4), item.getInt(5), LocalDateTime.parse(item.getString(6)),
-                LocalDateTime.parse(item.getString(7)), item.getString(8), item.getString(9)), id);
+                LocalDateTime.parse(item.getString(7)), item.getString(8), item.getString(9),
+                item.getObject(10, UUID.class), (Long) item.getObject(11)), id);
         return new Proposal(id, rs.getLong("version"), rs.getString("status"),
                 rs.getObject("student_id", UUID.class), rs.getObject("trainer_id", UUID.class),
                 rs.getObject("coaching_period_id", UUID.class), rs.getObject("plan_id", UUID.class),
@@ -109,11 +111,13 @@ public class JdbcScheduleProposalStore implements ScheduleProposalStore {
         for (ProposalItem item : p.items()) jdbc.update("""
                 INSERT INTO fitness.workout_schedule_proposal_items
                 (proposal_id,client_item_id,plan_session_id,week_number,day_number,sequence_number,
-                 local_start,local_end,start_utc_offset,end_utc_offset)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                 local_start,local_end,start_utc_offset,end_utc_offset,
+                 appointment_id,observed_appointment_version)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """, p.proposalId(), item.clientItemId(), item.planSessionId(), item.weekNumber(),
                 item.dayNumber(), item.sequenceNumber(), item.localStart().toString(), item.localEnd().toString(),
-                item.startUtcOffset(), item.endUtcOffset());
+                item.startUtcOffset(), item.endUtcOffset(), item.appointmentId(),
+                item.observedAppointmentVersion());
         jdbc.update("""
                 INSERT INTO fitness.workout_schedule_proposal_history
                 (proposal_id,proposal_version,from_status,to_status,actor_id,command_key,occurred_at)

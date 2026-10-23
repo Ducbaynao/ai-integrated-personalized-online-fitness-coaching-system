@@ -111,6 +111,21 @@ describe('Student change proposal screens', () => {
     renderer.act(() => tree.unmount()); decide.mockRestore();
   });
 
+  it('shows the pinned Appointment and explains that cancelling a workout does not cancel it', () => {
+    (useStudentWorkoutScheduleChangeProposalDetail as jest.Mock).mockReturnValue({
+      data: { ...proposal, changeType: 'CANCEL', destination: null, appointmentId: 'appointment-1', observedAppointmentVersion: 3 },
+      isPending: false, isError: false, isFetching: false, error: null, refetch: jest.fn(),
+    });
+    const { tree } = render(<StudentChangeProposalDetailScreen proposalId="proposal-1" />);
+    expect(JSON.stringify(tree.toJSON())).toContain('Hủy buổi tập không hủy lịch hẹn');
+    renderer.act(() => tree.root.findByProps({ testID: 'student-change-open-appointment' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/appointments/appointment-1');
+    renderer.act(() => tree.root.findByProps({ testID: 'student-change-accept' }).props.onPress());
+    expect(JSON.stringify(tree.toJSON()))
+      .toContain('Lịch hẹn liên kết vẫn CONFIRMED');
+    renderer.act(() => tree.unmount());
+  });
+
   it('retains exact REJECT body and key after an uncertain network result, even when Trainer authority is no longer current', async () => {
     const decide = jest.spyOn(workoutScheduleChangeProposalApi, 'decide')
       .mockRejectedValueOnce(new ApiError(0, 'network'))

@@ -2988,7 +2988,9 @@ paths:
         ID of a separate, already CONFIRMED and unlinked Appointment. In the same transaction, the backend locks it,
         requires the current Student/Trainer/Coaching Period and full [start,end) containment, then links it to the
         newly created occurrence. A missing or nonqualifying Appointment rejects the entire batch; confirmation never
-        creates or moves an Appointment. Trainer schedule proposals still reject COACH_REQUIRED in this flow.
+         creates or moves an Appointment. A Trainer proposal may identify an already CONFIRMED Appointment per
+         COACH_REQUIRED item; it records the observed Appointment version but reserves neither the Appointment
+         nor calendar time. Student ACCEPT rechecks the same ID and version before atomic confirmation.
         Matching actor commandKey and logical payload
         replay the original batch; reuse with another payload conflicts. A schedule-occupying occurrence for this
         Student with an unknown plannedEndAt rejects the entire batch with WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN
@@ -3047,7 +3049,11 @@ paths:
         The authenticated Trainer requires a current effective Coaching Period and current WORKOUT_PLAN CONTRIBUTE
         or MANAGE authority for the Student. Creation binds the proposal to the observed plan aggregate and effective
         published version but creates no Planned Workout occurrence. A proposal is accepted or rejected as a whole;
-        changed content requires a new proposal.
+         changed content requires a new proposal. A COACH_REQUIRED item identifies an already CONFIRMED,
+         currently unlinked Appointment for this Trainer, Student and Coaching Period. The backend stores the
+         Appointment ID and observed version. ACCEPT locks and rechecks the same identity/version, current
+         authority and full interval containment. A changed Appointment returns 409 and leaves the proposal
+         PENDING; REJECT remains available. No Appointment is created or moved by this operation.
       parameters:
         - { $ref: '#/components/parameters/WorkoutScheduleStudentId' }
       requestBody:
@@ -3193,8 +3199,9 @@ paths:
       description: >-
         Only a Trainer with a current effective Coaching Period and current WORKOUT_PLAN CONTRIBUTE or MANAGE
         may propose a change to this Student's SCHEDULED, unsealed occurrence before its old planned start.
-        RESCHEDULE also requires preserved source version/session and local-time intent; COACH_REQUIRED
-        reschedule is deferred. Any linked Appointment blocks either change. Creation stores an immutable
+        RESCHEDULE also requires preserved source version/session and local-time intent. A linked
+        Appointment permits RESCHEDULE only within that same confirmed interval; CANCEL leaves the
+        Appointment confirmed and releases the active occurrence dependency. Creation stores an immutable
         proposal snapshot but does not mutate an occurrence or reserve the target time. Student decision is final.
         Actor authority and resource visibility are checked before idempotent command replay.
       parameters:
@@ -3386,7 +3393,9 @@ paths:
         future, including when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
         version/session/prescription and plan-week coordinates are retained even if the target moves to another
         day or week; no current plan publication is selected. Missing legacy source version/session or local
-        intent, any linked Appointment, and COACH_REQUIRED supervision block this first flow. The backend
+        intent blocks replacement. A linked Appointment permits replacement only when its same confirmed
+        interval still fully contains the new workout; the active link transfers atomically to the successor.
+        COACH_REQUIRED without a qualifying linked Appointment remains blocked. The backend
         resolves explicit local intent/offsets in the selected IANA timezone, requires target start strictly
         after PostgreSQL time and at most 90 days later, and rechecks unknown-end on other SCHEDULED rows, historical
         source-instant duplicate, and SCHEDULED-range overlap. V31 database constraints cover only batch-linked
@@ -3419,7 +3428,8 @@ paths:
       description: >-
         Only its Student may cancel a SCHEDULED, unsealed occurrence, even when the source plan is PAUSED,
         COMPLETED, or ARCHIVED. No replacement is created and no Appointment is changed. Any linked Appointment,
-        regardless of status, blocks cancellation. A late cancellation (old plannedStartAt at or before
+        remains CONFIRMED when a linked occurrence is cancelled; its active dependency is released while
+        the historical link is retained. A late cancellation (old plannedStartAt at or before
         authoritative PostgreSQL time) requires the Student's nonblank reason. A legacy occurrence may be
         cancelled despite null plannedEndAt or missing source/local-time intent; its unknown end is never
         inferred. COACH_REQUIRED without a linked Appointment follows these same cancellation guards.
@@ -4376,8 +4386,8 @@ components:
         WORKOUT_SCHEDULE_CHANGE_PROPOSAL_VERSION_CONFLICT, WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STATE_CONFLICT,
         WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STALE, WORKOUT_SCHEDULE_OCCURRENCE_SEALED,
         WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE, WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED,
-        WORKOUT_SCHEDULE_APPOINTMENT_LINKED, WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE,
-        WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED, WORKOUT_SCHEDULE_DUPLICATE,
+        WORKOUT_SCHEDULE_APPOINTMENT_LINKED, WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING,
+        WORKOUT_SCHEDULE_LEGACY_SOURCE_UNAVAILABLE, WORKOUT_SCHEDULE_DUPLICATE,
         WORKOUT_SCHEDULE_OVERLAP, WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN, and
         WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT. An unknown end on another SCHEDULED occurrence blocks
         replacement creation, without disclosing that row's ID or timing.
@@ -5856,9 +5866,10 @@ components:
           type: [string, 'null']
           format: uuid
           description: >-
-            Student direct confirmation only. Required for a COACH_REQUIRED item and forbidden for other
-            supervision modes or Trainer scheduling proposals. Refers to a separate confirmed Appointment;
-            the backend atomically links it to the new occurrence after checking current parties, period and interval.
+             Required for a COACH_REQUIRED item in Student direct confirmation or a Trainer scheduling proposal;
+             forbidden for other supervision modes. The Trainer proposal stores the backend-observed Appointment
+             version. Student ACCEPT must recheck the same CONFIRMED Appointment and version. Confirmation
+             atomically links it to the new occurrence after checking current parties, period and interval.
     WorkoutScheduleBatchInput:
       type: object
       additionalProperties: false
@@ -6133,6 +6144,8 @@ components:
         - localEnd
         - startUtcOffset
         - endUtcOffset
+        - appointmentId
+        - observedAppointmentVersion
         - sourceSessionName
         - sourceSessionFocus
       properties:
@@ -6145,6 +6158,12 @@ components:
         localEnd: { $ref: '#/components/schemas/WorkoutScheduleLocalDateTime' }
         startUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
         endUtcOffset: { $ref: '#/components/schemas/WorkoutScheduleUtcOffset' }
+        appointmentId: { type: [string, 'null'], format: uuid }
+        observedAppointmentVersion:
+          type: [integer, 'null']
+          format: int64
+          minimum: 0
+          description: Server-observed version at proposal creation; null for an item without Appointment.
         sourceSessionName:
           type: [string, 'null']
           description: Name from this item's exact source plan version/session; null if unavailable.
@@ -6268,6 +6287,11 @@ components:
       type: object
       additionalProperties: false
       required: [expectedOccurrenceVersion, destination, commandKey]
+      description: >-
+        An Appointment-linked occurrence may move only to an interval fully contained by its same
+        CONFIRMED Appointment. Its active link transfers atomically to the new occurrence ID;
+        predecessor link provenance remains in Appointment event history. The Appointment itself
+        is not moved. A changed Appointment conflicts rather than silently remapping.
       properties:
         expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
         destination: { $ref: '#/components/schemas/WorkoutScheduleChangeDestination' }
@@ -6280,6 +6304,8 @@ components:
       description: >-
         A nonblank reason is required if the old planned start is at or before authoritative PostgreSQL
         command time; it is otherwise optional. The existing occurrence becomes CANCELLED with no successor.
+        If linked, the Appointment remains CONFIRMED; only its active dependency is released and
+        the former link remains in history. Appointment cancellation is a separate command.
       properties:
         expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
         reason: { type: [string, 'null'], maxLength: 1000 }
@@ -6343,7 +6369,10 @@ components:
       description: >-
         Proposes one occurrence change, without reserving time or changing the occurrence. destination
         must be supplied for RESCHEDULE and omitted/null for CANCEL. The Trainer must submit before the
-        old planned start and may not propose a change for a sealed or Appointment-linked occurrence.
+        old planned start and may not propose a change for a sealed occurrence. An Appointment-linked
+        RESCHEDULE must remain fully inside the same CONFIRMED Appointment; a CANCEL leaves the
+        Appointment CONFIRMED and releases only the active occurrence dependency. The proposal
+        records the observed Appointment ID/version; ACCEPT rechecks both without remapping.
       properties:
         occurrenceId: { type: string, format: uuid }
         expectedOccurrenceVersion: { type: integer, format: int64, minimum: 0 }
@@ -6381,6 +6410,8 @@ components:
         - sourcePlanSessionId
         - sourcePlanName
         - sourceSessionName
+        - appointmentId
+        - observedAppointmentVersion
         - destination
         - reason
         - proposedAt
@@ -6426,6 +6457,8 @@ components:
         sourcePlanId: { type: [string, 'null'], format: uuid }
         sourcePlanVersionId: { type: [string, 'null'], format: uuid }
         sourcePlanSessionId: { type: [string, 'null'], format: uuid }
+        appointmentId: { type: [string, 'null'], format: uuid, description: Appointment linked when proposal was created; null for unlinked or legacy occurrences. }
+        observedAppointmentVersion: { type: [integer, 'null'], format: int64, minimum: 0, description: Version pinned with appointmentId and rechecked on ACCEPT. }
         sourcePlanName: { type: [string, 'null'] }
         sourceSessionName: { type: [string, 'null'] }
         destination:
@@ -6544,6 +6577,8 @@ components:
         - planSummary
         - sessionSummary
         - availableActions
+        - linkedAppointmentId
+        - linkedAppointmentVersion
       properties:
         occurrenceId: { type: string, format: uuid }
         occurrenceVersion:
@@ -6601,6 +6636,15 @@ components:
           type: array
           uniqueItems: true
           items: { $ref: '#/components/schemas/PlannedWorkoutAvailableAction' }
+        linkedAppointmentId:
+          type: [string, 'null']
+          format: uuid
+          description: Current active Appointment link, not a historical predecessor link; null for unlinked and legacy rows.
+        linkedAppointmentVersion:
+          type: [integer, 'null']
+          format: int64
+          minimum: 0
+          description: Current Appointment version for presentation; null when there is no active link.
     PlannedWorkoutOccurrencePage:
       type: object
       additionalProperties: false

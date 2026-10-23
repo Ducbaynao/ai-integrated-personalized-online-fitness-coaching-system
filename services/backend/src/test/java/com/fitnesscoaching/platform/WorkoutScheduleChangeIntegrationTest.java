@@ -316,10 +316,14 @@ class WorkoutScheduleChangeIntegrationTest {
                 VALUES (?,?,?,?,?,'Etc/UTC','CANCELLED',?)
                 """, appointment, f.student(), old, Timestamp.from(localStart().toInstant(ZoneOffset.UTC)),
                 Timestamp.from(localStart().plusHours(1).toInstant(ZoneOffset.UTC)), f.student());
-        assertCode(() -> changes.cancel(new Cancel(old, f.student(), 0, null, "linked")),
-                "WORKOUT_SCHEDULE_APPOINTMENT_LINKED");
+        assertThat(changes.cancel(new Cancel(old, f.student(), 0, null, "linked")).previousStatus())
+                .isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?",
+                UUID.class, appointment)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointment_events_v2 WHERE appointment_id=? AND event_type='WORKOUT_LINK_RELEASED'",
+                Integer.class, appointment)).isOne();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_occurrence_changes WHERE previous_occurrence_id=?",
-                Integer.class, old)).isZero();
+                Integer.class, old)).isOne();
     }
 
     @Test void lateCancelRequiresReasonAndSealedOccurrenceCannotChange() {

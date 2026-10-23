@@ -25,15 +25,24 @@ public interface ScheduleProposalUseCase {
                   String decisionNote, String commandKey) {}
     record ProposalItem(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
                         int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
-                        String startUtcOffset, String endUtcOffset) {
+                        String startUtcOffset, String endUtcOffset,
+                        UUID appointmentId, Long observedAppointmentVersion) {
+        public ProposalItem(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
+                            int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
+                            String startUtcOffset, String endUtcOffset) {
+            this(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
+                    localStart, localEnd, startUtcOffset, endUtcOffset, null, null);
+        }
         public Item asWorkoutItem() {
             return new Item(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
-                    localStart, localEnd, startUtcOffset, endUtcOffset);
+                    localStart, localEnd, startUtcOffset, endUtcOffset,
+                    appointmentId, observedAppointmentVersion);
         }
-        public static ProposalItem fromWorkout(Item item) {
+        public static ProposalItem fromWorkout(Item item, Long observedAppointmentVersion) {
             return new ProposalItem(item.clientItemId(), item.planSessionId(), item.weekNumber(),
                     item.dayNumber(), item.sequenceNumber(), item.localStart(), item.localEnd(),
-                    item.startUtcOffset(), item.endUtcOffset());
+                    item.startUtcOffset(), item.endUtcOffset(), item.appointmentId(),
+                    observedAppointmentVersion);
         }
     }
     record Proposal(UUID proposalId, long proposalVersion, String status, UUID studentId, UUID trainerId,

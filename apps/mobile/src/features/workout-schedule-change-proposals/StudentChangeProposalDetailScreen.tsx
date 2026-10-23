@@ -126,6 +126,10 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
         <Text style={[styles.body, { color: theme.textPrimary }]}>Kết thúc: {proposal.oldPlannedEndAt ? formatChangeTime(proposal.oldPlannedEndAt, proposal.oldTimezone) : 'Chưa xác định trong bản ghi cũ'}</Text>
         {proposal.oldLocalStart && proposal.oldStartUtcOffset ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương đã lưu: {proposal.oldLocalStart.replace('T', ' ')} UTC{proposal.oldStartUtcOffset} · {proposal.oldTimezone || 'Múi giờ chưa xác định'}</Text> : null}
         <WorkoutButton testID="student-change-open-occurrence" label="Xem buổi tập gốc" secondary onPress={() => router.push(`/workouts/schedule/${proposal.occurrenceId}` as never)} />
+        {proposal.appointmentId ? <>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi tập này liên kết với một lịch hẹn. Máy chủ sẽ kiểm tra lại đúng lịch hẹn và phiên bản đã ghi nhận khi bạn chấp nhận.</Text>
+          <WorkoutButton testID="student-change-open-appointment" label="Xem lịch hẹn liên kết" secondary onPress={() => router.push(`/appointments/${proposal.appointmentId}` as never)} />
+        </> : null}
       </WorkoutCard>
       <WorkoutCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Nội dung đề xuất</Text>
@@ -137,6 +141,7 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
         </> : proposal.changeType === 'CANCEL' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Huấn luyện viên đề xuất hủy buổi này. Nếu chấp nhận, buổi gốc chuyển sang Đã hủy; không tạo buổi thay thế.</Text>
           : <Text style={[styles.body, { color: theme.warningText }]}>Thiếu thời gian đề xuất. Hãy tải lại trước khi quyết định.</Text>}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất PENDING chưa tự đổi lịch. ACCEPT sẽ được máy chủ kiểm tra lại quyền huấn luyện viên, phiên bản buổi tập và xung đột; REJECT giữ nguyên lịch.</Text>
+        {proposal.appointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đổi lịch chỉ được nằm trọn trong cùng lịch hẹn đã xác nhận. Hủy buổi tập không hủy lịch hẹn; hai lịch là hai thao tác riêng.</Text> : null}
       </WorkoutCard>
       {proposal.decidedAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đã quyết định lúc: {formatChangeTime(proposal.decidedAt, proposal.oldTimezone)}</Text> : null}
       {proposal.withdrawnAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đã rút lúc: {formatChangeTime(proposal.withdrawnAt, proposal.oldTimezone)}</Text> : null}
@@ -153,6 +158,7 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
         {confirmation === 'ACCEPT' && proposal.changeType === 'RESCHEDULE' && proposal.destination ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ mới: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset} → {proposal.destination.localEnd.replace('T', ' ')} UTC{proposal.destination.endUtcOffset} · {proposal.destination.timezone}</Text> : null}
         {confirmation === 'ACCEPT' && proposal.changeType === 'CANCEL' ? <>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Bạn sẽ hủy buổi gốc. Nếu giờ bắt đầu đã qua theo máy chủ, lý do của bạn là bắt buộc; lý do của huấn luyện viên không thay thế lý do này.</Text>
+          {proposal.appointmentId ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Lịch hẹn liên kết vẫn CONFIRMED sau khi hủy buổi tập. Muốn hủy lịch hẹn, bạn phải thực hiện riêng trong phần Lịch hẹn.</Text> : null}
           <TextInput testID="student-change-decision-reason" accessibilityLabel="Lý do của học viên khi chấp nhận hủy" placeholder="Nhập lý do nếu buổi đã qua giờ bắt đầu" multiline maxLength={1000}
             value={decisionReason} onChangeText={(value) => { setDecisionReason(value); setRetryCommand(null); setError(''); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
         </> : null}

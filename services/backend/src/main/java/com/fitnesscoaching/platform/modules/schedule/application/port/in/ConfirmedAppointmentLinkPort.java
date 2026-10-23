@@ -9,6 +9,15 @@ public interface ConfirmedAppointmentLinkPort {
     boolean lockQualifying(UUID appointmentId, UUID studentId, UUID coachingPeriodId,
                            Instant plannedStartAt, Instant plannedEndAt);
 
+    /** Proposal creation observes a qualifying, currently unlinked Appointment's version. */
+    Long observeProposalCandidate(UUID appointmentId, UUID studentId, UUID trainerId,
+                                  UUID coachingPeriodId, Instant plannedStartAt, Instant plannedEndAt);
+
+    /** ACCEPT must use the exact Appointment version observed when the Trainer proposed. */
+    boolean lockQualifyingProposal(UUID appointmentId, long observedVersion, UUID studentId,
+                                   UUID trainerId, UUID coachingPeriodId,
+                                   Instant plannedStartAt, Instant plannedEndAt);
+
     /** Links only after the Workout occurrence exists, in the same transaction. */
     boolean link(UUID appointmentId, UUID occurrenceId);
 }
