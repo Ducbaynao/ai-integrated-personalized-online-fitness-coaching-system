@@ -1,6 +1,10 @@
 package com.fitnesscoaching.platform;
 
+import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.scheduled.AiRunOrphanRecoveryScheduler;
 import com.fitnesscoaching.platform.modules.ai.adapter.out.client.AiOrphanRecoveryProperties;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.CompleteF01AiRunCommand;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunRepository;
 import com.fitnesscoaching.platform.modules.ai.application.service.AiRunOrphanRecoveryService;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
@@ -14,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -28,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
@@ -59,6 +65,15 @@ class AiRunOrphanRecoveryIntegrationTest {
     private AiRunRepository runRepository;
 
     @Autowired
+    private AiRunF01UseCase aiRunUseCase;
+
+    @Autowired
+    private AiRunOrphanRecoveryService recoveryService;
+
+    @Autowired
+    private AiRunOrphanRecoveryScheduler recoveryScheduler;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -73,6 +88,33 @@ class AiRunOrphanRecoveryIntegrationTest {
                 VALUES (?, 'student.recovery@example.com', 'dummy_hash', 'Test Student', 'ACTIVE', now(), now())
                 ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE'
                 """, USER_ID);
+    }
+
+    @Test
+    @DisplayName("Scheduler invocation passes through Spring transactional proxy to executeRecoveryBatch")
+    void schedulerInvocation_passesThroughTransactionalProxy() {
+        Instant now = Instant.now();
+        Instant staleStartedAt = now.minusSeconds(300);
+
+        AiRun run = runRepository.create(AiRun.builder()
+                .requestedBy(USER_ID)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .status(AiRunStatus.RUNNING)
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .inputPayload("{\"question\": \"Test scheduler proxy\"}")
+                .queuedAt(staleStartedAt.minusSeconds(5))
+                .startedAt(staleStartedAt)
+                .createdAt(staleStartedAt.minusSeconds(5))
+                .build());
+
+        // Invoke via the scheduler component as triggered by @Scheduled in production
+        int count = recoveryScheduler.runScheduledRecovery();
+        assertThat(count).isGreaterThanOrEqualTo(1);
+
+        AiRun updated = runRepository.findById(run.id()).orElseThrow();
+        assertThat(updated.status()).isEqualTo(AiRunStatus.FAILED);
+        assertThat(updated.errorCode()).isEqualTo("TIMEOUT");
     }
 
     @Test
@@ -95,9 +137,9 @@ class AiRunOrphanRecoveryIntegrationTest {
 
         Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
         AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService recoveryService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
 
-        int count = recoveryService.executeRecoveryBatch();
+        int count = isolatedService.executeRecoveryBatch();
         assertThat(count).isEqualTo(1);
 
         AiRun updated = runRepository.findById(run.id()).orElseThrow();
@@ -128,9 +170,9 @@ class AiRunOrphanRecoveryIntegrationTest {
 
         Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
         AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService recoveryService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
 
-        int count = recoveryService.executeRecoveryBatch();
+        int count = isolatedService.executeRecoveryBatch();
         assertThat(count).isEqualTo(1);
 
         AiRun updated = runRepository.findById(run.id()).orElseThrow();
@@ -159,9 +201,9 @@ class AiRunOrphanRecoveryIntegrationTest {
 
         Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
         AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService recoveryService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
 
-        int count = recoveryService.executeRecoveryBatch();
+        int count = isolatedService.executeRecoveryBatch();
         assertThat(count).isZero();
 
         AiRun current = runRepository.findById(run.id()).orElseThrow();
@@ -192,9 +234,9 @@ class AiRunOrphanRecoveryIntegrationTest {
 
         Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
         AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService recoveryService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
 
-        int count = recoveryService.executeRecoveryBatch();
+        int count = isolatedService.executeRecoveryBatch();
         assertThat(count).isZero();
 
         AiRun current = runRepository.findById(run.id()).orElseThrow();
@@ -204,8 +246,8 @@ class AiRunOrphanRecoveryIntegrationTest {
     }
 
     @Test
-    @DisplayName("Race condition: Run completed right before reconcile update cannot be overwritten")
-    void raceCondition_runCompletedBeforeReconcile_cannotBeOverwritten() {
+    @DisplayName("Race condition (Direction 1: Worker completes first) - cleaner cannot overwrite terminal result")
+    void raceCondition_workerCompletesFirst_cleanerDoesNotOverwrite() {
         Instant now = Instant.now();
         Instant staleTime = now.minusSeconds(200);
 
@@ -254,6 +296,98 @@ class AiRunOrphanRecoveryIntegrationTest {
     }
 
     @Test
+    @DisplayName("Race condition (Direction 2: Recovery completes first) - late completion throws Conflict and preserves FAILED")
+    void raceCondition_recoveryCompletesFirst_lateCompletionThrowsConflictAndPreservesFailed() {
+        Instant now = Instant.now();
+        Instant staleTime = now.minusSeconds(300);
+
+        // 1. Request AI started and entered RUNNING
+        AiRun run = runRepository.create(AiRun.builder()
+                .requestedBy(USER_ID)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .status(AiRunStatus.RUNNING)
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .inputPayload("{\"question\": \"Query whose provider is slow\"}")
+                .queuedAt(staleTime.minusSeconds(2))
+                .startedAt(staleTime)
+                .createdAt(staleTime.minusSeconds(2))
+                .build());
+
+        // 2. Recovery sweeps and reconciles run to FAILED with TIMEOUT
+        Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
+        AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        int reconciled = isolatedService.executeRecoveryBatch();
+        assertThat(reconciled).isEqualTo(1);
+
+        AiRun reconciledRun = runRepository.findById(run.id()).orElseThrow();
+        assertThat(reconciledRun.status()).isEqualTo(AiRunStatus.FAILED);
+        assertThat(reconciledRun.errorCode()).isEqualTo("TIMEOUT");
+
+        // 3. Provider/Orchestrator late completion arrives
+        CompleteF01AiRunCommand lateCommand = new CompleteF01AiRunCommand(
+                run.id(),
+                AiRunStatus.SUCCEEDED,
+                "{\"answer\": \"Late arriving answer from provider\"}",
+                null,
+                null,
+                120,
+                65,
+                185,
+                35000,
+                now
+        );
+
+        // 4. Verification: completeF01Run throws AiRunLifecycleConflictException
+        assertThatThrownBy(() -> aiRunUseCase.completeF01Run(lateCommand))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("already completed with status FAILED");
+
+        // 5. Verification: Database terminal state remains FAILED and was NOT overwritten
+        AiRun finalRun = runRepository.findById(run.id()).orElseThrow();
+        assertThat(finalRun.status()).isEqualTo(AiRunStatus.FAILED);
+        assertThat(finalRun.errorCode()).isEqualTo("TIMEOUT");
+        assertThat(finalRun.outputPayload()).isNull(); // Late answer was NOT written
+        assertThat(finalRun.inputTokenCount()).isNull(); // Late tokens were NOT applied
+        assertThat(finalRun.outputTokenCount()).isNull();
+    }
+
+    @Test
+    @DisplayName("Unknown token usage and cost: Preserved as NULL and never fabricated as zero")
+    void unknownUsageAndCost_remainsNullAndNeverFabricatedAsZero() {
+        Instant now = Instant.now();
+        Instant staleTime = now.minusSeconds(250);
+
+        AiRun run = runRepository.create(AiRun.builder()
+                .requestedBy(USER_ID)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .status(AiRunStatus.RUNNING)
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .inputPayload("{\"question\": \"Orphan with unknown tokens\"}")
+                .queuedAt(staleTime)
+                .startedAt(staleTime)
+                .createdAt(staleTime)
+                .build());
+
+        // Initial in-flight tokens are unknown (NULL)
+        assertThat(run.inputTokenCount()).isNull();
+        assertThat(run.outputTokenCount()).isNull();
+
+        Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
+        AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        isolatedService.executeRecoveryBatch();
+
+        // After reconciliation, tokens must strictly remain NULL (unknown, never fabricated 0)
+        AiRun recovered = runRepository.findById(run.id()).orElseThrow();
+        assertThat(recovered.status()).isEqualTo(AiRunStatus.FAILED);
+        assertThat(recovered.inputTokenCount()).isNull();
+        assertThat(recovered.outputTokenCount()).isNull();
+    }
+
+    @Test
     @DisplayName("Concurrent workers process stale runs without conflict using FOR UPDATE SKIP LOCKED")
     void concurrentRecoveryWorkers_processWithoutConflict() throws Exception {
         Instant now = Instant.now();
@@ -276,11 +410,11 @@ class AiRunOrphanRecoveryIntegrationTest {
 
         Clock testClock = Clock.fixed(now, ZoneId.of("UTC"));
         AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(true, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService recoveryService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
+        AiRunOrphanRecoveryService isolatedService = new AiRunOrphanRecoveryService(runRepository, properties, testClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        Callable<Integer> task1 = recoveryService::executeRecoveryBatch;
-        Callable<Integer> task2 = recoveryService::executeRecoveryBatch;
+        Callable<Integer> task1 = isolatedService::executeRecoveryBatch;
+        Callable<Integer> task2 = isolatedService::executeRecoveryBatch;
 
         List<Future<Integer>> results = executor.invokeAll(List.of(task1, task2));
         int totalReconciled = 0;

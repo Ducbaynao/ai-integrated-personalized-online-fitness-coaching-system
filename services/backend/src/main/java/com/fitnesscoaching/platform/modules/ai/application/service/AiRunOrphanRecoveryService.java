@@ -5,7 +5,6 @@ import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunReposit
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,24 +31,6 @@ public class AiRunOrphanRecoveryService {
         this.runRepository = runRepository;
         this.properties = properties;
         this.clock = clock;
-    }
-
-    /**
-     * Scheduled background sweeper for abandoned or crashed AI Runs.
-     * Controlled by properties:
-     * - ai.orphan-recovery.enabled
-     * - ai.orphan-recovery.fixed-delay-ms (default 60000)
-     */
-    @Scheduled(
-            fixedDelayString = "${ai.orphan-recovery.fixed-delay-ms:60000}",
-            initialDelayString = "${ai.orphan-recovery.initial-delay-ms:10000}"
-    )
-    public int recoverOrphanRuns() {
-        if (!Boolean.TRUE.equals(properties.enabled())) {
-            log.trace("AI orphan run recovery is disabled via configuration");
-            return 0;
-        }
-        return executeRecoveryBatch();
     }
 
     /**

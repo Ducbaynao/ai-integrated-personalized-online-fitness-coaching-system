@@ -18,11 +18,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,18 +35,6 @@ class AiRunOrphanRecoveryServiceUnitTest {
     @BeforeEach
     void setUp() {
         fixedClock = Clock.fixed(fixedNow, ZoneId.of("UTC"));
-    }
-
-    @Test
-    @DisplayName("recoverOrphanRuns: When recovery is disabled, returns 0 and does not touch repository")
-    void recoverOrphanRuns_disabled_skipsExecution() {
-        AiOrphanRecoveryProperties properties = new AiOrphanRecoveryProperties(false, 120, 60000, 10000, 50);
-        AiRunOrphanRecoveryService service = new AiRunOrphanRecoveryService(runRepository, properties, fixedClock);
-
-        int result = service.recoverOrphanRuns();
-
-        assertThat(result).isZero();
-        verifyNoInteractions(runRepository);
     }
 
     @Test
