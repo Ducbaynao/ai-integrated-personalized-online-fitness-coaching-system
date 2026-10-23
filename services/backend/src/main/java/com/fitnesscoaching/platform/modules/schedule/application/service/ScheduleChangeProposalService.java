@@ -79,7 +79,8 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
                 source.plannedStartAt(), source.plannedEndAt(), source.timezone(), local(source.localStart()),
                 local(source.localEnd()), source.startUtcOffset(), source.endUtcOffset(),
                 source.originalPlannedStartAt(), planId, source.planVersionId(), source.planSessionId(),
-                c.destination(), c.reason(), at, null, null, null, null);
+                c.destination(), c.reason(), at, null, null, null, null,
+                source.appointmentId(), source.observedAppointmentVersion());
         store.save(proposal, c.commandKey());
         audit(c.trainerId(), "TRAINER", "WORKOUT_SCHEDULE_CHANGE_PROPOSAL_CREATED", proposal.proposalId(), at);
         notice(proposal, "PENDING", c.trainerId(), c.studentId());
@@ -169,12 +170,15 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
             try {
                 if ("RESCHEDULE".equals(locked.changeType())) applied = workout.reschedule(
                         new WorkoutScheduleChangeUseCase.Reschedule(locked.occurrenceId(), c.studentId(),
-                                locked.observedOccurrenceVersion(), locked.destination(), c.decisionReason(), internalKey));
+                                 locked.observedOccurrenceVersion(), locked.destination(), c.decisionReason(),
+                                 internalKey, locked.observedAppointmentVersion(), locked.appointmentId()));
                 else applied = workout.cancel(new WorkoutScheduleChangeUseCase.Cancel(locked.occurrenceId(),
-                        c.studentId(), locked.observedOccurrenceVersion(), c.decisionReason(), internalKey));
+                         c.studentId(), locked.observedOccurrenceVersion(), c.decisionReason(), internalKey,
+                         locked.observedAppointmentVersion(), locked.appointmentId()));
             } catch (WorkoutScheduleFailure failure) {
                 if (List.of("WORKOUT_SCHEDULE_OCCURRENCE_VERSION_CONFLICT",
-                        "WORKOUT_SCHEDULE_OCCURRENCE_SEALED", "WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE")
+                         "WORKOUT_SCHEDULE_OCCURRENCE_SEALED", "WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE",
+                         "WORKOUT_SCHEDULE_APPOINTMENT_LINKED")
                         .contains(failure.code())) throw fail("WORKOUT_SCHEDULE_CHANGE_PROPOSAL_STALE", 409);
                 throw failure;
             }
@@ -221,7 +225,8 @@ public class ScheduleChangeProposalService implements ScheduleChangeProposalUseC
                 p.oldPlannedStartAt(), p.oldPlannedEndAt(), p.oldTimezone(), p.oldLocalStart(), p.oldLocalEnd(),
                 p.oldStartUtcOffset(), p.oldEndUtcOffset(), p.originalPlannedStartAt(), p.sourcePlanId(),
                 p.sourcePlanVersionId(), p.sourcePlanSessionId(), p.destination(), p.reason(), p.proposedAt(),
-                decidedAt, decidedBy, withdrawnAt, withdrawnBy);
+                decidedAt, decidedBy, withdrawnAt, withdrawnBy, p.appointmentId(),
+                p.observedAppointmentVersion());
     }
     private static LocalDateTime local(String value) {
         if (value == null) return null;

@@ -66,23 +66,35 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public Source inspectProposalSource(ConfirmBatch c) {
         validateBase(c);
-        if (c.items().stream().anyMatch(item -> item != null && item.appointmentId() != null))
-            throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409);
         UUID student = plans.findPlanStudent(c.planId());
         plans.lockStudentAndActor(student, c.actorId());
         var plan = plans.lockPlan(c.planId());
         var open = plans.lockOpenVersion(c.planId());
         Instant at = plans.databaseNow();
         checkedVersion(c, plan, open, at);
-        validateInternalOverlap(resolveItems(c, open.id(), at, false));
-        return new Source(open.id(), open.versionNumber());
+        List<ConfirmedItem> inspected = resolveItems(c, open.id(), at, false);
+        validateInternalOverlap(inspected);
+        Map<UUID, Item> byId = new HashMap<>();
+        c.items().forEach(item -> byId.put(item.clientItemId(), item));
+        Map<UUID, Long> observed = new HashMap<>();
+        Set<UUID> appointmentIds = new HashSet<>();
+        for (ConfirmedItem item : inspected.stream().filter(i -> byId.get(i.clientItemId()).appointmentId() != null)
+                .sorted(Comparator.comparing(i -> byId.get(i.clientItemId()).appointmentId())).toList()) {
+            Item proposed = byId.get(item.clientItemId());
+            if (proposed.observedAppointmentVersion() != null || !appointmentIds.add(proposed.appointmentId()))
+                throw fail("VALIDATION_FAILED", 400, item.clientItemId());
+            Long version = appointmentLinks.observeProposalCandidate(proposed.appointmentId(), student,
+                    c.actorId(), plan.coachingPeriodId(), item.plannedStartAt(), item.plannedEndAt());
+            if (version == null)
+                throw fail("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING", 409, item.clientItemId());
+            observed.put(item.clientItemId(), version);
+        }
+        return new Source(open.id(), open.versionNumber(), Map.copyOf(observed));
     }
 
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public ConfirmedBatch confirmProposal(ConfirmBatch c, UUID proposalId, UUID trainerId) {
         validateBase(c);
-        if (c.items().stream().anyMatch(item -> item != null && item.appointmentId() != null))
-            throw fail("WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED", 409);
         if (proposalId == null || trainerId == null) throw fail("VALIDATION_FAILED", 400);
         UUID student = plans.findPlanStudent(c.planId());
         if (!student.equals(c.actorId())) throw fail("WORKOUT_PLAN_NOT_FOUND", 404);
@@ -115,8 +127,15 @@ public class WorkoutScheduleBatchService implements WorkoutScheduleBatchUseCase 
         Set<UUID> appointmentIds = new HashSet<>();
         for (ConfirmedItem item : coached) {
             UUID appointmentId = sourceItems.get(item.clientItemId()).appointmentId();
-            if (!appointmentIds.add(appointmentId) || !appointmentLinks.lockQualifying(appointmentId, student,
-                    plan.coachingPeriodId(), item.plannedStartAt(), item.plannedEndAt()))
+            Item proposed = sourceItems.get(item.clientItemId());
+            boolean qualifies = "TRAINER_PROPOSAL".equals(source)
+                    ? proposed.observedAppointmentVersion() != null
+                        && appointmentLinks.lockQualifyingProposal(appointmentId,
+                            proposed.observedAppointmentVersion(), student, trainerId,
+                            plan.coachingPeriodId(), item.plannedStartAt(), item.plannedEndAt())
+                    : appointmentLinks.lockQualifying(appointmentId, student,
+                        plan.coachingPeriodId(), item.plannedStartAt(), item.plannedEndAt());
+            if (!appointmentIds.add(appointmentId) || !qualifies)
                 throw fail("WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING", 409, item.clientItemId());
         }
         ConfirmedBatch result = new ConfirmedBatch(UUID.randomUUID(), student, c.planId(), open.id(),

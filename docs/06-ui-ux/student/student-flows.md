@@ -55,7 +55,7 @@ Sau khi plan ACTIVE có phiên bản đã xuất bản hiện hành, Student có
 
 ## 5. Planned workout và actual workout
 
-Student mở đề xuất lịch từ Plan hub, xem từng buổi theo local time, múi giờ và UTC offset mà backend trả về, rồi xác nhận ACCEPT hoặc REJECT toàn bộ. ACCEPT chỉ tạo lịch khi backend xác nhận batch thành công; REJECT không tạo buổi tập. Khi phiên bản đề xuất/quyền/lịch thay đổi, Student tải lại và quyết định lại trên dữ liệu mới; lỗi mạng có thể gửi lại đúng lệnh với cùng commandKey. DTO proposal hiện chỉ có Trainer/plan/session ID và session coordinates, không có tên Trainer hay tên Exercise để Mobile tự suy diễn.
+Student mở đề xuất lịch từ Plan hub, xem từng buổi theo local time, múi giờ và UTC offset mà backend trả về, rồi xác nhận ACCEPT hoặc REJECT toàn bộ. Item `COACH_REQUIRED` hiển thị đường vào Appointment đã chọn; ACCEPT kiểm lại ID/version, quyền và interval trong một giao dịch, không tự thay lịch hẹn đã đổi. ACCEPT chỉ tạo lịch khi backend xác nhận batch thành công; REJECT không tạo buổi tập. Khi phiên bản đề xuất/quyền/lịch hẹn thay đổi, Student tải lại và quyết định lại trên dữ liệu mới; lỗi mạng có thể gửi lại đúng lệnh với cùng commandKey. Tên Trainer/plan/session chỉ là presentation nullable, không suy tên từ ID.
 
 1. Student mở Plan/Calendar.
 2. Chọn Planned Workout theo planned date.
@@ -68,7 +68,7 @@ Hoàn thành workout không đồng nghĩa đúng lịch.
 
 ## 5a. Đề xuất đổi/hủy một Planned Workout
 
-Đề xuất Trainer đổi/hủy **một Planned Workout** là luồng riêng với Appointment: Student mở từ lịch tập hoặc Plan hub, xem giờ cũ và thay đổi được đề xuất, rồi ACCEPT/REJECT toàn bộ proposal PENDING. ACCEPT được backend kiểm lại quyền Trainer, Coaching Period, occurrence version/seal, Appointment và xung đột trước khi tạo replacement hoặc hủy; REJECT không đổi lịch. Proposal stale vẫn đọc và REJECT được, 409 không tự động phát lại ACCEPT. Lỗi mạng chưa rõ kết quả retry cùng commandKey/body. Đây không phải thay đổi Appointment hay cả batch.
+Đề xuất Trainer đổi/hủy **một Planned Workout** là luồng riêng với Appointment: Student mở từ lịch tập hoặc Plan hub, xem giờ cũ, Appointment đang liên kết nếu có và thay đổi được đề xuất, rồi ACCEPT/REJECT proposal PENDING. ACCEPT được backend kiểm lại quyền Trainer, Coaching Period, occurrence version/seal, đúng Appointment ID/version và xung đột trước khi tạo replacement hoặc hủy; REJECT không đổi lịch. Reschedule liên kết chỉ ở trong cùng Appointment và chuyển active link nguyên tử sang successor; cancel chỉ bỏ active dependency, giữ Appointment `CONFIRMED` và gửi thông báo cho Trainer. Proposal stale vẫn đọc và REJECT được, 409 không tự động phát lại ACCEPT. Lỗi mạng chưa rõ kết quả retry cùng commandKey/body. Đây không phải thay đổi Appointment hay cả batch.
 
 ## 6. Appointment reschedule
 

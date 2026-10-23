@@ -51,7 +51,8 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
   };
   const rescheduleSourceReady = Boolean(item?.planSummary?.planVersionId && item.sessionSummary?.planSessionId
     && item.localStart && item.localEnd && item.timezone && item.startUtcOffset && item.endUtcOffset
-    && item.sessionSummary?.supervisionRequirement && item.sessionSummary.supervisionRequirement !== 'COACH_REQUIRED');
+    && item.sessionSummary?.supervisionRequirement
+    && (item.sessionSummary.supervisionRequirement !== 'COACH_REQUIRED' || item.linkedAppointmentId));
   const canSelect = Boolean(item?.status === 'SCHEDULED' && authority.canContribute);
   const validate = () => {
     if (!canSelect || !item || !changeType) return 'Buổi tập hoặc quyền tạo đề xuất không còn phù hợp. Hãy tải lại lịch.';
@@ -124,12 +125,13 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         </View>
         {!rescheduleSourceReady ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>
           {item.sessionSummary?.supervisionRequirement === 'COACH_REQUIRED'
-            ? 'Buổi cần Huấn luyện viên giám sát: luồng đầu chưa hỗ trợ đề xuất đổi lịch. Có thể đề xuất hủy nếu backend cho phép.'
+            ? 'Buổi cần Huấn luyện viên giám sát nhưng không có liên kết lịch hẹn hiện hành; không thể đề xuất đổi lịch.'
             : 'Thiếu metadata nguồn, local-time intent hoặc supervision; không thể đề xuất đổi lịch từ bản ghi này.'}
         </Text> : null}
         {changeType === 'RESCHEDULE' && rescheduleSourceReady ? <WorkoutCard testID="create-change-reschedule-form">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Giờ thay thế</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn tường minh IANA timezone, giờ bắt đầu/kết thúc địa phương và UTC offset. Không suy thời lượng từ kế hoạch.</Text>
+          {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đề xuất phải nằm trọn trong cùng lịch hẹn CONFIRMED. Lịch hẹn không tự đổi; backend sẽ kiểm lại ID và phiên bản khi Học viên chấp nhận.</Text> : null}
           {item.timezone ? <WorkoutButton label={`Dùng múi giờ occurrence: ${item.timezone}`} secondary onPress={() => editDestination({ timezone: item.timezone ?? '', startUtcOffset: '', endUtcOffset: '' })} /> : null}
           <TextInput testID="change-timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch}
             style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
@@ -164,6 +166,7 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận gửi {changeTypeLabels[changeType].toLowerCase()}</Text>
           <Text style={[styles.body, { color: theme.textPrimary }]}>Buổi hiện tại: {item.sessionSummary?.name?.trim() || 'Buổi tập theo lịch'} · {formatTrainerScheduleTime(item.plannedStartAt, item.timezone)}</Text>
           {changeType === 'RESCHEDULE' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ đề xuất: {destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {destination.timezone}</Text> : null}
+          {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn hiện có là một lifecycle riêng. Đề xuất hủy buổi tập không hủy lịch hẹn; đề xuất đổi lịch không tự dời lịch hẹn.</Text> : null}
           {reason.trim() ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {reason.trim()}</Text> : null}
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ một occurrence. Học viên sẽ ACCEPT/REJECT; gửi đề xuất PENDING không đổi occurrence hay giữ chỗ trên lịch.</Text>
           <WorkoutButton testID="confirm-create-change-proposal" label="Gửi đề xuất cho Học viên" busy={mutation.isPending} disabled={mutation.isPending || needsReview} onPress={send} />

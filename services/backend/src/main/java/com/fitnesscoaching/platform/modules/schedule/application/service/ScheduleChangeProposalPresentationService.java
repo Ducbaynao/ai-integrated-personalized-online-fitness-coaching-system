@@ -56,7 +56,8 @@ public class ScheduleChangeProposalPresentationService {
                     p.sourcePlanId(), p.sourcePlanVersionId(), p.sourcePlanSessionId(),
                     source == null ? null : source.planName(), session == null ? null : session.name(),
                     p.destination(), p.reason(), p.proposedAt(), p.decidedAt(), p.decidedBy(),
-                    p.withdrawnAt(), p.withdrawnBy());
+                    p.withdrawnAt(), p.withdrawnBy(), p.appointmentId(),
+                    p.observedAppointmentVersion());
         }).toList();
     }
 
@@ -69,7 +70,7 @@ public class ScheduleChangeProposalPresentationService {
                                UUID sourcePlanSessionId, String sourcePlanName, String sourceSessionName,
                                WorkoutScheduleChangeUseCase.Destination destination, String reason,
                                Instant proposedAt, Instant decidedAt, UUID decidedBy, Instant withdrawnAt,
-                               UUID withdrawnBy) {}
+                               UUID withdrawnBy, UUID appointmentId, Long observedAppointmentVersion) {}
     public record PageView(List<ProposalView> items, int page, int size, long totalItems, int totalPages) {}
     public record CommandView(ProposalView proposal, boolean replayed) {}
     public record DecisionView(ProposalView proposal, WorkoutScheduleChangeUseCase.ChangeResult appliedChange,

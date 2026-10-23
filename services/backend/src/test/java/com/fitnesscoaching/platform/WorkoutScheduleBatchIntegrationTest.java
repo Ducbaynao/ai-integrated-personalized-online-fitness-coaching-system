@@ -652,18 +652,18 @@ class WorkoutScheduleBatchIntegrationTest {
                 """, appointment, trainer, f.student(), occurrence, Timestamp.from(start),
                 Timestamp.from(start.plusSeconds(3600)), f.student());
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP", "CANCEL");
         jdbc.update("UPDATE fitness.appointments SET status='CONFIRMED' WHERE id=?", appointment);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP", "CANCEL");
         jdbc.update("UPDATE fitness.appointments SET status='COMPLETED' WHERE id=?", appointment);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP", "CANCEL");
         jdbc.update("UPDATE fitness.appointments SET status='CANCELLED' WHERE id=?", appointment);
         jdbc.update("UPDATE fitness.planned_workouts SET supervision_override_by=?,supervision_override_reason='Approved override',version=version+1 WHERE id=?",
                 f.student(), occurrence);
         assertThat(calendar.listMine(f.student(), start.minusSeconds(1), start.plusSeconds(1), 0, 20)
-                .items().getFirst().availableActions()).containsExactly("SKIP");
+                .items().getFirst().availableActions()).containsExactly("SKIP", "CANCEL");
     }
 
     @Test void anotherInProgressExecutionSuppressesStartButKeepsSkip() {

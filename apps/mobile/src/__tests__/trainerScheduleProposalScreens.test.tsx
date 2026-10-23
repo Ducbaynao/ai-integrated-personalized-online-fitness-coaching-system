@@ -29,7 +29,7 @@ const proposal: WorkoutScheduleProposal = {
   weekAnchorDate: '2026-10-12', timezone: 'Asia/Ho_Chi_Minh', proposedAt: '2026-10-11T01:00:00Z',
   items: [{ clientItemId: 'item-1', planSessionId: 'session-1', weekNumber: 1, dayNumber: 1, sequenceNumber: 1,
     localStart: '2026-10-12T08:00:00', localEnd: '2026-10-12T09:00:00', startUtcOffset: '+07:00', endUtcOffset: '+07:00',
-    sourceSessionName: 'Ngày thân trên', sourceSessionFocus: null }],
+    sourceSessionName: 'Ngày thân trên', sourceSessionFocus: null, appointmentId: null, observedAppointmentVersion: null }],
 };
 
 function setup(accessLevel = 'CONTRIBUTE') {

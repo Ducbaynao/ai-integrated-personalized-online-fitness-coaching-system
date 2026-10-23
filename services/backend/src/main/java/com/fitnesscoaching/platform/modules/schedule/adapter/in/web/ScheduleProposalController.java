@@ -83,9 +83,16 @@ public class ScheduleProposalController {
     public record ProposalItemInput(@NotNull UUID clientItemId, @NotNull UUID planSessionId,
                                     int weekNumber, int dayNumber, int sequenceNumber,
                                     @NotNull LocalDateTime localStart, @NotNull LocalDateTime localEnd,
-                                    @NotBlank String startUtcOffset, @NotBlank String endUtcOffset) {
+                                    @NotBlank String startUtcOffset, @NotBlank String endUtcOffset,
+                                    UUID appointmentId) {
+        public ProposalItemInput(UUID clientItemId, UUID planSessionId, int weekNumber, int dayNumber,
+                                 int sequenceNumber, LocalDateTime localStart, LocalDateTime localEnd,
+                                 String startUtcOffset, String endUtcOffset) {
+            this(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
+                    localStart, localEnd, startUtcOffset, endUtcOffset, null);
+        }
         Item toCommand() { return new Item(clientItemId, planSessionId, weekNumber, dayNumber, sequenceNumber,
-                localStart, localEnd, startUtcOffset, endUtcOffset); }
+                localStart, localEnd, startUtcOffset, endUtcOffset, appointmentId); }
     }
     public record WithdrawRequest(@NotNull Long expectedProposalVersion, @NotBlank String commandKey) {}
     public record DecisionRequest(@NotNull Long expectedProposalVersion, @NotBlank String decision,

@@ -18,10 +18,13 @@ Producer inventory on merged main: Coaching relationship request/invitation and 
 | Coaching Appointment request or Appointment reschedule request | New pending request | The party who must decide |
 | Appointment or reschedule-request decision | ACCEPT or REJECT | The requesting party |
 | Valid Appointment cancellation | CANCEL | The other party |
+| Linked Planned Workout cancellation under the 2026-10-23 B06 approval | CANCEL | The linked Appointment's Trainer, unless that Trainer is the actor |
 
 Do not emit on idempotent replay or to the acting user. Every recipient must be authorized at the source commit boundary; inbox reads and deep links recheck current object authority, and a former Trainer cannot inspect old live notifications. Preview text cannot contain message/proposal content, reasons, plan/health data or other sensitive detail. Deduplicate by immutable event identity, recipient and event type. Only an after-commit realtime **invalidation** may be broadcast. This matrix is approved policy. Producer hooks and mixed inbox filtering merged in PR #99; that bounded runtime does not establish device QA or all of M7. A producer without a WITHDRAW transition does not gain one merely for notification symmetry. B04 Workout Plan publish is not a proposal event.
 
 The initial mixed-event inbox YAML review draft was superseded and excluded from PR #99; `contracts/openapi/openapi.yaml` is the executable contract. V45 and the lifecycle-notification runtime merged in PR #99. Lifecycle notices are inserted in the source transaction and inbox reads recheck authority. Merge/CI do not by themselves verify independent A01 schema review or Mobile-to-backend device integration.
+
+The linked Planned Workout cancellation row was approved later, on 2026-10-23. Its producer and inbox/deep-link changes are a local B06/B08 checkpoint candidate, not part of merged PR #99; notification replay and permission loss still require verification before merge.
 
 **Decision status:** APPROVED by Person B on 2026-10-17. This record defines product policy; it does not claim the OpenAPI contract, Flyway migration, backend, Mobile, delivery service, or tests are already implemented. M7 remains broader than this slice.
 

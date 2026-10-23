@@ -116,6 +116,18 @@ describe('Trainer change proposal screens', () => {
     renderer.act(() => detail.tree.unmount());
   });
 
+  it('shows the observed Appointment as a separate lifecycle on a linked proposal', () => {
+    (useTrainerWorkoutScheduleChangeProposalDetail as jest.Mock).mockReturnValue({
+      data: { ...proposal, appointmentId: 'appointment-1', observedAppointmentVersion: 3 },
+      isPending: false, isError: false, isFetching: false, refetch: jest.fn(),
+    });
+    const { tree } = render(<TrainerChangeProposalDetailScreen relationshipId="relationship-1" proposalId="proposal-1" />);
+    expect(JSON.stringify(tree.toJSON())).toContain('hủy buổi tập không hủy lịch hẹn');
+    renderer.act(() => tree.root.findByProps({ testID: 'trainer-change-open-appointment' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/appointments/appointment-1');
+    renderer.act(() => tree.unmount());
+  });
+
   it('withdraws PENDING with real proposal version and stable key after uncertain network result', async () => {
     const withdraw = jest.spyOn(workoutScheduleChangeProposalApi, 'withdraw')
       .mockRejectedValueOnce(new ApiError(0, 'network'))

@@ -34,7 +34,7 @@ Calendar theo timezone, appointment type, conflict và availability. Planned Wor
 
 ## TR-10 Planned Workout change proposal
 
-Trong TR-03, Trainer có WORKOUT_PLAN VIEW hiện hành xem danh sách/detail đề xuất đổi/hủy một Planned Workout do chính mình tạo cho đúng Student; lọc trạng thái, phân trang và không nhìn dữ liệu của Trainer khác. CONTRIBUTE/MANAGE mới được tạo/rút PENDING. Form tạo lấy occurrence ID/version thật từ lịch, yêu cầu chọn tường minh IANA timezone, local start/end và UTC offsets khi RESCHEDULE; CANCEL có thể nêu lý do. Preview nêu rõ đề xuất PENDING không đổi lịch, Student quyết định sau. Mất quyền/404 che dữ liệu và xóa cache theo Trainer–Student; 409 tải lại và yêu cầu xác nhận mới. Đây không phải luồng Appointment reschedule hàng loạt ở TR-09.
+Trong TR-03, Trainer có WORKOUT_PLAN VIEW hiện hành xem danh sách/detail đề xuất đổi/hủy một Planned Workout do chính mình tạo cho đúng Student; lọc trạng thái, phân trang và không nhìn dữ liệu của Trainer khác. CONTRIBUTE/MANAGE mới được tạo/rút PENDING. Form tạo lấy occurrence ID/version thật từ lịch, yêu cầu chọn tường minh IANA timezone, local start/end và UTC offsets khi RESCHEDULE; CANCEL có thể nêu lý do. Với occurrence liên kết, reschedule chỉ trong cùng Appointment `CONFIRMED`; cancel buổi tập không tự hủy Appointment. Preview nêu rõ đề xuất PENDING không đổi lịch, Student quyết định sau. Mất quyền/404 che dữ liệu và xóa cache theo Trainer–Student; 409 tải lại và yêu cầu xác nhận mới. Đây không phải luồng Appointment reschedule hàng loạt ở TR-09. Khi chọn Appointment cho đề xuất batch có `COACH_REQUIRED`, form phân trang danh sách và cho tìm cả lịch hẹn bắt đầu sớm hơn cửa sổ mặc định để không loại nhầm một khoảng dài vẫn bao trọn buổi tập.
 
 ## TR-11 AI Insight Review
 

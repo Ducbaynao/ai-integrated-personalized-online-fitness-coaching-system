@@ -141,6 +141,10 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
         <Text style={[styles.body, { color: theme.textSecondary }]}>Mốc đầu chuỗi: {formatScheduleTime(item.originalPlannedStartAt, item.timezone, user?.timezone)}</Text>
         {item.rescheduledFromOccurrenceId ? <WorkoutButton testID="schedule-predecessor" label="Xem buổi tập trước khi đổi lịch" secondary onPress={() => router.push(`/workouts/schedule/${item.rescheduledFromOccurrenceId}` as never)} /> : null}
         {item.replacementOccurrenceId ? <WorkoutButton testID="schedule-replacement" label="Xem buổi tập thay thế" secondary onPress={() => router.push(`/workouts/schedule/${item.replacementOccurrenceId}` as never)} /> : null}
+        {item.linkedAppointmentId ? <>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi tập đang liên kết với một lịch hẹn riêng. Đổi lịch chỉ hợp lệ khi buổi mới vẫn nằm trọn trong chính lịch hẹn đó.</Text>
+          <WorkoutButton label="Xem lịch hẹn đang liên kết" secondary onPress={() => router.push(`/appointments/${item.linkedAppointmentId}` as never)} />
+        </> : null}
       </WorkoutCard>
       {needsReview ? <WorkoutState testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} /> : null}
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
@@ -177,6 +181,7 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
         {preview ? <WorkoutCard testID="schedule-reschedule-preview">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận đổi một buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi cũ được giữ trong lịch sử; buổi mới sẽ có ID riêng, giữ nguyên nguồn kế hoạch và nội dung tập.</Text>
+          {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn không tự dời. Buổi mới phải nằm trọn trong lịch hẹn CONFIRMED hiện tại; liên kết đang hoạt động sẽ chuyển sang buổi mới. Nếu cần giờ ngoài lịch hẹn, hãy hoàn tất yêu cầu đổi lịch hẹn trước rồi xem và xác nhận lại buổi tập.</Text> : null}
           <Text style={[styles.body, { color: theme.textPrimary }]}>{destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {destination.timezone}</Text>
           <WorkoutButton testID="schedule-confirm-reschedule" label="Xác nhận đổi lịch" busy={mutation.isPending} disabled={mutation.isPending} onPress={submit} />
         </WorkoutCard> : null}
@@ -184,6 +189,7 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
       {mode === 'CANCEL' && item.availableActions.includes('CANCEL') && !needsReview ? <WorkoutCard testID="schedule-cancel-form">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận hủy buổi tập</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi này sẽ chuyển sang Đã hủy và vẫn xem được trong lịch sử. Không tạo buổi thay thế.</Text>
+        {item.linkedAppointmentId ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Hủy buổi tập không hủy lịch hẹn. Lịch hẹn vẫn CONFIRMED; Huấn luyện viên sẽ được thông báo. Nếu muốn hủy lịch hẹn, hãy thực hiện riêng trong phần Lịch hẹn.</Text> : null}
         <TextInput testID="schedule-cancel-reason" accessibilityLabel="Lý do hủy buổi tập" placeholder="Lý do hủy (bắt buộc nếu đã qua giờ bắt đầu)" multiline maxLength={1000} value={reason}
           onChangeText={(value) => { setReason(value); resetCommand(); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
         <WorkoutButton testID="schedule-review-cancel" label="Xem lại trước khi hủy" onPress={() => {

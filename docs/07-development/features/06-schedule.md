@@ -1,5 +1,18 @@
 # B06 Schedule and Planned Workout Occurrence Decisions
 
+## 2026-10-23 — Linked Appointment and Trainer COACH_REQUIRED proposal decisions (APPROVED)
+
+Person B approved the following extension to the bounded B06 flow. This is product policy, not evidence that the contract, forward migration, backend, Mobile, or tests below have been implemented. The existing Student-direct confirmation and first-flow linked-change guards remain effective until the replacement commands have been verified.
+
+1. A Trainer may attach only an already `CONFIRMED` Appointment to each `COACH_REQUIRED` schedule-batch proposal item. Persist its ID and observed version. Student ACCEPT locks and rechecks that exact ID/version, Student, Trainer, current Coaching Period, `CONFIRMED` state, and full containment of the workout interval by the Appointment interval. A changed Appointment makes ACCEPT return 409 while the proposal remains `PENDING`; it is never silently replaced. The Student may still REJECT. Replay retains actor-scoped idempotency and current-authority checks.
+2. For an occurrence with an Appointment link, the Student decides a direct reschedule or cancellation; a Trainer can only propose the change for Student ACCEPT/REJECT. A rescheduled interval must remain wholly inside the **same** `CONFIRMED` Appointment. To move outside it, both parties first complete the existing bilateral Appointment-reschedule request, then the Student confirms the occurrence change against fresh data/version. Neither command silently moves the Appointment.
+3. Occurrence reschedule creates a successor ID and marks the predecessor `RESCHEDULED`. In the same transaction, transfer the active Appointment link to the qualifying successor, retaining predecessor-to-Appointment provenance in immutable history/audit. Do not change the Appointment's time or status. START of the successor uses only the current link, never a historical link.
+4. The Student may cancel a linked occurrence under the approved B06 occurrence guards; a Trainer may only propose cancellation. The Appointment remains `CONFIRMED` and visible to both parties. Notify the Trainer that the workout was cancelled. Retain historical link provenance while releasing the active dependency so the separately authorized Appointment-cancel command can subsequently run. Mobile must explain that cancelling the workout does not cancel the Appointment.
+
+The 2026-10-20 first-flow exclusions and executable OpenAPI/runtime descriptions below are historical boundaries; this later approval does not claim they are already lifted in production. The B08 notification matrix gains the specific committed linked-workout cancellation event without actor self-notification or replay duplication.
+
+**Local implementation candidate (not merged):** This checkpoint extends the executable OpenAPI, adds forward V47 proposal-observation columns, coordinates the existing active Appointment FK with occurrence replacement/cancellation, and adds Student/Trainer Mobile presentation. Earlier first-flow exclusions in section 18 remain the historical policy of that slice, not the current behavior of this local candidate. V47 requires independent A01 schema review before merge; tests and device QA are reported separately from approval.
+
 ## 2026-10-21 — Automatic Planned Workout recurrence (APPROVED)
 
 Person B approved the following product policy for `B06-AUTOMATIC-RECURRENCE-MATERIALIZER`. This section is a **decision record**, not evidence that an OpenAPI contract, migration, job, backend endpoint, or Mobile flow is implemented. Earlier references to “no automatic materializer” describe the first scheduling flow and its historical runtime boundary; they do not revoke this later approval.

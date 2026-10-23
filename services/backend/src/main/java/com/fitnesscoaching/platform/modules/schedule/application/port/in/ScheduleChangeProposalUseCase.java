@@ -28,7 +28,24 @@ public interface ScheduleChangeProposalUseCase {
                     String oldStartUtcOffset, String oldEndUtcOffset, Instant originalPlannedStartAt,
                     UUID sourcePlanId, UUID sourcePlanVersionId, UUID sourcePlanSessionId,
                     Destination destination, String reason, Instant proposedAt, Instant decidedAt,
-                    UUID decidedBy, Instant withdrawnAt, UUID withdrawnBy) {}
+                    UUID decidedBy, Instant withdrawnAt, UUID withdrawnBy,
+                    UUID appointmentId, Long observedAppointmentVersion) {
+        public Proposal(UUID proposalId, long proposalVersion, String status, String changeType,
+                        UUID studentId, UUID trainerId, UUID coachingPeriodId, UUID occurrenceId,
+                        long observedOccurrenceVersion, Instant oldPlannedStartAt, Instant oldPlannedEndAt,
+                        String oldTimezone, LocalDateTime oldLocalStart, LocalDateTime oldLocalEnd,
+                        String oldStartUtcOffset, String oldEndUtcOffset, Instant originalPlannedStartAt,
+                        UUID sourcePlanId, UUID sourcePlanVersionId, UUID sourcePlanSessionId,
+                        Destination destination, String reason, Instant proposedAt, Instant decidedAt,
+                        UUID decidedBy, Instant withdrawnAt, UUID withdrawnBy) {
+            this(proposalId, proposalVersion, status, changeType, studentId, trainerId, coachingPeriodId,
+                    occurrenceId, observedOccurrenceVersion, oldPlannedStartAt, oldPlannedEndAt,
+                    oldTimezone, oldLocalStart, oldLocalEnd, oldStartUtcOffset, oldEndUtcOffset,
+                    originalPlannedStartAt, sourcePlanId, sourcePlanVersionId, sourcePlanSessionId,
+                    destination, reason, proposedAt, decidedAt, decidedBy, withdrawnAt, withdrawnBy,
+                    null, null);
+        }
+    }
     record CommandResult(Proposal proposal, boolean replayed) {
         public CommandResult asReplay() { return new CommandResult(proposal, true); }
     }

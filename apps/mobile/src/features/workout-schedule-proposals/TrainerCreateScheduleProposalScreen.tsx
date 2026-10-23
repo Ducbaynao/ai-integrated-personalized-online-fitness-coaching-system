@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { appointmentApi } from '@/services/appointmentApi';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { useCurrentWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
@@ -16,7 +17,7 @@ import { proposalErrorMessage } from './proposalPresentation';
 import { isInSessionWeek, isMonday, proposalTimezones, validProposalOffsets } from './proposalTime';
 import { workoutScheduleProposalQueryKeys } from './workoutScheduleProposalQueries';
 
-type Entry = { session: WorkoutSession; localStart: string; localEnd: string; startOffset: string; endOffset: string };
+type Entry = { session: WorkoutSession; localStart: string; localEnd: string; startOffset: string; endOffset: string; appointmentId?: string };
 type Pending = { body: CreateWorkoutScheduleProposalRequest; studentId: string };
 
 export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relationshipId: string }) {
@@ -49,24 +50,45 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState('');
   const [stale, setStale] = useState(false);
+  const [includeEarlierAppointments, setIncludeEarlierAppointments] = useState(false);
+  const [appointmentWindow] = useState(() => {
+    const now = Date.now();
+    return { from: new Date(now - 86_400_000).toISOString(), until: new Date(now + 91 * 86_400_000).toISOString() };
+  });
+  const appointmentFrom = includeEarlierAppointments ? new Date(0).toISOString() : appointmentWindow.from;
   const submitting = useRef(false);
   const zones = useMemo(() => proposalTimezones(timezoneSearch), [timezoneSearch]);
+  const appointmentQuery = useInfiniteQuery({
+    queryKey: ['appointments', trainerId, studentId, 'proposal-candidates', appointmentFrom, appointmentWindow.until],
+    enabled: allowed && !concealed && !!appointmentWindow && entries.some(entry => entry.session.supervisionRequirement === 'COACH_REQUIRED'),
+    gcTime: 0, initialPageParam: 0,
+    queryFn: ({ pageParam }) => appointmentApi.appointments(appointmentFrom, appointmentWindow.until, pageParam),
+    getNextPageParam: page => (page.page + 1) * page.size < page.totalItems ? page.page + 1 : undefined,
+  });
+  const appointmentCandidates = useMemo(() => appointmentQuery.data?.pages.flatMap(page => page.items).filter(item =>
+    item.status === 'CONFIRMED' && !item.plannedWorkoutId && item.studentId === studentId
+      && item.trainerId === trainerId && item.coachingPeriodId === relationshipQuery.data?.currentPeriod?.id) ?? [],
+  [appointmentQuery.data, relationshipQuery.data?.currentPeriod?.id, studentId, trainerId]);
 
   useEffect(() => {
     if (concealed || !studentId || (allowed && !(planQuery.error instanceof ApiError && [403, 404].includes(planQuery.error.status))
-      && !(versionQuery.error instanceof ApiError && [403, 404].includes(versionQuery.error.status)))) return;
+      && !(versionQuery.error instanceof ApiError && [403, 404].includes(versionQuery.error.status))
+      && !(appointmentQuery.error instanceof ApiError && [403, 404].includes(appointmentQuery.error.status)))) return;
     client.removeQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
     client.removeQueries({ queryKey: workoutScheduleProposalQueryKeys.trainer(trainerId, studentId) });
+    client.removeQueries({ queryKey: ['appointments', trainerId, studentId] });
     queueMicrotask(() => setConcealed(true));
-  }, [allowed, client, concealed, planQuery.error, studentId, trainerId, versionQuery.error]);
+  }, [allowed, appointmentQuery.error, client, concealed, planQuery.error, studentId, trainerId, versionQuery.error]);
 
   const resetReview = () => { setPreview(false); setPending(null); setError(''); setStale(false); };
   const updateEntry = (id: string, patch: Partial<Entry>) => {
-    setEntries((current) => current.map((entry) => entry.session.id === id ? { ...entry, ...patch } : entry));
+    const timeChanged = ['localStart', 'localEnd', 'startOffset', 'endOffset'].some(key => key in patch);
+    setEntries((current) => current.map((entry) => entry.session.id === id
+      ? { ...entry, ...(timeChanged ? { appointmentId: undefined } : {}), ...patch } : entry));
     resetReview();
   };
   const selectSession = (session: WorkoutSession) => {
-    if (!['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement)) return;
+    if (!['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement)) return;
     setEntries((current) => current.some((entry) => entry.session.id === session.id)
       ? current.filter((entry) => entry.session.id !== session.id)
       : [...current, { session, localStart: '', localEnd: '', startOffset: '', endOffset: '' }]);
@@ -78,7 +100,8 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
     const intervals: { from: number; until: number }[] = [];
     for (const entry of entries) {
       const { session } = entry;
-      if (!['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement)) return `Buổi ${session.name} chưa được phép đề xuất trong luồng này.`;
+      if (!['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement)) return `Buổi ${session.name} thiếu metadata giám sát hợp lệ.`;
+      if (session.supervisionRequirement === 'COACH_REQUIRED' && !entry.appointmentId) return `Chọn lịch hẹn CONFIRMED cho ${session.name}.`;
       if (!isInSessionWeek(anchor, session.weekNumber, entry.localStart)) return `Ngày bắt đầu của ${session.name} phải nằm trong tuần ${session.weekNumber} tính từ thứ Hai đã chọn.`;
       const starts = validProposalOffsets(timezone, entry.localStart);
       const ends = validProposalOffsets(timezone, entry.localEnd);
@@ -87,11 +110,15 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       const end = ends.find((choice) => choice.offset === entry.endOffset);
       if (!start || !end) return `Chọn tường minh UTC offset hợp lệ cho cả bắt đầu và kết thúc của ${session.name}.`;
       if (end.instant <= start.instant) return `Giờ kết thúc của ${session.name} phải sau giờ bắt đầu.`;
+      if (session.supervisionRequirement === 'COACH_REQUIRED' && !appointmentCandidates.some(candidate =>
+        candidate.appointmentId === entry.appointmentId && new Date(candidate.startAt).getTime() <= start.instant
+          && new Date(candidate.endAt).getTime() >= end.instant))
+        return `Lịch hẹn đã chọn cho ${session.name} không còn phù hợp; hãy tải lại và chọn lại.`;
       if (intervals.some((other) => start.instant < other.until && other.from < end.instant)) return 'Các buổi trong cùng đề xuất không được chồng thời gian.';
       intervals.push({ from: start.instant, until: end.instant });
     }
     return null;
-  }, [anchor, entries, sourceReady, timezone]);
+  }, [anchor, appointmentCandidates, entries, sourceReady, timezone]);
 
   const windowError = () => {
     const now = Date.now();
@@ -112,7 +139,8 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       weekAnchorDate: anchor, timezone, commandKey: createCommandKey(),
       items: entries.map((entry) => ({ clientItemId: createCommandKey(), planSessionId: entry.session.id,
         weekNumber: entry.session.weekNumber, dayNumber: entry.session.dayNumber, sequenceNumber: entry.session.sequenceNumber,
-        localStart: entry.localStart, localEnd: entry.localEnd, startUtcOffset: entry.startOffset, endUtcOffset: entry.endOffset })),
+        localStart: entry.localStart, localEnd: entry.localEnd, startUtcOffset: entry.startOffset, endUtcOffset: entry.endOffset,
+        ...(entry.appointmentId ? { appointmentId: entry.appointmentId } : {}) })),
     } };
     setPending(command); submitting.current = true; setError(''); mutation.mutate(command);
   };
@@ -173,11 +201,16 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Chọn buổi từ phiên bản đã xuất bản</Text>
       {sessions.map((session) => {
         const selected = entries.find((entry) => entry.session.id === session.id);
-        const eligible = ['SELF_ALLOWED', 'COACH_PREFERRED'].includes(session.supervisionRequirement);
+        const eligible = ['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement);
+        const selectedStart = selected && validProposalOffsets(timezone, selected.localStart).find(choice => choice.offset === selected.startOffset);
+        const selectedEnd = selected && validProposalOffsets(timezone, selected.localEnd).find(choice => choice.offset === selected.endOffset);
+        const matchingAppointments = appointmentCandidates.filter(candidate => selectedStart && selectedEnd
+          && new Date(candidate.startAt).getTime() <= selectedStart.instant
+          && new Date(candidate.endAt).getTime() >= selectedEnd.instant);
         return <WorkoutCard key={session.id} testID={`source-session-${session.id}`}>
           <Text style={[styles.label, { color: theme.textPrimary }]}>{session.name} · Tuần {session.weekNumber}, ngày {session.dayNumber}, thứ tự {session.sequenceNumber}</Text>
           {session.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {session.focus}</Text> : null}
-          {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>{session.supervisionRequirement === 'COACH_REQUIRED' ? 'Cần huấn luyện viên giám sát; flow đầu chưa hỗ trợ đề xuất buổi này.' : 'Thiếu metadata giám sát hợp lệ; không thể chọn.'}</Text> : null}
+          {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Thiếu metadata giám sát hợp lệ; không thể chọn.</Text> : null}
           <WorkoutButton testID={`select-session-${session.id}`} label={selected ? 'Bỏ buổi này' : 'Chọn buổi này'} secondary={!selected} disabled={!eligible} onPress={() => selectSession(session)} />
           {selected ? <>
             <Text style={[styles.body, { color: theme.textSecondary }]}>Nhập tường minh ngày giờ địa phương dạng YYYY-MM-DDTHH:mm. Không suy thời lượng từ kế hoạch.</Text>
@@ -196,6 +229,23 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
                   onPress={() => updateEntry(session.id, part === 'Start' ? { startOffset: option.offset } : { endOffset: option.offset })} />)}</View>
               </View>;
             })}
+            {session.supervisionRequirement === 'COACH_REQUIRED' ? <View>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>Lịch hẹn đã xác nhận cho buổi có huấn luyện viên</Text>
+              <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn lịch hẹn cùng Học viên, Huấn luyện viên và Coaching Period, bao trọn buổi tập. Máy chủ sẽ kiểm lại ID, phiên bản và khoảng thời gian khi Học viên chấp nhận.</Text>
+              {appointmentQuery.isPending ? <WorkoutState busy title="Đang tải lịch hẹn" message="Vui lòng chờ." /> : null}
+              {appointmentQuery.isError ? <WorkoutState title="Không thể tải lịch hẹn" message={proposalErrorMessage(appointmentQuery.error)} onRetry={() => appointmentQuery.refetch()} /> : null}
+              {!appointmentQuery.isPending && !appointmentQuery.isError && !matchingAppointments.length
+                ? <WorkoutState title="Chưa có lịch hẹn phù hợp" message="Hãy xác nhận lịch hẹn trước khi đề xuất buổi tập cần huấn luyện viên." /> : null}
+              {!includeEarlierAppointments ? <WorkoutButton testID="proposal-search-earlier-appointments"
+                label="Tìm cả lịch hẹn bắt đầu trước hôm qua" secondary
+                onPress={() => setIncludeEarlierAppointments(true)} /> : null}
+              {matchingAppointments.map(candidate => <WorkoutButton key={candidate.appointmentId} testID={`proposal-appointment-${candidate.appointmentId}`}
+                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${candidate.timezone}`}
+                secondary={selected.appointmentId !== candidate.appointmentId}
+                onPress={() => updateEntry(session.id, { appointmentId: candidate.appointmentId })} />)}
+              {appointmentQuery.hasNextPage ? <WorkoutButton label="Tải thêm lịch hẹn" secondary
+                busy={appointmentQuery.isFetchingNextPage} onPress={() => appointmentQuery.fetchNextPage()} /> : null}
+            </View> : null}
           </> : null}
         </WorkoutCard>;
       })}
@@ -204,7 +254,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       {preview && !validation ? <WorkoutCard testID="proposal-preview">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận tạo đề xuất</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {plan?.name} · Phiên bản {version?.versionNumber} · Múi giờ Trainer chọn: {timezone} · Tuần bắt đầu: {anchor}</Text>
-        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}</Text>)}
+        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Có lịch hẹn CONFIRMED được chọn' : ''}</Text>)}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên sẽ xem múi giờ, thời gian từng buổi rồi chấp nhận hoặc từ chối toàn bộ. Không buổi nào được tạo khi chỉ gửi đề xuất.</Text>
         <WorkoutButton testID="confirm-create-proposal" label="Gửi đề xuất cho học viên" busy={mutation.isPending} disabled={mutation.isPending || stale} onPress={create} />
       </WorkoutCard> : null}

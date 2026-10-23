@@ -17,6 +17,6 @@ public interface WorkoutScheduleCalendarQuery {
                       UUID replacementOccurrenceId, Instant plannedEndAt,
                       String timezone, String localStart, String localEnd, String startUtcOffset,
                       String endUtcOffset, PlanSummary planSummary, SessionSummary sessionSummary,
-                      List<String> availableActions) {}
+                      List<String> availableActions, UUID linkedAppointmentId, Long linkedAppointmentVersion) {}
     record Page(List<Occurrence> items, int page, int size, long totalItems, int totalPages) {}
 }
