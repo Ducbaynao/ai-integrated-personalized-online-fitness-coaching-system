@@ -131,6 +131,17 @@ class AiRunF01ServiceUnitTest {
     }
 
     @Test
+    @DisplayName("revalidateActorAuthorization: Loss of STUDENT role while retaining valid TRAINER role is not blocked")
+    void revalidateActorAuthorization_studentRoleRevokedButTrainerActive_succeeds() {
+        when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(actorId, "STUDENT")).thenReturn(false);
+        when(userRoleQuery.hasActiveRole(actorId, "TRAINER")).thenReturn(true);
+
+        // Act & Assert - does not throw
+        service.revalidateActorAuthorization(actorId);
+    }
+
+    @Test
     @DisplayName("getF01Run: Revalidates actor before retrieving run - blocks if account is inactive")
     void getF01Run_revalidatesAndBlocksInactiveAccount() {
         when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.DISABLED));
