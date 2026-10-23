@@ -14,6 +14,7 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRunInputReference;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunKnowledgeChunk;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 import com.fitnesscoaching.platform.modules.ai.domain.AiValidationResult;
+import com.fitnesscoaching.platform.modules.content.domain.RetrievedKnowledgeChunk;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -841,5 +843,182 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
 
         assertThat(chunkRefs).hasSize(1);
         assertThat(chunkRefs.get(0).rank()).isEqualTo(1);
+    }
+@Test
+    @DisplayName("13. Output revalidation: Account deactivated during AI execution blocks delivery, preserves run lifecycle, and blocks polling")
+    void accountDeactivatedDuringAiExecution_blocksDeliveryAndPolling() throws Exception {
+        // Given: client provides a valid question
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Nạp protein thế nào để tối đa hóa quá trình tổng hợp cơ bắp?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        // Simulated AI client simulates external call latency and deactivates student in DB during processing
+        simulatedAiClient.setCustomBehavior(env -> {
+            // Simulate user account deactivation concurrently while AI model was computing
+            jdbcTemplate.update("UPDATE fitness.users SET status = 'DISABLED'::fitness.account_status WHERE id = ?", STUDENT_USER_ID);
+
+            List<RetrievedKnowledgeChunk> initialChunks =
+                    retrievalUseCase.retrieveActiveKnowledge(env.question(), env.knowledgeScope().allowedSourceIds(), 3);
+            evidenceTracker.recordRunEvidence(env.requestId(), initialChunks);
+            RetrievedKnowledgeChunk chunk = initialChunks.get(0);
+
+            return new F01KnowledgeQueryResponse(
+                    env.requestId(),
+                    env.correlationId(),
+                    "SUCCEEDED",
+                    "INFORMATION",
+                    "NONE",
+                    "Theo tài liệu: " + chunk.snippet(),
+                    List.of(new F01KnowledgeQueryResponse.CitationDto(
+                            chunk.documentCode(),
+                            chunk.versionLabel(),
+                            chunk.sourceId(),
+                            new F01KnowledgeQueryResponse.LocatorDto(chunk.contentPath(), chunk.headingPath(), List.of(1, 2), chunk.sectionIndex()),
+                            chunk.snippet()
+                    )),
+                    List.of("Khuyến nghị chung"),
+                    List.of(),
+                    Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
+                    new F01KnowledgeQueryResponse.UsageDto(300, 50, 350, 120),
+                    null,
+                    new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "f01-rule-v1", "simulated", "simulated-f01-v1", null, null)
+            );
+        });
+
+        // When: request is executed
+        String errorContent = mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")))
+                .andReturn().getResponse().getContentAsString();
+
+        // Then: zero answer or citations are leaked in response body
+        assertThat(errorContent).doesNotContain("Theo tài liệu:");
+        assertThat(errorContent).doesNotContain("INFORMATION");
+
+        // Verify that in the database, the AI Run was safely completed with SUCCEEDED status and token audit
+        List<AiRun> runs = jdbcTemplate.query(
+                "SELECT * FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC",
+                (rs, rowNum) -> aiRunRepository.findById(UUID.fromString(rs.getString("id"))).orElse(null),
+                STUDENT_USER_ID
+        );
+        assertThat(runs).isNotEmpty();
+        AiRun latestRun = runs.get(0);
+        assertThat(latestRun.status()).isEqualTo(AiRunStatus.SUCCEEDED);
+        assertThat(latestRun.completedAt()).isNotNull();
+
+        // Verify polling via GET /api/v1/ai/runs/{runId} is also blocked with 403 ACCOUNT_UNAVAILABLE
+        mockMvc.perform(get("/api/v1/ai/runs/" + latestRun.id())
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("14. Output revalidation: Role revoked during AI execution blocks delivery, preserves run lifecycle, and blocks polling")
+    void roleRevokedDuringAiExecution_blocksDeliveryAndPolling() throws Exception {
+        // Given: client provides a valid question
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Thời điểm nạp protein tối ưu trong ngày là khi nào?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        // Simulated AI client simulates external call latency and strips STUDENT role from DB during processing
+        simulatedAiClient.setCustomBehavior(env -> {
+            // Revoke STUDENT role concurrently while AI model was computing
+            jdbcTemplate.update("DELETE FROM fitness.user_roles WHERE user_id = ? AND role_id IN (SELECT id FROM fitness.roles WHERE code = 'STUDENT')", STUDENT_USER_ID);
+
+            List<RetrievedKnowledgeChunk> initialChunks =
+                    retrievalUseCase.retrieveActiveKnowledge(env.question(), env.knowledgeScope().allowedSourceIds(), 3);
+            evidenceTracker.recordRunEvidence(env.requestId(), initialChunks);
+            RetrievedKnowledgeChunk chunk = initialChunks.get(0);
+
+            return new F01KnowledgeQueryResponse(
+                    env.requestId(),
+                    env.correlationId(),
+                    "SUCCEEDED",
+                    "INFORMATION",
+                    "NONE",
+                    "Theo tài liệu: " + chunk.snippet(),
+                    List.of(new F01KnowledgeQueryResponse.CitationDto(
+                            chunk.documentCode(),
+                            chunk.versionLabel(),
+                            chunk.sourceId(),
+                            new F01KnowledgeQueryResponse.LocatorDto(chunk.contentPath(), chunk.headingPath(), List.of(1, 2), chunk.sectionIndex()),
+                            chunk.snippet()
+                    )),
+                    List.of("Khuyến nghị chung"),
+                    List.of(),
+                    Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
+                    new F01KnowledgeQueryResponse.UsageDto(320, 60, 380, 130),
+                    null,
+                    new F01KnowledgeQueryResponse.GenerationMetadataDto("1.0.0", "v1.0", "f01-rule-v1", "simulated", "simulated-f01-v1", null, null)
+            );
+        });
+
+        // When: request is executed
+        String errorContent = mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")))
+                .andReturn().getResponse().getContentAsString();
+
+        // Then: zero answer or citations are leaked in response body
+        assertThat(errorContent).doesNotContain("Theo tài liệu:");
+        assertThat(errorContent).doesNotContain("INFORMATION");
+
+        // Verify that in the database, the AI Run was safely completed with SUCCEEDED status and token audit
+        List<AiRun> runs = jdbcTemplate.query(
+                "SELECT * FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC",
+                (rs, rowNum) -> aiRunRepository.findById(UUID.fromString(rs.getString("id"))).orElse(null),
+                STUDENT_USER_ID
+        );
+        assertThat(runs).isNotEmpty();
+        AiRun latestRun = runs.get(0);
+        assertThat(latestRun.status()).isEqualTo(AiRunStatus.SUCCEEDED);
+
+        // Verify polling via GET /api/v1/ai/runs/{runId} is also blocked with 403 AI_FORBIDDEN
+        mockMvc.perform(get("/api/v1/ai/runs/" + latestRun.id())
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("15. Upfront deactivated account: Rejected before AI Run creation")
+    void upfrontDeactivatedAccount_rejectedBeforeAiRunCreation() throws Exception {
+        // Deactivate student upfront
+        jdbcTemplate.update("UPDATE fitness.users SET status = 'DISABLED'::fitness.account_status WHERE id = ?", STUDENT_USER_ID);
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Tập cardio bao nhiêu phút mỗi ngày?",
+                "vi",
+                null,
+                UUID.randomUUID()
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+
+        // Verify zero AI runs were created for this request
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.ai_runs WHERE requested_by = ?",
+                Integer.class,
+                STUDENT_USER_ID
+        );
+        assertThat(count).isEqualTo(0);
     }
 }

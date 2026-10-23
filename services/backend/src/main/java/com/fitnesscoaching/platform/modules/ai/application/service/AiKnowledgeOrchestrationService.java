@@ -312,6 +312,10 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                         completedAt
                 ));
 
+                // Pre-delivery revalidation: verify actor is still ACTIVE and retains STUDENT or TRAINER capability
+                // before releasing AI generated answer and citations to the caller.
+                aiRunUseCase.revalidateActorAuthorization(actorId);
+
                 return serviceResponse;
             } else {
                 // Failure / Rejected completion
@@ -339,6 +343,9 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                         (int) latencyMs,
                         completedAt
                 ));
+
+                // Pre-delivery revalidation: verify actor is still ACTIVE and retains STUDENT or TRAINER capability
+                aiRunUseCase.revalidateActorAuthorization(actorId);
 
                 String asOf = Instant.now().truncatedTo(ChronoUnit.SECONDS).toString();
                 return new F01KnowledgeQueryResponse(

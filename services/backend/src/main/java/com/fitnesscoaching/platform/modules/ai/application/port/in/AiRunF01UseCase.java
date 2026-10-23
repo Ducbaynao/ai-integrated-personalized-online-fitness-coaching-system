@@ -43,4 +43,12 @@ public interface AiRunF01UseCase {
      * Records terminal completion of the run with sanitized diagnostics and provenance.
      */
     AiRun completeF01Run(CompleteF01AiRunCommand command);
+
+    /**
+     * Revalidates that the actor's account is still ACTIVE and retains STUDENT or TRAINER capability
+     * before releasing AI output.
+     * Throws AccountUnavailableException if the account is not ACTIVE.
+     * Throws AiRunAccessDeniedException if the actor lacks STUDENT or TRAINER capability.
+     */
+    void revalidateActorAuthorization(UUID actorId);
 }

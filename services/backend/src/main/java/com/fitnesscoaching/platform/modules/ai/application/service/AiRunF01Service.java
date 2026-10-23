@@ -198,6 +198,8 @@ public class AiRunF01Service implements AiRunF01UseCase {
             throw new AiRunValidationException("Run ID is required");
         }
 
+        revalidateActorAuthorization(actorId);
+
         AiRun run = runRepository.findById(runId)
                 .orElseThrow(() -> new AiRunNotFoundException("AI Run not found with ID: " + runId));
 
@@ -283,6 +285,26 @@ public class AiRunF01Service implements AiRunF01UseCase {
 
         return runRepository.findById(command.runId())
                 .orElseThrow(() -> new AiRunNotFoundException("AI Run not found after completion: " + command.runId()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void revalidateActorAuthorization(UUID actorId) {
+        if (actorId == null) {
+            throw new AiRunAccessDeniedException("Authenticated actor ID is required");
+        }
+
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(actorId)
+                .orElseThrow(() -> new AccountUnavailableException("Actor account does not exist"));
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AccountUnavailableException("Actor account is not active");
+        }
+
+        boolean isStudent = userRoleQuery.hasActiveRole(actorId, "STUDENT");
+        boolean isTrainer = userRoleQuery.hasActiveRole(actorId, "TRAINER");
+        if (!isStudent && !isTrainer) {
+            throw new AiRunAccessDeniedException("User lacks STUDENT or TRAINER capability to access AI general knowledge output");
+        }
     }
 
     private String sanitizeErrorMessage(String rawMessage) {
