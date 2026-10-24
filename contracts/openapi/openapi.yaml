@@ -156,11 +156,30 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /attention-return-status/me:
+    get:
+      tags: [Attention and Review]
+      operationId: getMyReturnAfter100DaysStatus
+      description: Read-only result from actual COMPLETED workouts and a Student-confirmed IANA timezone. UNKNOWN never means zero activity. GET does not create a signal or notice.
+      responses:
+        '200': { description: Current evidence completeness, content: { application/json: { schema: { $ref: '#/components/schemas/ReturnAfter100DaysStatus' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
+  /students/{studentId}/attention-return-status:
+    get:
+      tags: [Attention and Review]
+      operationId: getCurrentTrainerReturnAfter100DaysStatus
+      description: Current ACTIVE HUMAN_COACH period and WORKOUT_HISTORY VIEW are required. A former Trainer or unrelated actor gets concealed 404.
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Authorized evidence completeness, content: { application/json: { schema: { $ref: '#/components/schemas/ReturnAfter100DaysStatus' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AttentionConcealed' }
   /students/{studentId}/attention-signals:
     get:
       tags: [Attention and Review]
       operationId: listCurrentTrainerAttentionSignals
-      description: Current ACTIVE HUMAN_COACH period only. MISSED_PLANNED_V1 additionally requires WORKOUT_HISTORY VIEW. Unauthorized rows cannot affect pagination or count.
+      description: Current ACTIVE HUMAN_COACH period only. MISSED_PLANNED_V1 and RETURN_AFTER_100_DAYS_V1 additionally require WORKOUT_HISTORY VIEW. Unauthorized rows cannot affect pagination or count.
       parameters:
         - { name: studentId, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
@@ -4794,13 +4813,13 @@ components:
     AttentionSignal:
       type: object
       additionalProperties: false
-      required: [id, studentId, trainerId, coachingPeriodId, rule, severity, status, version, occurrenceId, occurrenceVersion, plannedStartAt, plannedEndAt, reviewTaskId, detectedAt]
+      required: [id, studentId, trainerId, coachingPeriodId, rule, severity, status, version, occurrenceId, occurrenceVersion, plannedStartAt, plannedEndAt, reviewTaskId, returnEvidence, detectedAt]
       properties:
         id: { type: string, format: uuid }
         studentId: { type: string, format: uuid }
         trainerId: { type: [string, 'null'], format: uuid }
         coachingPeriodId: { type: [string, 'null'], format: uuid }
-        rule: { type: string, enum: [MISSED_PLANNED_V1, REVIEW_OVERDUE_V1] }
+        rule: { type: string, enum: [MISSED_PLANNED_V1, REVIEW_OVERDUE_V1, RETURN_AFTER_100_DAYS_V1], description: RETURN_AFTER_100_DAYS_V1 is LOW and requires two actual COMPLETED executions at least 100 Student-confirmed IANA calendar days apart. Missing evidence or timezone is unknown, not an alert. }
         severity: { type: string, enum: [LOW, MEDIUM] }
         status: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED] }
         version: { type: integer, format: int64, minimum: 0 }
@@ -4809,7 +4828,31 @@ components:
         plannedStartAt: { type: [string, 'null'], format: date-time }
         plannedEndAt: { type: [string, 'null'], format: date-time }
         reviewTaskId: { type: [string, 'null'], format: uuid }
+        returnEvidence: { anyOf: [{ $ref: '#/components/schemas/ReturnAfter100DaysEvidence' }, { type: 'null' }], description: Present only for RETURN_AFTER_100_DAYS_V1; completion facts and local dates are source evidence, not a period with no logs. }
         detectedAt: { type: string, format: date-time }
+    ReturnAfter100DaysEvidence:
+      type: object
+      additionalProperties: false
+      required: [previousExecutionId, previousExecutionVersion, currentExecutionId, currentExecutionVersion, previousCompletedAt, currentCompletedAt, previousLocalDate, currentLocalDate, timezone, calendarDays]
+      properties:
+        previousExecutionId: { type: string, format: uuid }
+        previousExecutionVersion: { type: integer, format: int64, minimum: 0 }
+        currentExecutionId: { type: string, format: uuid }
+        currentExecutionVersion: { type: integer, format: int64, minimum: 0 }
+        previousCompletedAt: { type: string, format: date-time }
+        currentCompletedAt: { type: string, format: date-time }
+        previousLocalDate: { type: string, format: date }
+        currentLocalDate: { type: string, format: date }
+        timezone: { type: string, description: Student-confirmed IANA timezone at evaluation. }
+        calendarDays: { type: integer, format: int64, minimum: 100 }
+    ReturnAfter100DaysStatus:
+      type: object
+      additionalProperties: false
+      required: [status, reason, timezone]
+      properties:
+        status: { type: string, enum: [UNKNOWN, NO_QUALIFYING_GAP, DETECTED] }
+        reason: { type: [string, 'null'], enum: [TIMEZONE_UNCONFIRMED, PREVIOUS_COMPLETION_MISSING, COMPLETION_TIME_MISSING, null], description: Non-null only when status is UNKNOWN. }
+        timezone: { type: [string, 'null'], description: Student-confirmed IANA timezone, null when not yet confirmed. }
     AttentionSignalEvent:
       type: object
       additionalProperties: false
@@ -4894,11 +4937,11 @@ components:
       required: [id, eventType, title, body, messageId, relatedEntityType, relatedEntityId, coachingPeriodId, createdAt, readAt]
       properties:
         id: { type: string, format: uuid }
-        eventType: { type: string, description: CHAT_MESSAGE or a committed lifecycle transition. }
+        eventType: { type: string, description: CHAT_MESSAGE or a committed lifecycle transition. Attention/Review notices are only ATTENTION_DETECTED, REVIEW_TASK_CREATED, or REVIEW_TASK_COMPLETED. Backfilled signals never generate notices. }
         title: { type: string }
         body: { type: string, description: Generic preview only, with no message, health or proposal details. }
         messageId: { type: [string, 'null'], format: uuid, description: Present only for CHAT_MESSAGE. }
-        relatedEntityType: { type: [string, 'null'] }
+        relatedEntityType: { type: [string, 'null'], description: Attention/Review values are WORKOUT_ATTENTION_SIGNAL, REVIEW_ATTENTION_SIGNAL, and COACHING_REVIEW_TASK. The destination API rechecks current authority. }
         relatedEntityId: { type: [string, 'null'], format: uuid }
         coachingPeriodId: { type: [string, 'null'], format: uuid }
         createdAt: { type: string, format: date-time }

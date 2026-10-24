@@ -505,7 +505,8 @@ class WorkoutRecurrenceHttpIntegrationTest {
     }
 
     private static LocalDate anchor() {
-        return LocalDate.now(ZoneOffset.UTC).plusWeeks(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        // Keep the first period inside, and the next three-week cycle outside, the 30-day job window.
+        return LocalDate.now(ZoneOffset.UTC).plusWeeks(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
     }
     private record Fixture(UUID student, UUID plan, UUID version, UUID session) {}
 }

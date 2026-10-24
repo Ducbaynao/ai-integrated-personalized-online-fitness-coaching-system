@@ -112,4 +112,19 @@ describe('B08 chat screens', () => {
     expect(tree.root.findAll(node => node.props.children === 'Bạn có tin nhắn mới').length).toBeGreaterThan(0);
     expect(chatApi.readNotification).not.toHaveBeenCalled();
   });
+
+  it('opens Attention through an authorized read surface and does not mark a notice READ on GET', async () => {
+    (chatApi.notifications as jest.Mock).mockResolvedValue({ items: [{
+      id: 'notice-return', eventType: 'ATTENTION_DETECTED',
+      title: 'Thông báo mới', body: 'Bạn có cập nhật mới',
+      messageId: null, relatedEntityType: 'WORKOUT_ATTENTION_SIGNAL', relatedEntityId: 'signal-1',
+      coachingPeriodId: null, createdAt: '2026-10-23T08:00:00Z', readAt: null,
+    }], page: 0, size: 20, hasMore: false });
+    const tree = render(<NotificationsScreen />);
+    await settle();
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Xem tín hiệu và đánh giá' }).props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/attention');
+    expect(chatApi.readNotification).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).not.toContain('signal-1');
+  });
 });

@@ -59,6 +59,15 @@ public class AttentionReviewController {
             @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         return service.signals(actor(jwt),actor(jwt),page,size);
     }
+    @GetMapping("/attention-return-status/me")
+    public AttentionReviewService.ReturnStatus myReturnStatus(@AuthenticationPrincipal Jwt jwt) {
+        return service.returnStatus(actor(jwt),actor(jwt));
+    }
+    @GetMapping("/students/{studentId}/attention-return-status")
+    public AttentionReviewService.ReturnStatus trainerReturnStatus(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID studentId) {
+        return service.returnStatus(actor(jwt),studentId);
+    }
     @GetMapping("/students/{studentId}/attention-signals")
     public AttentionReviewService.Page<AttentionReviewService.Signal> trainerSignals(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID studentId,@RequestParam(defaultValue="0") int page,
