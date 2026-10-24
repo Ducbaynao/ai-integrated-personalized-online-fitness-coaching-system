@@ -53,7 +53,9 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
         if (sourceEventId == null || type == null || entityType == null || entityId == null
                 || !List.of("APPOINTMENT", "APPOINTMENT_REQUEST", "WORKOUT_SCHEDULE_PROPOSAL",
                     "WORKOUT_CHANGE_PROPOSAL", "NUTRITION_STRATEGY_PROPOSAL", "FITNESS_GOAL_PROPOSAL",
-                     "COACHING_REQUEST", "COACHING_RESUME_REQUEST", "PLANNED_WORKOUT").contains(entityType)
+                     "COACHING_REQUEST", "COACHING_RESUME_REQUEST", "PLANNED_WORKOUT",
+                     "WORKOUT_ATTENTION_SIGNAL", "REVIEW_ATTENTION_SIGNAL",
+                     "COACHING_REVIEW_TASK").contains(entityType)
                 || recipient == null || recipient.equals(actor)
                 || !visible(recipient, student, trainer, period, entityType, entityId)
                 || accounts.getAccountStatus(recipient).orElse(null) != AccountStatus.ACTIVE) return;
@@ -134,7 +136,8 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                   AND (event_type='CHAT_MESSAGE' OR related_entity_type IN ('APPOINTMENT','APPOINTMENT_REQUEST',
                       'WORKOUT_SCHEDULE_PROPOSAL','WORKOUT_CHANGE_PROPOSAL','NUTRITION_STRATEGY_PROPOSAL',
                        'FITNESS_GOAL_PROPOSAL','COACHING_REQUEST','COACHING_RESUME_REQUEST',
-                       'PLANNED_WORKOUT'))
+                       'PLANNED_WORKOUT','WORKOUT_ATTENTION_SIGNAL','REVIEW_ATTENTION_SIGNAL',
+                       'COACHING_REVIEW_TASK'))
                 ORDER BY created_at DESC,id DESC
                 """, (rs, row) -> visible(actor, rs.getObject("source_student_id", UUID.class),
                 rs.getObject("source_trainer_id", UUID.class), rs.getObject("coaching_period_id", UUID.class),
@@ -192,6 +195,7 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
         if (!currentPeriod) return false;
         DataScope scope = switch (entityType) {
             case "WORKOUT_SCHEDULE_PROPOSAL", "WORKOUT_CHANGE_PROPOSAL", "PLANNED_WORKOUT" -> DataScope.WORKOUT_PLAN;
+            case "WORKOUT_ATTENTION_SIGNAL" -> DataScope.WORKOUT_HISTORY;
             case "NUTRITION_STRATEGY_PROPOSAL" -> DataScope.NUTRITION_GOAL;
             case "FITNESS_GOAL_PROPOSAL" -> DataScope.FITNESS_GOAL;
             default -> null;

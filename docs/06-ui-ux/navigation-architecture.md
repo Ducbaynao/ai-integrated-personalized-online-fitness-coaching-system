@@ -91,6 +91,8 @@ Chat và in-app notification B08 mở từ Coaching hub; gửi tin đầu tiên 
 
 M7 review/attention mở từ Coaching hub ở `/(app)/attention` cho Student và từ TR-03 tại `/(app)/coaching/[relationshipId]/attention` cho Trainer hiện hành. Student xác nhận timezone IANA trước khi tạo review tasks; Trainer không xem task/signal period cũ sau pause/end/resume. Mỗi mutation dùng version và command key thật; 409 yêu cầu tải lại, không tự áp dụng lại quyết định cũ.
 
+B08 local candidate: in-app notice DETECTED signal hoặc CREATED/COMPLETED review task chỉ có preview chung. Student mở `/(app)/attention`; Trainer mở Coaching workspace rồi chọn Student hiện hành để đọc Attention/Review qua API kiểm quyền. Notice không chứa evidence, không tự đánh dấu READ từ GET, và không cấp quyền truy cập. Read-only return-status API trả UNKNOWN khi thiếu completion trước, completion time hoặc timezone xác nhận; NO_QUALIFYING_GAP khi có đủ dữ liệu mà chưa đạt 100 ngày, DETECTED khi đạt ngưỡng. Signal hiển thị hai ngày hoàn tất theo timezone Student xác nhận; GET không tạo signal/notice.
+
 ## Trainer Mobile
 
 Bottom navigation:

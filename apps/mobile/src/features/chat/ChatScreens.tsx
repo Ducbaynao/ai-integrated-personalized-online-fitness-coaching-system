@@ -191,6 +191,10 @@ export function NotificationsScreen() {
         ? <CoachingButton label="Xem yêu cầu huấn luyện" secondary onPress={() => router.push(`/coaching/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'COACHING_RESUME_REQUEST'
         ? <CoachingButton label="Xem quan hệ huấn luyện" secondary onPress={() => router.push('/coaching' as never)} /> : null}
+      {['WORKOUT_ATTENTION_SIGNAL', 'REVIEW_ATTENTION_SIGNAL', 'COACHING_REVIEW_TASK']
+        .includes(item.relatedEntityType ?? '')
+        ? <CoachingButton label={role === 'STUDENT' ? 'Xem tín hiệu và đánh giá' : 'Mở học viên để xem tín hiệu và đánh giá'}
+          secondary onPress={() => router.push(role === 'STUDENT' ? '/attention' as never : '/coaching' as never)} /> : null}
       {!item.readAt ? <CoachingButton label="Đánh dấu thông báo đã đọc" secondary onPress={() => read.mutate(item.id)} /> : null}
     </CoachingCard>)}
     {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary onPress={() => query.fetchNextPage()} /> : null}

@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import moment from 'moment-timezone';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail } from '@/features/coaching/coachingQueries';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
-import { attentionReviewApi, AttentionSignal, CompleteReviewBody, ReviewTask, SignalActionBody } from '@/services/attentionReviewApi';
+import { attentionReviewApi, AttentionPage, AttentionSignal, CompleteReviewBody, ReviewTask, SignalActionBody } from '@/services/attentionReviewApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
@@ -24,6 +24,7 @@ const labelStatus: Record<ReviewTask['status'], string> = {
 const signalTitle: Record<AttentionSignal['rule'], string> = {
   MISSED_PLANNED_V1: 'Buổi tập dự kiến đã lỡ',
   REVIEW_OVERDUE_V1: 'Đánh giá huấn luyện quá hạn',
+  RETURN_AFTER_100_DAYS_V1: 'Trở lại tập luyện sau 100 ngày',
 };
 const signalStatus: Record<AttentionSignal['status'], string> = {
   OPEN: 'Cần xem xét', ACKNOWLEDGED: 'Đã ghi nhận', RESOLVED: 'Đã xử lý', DISMISSED: 'Đã bỏ qua',
@@ -61,6 +62,9 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const [missingText, setMissingText] = useState('');
   const [reason, setReason] = useState('');
   const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
+  const [deniedReturnScope, setDeniedReturnScope] = useState<string | null>(null);
+  const scopeId = scope.join(':');
+  const returnBlocked = trainer && deniedReturnScope === scopeId;
   const [pending, setPending] = useState<Pending | null>(null);
   const zones = useMemo(() => zoneSearch.trim().length < 2 ? [] : moment.tz.names()
     .filter(name => name.toLocaleLowerCase().includes(zoneSearch.trim().toLocaleLowerCase())).slice(0, 15), [zoneSearch]);
@@ -74,6 +78,15 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
     gcTime: 0, initialPageParam: 0,
     queryFn: ({ pageParam }) => attentionReviewApi.signals(pageParam, trainer ? studentId : undefined),
     getNextPageParam: last => last.hasMore ? last.page + 1 : undefined });
+  const returnStatus = useQuery({ queryKey: [...scope, 'return-status'], enabled: ready && !returnBlocked,
+    gcTime: 0, queryFn: async () => {
+      try { return await attentionReviewApi.returnStatus(trainer ? studentId : undefined); }
+      catch (error) {
+        if (trainer && error instanceof ApiError && [403, 404].includes(error.status))
+          setDeniedReturnScope(scopeId);
+        throw error;
+      }
+    } });
   const history = useQuery({ queryKey: [...scope, 'signal-history', selectedSignal],
     enabled: ready && Boolean(selectedSignal), gcTime: 0,
     queryFn: () => attentionReviewApi.signalHistory(selectedSignal!) });
@@ -99,10 +112,25 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const concealed = [relation, reviews, signals].some(query => query.isError
     && query.error instanceof ApiError && [403, 404].includes(query.error.status));
   useEffect(() => { if (concealed) cache.removeQueries({ queryKey: scope }); }, [concealed, cache, scope]);
+  const returnDenied = returnBlocked || (trainer && returnStatus.isError && returnStatus.error instanceof ApiError
+    && [403, 404].includes(returnStatus.error.status));
+  useEffect(() => {
+    if (!returnBlocked) return;
+    cache.removeQueries({ queryKey: [...scope, 'return-status'], exact: true });
+    cache.setQueryData<InfiniteData<AttentionPage<AttentionSignal>>>([...scope, 'signals'], old => old && ({
+      ...old, pages: old.pages.map(page => ({ ...page,
+        items: page.items.filter(signal => signal.rule === 'REVIEW_OVERDUE_V1') })),
+    }));
+    if (selectedSignal && signals.data?.pages.some(page => page.items.some(signal =>
+      signal.id === selectedSignal && signal.rule !== 'REVIEW_OVERDUE_V1'))) {
+      cache.removeQueries({ queryKey: [...scope, 'signal-history', selectedSignal], exact: true });
+    }
+  }, [returnBlocked, scope, cache, selectedSignal, signals.data]);
   const run = (command: Pending) => { if (!mutation.isPending) { setPending(command); mutation.mutate(command); } };
   const retry = () => { if (pending && !mutation.isPending) mutation.mutate(pending); };
   const reviewRows = reviews.data?.pages.flatMap(page => page.items) ?? [];
-  const signalRows = signals.data?.pages.flatMap(page => page.items) ?? [];
+  const signalRows = (signals.data?.pages.flatMap(page => page.items) ?? [])
+    .filter(signal => !returnDenied || signal.rule === 'REVIEW_OVERDUE_V1');
   const canView = activeCapability === (trainer ? 'TRAINER' : 'STUDENT') && ready && !concealed;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -171,10 +199,35 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
         {reviews.hasNextPage ? <CoachingButton label="Tải thêm đánh giá" secondary disabled={reviews.isFetchingNextPage}
           busy={reviews.isFetchingNextPage} onPress={() => reviews.fetchNextPage()} /> : null}
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Tín hiệu từ quy tắc</Text>
+        {!returnDenied && returnStatus.isPending ? <CoachingState busy title="Đang kiểm tra bằng chứng 100 ngày" message="Vui lòng chờ." /> : null}
+        {returnDenied ? <CoachingState title="Chưa có quyền xem lịch sử tập luyện"
+          message="Chu kỳ đánh giá và tín hiệu quá hạn vẫn có thể xem."
+          onRetry={() => {
+            setDeniedReturnScope(null);
+            void cache.invalidateQueries({ queryKey: [...scope, 'signals'], exact: true });
+          }} /> : null}
+        {!returnDenied && returnStatus.isError
+          ? <CoachingState title="Không thể kiểm tra bằng chứng 100 ngày" message={message(returnStatus.error)}
+              onRetry={() => returnStatus.refetch()} /> : null}
+        {!returnDenied && returnStatus.data ? <CoachingCard testID="return-100-day-status">
+          <Text style={[styles.h2, { color: theme.textPrimary }]}>Trở lại sau 100 ngày</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>{returnStatus.data.status === 'UNKNOWN'
+            ? returnStatus.data.reason === 'TIMEZONE_UNCONFIRMED'
+              ? 'Chưa xác định: Học viên chưa xác nhận IANA timezone.'
+              : returnStatus.data.reason === 'COMPLETION_TIME_MISSING'
+                ? 'Chưa xác định: một buổi tập hoàn tất thiếu thời gian kết thúc.'
+                : 'Chưa xác định: chưa đủ hai buổi tập thực sự hoàn tất.'
+            : returnStatus.data.status === 'DETECTED'
+              ? 'Có hai buổi tập hoàn tất cách nhau ít nhất 100 ngày lịch. Xem tín hiệu và bằng chứng bên dưới.'
+              : 'Đã đủ dữ liệu, chưa có hai buổi tập hoàn tất cách nhau 100 ngày lịch.'}</Text>
+          {returnStatus.data.timezone ? <Text style={[styles.body, { color: theme.textSecondary }]}>
+            Múi giờ đã xác nhận: {returnStatus.data.timezone}
+          </Text> : null}
+        </CoachingCard> : null}
         {signals.isPending ? <CoachingState busy title="Đang tải tín hiệu" message="Vui lòng chờ." /> : null}
         {signals.isError ? <CoachingState title="Không thể tải tín hiệu" message={message(signals.error)} onRetry={() => signals.refetch()} /> : null}
         {!signals.isPending && !signals.isError && signalRows.length === 0
-          ? <CoachingState title="Chưa có tín hiệu" message="Thiếu dữ liệu không được tự biến thành một cảnh báo." /> : null}
+          ? <CoachingState title="Chưa có tín hiệu" message="Nếu thiếu buổi tập hoàn tất trước đó hoặc múi giờ đã xác nhận, kết quả 100 ngày là chưa xác định, không phải cảnh báo." /> : null}
         {signalRows.map(signal => <CoachingCard key={signal.id} testID={`attention-${signal.id}`}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{signalTitle[signal.rule]}</Text>
           <Text style={[styles.label, { color: theme.textPrimary }]}>Quy tắc hệ thống · {signal.severity === 'MEDIUM' ? 'Ưu tiên vừa' : 'Ưu tiên thấp'} · {signalStatus[signal.status]}</Text>
@@ -182,6 +235,11 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           {signal.plannedStartAt && signal.plannedEndAt
             ? <Text style={[styles.body, { color: theme.textSecondary }]}>Khoảng dự kiến: {localDate(signal.plannedStartAt, 'Etc/UTC')} – {localDate(signal.plannedEndAt, 'Etc/UTC')}</Text> : null}
           {signal.reviewTaskId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: nhiệm vụ đánh giá</Text> : null}
+          {signal.returnEvidence ? <Text style={[styles.body, { color: theme.textSecondary }]}>
+            Hai buổi tập đã hoàn tất: {signal.returnEvidence.previousLocalDate} → {signal.returnEvidence.currentLocalDate}
+            {' · '}{signal.returnEvidence.calendarDays} ngày lịch · {signal.returnEvidence.timezone}.
+            Đây là tín hiệu để xem lại, không tự đổi kế hoạch tập.
+          </Text> : null}
           <CoachingButton label="Xem lịch sử xử lý" secondary onPress={() => setSelectedSignal(signal.id)} />
           {selectedSignal === signal.id ? <View>
             {history.isPending ? <CoachingState busy title="Đang tải lịch sử" message="Vui lòng chờ." /> : null}

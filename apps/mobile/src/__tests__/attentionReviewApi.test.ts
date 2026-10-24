@@ -33,4 +33,11 @@ describe('M7 review and attention API', () => {
       method: 'POST', body: { expectedVersion: 4, commandKey: 'key-2' },
     });
   });
+
+  it('reads the 100-day evidence status without issuing a mutation', async () => {
+    await attentionReviewApi.returnStatus();
+    await attentionReviewApi.returnStatus('student-1');
+    expect(request).toHaveBeenNthCalledWith(1, '/attention-return-status/me');
+    expect(request).toHaveBeenNthCalledWith(2, '/students/student-1/attention-return-status');
+  });
 });
