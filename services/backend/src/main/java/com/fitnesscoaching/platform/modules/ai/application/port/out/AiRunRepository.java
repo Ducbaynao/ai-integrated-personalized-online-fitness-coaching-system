@@ -62,4 +62,14 @@ public interface AiRunRepository {
      * Returns true if transition succeeded, false if run was already completed or not in non-terminal state.
      */
     boolean reconcileStaleRun(UUID runId, String errorCode, String errorMessage, Instant completedAt);
+
+    /**
+     * Finds runs with optional status and requestType filters, ordered by created_at DESC.
+     */
+    List<AiRun> findRuns(int offset, int limit, AiRunStatus status, String requestType);
+
+    /**
+     * Counts runs matching optional status and requestType filters.
+     */
+    long countRuns(AiRunStatus status, String requestType);
 }

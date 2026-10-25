@@ -3935,6 +3935,99 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /admin/ai/runs:
+    get:
+      tags: [Admin AI Operations]
+      operationId: listAdminAiRuns
+      summary: List AI runs with operational metadata and filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, REJECTED_BY_VALIDATOR, FAILED, CANCELLED] }
+        - name: requestType
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated AI runs with sanitized operational metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAiRunPageResponse' }
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/ai/runs/{runId}:
+    get:
+      tags: [Admin AI Operations]
+      operationId: getAdminAiRunDetail
+      summary: Get AI run detail with operational telemetry and validation results
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Sanitized AI run details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAiRunDetailResponse' }
+        '404':
+          description: AI run not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/ai/features/f01:
+    get:
+      tags: [Admin AI Operations]
+      operationId: getF01FeatureStatus
+      summary: Get current F01 AI general knowledge feature toggle status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: F01 feature status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiFeatureStatusResponse' }
+
+  /admin/ai/features/f01/toggle:
+    post:
+      tags: [Admin AI Operations]
+      operationId: toggleF01Feature
+      summary: Enable or disable F01 AI feature with audit reason
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ToggleAiFeatureRequest' }
+      responses:
+        '200':
+          description: Updated F01 feature status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiFeatureStatusResponse' }
+
   /content/knowledge/query:
     post:
       tags: [Content Knowledge Query]
@@ -8875,6 +8968,102 @@ components:
               contentPath: { type: string }
               snippet: { type: string }
               content: { type: string }
+
+    AdminAiRunSummaryResponse:
+      type: object
+      required: [id, requestType, status, purpose, correlationId, queuedAt, createdAt, evaluationOnly]
+      properties:
+        id: { type: string, format: uuid }
+        requestType: { type: string }
+        status: { type: string }
+        purpose: { type: string }
+        correlationId: { type: string, format: uuid }
+        queuedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        latencyMs: { type: integer }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+        inputTokenCount: { type: integer }
+        outputTokenCount: { type: integer }
+        totalTokenCount: { type: integer }
+        evaluationOnly: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    AdminAiRunPageResponse:
+      type: object
+      required: [items, total, page, size, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAiRunSummaryResponse' }
+        total: { type: integer }
+        page: { type: integer }
+        size: { type: integer }
+        totalPages: { type: integer }
+
+    AdminAiValidationSummary:
+      type: object
+      required: [id, validatorCode, passed, severity, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        validatorCode: { type: string }
+        passed: { type: boolean }
+        severity: { type: string }
+        details: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    AdminAiRunChunkReference:
+      type: object
+      required: [chunkId, rank, similarityScore]
+      properties:
+        chunkId: { type: string, format: uuid }
+        rank: { type: integer }
+        similarityScore: { type: number }
+
+    AdminAiRunDetailResponse:
+      type: object
+      required: [id, requestType, status, purpose, correlationId, queuedAt, createdAt, evaluationOnly, validations, citations]
+      properties:
+        id: { type: string, format: uuid }
+        requestType: { type: string }
+        status: { type: string }
+        purpose: { type: string }
+        correlationId: { type: string, format: uuid }
+        queuedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        latencyMs: { type: integer }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+        inputTokenCount: { type: integer }
+        outputTokenCount: { type: integer }
+        totalTokenCount: { type: integer }
+        evaluationOnly: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        validations:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAiValidationSummary' }
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAiRunChunkReference' }
+
+    AiFeatureStatusResponse:
+      type: object
+      required: [featureCode, enabled, description]
+      properties:
+        featureCode: { type: string }
+        enabled: { type: boolean }
+        description: { type: string }
+        updatedBy: { type: string, format: uuid }
+        updatedAt: { type: string, format: date-time }
+
+    ToggleAiFeatureRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        reason: { type: string }
 
 security:
   - bearerAuth: []

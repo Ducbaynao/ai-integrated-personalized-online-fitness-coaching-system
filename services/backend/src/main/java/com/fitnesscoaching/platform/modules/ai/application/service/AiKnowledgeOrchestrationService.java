@@ -8,6 +8,7 @@ import com.fitnesscoaching.platform.common.exception.AiTimeoutException;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F01KnowledgeQueryApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F01KnowledgeQueryResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.out.client.AiServiceProperties;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.AiFeatureControlUseCase;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiKnowledgeQueryUseCase;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.CompleteF01AiRunCommand;
@@ -52,6 +53,30 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
     private final ObjectMapper objectMapper;
     private final AiServiceProperties aiProperties;
     private final F01RuntimeOutputValidator runtimeValidator;
+    private final AiFeatureControlUseCase featureControlUseCase;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiKnowledgeOrchestrationService(
+            AiRunF01UseCase aiRunUseCase,
+            F01AiServiceClient aiServiceClient,
+            AiProvenanceRepository provenanceRepository,
+            KnowledgeRetrievalUseCase retrievalUseCase,
+            F01RunEvidenceTracker evidenceTracker,
+            ObjectMapper objectMapper,
+            AiServiceProperties aiProperties,
+            F01RuntimeOutputValidator runtimeValidator,
+            AiFeatureControlUseCase featureControlUseCase
+    ) {
+        this.aiRunUseCase = aiRunUseCase;
+        this.aiServiceClient = aiServiceClient;
+        this.provenanceRepository = provenanceRepository;
+        this.retrievalUseCase = retrievalUseCase;
+        this.evidenceTracker = evidenceTracker;
+        this.objectMapper = objectMapper;
+        this.aiProperties = aiProperties;
+        this.runtimeValidator = runtimeValidator;
+        this.featureControlUseCase = featureControlUseCase;
+    }
 
     public AiKnowledgeOrchestrationService(
             AiRunF01UseCase aiRunUseCase,
@@ -63,20 +88,23 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
             AiServiceProperties aiProperties,
             F01RuntimeOutputValidator runtimeValidator
     ) {
-        this.aiRunUseCase = aiRunUseCase;
-        this.aiServiceClient = aiServiceClient;
-        this.provenanceRepository = provenanceRepository;
-        this.retrievalUseCase = retrievalUseCase;
-        this.evidenceTracker = evidenceTracker;
-        this.objectMapper = objectMapper;
-        this.aiProperties = aiProperties;
-        this.runtimeValidator = runtimeValidator;
+        this(
+                aiRunUseCase,
+                aiServiceClient,
+                provenanceRepository,
+                retrievalUseCase,
+                evidenceTracker,
+                objectMapper,
+                aiProperties,
+                runtimeValidator,
+                new StaticAiFeatureControl(aiProperties)
+        );
     }
 
     @Override
     public F01KnowledgeQueryResponse queryKnowledge(UUID actorId, F01KnowledgeQueryApiRequest request) {
         // 0. Feature-disable check: when disabled, reject before creating Run or calling AI
-        if (Boolean.FALSE.equals(aiProperties.enabled())) {
+        if (!featureControlUseCase.isF01Enabled()) {
             throw new AiFeatureDisabledException("AI general fitness knowledge assistance is currently disabled by administrator configuration.");
         }
 
@@ -312,6 +340,12 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                         completedAt
                 ));
 
+                // Pre-delivery feature check: if feature was disabled in-flight by Admin, block delivery
+                if (!featureControlUseCase.isF01Enabled()) {
+                    log.warn("F01 feature was disabled during execution for run {}. Blocking output delivery.", run.id());
+                    throw new AiFeatureDisabledException("AI general fitness knowledge assistance was disabled by administrator during processing.");
+                }
+
                 // Pre-delivery revalidation: verify actor is still ACTIVE and retains STUDENT or TRAINER capability
                 // before releasing AI generated answer and citations to the caller.
                 aiRunUseCase.revalidateActorAuthorization(actorId);
@@ -343,6 +377,12 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                         (int) latencyMs,
                         completedAt
                 ));
+
+                // Pre-delivery feature check: if feature was disabled in-flight by Admin, block delivery
+                if (!featureControlUseCase.isF01Enabled()) {
+                    log.warn("F01 feature was disabled during execution for run {}. Blocking output delivery.", run.id());
+                    throw new AiFeatureDisabledException("AI general fitness knowledge assistance was disabled by administrator during processing.");
+                }
 
                 // Pre-delivery revalidation: verify actor is still ACTIVE and retains STUDENT or TRAINER capability
                 aiRunUseCase.revalidateActorAuthorization(actorId);
@@ -386,6 +426,23 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize to JSON", e);
+        }
+    }
+
+    private record StaticAiFeatureControl(AiServiceProperties properties) implements AiFeatureControlUseCase {
+        @Override
+        public boolean isF01Enabled() {
+            return Boolean.TRUE.equals(properties.enabled());
+        }
+
+        @Override
+        public AiFeatureStatusDto getF01Status() {
+            return new AiFeatureStatusDto(F01_FEATURE_CODE, isF01Enabled(), "Static Fallback", null, null);
+        }
+
+        @Override
+        public AiFeatureStatusDto setF01Enabled(UUID actorId, boolean enabled, String reason) {
+            throw new UnsupportedOperationException("Static feature control cannot modify status");
         }
     }
 }
