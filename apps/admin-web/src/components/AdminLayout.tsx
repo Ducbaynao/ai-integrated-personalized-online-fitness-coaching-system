@@ -4,6 +4,13 @@ import { useAuth } from '../features/auth/authContextValue.ts'
 export function AdminLayout() {
   const auth = useAuth()
   const canManageCatalog = auth.user?.permissions.includes('CATALOG_MANAGE') ?? false
+  const canManageKnowledge =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('KNOWLEDGE_REVIEW') ?? false) ||
+    (auth.user?.permissions.includes('KNOWLEDGE_IMPORT') ?? false)
+  const canManageAi =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('SYSTEM_CONFIG_MANAGE') ?? false)
 
   return (
     <div className="app-shell">
@@ -23,6 +30,8 @@ export function AdminLayout() {
           <NavLink to="/" end>Trang tổng quan</NavLink>
           {canManageCatalog ? <NavLink to="/exercises">Bài tập</NavLink> : null}
           {canManageCatalog ? <NavLink to="/nutrition/catalog">Danh mục thực phẩm</NavLink> : null}
+          {canManageKnowledge ? <NavLink to="/knowledge">Cơ sở tri thức</NavLink> : null}
+          {canManageAi ? <NavLink to="/ai/operations">Vận hành AI</NavLink> : null}
         </nav>
         <main className="main-content">
           <Outlet />

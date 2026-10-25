@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -247,5 +248,40 @@ public class JdbcAiRunRepository implements AiRunRepository {
                 runId
         );
         return rows > 0;
+    }
+
+    @Override
+    public List<AiRun> findRuns(int offset, int limit, AiRunStatus status, String requestType) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM fitness.ai_runs WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (status != null) {
+            sql.append(" AND status = ?::fitness.ai_run_status");
+            params.add(status.name());
+        }
+        if (requestType != null && !requestType.isBlank()) {
+            sql.append(" AND request_type = ?");
+            params.add(requestType.trim());
+        }
+        sql.append(" ORDER BY created_at DESC OFFSET ? LIMIT ?");
+        params.add(Math.max(0, offset));
+        params.add(Math.max(1, limit));
+
+        return jdbcTemplate.query(sql.toString(), ROW_MAPPER, params.toArray());
+    }
+
+    @Override
+    public long countRuns(AiRunStatus status, String requestType) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM fitness.ai_runs WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (status != null) {
+            sql.append(" AND status = ?::fitness.ai_run_status");
+            params.add(status.name());
+        }
+        if (requestType != null && !requestType.isBlank()) {
+            sql.append(" AND request_type = ?");
+            params.add(requestType.trim());
+        }
+        Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+        return count != null ? count : 0L;
     }
 }
