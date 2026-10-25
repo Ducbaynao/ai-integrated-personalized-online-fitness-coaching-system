@@ -43,7 +43,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const { user, activeCapability } = useAuth();
   const actor = user?.id ?? '';
   const trainer = Boolean(relationshipId) && activeCapability === 'TRAINER';
-  const relation = useRelationshipDetail(relationshipId ?? '');
+  const relation = useRelationshipDetail(relationshipId ?? '', true);
   const studentId = trainer ? relation.data?.relationship?.studentId : undefined;
   const scope = useMemo(() => ['attention-review', actor, activeCapability, studentId ?? 'self'],
     [actor, activeCapability, studentId]);
@@ -141,8 +141,10 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
         if (router.canGoBack()) router.back();
         else router.replace(relationshipId ? `/coaching/${relationshipId}` as never : '/coaching' as never);
       }} />
-      {relationshipId && relation.isPending ? <CoachingState busy title="Đang kiểm tra quyền" message="Vui lòng chờ." /> : null}
-      {!canView ? <CoachingState title="Không thể xem dữ liệu" message="Quyền hoặc kỳ huấn luyện không còn hiệu lực." /> : null}
+      {relationshipId && (relation.isPending || (!relation.isFetchedAfterMount && relation.isFetching))
+        ? <CoachingState busy title="Đang kiểm tra quyền" message="Vui lòng chờ." /> : null}
+      {!canView && (!relationshipId || !relation.isFetching)
+        ? <CoachingState title="Không thể xem dữ liệu" message="Quyền hoặc kỳ huấn luyện không còn hiệu lực." /> : null}
       {canView && !trainer ? <CoachingCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Múi giờ đánh giá</Text>
         {timezone.isPending ? <CoachingState busy title="Đang tải múi giờ" message="Vui lòng chờ." /> : null}

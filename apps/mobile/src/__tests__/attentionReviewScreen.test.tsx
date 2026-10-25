@@ -133,6 +133,19 @@ describe('M7 attention and review screen', () => {
     expect(tree.root.findAllByProps({ testID: 'review-review-1' })).toHaveLength(0);
   });
 
+  it('requires a fresh relationship read when Trainer opens Attention', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ isFetchedAfterMount: false, isFetching: true,
+      isPending: false, data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE' },
+        currentPeriod: { mode: 'HUMAN_COACH' } } });
+    const tree = render(<AttentionReviewScreen relationshipId="relationship-1" />);
+    await settle();
+    expect(useRelationshipDetail).toHaveBeenCalledWith('relationship-1', true);
+    expect(attentionReviewApi.reviews).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Đang kiểm tra quyền');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Không thể xem dữ liệu');
+  });
+
   it('does not show return evidence when current Trainer lacks WORKOUT_HISTORY VIEW', async () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
     (useRelationshipDetail as jest.Mock).mockReturnValue({ isFetchedAfterMount: true, isPending: false,

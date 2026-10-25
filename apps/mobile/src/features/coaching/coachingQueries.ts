@@ -62,7 +62,10 @@ export function relationshipHistoryOptions(relationshipId: string) {
 
 export const useTrainerDirectory = (query: string) => useInfiniteQuery(trainerDirectoryOptions(query));
 export const useRelationships = () => useInfiniteQuery(relationshipCollectionOptions());
-export const useRelationshipDetail = (id: string) => useQuery(relationshipDetailOptions(id));
+export const useRelationshipDetail = (id: string, requireFreshRead = false) => useQuery({
+  ...relationshipDetailOptions(id),
+  refetchOnMount: requireFreshRead ? 'always' : undefined,
+});
 export const useRelationshipHistory = (id: string) => useInfiniteQuery(relationshipHistoryOptions(id));
 export const useSharingSummary = (id: string) => useQuery(sharingSummaryOptions(id));
 
