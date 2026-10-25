@@ -1,5 +1,17 @@
 # B08 Chat and In-App Notification — approved first slice
 
+## 2026-10-24 — Return-after-100-days and Attention/Review in-app notices (APPROVED)
+
+Person B approved a deterministic return signal when **two actually COMPLETED workouts** for the same Student are separated by at least 100 calendar days in the Student-confirmed IANA timezone. Missing a prior completion, missing a confirmed timezone, or insufficient completion evidence is **unknown**, not evidence of inactivity; absence of a log is never treated as zero workouts. The signal is for the Student and their currently authorized Trainer. It does not alter a Plan or block START. A versioned rule must retain the two completion identities and their local dates as evidence, deduplicate repeated evaluation, and keep audit history. This approval does not set a reminder time or retention duration.
+
+Person B subsequently approved **LOW** severity for this informational return signal. This does not promote it to a high-severity warning or authorize an automatic Plan change.
+
+For existing historical completions, backfill the qualifying signal **without** an in-app notice. For newly committed facts, notices cover only: newly DETECTED Attention Signal (Student and currently authorized Trainer), newly CREATED Review task (current Trainer), and COMPLETED Review task (Student). Severity changes, ACK/RESOLVE/DISMISS and task CANCELLED do not generate notices. The database migration records the activation boundary so a delayed first job cannot misclassify historical completions as new.
+
+Attention Signal and Coaching Review in-app notices originate only from committed domain facts, are sent only to recipients authorized at commit, and are deduplicated by event identity, recipient and notice type. GET, replay and repeated scheduled evaluation must not create another notice. Preview and realtime invalidation contain no sensitive source content; opening the destination and reading its data recheck current authority. There are no AI/marketing notices in this slice. Workout/Appointment clock-time reminders, automatic deletion, attachments and push remain outside this approval. This is product policy, **not** a statement that the contract, migration, producer, or Mobile UI is implemented. M7 remains incomplete.
+
+**Implementation status (2026-10-24):** The V48 cutover, Workout-owned completion read port, Progress rule and transactional in-app producers, OpenAPI, Student/Trainer Mobile presentation, and tests are local checkpoint changes on `feature/b08-return-100d-attention-review-notifications`. They are not merged or independently reviewed; V48 still requires A01 schema review. Device visual QA and Mobile-to-backend live integration remain unverified.
+
 ## 2026-10-20 — Lifecycle in-app notification extension (APPROVED)
 
 Person B approved in-app notifications for committed proposal, Appointment and coaching-request domain facts. The actor who performed an action never receives that action's notification. A notification is deduplicated by source event, recipient and event type; its preview is generic and contains no sensitive detail. A deep link must recheck current object authority. Notification persistence must share the source transaction or a reliable transactional outbox; realtime invalidation is emitted only after commit. This **extends** first-slice decision 6 below, which excluded non-message events at the time. The extension is product policy, not a claim that V43, `InAppNotificationService`, OpenAPI or Mobile already supports these events.
@@ -24,7 +36,7 @@ Do not emit on idempotent replay or to the acting user. Every recipient must be 
 
 The initial mixed-event inbox YAML review draft was superseded and excluded from PR #99; `contracts/openapi/openapi.yaml` is the executable contract. V45 and the lifecycle-notification runtime merged in PR #99. Lifecycle notices are inserted in the source transaction and inbox reads recheck authority. Merge/CI do not by themselves verify independent A01 schema review or Mobile-to-backend device integration.
 
-The linked Planned Workout cancellation row was approved later, on 2026-10-23. Its producer and inbox/deep-link changes are a local B06/B08 checkpoint candidate, not part of merged PR #99; notification replay and permission loss still require verification before merge.
+The linked Planned Workout cancellation row was approved later, on 2026-10-23. Its producer and inbox/deep-link changes merged in PR #107; that bounded runtime does not establish device QA or all of M7.
 
 **Decision status:** APPROVED by Person B on 2026-10-17. This record defines product policy; it does not claim the OpenAPI contract, Flyway migration, backend, Mobile, delivery service, or tests are already implemented. M7 remains broader than this slice.
 
@@ -58,7 +70,7 @@ This is the direct consequence of B08's per-period conversation identity and B03
 | Approved `MISSED_PLANNED_V1`/`REVIEW_OVERDUE_V1` Attention Signals and 14-day Coaching Review Cycle | `MERGED_VERIFIED` as a bounded slice after PR #89 | V44, `AttentionReviewService`, OpenAPI and Mobile implement the later approved rules below. The proposed 100-day-return rule and wider M7 obligations are not covered. |
 | Retention and account erasure | `BLOCKED_DECISION` | Approved B08 decision 7 names a release gate; no operational duration, deletion/anonymization scope, or legal-hold policy has been approved. |
 
-Rows still marked `BLOCKED_DECISION` are not implementation approvals. Source schemas and UX sketches do not supply attachment, external delivery, retention or erasure policy. The later approved Attention/Review rules below supersede the earlier decision-pending snapshot only for their two named signals and 14-day review cycle; they do not approve the 100-day-return rule or complete M7.
+Rows still marked `BLOCKED_DECISION` are not implementation approvals. Source schemas and UX sketches do not supply attachment, external delivery, retention or erasure policy. This paragraph is an **as-of-2026-10-18 historical snapshot**: its then-pending 100-day rule is superseded by the 2026-10-24 approval at the top of this record. It does not complete M7.
 
 ## M7 Attention and Review decisions — APPROVED 2026-10-18
 
@@ -70,4 +82,4 @@ The following are product decisions approved by Person B, **not** claims that an
 
 The Student reads their own signals and history. A Trainer reads or acts only on signals for an `ACTIVE` `HUMAN_COACH` period currently assigned to them, with current VIEW authority for the evidence source. Denial conceals count and detail. Trainer actions are ACK, RESOLVE and DISMISS; the latter two require a reason. Mutations use version and actor-scoped command keys, transactionally rechecking authority. Pause/end/revoke conceals immediately. Resume opens a new period and re-evaluates for that period; it never restores access to the old period's signals. Admin has no implicit coaching authority.
 
-The observed Pixel_7 defect in which the Chat title can overlap the Android status bar is in this checkpoint's UI scope. The policies above do **not** approve the proposed 100-day return rule, attachments/linked files, push/reminders/preferences, retention/export/account erasure, or backup-deletion timing. These remain open decisions or release gates; M7 is not Done on completion of this slice.
+The observed Pixel_7 defect in which the Chat title can overlap the Android status bar was in that checkpoint's UI scope. **As of 2026-10-18**, the policies above did not approve the then-proposed 100-day return rule; that portion was superseded by the 2026-10-24 approval at the top of this record. Attachments/linked files, push/reminders/preferences, retention/export/account erasure, and backup-deletion timing remain open decisions or release gates; M7 is not Done on completion of this slice.

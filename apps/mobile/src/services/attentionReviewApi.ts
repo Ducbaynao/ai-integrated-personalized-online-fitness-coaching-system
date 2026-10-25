@@ -11,11 +11,23 @@ export type ReviewTask = {
 };
 export type AttentionSignal = {
   id: string; studentId: string; trainerId: string | null; coachingPeriodId: string | null;
-  rule: 'MISSED_PLANNED_V1' | 'REVIEW_OVERDUE_V1'; severity: 'LOW' | 'MEDIUM';
+  rule: 'MISSED_PLANNED_V1' | 'REVIEW_OVERDUE_V1' | 'RETURN_AFTER_100_DAYS_V1'; severity: 'LOW' | 'MEDIUM';
   status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED'; version: number;
   occurrenceId: string | null; occurrenceVersion: number | null;
   plannedStartAt: string | null; plannedEndAt: string | null;
-  reviewTaskId: string | null; detectedAt: string;
+  reviewTaskId: string | null; returnEvidence: ReturnAfter100DaysEvidence | null; detectedAt: string;
+};
+export type ReturnAfter100DaysEvidence = {
+  previousExecutionId: string; previousExecutionVersion: number;
+  currentExecutionId: string; currentExecutionVersion: number;
+  previousCompletedAt: string; currentCompletedAt: string;
+  previousLocalDate: string; currentLocalDate: string;
+  timezone: string; calendarDays: number;
+};
+export type ReturnAfter100DaysStatus = {
+  status: 'UNKNOWN' | 'NO_QUALIFYING_GAP' | 'DETECTED';
+  reason: 'TIMEZONE_UNCONFIRMED' | 'PREVIOUS_COMPLETION_MISSING' | 'COMPLETION_TIME_MISSING' | null;
+  timezone: string | null;
 };
 export type AttentionSignalEvent = {
   eventType: string; previousSeverity: string | null; resultingSeverity: string;
@@ -54,6 +66,11 @@ export const attentionReviewApi = {
   signals(page = 0, studentId?: string) {
     const prefix = studentId ? `/students/${encodeURIComponent(studentId)}/attention-signals` : '/attention-signals/me';
     return request<AttentionPage<AttentionSignal>>(`${prefix}?page=${page}&size=20`);
+  },
+  returnStatus(studentId?: string) {
+    const path = studentId ? `/students/${encodeURIComponent(studentId)}/attention-return-status`
+      : '/attention-return-status/me';
+    return request<ReturnAfter100DaysStatus>(path);
   },
   signal(id: string) { return request<AttentionSignal>(`/attention-signals/${encodeURIComponent(id)}`); },
   signalHistory(id: string) {

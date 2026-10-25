@@ -12,6 +12,8 @@ import com.fitnesscoaching.platform.modules.student.application.port.in.StudentC
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerCoachingEligibilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutCompletionEvidenceQuery;
+import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class AttentionReviewService {
     private final CurrentCoachingContextQuery contexts;
     private final HumanReviewPeriodQuery periods;
     private final WorkoutMissedEvidenceQuery workouts;
+    private final WorkoutCompletionEvidenceQuery completions;
+    private final LifecycleNotificationWriter notifications;
     private final CoachingAuthorityQuery authority;
     private final StudentCapabilityQuery students;
     private final TrainerCoachingEligibilityQuery trainers;
@@ -39,11 +43,13 @@ public class AttentionReviewService {
 
     public AttentionReviewService(JdbcTemplate jdbc, ObjectMapper json,
             CurrentCoachingContextQuery contexts, HumanReviewPeriodQuery periods,
-            WorkoutMissedEvidenceQuery workouts, CoachingAuthorityQuery authority,
+            WorkoutMissedEvidenceQuery workouts, WorkoutCompletionEvidenceQuery completions,
+            LifecycleNotificationWriter notifications, CoachingAuthorityQuery authority,
             StudentCapabilityQuery students, TrainerCoachingEligibilityQuery trainers,
             UserAccountStatusQuery accounts) {
         this.jdbc=jdbc; this.json=json; this.contexts=contexts; this.periods=periods;
-        this.workouts=workouts; this.authority=authority; this.students=students;
+        this.workouts=workouts; this.completions=completions; this.notifications=notifications;
+        this.authority=authority; this.students=students;
         this.trainers=trainers; this.accounts=accounts;
     }
 
@@ -56,7 +62,14 @@ public class AttentionReviewService {
     public record Signal(UUID id, UUID studentId, UUID trainerId, UUID coachingPeriodId,
                          String rule, String severity, String status, long version,
                          UUID occurrenceId, Long occurrenceVersion, Instant plannedStartAt,
-                         Instant plannedEndAt, UUID reviewTaskId, Instant detectedAt) {}
+                         Instant plannedEndAt, UUID reviewTaskId, ReturnEvidence returnEvidence,
+                         Instant detectedAt) {}
+    public record ReturnEvidence(UUID previousExecutionId, long previousExecutionVersion,
+                                 UUID currentExecutionId, long currentExecutionVersion,
+                                 Instant previousCompletedAt, Instant currentCompletedAt,
+                                 LocalDate previousLocalDate, LocalDate currentLocalDate,
+                                 String timezone, long calendarDays) {}
+    public record ReturnStatus(String status, String reason, String timezone) {}
     public record SignalEvent(String eventType, String previousSeverity, String resultingSeverity,
                               String previousStatus, String resultingStatus, long resultingVersion,
                               String reason, Instant occurredAt) {}
@@ -160,7 +173,8 @@ public class AttentionReviewService {
                     candidate.occurrenceId(),candidate.occurrenceVersion(),candidate.plannedStartAt(),
                     candidate.plannedEndAt(),null);
         }
-        for (Signal signal: openRuleSignals("MISSED_PLANNED_V1")) {
+        for (OpenRuleSignal open: openRuleSignals("MISSED_PLANNED_V1")) {
+            Signal signal=open.signal();
             var source=workouts.find(signal.occurrenceId());
             if (source.isEmpty() || !source.get().eligible() || source.get().plannedEndAt()==null
                     || !source.get().plannedEndAt().isBefore(now.minus(Duration.ofHours(24)))) {
@@ -169,6 +183,59 @@ public class AttentionReviewService {
                     && signal.occurrenceVersion()!=source.get().occurrenceVersion()) {
                 resolveSource("MISSED_PLANNED_V1",signal.occurrenceId()+":v"+signal.occurrenceVersion(),"SOURCE_SUPERSEDED");
             }
+        }
+        evaluateReturns(now);
+    }
+
+    private void evaluateReturns(Instant now) {
+        Map<UUID, WorkoutCompletionEvidenceQuery.Completion> priorByStudent = new HashMap<>();
+        Map<UUID, Optional<Map.Entry<String,Long>>> timezones = new HashMap<>();
+        Set<String> validKeys = new HashSet<>();
+        for (var current: completions.completed()) {
+            var previous=priorByStudent.put(current.studentId(),current);
+            if (previous==null || previous.performedEndAt()==null || current.performedEndAt()==null
+                    || previous.performedEndAt().isAfter(now) || current.performedEndAt().isAfter(now)
+                    || !current.performedEndAt().isAfter(previous.performedEndAt())) continue;
+            var confirmation=timezones.computeIfAbsent(current.studentId(),student -> jdbc.query("""
+                    SELECT timezone,version FROM fitness.student_review_timezones WHERE student_id=?
+                    """,(rs,n)->Map.entry(rs.getString(1),rs.getLong(2)),student)
+                    .stream().findFirst()).orElse(null);
+            if (confirmation==null) continue;
+            ZoneId zone=zone(confirmation.getKey());
+            LocalDate before=previous.performedEndAt().atZone(zone).toLocalDate();
+            LocalDate after=current.performedEndAt().atZone(zone).toLocalDate();
+            long days=java.time.temporal.ChronoUnit.DAYS.between(before,after);
+            if (days<100) continue;
+            String sourceKey=current.executionId()+":v"+current.version()+":tzv"+confirmation.getValue();
+            validKeys.add(current.studentId()+":"+sourceKey);
+            var existing=jdbc.queryForList("""
+                    SELECT id FROM fitness.attention_signals
+                    WHERE student_id=? AND signal_type='RETURN_AFTER_100_DAYS_V1' AND source_key=?
+                    LIMIT 1
+                    """,UUID.class,current.studentId(),sourceKey);
+            if (!existing.isEmpty()) continue;
+            var context=contexts.findEffectiveContext(current.studentId(),false).orElse(null);
+            UUID period=context!=null && context.mode()==CurrentCoachingContextQuery.Mode.HUMAN_COACH
+                    ?context.periodId():null;
+            UUID trainer=period==null?null:context.trainerId();
+            UUID id=UUID.randomUUID();
+            ReturnEvidence evidence=new ReturnEvidence(previous.executionId(),previous.version(),
+                    current.executionId(),current.version(),previous.performedEndAt(),current.performedEndAt(),
+                    before,after,zone.getId(),days);
+            var inserted=jdbc.query("""
+                    INSERT INTO fitness.attention_signals(id,student_id,trainer_id,coaching_period_id,
+                      source,signal_type,severity,status,title,explanation,evidence,related_entity_type,
+                      related_entity_id,source_key,source_version)
+                    VALUES (?,?,?,?,'SYSTEM_RULE','RETURN_AFTER_100_DAYS_V1','LOW','OPEN',
+                      'Trở lại tập luyện sau 100 ngày','Tín hiệu từ hai buổi tập đã hoàn tất',
+                      ?::jsonb,'WORKOUT_EXECUTION',?,?,?) ON CONFLICT DO NOTHING RETURNING id
+                    """,(rs,n)->rs.getObject(1,UUID.class),id,current.studentId(),trainer,period,
+                    write(Map.of("returnEvidence",evidence)),current.executionId(),sourceKey,current.version());
+            if (!inserted.isEmpty()) signalEvent(id,null,"DETECTED","LOW","LOW",null,"OPEN",null,0,null);
+        }
+        for (OpenRuleSignal open: openRuleSignals("RETURN_AFTER_100_DAYS_V1")) {
+            if (!validKeys.contains(open.signal().studentId()+":"+open.sourceKey()))
+                resolveSource("RETURN_AFTER_100_DAYS_V1",open.sourceKey(),"SOURCE_CORRECTED");
         }
     }
 
@@ -267,16 +334,43 @@ public class AttentionReviewService {
                 FROM fitness.attention_signals WHERE student_id=? AND source='SYSTEM_RULE'
                   AND (?::uuid IS NULL OR coaching_period_id=?)
                   AND (? OR signal_type='REVIEW_OVERDUE_V1')
-                  AND signal_type IN ('MISSED_PLANNED_V1','REVIEW_OVERDUE_V1')
+                  AND signal_type IN ('MISSED_PLANNED_V1','REVIEW_OVERDUE_V1','RETURN_AFTER_100_DAYS_V1')
                 ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?
                 """,(rs,n)->mapSignal(rs),student,period,period,workoutAllowed,size+1,(long)page*size);
         return new Page<>(rows.size()>size?rows.subList(0,size):rows,page,size,rows.size()>size);
     }
 
+    /** Read-only evaluation; GET never materializes a signal or a notification. */
+    @Transactional
+    public ReturnStatus returnStatus(UUID actor,UUID student) {
+        if (actor.equals(student)) requireStudent(actor);
+        else {
+            listPeriod(actor,student);
+            if (!authority.evaluateCurrent(new AuthorityRequest(actor,student,
+                    DataScope.WORKOUT_HISTORY,DataAccessLevel.VIEW)).allowed())
+                throw fail("ATTENTION_NOT_FOUND",404);
+        }
+        String confirmed=jdbc.query("SELECT timezone FROM fitness.student_review_timezones WHERE student_id=?",
+                (rs,n)->rs.getString(1),student).stream().findFirst().orElse(null);
+        if (confirmed==null) return new ReturnStatus("UNKNOWN","TIMEZONE_UNCONFIRMED",null);
+        ZoneId zone=zone(confirmed);
+        var facts=completions.completedForStudent(student);
+        if (facts.size()<2) return new ReturnStatus("UNKNOWN","PREVIOUS_COMPLETION_MISSING",confirmed);
+        if (facts.stream().anyMatch(row->row.performedEndAt()==null))
+            return new ReturnStatus("UNKNOWN","COMPLETION_TIME_MISSING",confirmed);
+        for (int i=1;i<facts.size();i++) {
+            var before=facts.get(i-1).performedEndAt().atZone(zone).toLocalDate();
+            var after=facts.get(i).performedEndAt().atZone(zone).toLocalDate();
+            if (java.time.temporal.ChronoUnit.DAYS.between(before,after)>=100)
+                return new ReturnStatus("DETECTED",null,confirmed);
+        }
+        return new ReturnStatus("NO_QUALIFYING_GAP",null,confirmed);
+    }
+
     @Transactional
     public Signal signal(UUID actor,UUID id) {
         Signal row=findSignal(id);
-        requireRead(actor,row.studentId(),row.coachingPeriodId(),row.rule().equals("MISSED_PLANNED_V1"));
+        requireRead(actor,row.studentId(),row.coachingPeriodId(),workoutEvidence(row.rule()));
         return row;
     }
 
@@ -298,7 +392,7 @@ public class AttentionReviewService {
             throw fail("VALIDATION_FAILED",400);
         Signal signal=findSignal(id);
         requireTrainer(actor,signal.studentId(),signal.coachingPeriodId(),
-                signal.rule().equals("MISSED_PLANNED_V1"),true);
+                workoutEvidence(signal.rule()),true);
         String hash=hash(action+":"+id+":"+expectedVersion+":"+Objects.toString(reason,""));
         Signal prior=receipt(actor,key,hash,Signal.class);
         if (prior!=null) return prior;
@@ -379,12 +473,14 @@ public class AttentionReviewService {
         }
     }
 
-    private List<Signal> openRuleSignals(String rule) {
+    private record OpenRuleSignal(Signal signal,String sourceKey) {}
+
+    private List<OpenRuleSignal> openRuleSignals(String rule) {
         return jdbc.query("""
                 SELECT id,student_id,trainer_id,coaching_period_id,signal_type,severity::text,status::text,
-                  version,related_entity_id,source_version,evidence::text,created_at
+                  version,related_entity_id,source_version,evidence::text,created_at,source_key
                 FROM fitness.attention_signals WHERE signal_type=? AND status IN ('OPEN','ACKNOWLEDGED')
-                """,(rs,n)->mapSignal(rs),rule);
+                """,(rs,n)->new OpenRuleSignal(mapSignal(rs),rs.getString(13)),rule);
     }
 
     private Review findReview(UUID id) { return reviewRow(id,false); }
@@ -404,7 +500,7 @@ public class AttentionReviewService {
                 SELECT id,student_id,trainer_id,coaching_period_id,signal_type,severity::text,status::text,
                   version,related_entity_id,source_version,evidence::text,created_at
                 FROM fitness.attention_signals WHERE id=? AND source='SYSTEM_RULE'
-                  AND signal_type IN ('MISSED_PLANNED_V1','REVIEW_OVERDUE_V1')
+                  AND signal_type IN ('MISSED_PLANNED_V1','REVIEW_OVERDUE_V1','RETURN_AFTER_100_DAYS_V1')
                 """+(lock?" FOR UPDATE":""),(rs,n)->mapSignal(rs),id).stream().findFirst()
                 .orElseThrow(()->fail("ATTENTION_NOT_FOUND",404));
     }
@@ -425,14 +521,20 @@ public class AttentionReviewService {
             String raw=evidence.path("plannedStartAt").asText("");
             String end=evidence.path("plannedEndAt").asText("");
             String task=evidence.path("reviewTaskId").asText("");
+            var returned=evidence.path("returnEvidence");
+            ReturnEvidence returnEvidence=returned.isMissingNode()?null:json.treeToValue(returned,ReturnEvidence.class);
             return new Signal(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getObject(3,UUID.class),
                     rs.getObject(4,UUID.class),rs.getString(5),rs.getString(6),rs.getString(7),rs.getLong(8),
                     rs.getString(5).equals("MISSED_PLANNED_V1")?rs.getObject(9,UUID.class):null,
                     rs.getString(5).equals("MISSED_PLANNED_V1") && rs.getObject(10)!=null?rs.getLong(10):null,
                     raw.isEmpty()?null:Instant.parse(raw),
-                    end.isEmpty()?null:Instant.parse(end),task.isEmpty()?null:UUID.fromString(task),
+                    end.isEmpty()?null:Instant.parse(end),task.isEmpty()?null:UUID.fromString(task),returnEvidence,
                     rs.getTimestamp(12).toInstant());
         }
+    }
+
+    private static boolean workoutEvidence(String rule) {
+        return rule.equals("MISSED_PLANNED_V1") || rule.equals("RETURN_AFTER_100_DAYS_V1");
     }
 
     private void requireRead(UUID actor,UUID student,UUID period,boolean workoutEvidence) {
@@ -481,20 +583,53 @@ public class AttentionReviewService {
                 """,actor,key,hash,kind,id,write(response));
     }
     private void taskEvent(UUID id,UUID actor,String type,Long previous,long result,String detail) {
+        UUID eventId=UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO fitness.coaching_review_task_events(task_id,actor_id,event_type,
-                  previous_version,resulting_version,detail) VALUES (?,?,?,?,?,?::jsonb)
-                """,id,actor,type,previous,result,detail);
+                INSERT INTO fitness.coaching_review_task_events(id,task_id,actor_id,event_type,
+                  previous_version,resulting_version,detail) VALUES (?,?,?,?,?,?,?::jsonb)
+                """,eventId,id,actor,type,previous,result,detail);
+        if (type.equals("CREATED") || type.equals("COMPLETED")) {
+            Review task=findReview(id);
+            UUID recipient=type.equals("CREATED")?task.trainerId():task.studentId();
+            notifications.committed(eventId,"REVIEW_TASK_"+type,"COACHING_REVIEW_TASK",id,
+                    task.studentId(),task.trainerId(),task.coachingPeriodId(),actor,recipient);
+        }
     }
     private void signalEvent(UUID id,UUID actor,String type,String beforeSeverity,String afterSeverity,
                              String beforeStatus,String afterStatus,Long previous,long result,String reason) {
+        UUID eventId=UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO fitness.attention_signal_events(signal_id,actor_id,event_type,
+                INSERT INTO fitness.attention_signal_events(id,signal_id,actor_id,event_type,
                   previous_severity,resulting_severity,previous_status,resulting_status,
                   previous_version,resulting_version,reason)
-                VALUES (?,?,?,?::fitness.severity_level,?::fitness.severity_level,
+                VALUES (?,?,?,?,?::fitness.severity_level,?::fitness.severity_level,
                   ?::fitness.attention_status,?::fitness.attention_status,?,?,?)
-                """,id,actor,type,beforeSeverity,afterSeverity,beforeStatus,afterStatus,previous,result,reason);
+                """,eventId,id,actor,type,beforeSeverity,afterSeverity,beforeStatus,afterStatus,previous,result,reason);
+        if (type.equals("DETECTED")) notifyDetected(eventId,id);
+    }
+
+    private void notifyDetected(UUID eventId,UUID id) {
+        Signal signal=findSignal(id);
+        Instant activation=jdbc.queryForObject("""
+                SELECT activated_at FROM fitness.attention_rule_activations
+                WHERE rule_code='RETURN_AFTER_100_DAYS_V1'
+                """,Timestamp.class).toInstant();
+        boolean newFact=switch(signal.rule()) {
+            case "RETURN_AFTER_100_DAYS_V1" -> signal.returnEvidence()!=null
+                    && signal.returnEvidence().currentCompletedAt().isAfter(activation);
+            case "MISSED_PLANNED_V1" -> signal.plannedEndAt()!=null
+                    && signal.plannedEndAt().isAfter(activation);
+            case "REVIEW_OVERDUE_V1" -> jdbc.queryForObject("""
+                    SELECT created_at > ? FROM fitness.coaching_review_tasks WHERE id=?
+                    """,Boolean.class,Timestamp.from(activation),signal.reviewTaskId());
+            default -> false;
+        };
+        if (!newFact) return;
+        String entityType=workoutEvidence(signal.rule())?"WORKOUT_ATTENTION_SIGNAL":"REVIEW_ATTENTION_SIGNAL";
+        notifications.committed(eventId,"ATTENTION_DETECTED",entityType,id,signal.studentId(),
+                signal.trainerId(),signal.coachingPeriodId(),null,signal.studentId());
+        if (signal.trainerId()!=null) notifications.committed(eventId,"ATTENTION_DETECTED",entityType,id,
+                signal.studentId(),signal.trainerId(),signal.coachingPeriodId(),null,signal.trainerId());
     }
     private static ZoneId zone(String value) {
         try { if (value==null || !value.contains("/")) throw new DateTimeException("IANA zone required");

@@ -16,14 +16,22 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -54,6 +62,7 @@ class AttentionReviewIntegrationTest {
     @Autowired CoachingSharingUseCase sharing;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired PlatformTransactionManager transactions;
 
     @Test void explicitZoneCreatesRealTaskAndStudentRetainsReviewAfterPause() throws Exception {
         UUID student=student(),trainer=trainer();
@@ -83,6 +92,9 @@ class AttentionReviewIntegrationTest {
         assertThat(service.complete(trainer,task.id(),task.version(),completeKey,
                 "Reviewed available data",List.of(),List.of("Body measurement unavailable")).version())
                 .isEqualTo(completed.version());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=? "
+                +"AND related_entity_type='COACHING_REVIEW_TASK' AND related_entity_id=? "
+                +"AND event_type='REVIEW_TASK_COMPLETED'",Integer.class,student,task.id())).isEqualTo(1);
         assertThatThrownBy(()->service.complete(trainer,task.id(),task.version(),UUID.randomUUID(),
                 "Again",List.of(),List.of())).isInstanceOf(AttentionReviewFailure.class)
                 .hasMessage("REVIEW_VERSION_CONFLICT");
@@ -135,6 +147,9 @@ class AttentionReviewIntegrationTest {
         assertThat(service.signal(student,signal.id()).severity()).isEqualTo("MEDIUM");
         assertThat(service.signalHistory(student,signal.id())).extracting(AttentionReviewService.SignalEvent::eventType)
                 .contains("DETECTED","SEVERITY_CHANGED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications "
+                +"WHERE related_entity_id=? AND event_type='ATTENTION_DETECTED'",Integer.class,signal.id()))
+                .isEqualTo(2);
     }
 
     @Test void trainerWorkoutEvidenceRequiresCurrentViewAndRevocationConcealsCountAndDetail() throws Exception {
@@ -151,16 +166,25 @@ class AttentionReviewIntegrationTest {
         mvc.perform(get("/api/v1/attention-signals/{id}",signal.id())
                 .with(jwt().jwt(j->j.subject(trainer.toString()))))
                 .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/students/{id}/attention-return-status",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
         var permission=sharing.grantOrReplace(student,relationship,DataScope.WORKOUT_HISTORY,
                 SharingDecision.ALLOW,DataAccessLevel.VIEW,null,null,null,null,UUID.randomUUID());
         mvc.perform(get("/api/v1/students/{id}/attention-signals",student)
                 .with(jwt().jwt(j->j.subject(trainer.toString()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(signal.id().toString()));
+        mvc.perform(get("/api/v1/students/{id}/attention-return-status",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNKNOWN"));
         sharing.revoke(student,relationship,permission.id(),permission.version(),"No longer shared",UUID.randomUUID());
         mvc.perform(get("/api/v1/students/{id}/attention-signals",student)
                 .with(jwt().jwt(j->j.subject(trainer.toString()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
         mvc.perform(get("/api/v1/attention-signals/{id}",signal.id())
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/students/{id}/attention-return-status",student)
                 .with(jwt().jwt(j->j.subject(trainer.toString()))))
                 .andExpect(status().isNotFound());
         assertThat(service.signal(student,signal.id()).id()).isEqualTo(signal.id());
@@ -205,6 +229,188 @@ class AttentionReviewIntegrationTest {
                 .with(jwt().jwt(j->j.subject(trainer.toString())))).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/attention-signals/{id}",overdue.id())
                 .with(jwt().jwt(j->j.subject(trainer.toString())))).andExpect(status().isNotFound());
+    }
+
+    @Test void returnRuleUsesCompletedFactsAndConfirmedLocalCalendarDaysNotMissingLogs() {
+        for (int days : List.of(99,100,101)) {
+            UUID student=student();
+            service.confirmTimezone(student,"America/New_York",UUID.randomUUID());
+            ZonedDateTime first=ZonedDateTime.of(2025,3,8,12,0,0,0,ZoneId.of("America/New_York"));
+            UUID earlier=completed(student,first.toInstant());
+            UUID later=completed(student,first.plusDays(days).toInstant());
+            assertThat(service.returnStatus(student,student).status())
+                    .isEqualTo(days<100?"NO_QUALIFYING_GAP":"DETECTED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.attention_signals WHERE student_id=?",
+                    Integer.class,student)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=?",
+                    Integer.class,student)).isZero();
+            service.evaluate();
+            var returns=service.signals(student,student,0,20).items().stream()
+                    .filter(signal->signal.rule().equals("RETURN_AFTER_100_DAYS_V1")).toList();
+            assertThat(returns).hasSize(days<100?0:1);
+            assertThat(service.returnStatus(student,student).status())
+                    .isEqualTo(days<100?"NO_QUALIFYING_GAP":"DETECTED");
+            if (days>=100) {
+                var evidence=returns.getFirst().returnEvidence();
+                assertThat(returns.getFirst().severity()).isEqualTo("LOW");
+                assertThat(evidence.previousExecutionId()).isEqualTo(earlier);
+                assertThat(evidence.currentExecutionId()).isEqualTo(later);
+                assertThat(evidence.calendarDays()).isEqualTo(days);
+                assertThat(evidence.timezone()).isEqualTo("America/New_York");
+                assertThat(ChronoUnit.DAYS.between(evidence.previousLocalDate(),evidence.currentLocalDate()))
+                        .isEqualTo(days);
+                service.evaluate();
+                assertThat(service.signals(student,student,0,20).items().stream()
+                        .filter(signal->signal.rule().equals("RETURN_AFTER_100_DAYS_V1"))).hasSize(1);
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=? "
+                        +"AND related_entity_type='WORKOUT_ATTENTION_SIGNAL'",Integer.class,student)).isZero();
+            }
+        }
+        UUID missingPrior=student(),missingZone=student();
+        service.confirmTimezone(missingPrior,"Asia/Bangkok",UUID.randomUUID());
+        completed(missingPrior,Instant.parse("2025-08-01T10:00:00Z"));
+        completed(missingZone,Instant.parse("2025-01-01T10:00:00Z"));
+        completed(missingZone,Instant.parse("2025-08-01T10:00:00Z"));
+        service.evaluate();
+        assertThat(service.signals(missingPrior,missingPrior,0,20).items()).isEmpty();
+        assertThat(service.signals(missingZone,missingZone,0,20).items()).isEmpty();
+        assertThat(service.returnStatus(missingPrior,missingPrior).reason())
+                .isEqualTo("PREVIOUS_COMPLETION_MISSING");
+        assertThat(service.returnStatus(missingZone,missingZone).reason())
+                .isEqualTo("TIMEZONE_UNCONFIRMED");
+        UUID sameDay=student(),unknownEnd=student();
+        service.confirmTimezone(sameDay,"Asia/Bangkok",UUID.randomUUID());
+        service.confirmTimezone(unknownEnd,"Asia/Bangkok",UUID.randomUUID());
+        completed(sameDay,Instant.parse("2025-01-01T01:00:00Z"));
+        UUID lastSameDay=completed(sameDay,Instant.parse("2025-01-01T11:00:00Z"));
+        completed(sameDay,Instant.parse("2025-04-11T11:00:00Z"));
+        jdbc.update("""
+                INSERT INTO fitness.workout_session_logs
+                  (student_id,performed_start_at,status,logged_by)
+                VALUES (?,?,'COMPLETED',?)
+                """,unknownEnd,Timestamp.from(Instant.parse("2025-01-01T10:00:00Z")),unknownEnd);
+        completed(unknownEnd,Instant.parse("2025-08-01T10:00:00Z"));
+        service.evaluate();
+        var sameDayReturn=service.signals(sameDay,sameDay,0,20).items().stream()
+                .filter(signal->signal.rule().equals("RETURN_AFTER_100_DAYS_V1")).findFirst().orElseThrow();
+        assertThat(sameDayReturn.returnEvidence().previousExecutionId()).isEqualTo(lastSameDay);
+        assertThat(service.signals(unknownEnd,unknownEnd,0,20).items()).isEmpty();
+        assertThat(service.returnStatus(unknownEnd,unknownEnd).reason())
+                .isEqualTo("COMPLETION_TIME_MISSING");
+    }
+
+    @Test void returnStatusHttpReadsOnlyTheRequestedStudentsCompletions() throws Exception {
+        UUID studentA=student(),studentB=student();
+        service.confirmTimezone(studentA,"Asia/Bangkok",UUID.randomUUID());
+        service.confirmTimezone(studentB,"Asia/Bangkok",UUID.randomUUID());
+        completed(studentA,Instant.parse("2025-01-01T10:00:00Z"));
+        completed(studentA,Instant.parse("2025-04-11T10:00:00Z"));
+        completed(studentB,Instant.parse("2025-06-01T10:00:00Z"));
+        mvc.perform(get("/api/v1/attention-return-status/me")
+                .with(jwt().jwt(j->j.subject(studentA.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DETECTED"));
+        mvc.perform(get("/api/v1/attention-return-status/me")
+                .with(jwt().jwt(j->j.subject(studentB.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.reason").value("PREVIOUS_COMPLETION_MISSING"));
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_indexes WHERE schemaname='fitness'
+                  AND tablename='workout_session_logs'
+                  AND indexname IN ('idx_workout_logs_student_performed','ix_workout_execution_student_time')
+                """,Integer.class)).isEqualTo(2);
+        var plan=jdbc.queryForList("""
+                EXPLAIN SELECT id,student_id,version,performed_start_at,performed_end_at
+                FROM fitness.workout_session_logs
+                WHERE student_id=? AND status='COMPLETED'
+                ORDER BY COALESCE(performed_end_at,performed_start_at),id
+                """,String.class,studentA);
+        assertThat(String.join(" ",plan)).contains("student_id");
+    }
+
+    @Test void newlyCommittedReturnAndReviewNoticeAreAtomicAndConcealedAfterPause() throws Exception {
+        UUID student=student(),trainer=trainer();
+        UUID relationship=activate(student,trainer);
+        var grant=sharing.grantOrReplace(student,relationship,DataScope.WORKOUT_HISTORY,
+                SharingDecision.ALLOW,DataAccessLevel.VIEW,null,null,null,null,UUID.randomUUID());
+        service.confirmTimezone(student,"Asia/Bangkok",UUID.randomUUID());
+        service.evaluate();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=? "
+                +"AND related_entity_type='COACHING_REVIEW_TASK'",Integer.class,trainer)).isPositive();
+        Instant now=jdbc.queryForObject("SELECT clock_timestamp()",Timestamp.class).toInstant();
+        completed(student,now.minus(101,ChronoUnit.DAYS));
+        completed(student,now);
+        service.evaluate();
+        var signal=service.signals(student,student,0,20).items().stream()
+                .filter(row->row.rule().equals("RETURN_AFTER_100_DAYS_V1")).findFirst().orElseThrow();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=?",
+                Integer.class,signal.id())).isEqualTo(2);
+        service.evaluate();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=?",
+                Integer.class,signal.id())).isEqualTo(2);
+        mvc.perform(get("/api/v1/notifications/me").with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isOk());
+        sharing.revoke(student,relationship,grant.id(),grant.version(),"Revoked",UUID.randomUUID());
+        mvc.perform(get("/api/v1/notifications/me").with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[?(@.relatedEntityId=='"+signal.id()+"')]").isEmpty());
+        lifecycle.relationshipAction(student,relationship,"PAUSE",1,null,UUID.randomUUID());
+        mvc.perform(get("/api/v1/notifications/me").with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[?(@.relatedEntityId=='"+signal.id()+"')]").isEmpty());
+        mvc.perform(get("/api/v1/attention-signals/{id}",signal.id())
+                .with(jwt().jwt(j->j.subject(trainer.toString())))).andExpect(status().isNotFound());
+        assertThat(service.signal(student,signal.id()).id()).isEqualTo(signal.id());
+    }
+
+    @Test void concurrentJobsDedupeTheSameReturnAndRollbackLeavesNoPartialNotice() throws Exception {
+        UUID student=student();
+        service.confirmTimezone(student,"Asia/Bangkok",UUID.randomUUID());
+        Instant now=jdbc.queryForObject("SELECT clock_timestamp()",Timestamp.class).toInstant();
+        completed(student,now.minus(101,ChronoUnit.DAYS));
+        completed(student,now);
+        var ready=new CountDownLatch(2);
+        var start=new CountDownLatch(1);
+        try (var workers=Executors.newFixedThreadPool(2)) {
+            var tasks=new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int i=0;i<2;i++) tasks.add(workers.submit(()->{
+                ready.countDown();
+                if (!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("scheduler gate");
+                service.evaluate();
+                return null;
+            }));
+            assertThat(ready.await(10,TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (var task:tasks) task.get(30,TimeUnit.SECONDS);
+        }
+        var signals=service.signals(student,student,0,20).items().stream()
+                .filter(row->row.rule().equals("RETURN_AFTER_100_DAYS_V1")).toList();
+        assertThat(signals).hasSize(1);
+        UUID id=signals.getFirst().id();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.attention_signal_events WHERE signal_id=?",
+                Integer.class,id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE related_entity_id=?",
+                Integer.class,id)).isEqualTo(1);
+
+        UUID other=student();
+        service.confirmTimezone(other,"Asia/Bangkok",UUID.randomUUID());
+        completed(other,now.minus(101,ChronoUnit.DAYS));
+        completed(other,now);
+        assertThatThrownBy(()->new TransactionTemplate(transactions).execute(status->{
+            service.evaluate();
+            throw new IllegalStateException("rollback after producer");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.attention_signals WHERE student_id=? "
+                +"AND signal_type='RETURN_AFTER_100_DAYS_V1'",Integer.class,other)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=? "
+                +"AND related_entity_type='WORKOUT_ATTENTION_SIGNAL'",Integer.class,other)).isZero();
+    }
+
+    private UUID completed(UUID student,Instant end) {
+        UUID id=UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.workout_session_logs
+                  (id,student_id,performed_start_at,performed_end_at,status,logged_by)
+                VALUES (?,?,?,?,'COMPLETED',?)
+                """,id,student,Timestamp.from(end.minusSeconds(1800)),Timestamp.from(end),student);
+        return id;
     }
 
     private UUID occurrence(UUID student,Instant start,Instant end,boolean sealed) {

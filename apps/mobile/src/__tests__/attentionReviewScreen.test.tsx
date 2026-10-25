@@ -16,7 +16,7 @@ jest.mock('@/features/coaching/coachingQueries', () => ({ useRelationshipDetail:
 jest.mock('@/services/attentionReviewApi', () => ({ attentionReviewApi: {
   timezone: jest.fn(), confirmTimezone: jest.fn(), reviews: jest.fn(), review: jest.fn(),
   complete: jest.fn(), acknowledgeReview: jest.fn(), signals: jest.fn(),
-  signal: jest.fn(), signalHistory: jest.fn(), act: jest.fn(),
+  signal: jest.fn(), signalHistory: jest.fn(), act: jest.fn(), returnStatus: jest.fn(),
 } }));
 
 const clients: QueryClient[] = [];
@@ -41,6 +41,20 @@ const task = {
   completedAt: '2026-10-18T00:00:00Z', studentAcknowledgedAt: null,
 };
 const page = (items: unknown[]) => ({ items, page: 0, size: 20, hasMore: false });
+const signal = (id: string, rule: 'REVIEW_OVERDUE_V1' | 'RETURN_AFTER_100_DAYS_V1') => ({
+  id, studentId: 'student-1', trainerId: 'trainer-1', coachingPeriodId: 'period-1',
+  rule, severity: 'LOW', status: 'OPEN', version: 0,
+  occurrenceId: null, occurrenceVersion: null, plannedStartAt: null, plannedEndAt: null,
+  reviewTaskId: rule === 'REVIEW_OVERDUE_V1' ? 'review-1' : null,
+  returnEvidence: rule === 'RETURN_AFTER_100_DAYS_V1' ? {
+    previousExecutionId: 'prior', previousExecutionVersion: 1,
+    currentExecutionId: 'current', currentExecutionVersion: 1,
+    previousCompletedAt: '2026-01-01T10:00:00Z', currentCompletedAt: '2026-04-11T10:00:00Z',
+    previousLocalDate: '2026-01-01', currentLocalDate: '2026-04-11',
+    timezone: 'Asia/Bangkok', calendarDays: 100,
+  } : null,
+  detectedAt: '2026-04-11T10:00:00Z',
+});
 
 describe('M7 attention and review screen', () => {
   beforeEach(() => {
@@ -51,6 +65,9 @@ describe('M7 attention and review screen', () => {
     (attentionReviewApi.timezone as jest.Mock).mockResolvedValue(null);
     (attentionReviewApi.reviews as jest.Mock).mockResolvedValue(page([task]));
     (attentionReviewApi.signals as jest.Mock).mockResolvedValue(page([]));
+    (attentionReviewApi.returnStatus as jest.Mock).mockResolvedValue({
+      status: 'UNKNOWN', reason: 'PREVIOUS_COMPLETION_MISSING', timezone: 'Asia/Bangkok',
+    });
     (attentionReviewApi.acknowledgeReview as jest.Mock).mockResolvedValue({ ...task, version: 2,
       studentAcknowledgedAt: '2026-10-18T01:00:00Z' });
   });
@@ -66,6 +83,35 @@ describe('M7 attention and review screen', () => {
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Xác nhận đã xem' }).props.onPress());
     await settle();
     expect(attentionReviewApi.acknowledgeReview).toHaveBeenCalledWith('review-1', 1, expect.any(String));
+  });
+
+  it('labels absent completion evidence as unknown rather than zero', async () => {
+    const empty = render(<AttentionReviewScreen />);
+    await settle();
+    expect(JSON.stringify(empty.toJSON())).toContain('chưa xác định');
+    expect(attentionReviewApi.returnStatus).toHaveBeenCalledWith(undefined);
+  });
+
+  it('explains completed-workout return evidence without inventing a plan action', async () => {
+    const evidence = {
+      previousExecutionId: 'prior', previousExecutionVersion: 2,
+      currentExecutionId: 'current', currentExecutionVersion: 1,
+      previousCompletedAt: '2026-01-01T10:00:00Z', currentCompletedAt: '2026-04-11T10:00:00Z',
+      previousLocalDate: '2026-01-01', currentLocalDate: '2026-04-11',
+      timezone: 'Asia/Bangkok', calendarDays: 100,
+    };
+    (attentionReviewApi.signals as jest.Mock).mockResolvedValue(page([{
+      id: 'signal-return', studentId: 'student-1', trainerId: null, coachingPeriodId: null,
+      rule: 'RETURN_AFTER_100_DAYS_V1', severity: 'LOW', status: 'OPEN', version: 0,
+      occurrenceId: null, occurrenceVersion: null, plannedStartAt: null, plannedEndAt: null,
+      reviewTaskId: null, returnEvidence: evidence, detectedAt: '2026-04-11T10:00:00Z',
+    }]));
+    const result = render(<AttentionReviewScreen />);
+    await settle();
+    expect(result.root.findAllByProps({ testID: 'attention-signal-return' }).length).toBeGreaterThan(0);
+    expect(JSON.stringify(result.toJSON())).toContain(' ngày lịch');
+    expect(JSON.stringify(result.toJSON())).toContain('"100"');
+    expect(JSON.stringify(result.toJSON())).toContain('không tự đổi kế hoạch tập');
   });
 
   it('returns to Coaching hub when opened directly without navigation history', async () => {
@@ -85,6 +131,73 @@ describe('M7 attention and review screen', () => {
     await settle();
     expect(attentionReviewApi.reviews).not.toHaveBeenCalled();
     expect(tree.root.findAllByProps({ testID: 'review-review-1' })).toHaveLength(0);
+  });
+
+  it('requires a fresh relationship read when Trainer opens Attention', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ isFetchedAfterMount: false, isFetching: true,
+      isPending: false, data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE' },
+        currentPeriod: { mode: 'HUMAN_COACH' } } });
+    const tree = render(<AttentionReviewScreen relationshipId="relationship-1" />);
+    await settle();
+    expect(useRelationshipDetail).toHaveBeenCalledWith('relationship-1', true);
+    expect(attentionReviewApi.reviews).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Đang kiểm tra quyền');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Không thể xem dữ liệu');
+  });
+
+  it('does not show return evidence when current Trainer lacks WORKOUT_HISTORY VIEW', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ isFetchedAfterMount: true, isPending: false,
+      data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE' },
+        currentPeriod: { mode: 'HUMAN_COACH' } } });
+    (attentionReviewApi.returnStatus as jest.Mock).mockRejectedValue(new ApiError(404, 'concealed'));
+    (attentionReviewApi.signals as jest.Mock).mockResolvedValue(page([
+      signal('review-signal', 'REVIEW_OVERDUE_V1'), signal('return-signal', 'RETURN_AFTER_100_DAYS_V1'),
+    ]));
+    const tree = render(<AttentionReviewScreen relationshipId="relationship-1" />);
+    await settle();
+    expect(attentionReviewApi.returnStatus).toHaveBeenCalledWith('student-1');
+    expect(tree.root.findAllByProps({ testID: 'return-100-day-status' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'review-review-1' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'attention-review-signal' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'attention-return-signal' })).toHaveLength(0);
+    expect(JSON.stringify(clients[0].getQueryData(['attention-review', 'trainer-1', 'TRAINER', 'student-1', 'signals'])))
+      .not.toContain('return-signal');
+    (attentionReviewApi.returnStatus as jest.Mock).mockResolvedValue({
+      status: 'DETECTED', reason: null, timezone: 'Asia/Bangkok',
+    });
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Thử lại' }).props.onPress());
+    await settle();
+    expect(tree.root.findAllByProps({ testID: 'return-100-day-status' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'attention-return-signal' }).length).toBeGreaterThan(0);
+  });
+
+  it('removes stale return evidence after a denied refetch but retains allowed review data', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ isFetchedAfterMount: true, isPending: false,
+      data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE' },
+        currentPeriod: { mode: 'HUMAN_COACH' } } });
+    (attentionReviewApi.returnStatus as jest.Mock).mockResolvedValue({
+      status: 'DETECTED', reason: null, timezone: 'Asia/Bangkok',
+    });
+    (attentionReviewApi.signals as jest.Mock).mockResolvedValue(page([
+      signal('review-signal', 'REVIEW_OVERDUE_V1'), signal('return-signal', 'RETURN_AFTER_100_DAYS_V1'),
+    ]));
+    const tree = render(<AttentionReviewScreen relationshipId="relationship-1" />);
+    await settle();
+    expect(tree.root.findAllByProps({ testID: 'return-100-day-status' }).length).toBeGreaterThan(0);
+    (attentionReviewApi.returnStatus as jest.Mock).mockRejectedValue(new ApiError(403, 'revoked'));
+    await renderer.act(async () => {
+      await clients[0].refetchQueries({ queryKey: ['attention-review', 'trainer-1', 'TRAINER', 'student-1', 'return-status'] });
+    });
+    await settle();
+    expect(tree.root.findAllByProps({ testID: 'return-100-day-status' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'review-review-1' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'attention-review-signal' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'attention-return-signal' })).toHaveLength(0);
+    expect(JSON.stringify(clients[0].getQueryData(['attention-review', 'trainer-1', 'TRAINER', 'student-1', 'signals'])))
+      .not.toContain('return-signal');
   });
 
   it('drops visible Trainer data after a concealed 404', async () => {
