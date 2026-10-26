@@ -13,13 +13,14 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { SessionGateScreen } from '@/features/auth/SessionGateScreen';
 import { queryClient } from '@/services/queryClient';
+import { PushReceiptListener } from '@/features/chat/PushReceiptListener';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
-  const { status, isLoading, restoreError, retrySessionRestore } = useAuth();
+  const { status, user, isLoading, restoreError, retrySessionRestore } = useAuth();
 
   useEffect(() => {
     if (fontsReady && !isLoading && Platform.OS !== 'web') {
@@ -46,11 +47,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   }
 
   return (
+    <>
+    {status === 'AUTHENTICATED' && user ? <PushReceiptListener actor={user.id} /> : null}
     <Stack
       screenOptions={{
         headerShown: false,
       }}
     />
+    </>
   );
 }
 

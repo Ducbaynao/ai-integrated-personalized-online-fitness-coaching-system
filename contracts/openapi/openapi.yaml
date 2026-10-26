@@ -283,6 +283,49 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/ChatConcealed' }
         '409': { $ref: '#/components/responses/ChatConflict' }
+  /chat/students/{studentId}/attachments:
+    post:
+      tags: [Chat]
+      operationId: sendChatAttachment
+      description: >-
+        Send one JPEG, PNG or PDF (maximum 10 MiB) in the current ACTIVE human Coaching Period.
+        The declared image/jpg alias is normalized to image/jpeg; the actual JPEG signature is
+        still mandatory. Backend verifies file signature and declared type, requires a successful malware scan,
+        stores only a private S3-compatible object reference in PostgreSQL, and creates the
+        message and in-app notice atomically. Exact actor-scoped command replay returns the
+        original message after authority recheck. Scanner/storage failure never releases a file.
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file, commandKey]
+              properties:
+                file: { type: string, format: binary, description: One JPEG (image/jpeg or image/jpg alias), PNG or PDF, at most 10 MiB. }
+                commandKey: { type: string, format: uuid }
+      responses:
+        '201': { description: Committed attachment message or exact replay, content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+        '409': { $ref: '#/components/responses/ChatConflict' }
+        '503': { description: Private storage or malware scanner unavailable; no attachment is released, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /chat/attachments/{attachmentId}/content:
+    get:
+      tags: [Chat]
+      operationId: downloadChatAttachment
+      description: >-
+        The backend rechecks conversation authority on every request and only returns an
+        attachment marked CLEAN from private storage. No public object URL is returned.
+      parameters: [{ name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Verified attachment bytes, headers: { Content-Disposition: { schema: { type: string } }, Cache-Control: { schema: { type: string } } }, content: { image/jpeg: { schema: { type: string, format: binary } }, image/png: { schema: { type: string, format: binary } }, application/pdf: { schema: { type: string, format: binary } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+        '503': { description: Private storage unavailable; never serve unscanned content, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
   /chat/messages/{messageId}/receipts:
     post:
       tags: [Chat]
@@ -317,10 +360,10 @@ paths:
       tags: [In-App Notification]
       operationId: listMyInAppNotifications
       description: >-
-        Mixed Chat and implemented Appointment lifecycle facts. Source-object authority is
-        checked before pagination and again on read/deep link; former Trainers cannot infer
-        old-period notifications. Other proposal/coaching-request producers remain deferred
-        until their source-specific authority hooks are executable.
+        Mixed Chat, proposal, Appointment, Attention, Review and coaching-request facts.
+        Source-object authority is checked before pagination and again on read/deep link;
+        former Trainers cannot infer old-period notifications. Push opt-in is independent
+        of this in-app inbox, which cannot be disabled.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
@@ -339,6 +382,79 @@ paths:
         '200':
           description: Idempotently marked read without marking the related message READ
           content: { application/json: { schema: { $ref: '#/components/schemas/InAppNotification' } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+  /notifications/me/push/preferences:
+    get:
+      tags: [In-App Notification]
+      operationId: listMyPushPreferences
+      description: Absence of an eventType row means push is OFF. In-app delivery is unaffected.
+      responses:
+        '200': { description: Explicit per-event-category preferences, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PushPreference' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/push/deliveries/{notificationId}:
+    get:
+      tags: [In-App Notification]
+      operationId: getMyPushDeliveryStates
+      description: >-
+        Authority-checked per-device states without exposing device tokens. TICKET_ACCEPTED
+        is Expo acceptance, PROVIDER_ACCEPTED is FCM/APNs acceptance, and
+        DEVICE_ACKNOWLEDGED requires an explicit callback; none marks the in-app notice READ.
+      parameters: [{ name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Empty if no opted-in device was queued, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PushDeliveryState' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+  /notifications/me/push/preferences/{eventType}:
+    put:
+      tags: [In-App Notification]
+      operationId: putMyPushPreference
+      description: >-
+        Idempotent actor-owned setting. eventType is one of CHAT, COACHING, WORKOUT,
+        GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT; unknown producers never push.
+        User explicitly chooses IANA timezone and optional quiet hours [start,end), including
+        cross-midnight. No device/profile timezone fallback. Quiet notices remain queued until
+        the next allowed dispatch; no new reminder is generated.
+      parameters: [{ name: eventType, in: path, required: true, schema: { type: string, enum: [CHAT, COACHING, WORKOUT, GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT] } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PushPreferenceInput' } } } }
+      responses:
+        '200': { description: Current preference, content: { application/json: { schema: { $ref: '#/components/schemas/PushPreference' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/push/devices/{deviceKey}:
+    put:
+      tags: [In-App Notification]
+      operationId: registerMyExpoPushDevice
+      description: >-
+        Registers the current actor's Expo push token; never transfers a token between accounts.
+        An EAS project ID and native FCM/APNs credentials are deployment prerequisites.
+      parameters: [{ name: deviceKey, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PushDeviceInput' } } } }
+      responses:
+        '204': { description: Registered or identical replay }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409': { description: Token already belongs to another account }
+    delete:
+      tags: [In-App Notification]
+      operationId: unregisterMyExpoPushDevice
+      parameters: [{ name: deviceKey, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '204': { description: Disabled, including replay }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/push/devices/{deviceKey}/received/{notificationId}:
+    post:
+      tags: [In-App Notification]
+      operationId: acknowledgePushReceivedOnDevice
+      description: >-
+        Explicit callback from the recipient's registered device. Expo ticket acceptance and
+        provider receipt acceptance are NOT device delivery. This callback does not mark the
+        in-app notice or related Chat message READ; source authority is rechecked.
+      parameters:
+        - { name: deviceKey, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Device receipt recorded idempotently }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/ChatConcealed' }
   /nutrition/catalog/foods:
@@ -4983,16 +5099,20 @@ components:
     ChatMessage:
       type: object
       additionalProperties: false
-      required: [id, conversationId, senderId, body, status, sentAt, deliveredAt, readAt]
+      required: [id, conversationId, senderId, body, status, sentAt, deliveredAt, readAt, attachmentId, attachmentName, attachmentContentType, attachmentSize]
       properties:
         id: { type: string, format: uuid }
         conversationId: { type: string, format: uuid }
         senderId: { type: string, format: uuid }
-        body: { type: string }
+        body: { type: [string, 'null'], description: Null for attachment-only messages. }
         status: { type: string, enum: [SENT, DELIVERED, READ] }
         sentAt: { type: string, format: date-time }
         deliveredAt: { type: [string, 'null'], format: date-time }
         readAt: { type: [string, 'null'], format: date-time }
+        attachmentId: { type: [string, 'null'], format: uuid }
+        attachmentName: { type: [string, 'null'], description: Original filename, never included in notification preview. }
+        attachmentContentType: { type: [string, 'null'], enum: [image/jpeg, image/png, application/pdf, null] }
+        attachmentSize: { type: [integer, 'null'], format: int64, maximum: 10485760 }
     ChatSendRequest:
       type: object
       additionalProperties: false
@@ -5006,6 +5126,34 @@ components:
       required: [kind]
       properties:
         kind: { type: string, enum: [DELIVERED, READ] }
+    PushPreferenceInput:
+      type: object
+      additionalProperties: false
+      required: [enabled, timezone]
+      properties:
+        enabled: { type: boolean }
+        timezone: { type: string, description: Explicit IANA timezone chosen by the account owner. }
+        quietHoursStart: { type: [string, 'null'], description: Local HH:mm; both endpoints present or both absent. }
+        quietHoursEnd: { type: [string, 'null'], description: Local HH:mm; exclusive end. }
+    PushPreference:
+      allOf:
+        - { $ref: '#/components/schemas/PushPreferenceInput' }
+        - { type: object, required: [eventType], properties: { eventType: { type: string } } }
+    PushDeviceInput:
+      type: object
+      additionalProperties: false
+      required: [expoPushToken]
+      properties:
+        expoPushToken: { type: string, description: Expo project-scoped token; never returned by GET. }
+    PushDeliveryState:
+      type: object
+      additionalProperties: false
+      required: [status, attemptedAt, providerAcceptedAt, deviceAcknowledgedAt]
+      properties:
+        status: { type: string, enum: [QUEUED, TICKET_ACCEPTED, PROVIDER_ACCEPTED, DEVICE_ACKNOWLEDGED, FAILED, SKIPPED] }
+        attemptedAt: { type: [string, 'null'], format: date-time }
+        providerAcceptedAt: { type: [string, 'null'], format: date-time }
+        deviceAcknowledgedAt: { type: [string, 'null'], format: date-time }
     ChatConversationPage:
       type: object
       additionalProperties: false

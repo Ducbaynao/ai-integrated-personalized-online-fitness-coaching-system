@@ -5,9 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -39,6 +44,25 @@ public class ChatController {
     public ResponseEntity<ChatService.Message> send(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID studentId, @Valid @RequestBody SendRequest body) {
         return ResponseEntity.status(201).body(chat.send(actor(jwt), studentId, body.body(), body.commandKey()));
+    }
+
+    @PostMapping(value = "/students/{studentId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatService.Message> sendAttachment(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID studentId, @RequestPart("file") MultipartFile file,
+            @RequestParam("commandKey") UUID commandKey) throws java.io.IOException {
+        if (file.getSize() > ChatAttachmentPolicy.MAX_BYTES)
+            throw new ChatFailure("CHAT_ATTACHMENT_SIZE_INVALID", 400);
+        return ResponseEntity.status(201).body(chat.sendAttachment(actor(jwt), studentId,
+                file.getOriginalFilename(), file.getContentType(), file.getBytes(), commandKey));
+    }
+
+    @GetMapping("/attachments/{attachmentId}/content")
+    public ResponseEntity<byte[]> download(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID attachmentId) {
+        ChatService.AttachmentContent file = chat.download(actor(jwt), attachmentId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(file.filename()).build().toString())
+                .contentType(MediaType.parseMediaType(file.contentType())).body(file.bytes());
     }
 
     @PostMapping("/messages/{messageId}/receipts")

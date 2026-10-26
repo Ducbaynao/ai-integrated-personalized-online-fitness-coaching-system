@@ -1,0 +1,40 @@
+package com.fitnesscoaching.platform.modules.chat;
+
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+
+import java.net.URI;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ChatObjectStorageTest {
+    @Test void privateDisposableObjectRoundTrip() {
+        try (GenericContainer<?> s3 = new GenericContainer<>(
+                "adobe/s3mock@sha256:ab01a6946750f451ca215a47e91030695b260e4003b8a5a6201d25029b8fca92")
+                .withExposedPorts(9090)
+                .waitingFor(Wait.forHttp("/favicon.ico").forPort(9090))) {
+            s3.start();
+            String endpoint = "http://" + s3.getHost() + ":" + s3.getMappedPort(9090);
+            String bucket = "private-chat-test";
+            try (S3Client client = S3Client.builder().endpointOverride(URI.create(endpoint))
+                    .region(Region.US_EAST_1).forcePathStyle(true)
+                    .credentialsProvider(StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create("test-access", "test-secret-123"))).build()) {
+                client.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
+            }
+            ChatObjectStorage storage = new ChatObjectStorage(endpoint, bucket, "test-access", "test-secret-123");
+            String key = "chat/test/" + UUID.randomUUID();
+            byte[] bytes = new byte[] {1, 2, 3};
+            storage.put(key, bytes, "image/png");
+            assertThat(storage.get(key)).containsExactly(bytes);
+            storage.delete(key);
+        }
+    }
+}

@@ -76,6 +76,7 @@ export default function AppLayout() {
       <Stack.Screen name="chat/new" />
       <Stack.Screen name="chat/[conversationId]" />
       <Stack.Screen name="notifications/index" />
+      <Stack.Screen name="notifications/push" />
       <Stack.Screen name="appointments/index" />
       <Stack.Screen name="appointments/new" />
       <Stack.Screen name="appointments/requests/[requestId]" />
