@@ -10,6 +10,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -27,18 +29,24 @@ public class ChatService {
     private final TrainerCoachingEligibilityQuery trainers;
     private final ChatNotificationWriter notifications;
     private final ApplicationEventPublisher events;
+    private final ClamdAttachmentScanner scanner;
+    private final ChatObjectStorage storage;
 
     public ChatService(JdbcTemplate jdbc, CurrentCoachingContextQuery contexts, UserAccountStatusQuery accounts,
                        StudentCapabilityQuery students, TrainerCoachingEligibilityQuery trainers,
-                       ChatNotificationWriter notifications, ApplicationEventPublisher events) {
+                       ChatNotificationWriter notifications, ApplicationEventPublisher events,
+                       ClamdAttachmentScanner scanner, ChatObjectStorage storage) {
         this.jdbc = jdbc; this.contexts = contexts; this.accounts = accounts; this.students = students;
         this.trainers = trainers; this.notifications = notifications; this.events = events;
+        this.scanner = scanner; this.storage = storage;
     }
 
     public record Conversation(UUID id, UUID coachingPeriodId, UUID studentId, UUID trainerId,
                                Instant createdAt, Instant updatedAt, boolean sendAllowed) {}
     public record Message(UUID id, UUID conversationId, UUID senderId, String body, String status,
-                          Instant sentAt, Instant deliveredAt, Instant readAt) {}
+                          Instant sentAt, Instant deliveredAt, Instant readAt,
+                          UUID attachmentId, String attachmentName, String attachmentContentType,
+                          Long attachmentSize) {}
     public record Page<T>(List<T> items, int page, int size, boolean hasMore) {}
     public record Changed(UUID studentId, UUID trainerId, UUID periodId, UUID conversationId) {}
     private record Receipt(String hash, UUID messageId) {}
@@ -88,6 +96,88 @@ public class ChatService {
         return message(id);
     }
 
+    @Transactional
+    public Message sendAttachment(UUID actor, UUID student, String filename, String declaredType,
+                                  byte[] bytes, UUID commandKey) {
+        if (commandKey == null || filename == null || filename.isBlank() || filename.length() > 255
+                || filename.indexOf('/') >= 0 || filename.indexOf('\\') >= 0
+                || filename.chars().anyMatch(c -> c < 32)) throw fail("VALIDATION_FAILED", 400);
+        String contentType = ChatAttachmentPolicy.verifiedType(bytes, declaredType);
+        var context = current(student, true);
+        if (!actor.equals(student) && !actor.equals(context.trainerId()))
+            throw fail("CHAT_CONVERSATION_NOT_FOUND", 404);
+        requireParticipant(actor, student, context.trainerId());
+        String checksum = hashBytes(bytes);
+        String receiptHash = hash(student + ":ATTACHMENT:" + filename + ":" + contentType + ":" + checksum);
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?::text,0))", actor + ":" + commandKey);
+        List<Receipt> receipts = jdbc.query("SELECT payload_hash,message_id FROM fitness.chat_command_receipts "
+                + "WHERE actor_id=? AND command_key=?",
+                (rs, row) -> new Receipt(rs.getString(1), rs.getObject(2, UUID.class)), actor, commandKey);
+        if (!receipts.isEmpty()) {
+            if (!receiptHash.equals(receipts.getFirst().hash())) throw fail("CHAT_IDEMPOTENCY_CONFLICT", 409);
+            Message prior = message(receipts.getFirst().messageId());
+            if (!context.periodId().equals(conversationById(prior.conversationId()).coachingPeriodId()))
+                throw fail("CHAT_CONVERSATION_NOT_FOUND", 404);
+            return prior;
+        }
+        scanner.requireClean(bytes); // No object is stored or message committed if scanning fails.
+        UUID messageId = UUID.randomUUID();
+        UUID mediaId = UUID.randomUUID();
+        String objectKey = "chat/" + context.periodId() + "/" + messageId + "/" + mediaId;
+        storage.put(objectKey, bytes, contentType);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) storage.delete(objectKey);
+            }
+        });
+        Conversation conversation = ensureConversation(context.periodId(), context.relationshipId(), student,
+                context.trainerId(), actor);
+        jdbc.update("""
+                INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                    original_filename,content_type,size_bytes,checksum_sha256,media_purpose,visibility,scan_status)
+                VALUES (?,?,'S3',?,?,?,?,?,?, 'CHAT_ATTACHMENT','PRIVATE','CLEAN')
+                """, mediaId, actor, storage.bucket(), objectKey, filename, contentType, bytes.length, checksum);
+        jdbc.update("""
+                INSERT INTO fitness.messages(id,conversation_id,sender_id,message_type,status)
+                VALUES (?,?,?,?::fitness.message_type,'SENT')
+                """, messageId, conversation.id(), actor, contentType.startsWith("image/") ? "IMAGE" : "FILE");
+        jdbc.update("INSERT INTO fitness.message_attachments(message_id,media_id) VALUES (?,?)", messageId, mediaId);
+        jdbc.update("UPDATE fitness.conversations SET updated_at=clock_timestamp() WHERE id=?", conversation.id());
+        UUID recipient = actor.equals(student) ? context.trainerId() : student;
+        jdbc.update("INSERT INTO fitness.message_read_receipts(message_id,user_id) VALUES (?,?)", messageId, recipient);
+        jdbc.update("INSERT INTO fitness.chat_command_receipts(actor_id,command_key,payload_hash,message_id) VALUES (?,?,?,?)",
+                actor, commandKey, receiptHash, messageId);
+        notifications.messageCommitted(recipient, messageId, context.periodId(), student, context.trainerId());
+        events.publishEvent(new Changed(student, context.trainerId(), context.periodId(), conversation.id()));
+        return message(messageId);
+    }
+
+    @Transactional(readOnly = true)
+    public AttachmentContent download(UUID actor, UUID attachmentId) {
+        requireAccount(actor);
+        var rows = jdbc.query("""
+                SELECT m.conversation_id,mf.object_key,mf.content_type,mf.original_filename,mf.size_bytes
+                FROM fitness.message_attachments ma
+                JOIN fitness.messages m ON m.id=ma.message_id
+                JOIN fitness.media_files mf ON mf.id=ma.media_id
+                WHERE ma.id=? AND mf.scan_status='CLEAN' AND mf.deleted_at IS NULL
+                  AND mf.storage_provider='S3' AND mf.visibility='PRIVATE'
+                """, (rs, row) -> new AttachmentRow(rs.getObject(1, UUID.class), rs.getString(2),
+                rs.getString(3), rs.getString(4), rs.getLong(5)), attachmentId);
+        if (rows.isEmpty()) throw fail("CHAT_ATTACHMENT_NOT_FOUND", 404);
+        AttachmentRow row = rows.getFirst();
+        try { detail(actor, row.conversationId()); }
+        catch (ChatFailure concealed) { throw fail("CHAT_ATTACHMENT_NOT_FOUND", 404); }
+        byte[] bytes = storage.get(row.objectKey());
+        if (bytes.length != row.sizeBytes() || bytes.length > ChatAttachmentPolicy.MAX_BYTES)
+            throw fail("CHAT_ATTACHMENT_STORAGE_UNAVAILABLE", 503);
+        return new AttachmentContent(bytes, row.contentType(), row.filename());
+    }
+
+    public record AttachmentContent(byte[] bytes, String contentType, String filename) {}
+    private record AttachmentRow(UUID conversationId, String objectKey, String contentType,
+                                 String filename, long sizeBytes) {}
+
     @Transactional(readOnly = true)
     public Page<Conversation> conversations(UUID actor, int page, int size) {
         validatePage(page, size);
@@ -119,8 +209,11 @@ public class ChatService {
         detail(actor, conversationId);
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
-                       r.delivered_at,r.read_at FROM fitness.messages m
+                       r.delivered_at,r.read_at,ma.id,mf.original_filename,mf.content_type,mf.size_bytes
+                       FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
+                LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
+                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id
                 WHERE m.conversation_id=? ORDER BY m.sent_at DESC,m.id DESC LIMIT ? OFFSET ?
                 """, (rs, row) -> mapMessage(rs), conversationId, size + 1, (long) page * size);
         boolean more = rows.size() > size;
@@ -235,8 +328,11 @@ public class ChatService {
     private Message message(UUID id) {
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
-                       r.delivered_at,r.read_at FROM fitness.messages m
+                       r.delivered_at,r.read_at,ma.id,mf.original_filename,mf.content_type,mf.size_bytes
+                       FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
+                LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
+                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id
                 WHERE m.id=?
                 """, (rs, row) -> mapMessage(rs), id);
         if (rows.isEmpty()) throw fail("CHAT_MESSAGE_NOT_FOUND", 404);
@@ -247,7 +343,9 @@ public class ChatService {
         return new Message(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
                 rs.getObject(3, UUID.class), rs.getString(4), rs.getString(5),
                 rs.getTimestamp(6).toInstant(), rs.getTimestamp(7) == null ? null : rs.getTimestamp(7).toInstant(),
-                rs.getTimestamp(8) == null ? null : rs.getTimestamp(8).toInstant());
+                rs.getTimestamp(8) == null ? null : rs.getTimestamp(8).toInstant(),
+                rs.getObject(9, UUID.class), rs.getString(10), rs.getString(11),
+                rs.getObject(12) == null ? null : rs.getLong(12));
     }
 
     private static void validatePage(int page, int size) {
@@ -258,6 +356,10 @@ public class ChatService {
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (Exception impossible) { throw new IllegalStateException(impossible); }
+    }
+    private static String hashBytes(byte[] value) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)); }
         catch (Exception impossible) { throw new IllegalStateException(impossible); }
     }
 }

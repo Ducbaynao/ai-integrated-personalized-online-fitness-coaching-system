@@ -117,7 +117,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     ...(headers as Record<string, string>),
   };
 
-  if (body !== undefined) {
+  if (body !== undefined && !(body instanceof FormData)) {
     requestHeaders['Content-Type'] = 'application/json';
   }
 
@@ -135,7 +135,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(url, {
       ...rest,
       headers: requestHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (err: unknown) {
     if (rest.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
@@ -177,6 +177,29 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   return parseResponse<T>(response);
+}
+
+/** Authenticated binary read. Never expose a public storage URL or cache the response. */
+export async function downloadAuthenticated(path: string, retried = false): Promise<Uint8Array> {
+  const accessToken = await tokenStorage.getAccessToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { Authorization: `Bearer ${accessToken ?? ''}`, 'Cache-Control': 'no-store' },
+    });
+  } catch {
+    throw new ApiError(0, 'Network connection failed');
+  }
+  if (response.status === 401 && !retried) {
+    if (!refreshPromise) refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
+    await refreshPromise;
+    return downloadAuthenticated(path, true);
+  }
+  if (!response.ok) {
+    await parseResponse(response);
+    throw new ApiError(response.status, 'Attachment unavailable');
+  }
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 /**

@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.chat;
 import com.fitnesscoaching.platform.common.exception.ErrorResponse;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationController;
+import com.fitnesscoaching.platform.modules.notification.PushPreferenceController;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,8 @@ import java.time.Clock;
 import java.time.Instant;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {ChatController.class, InAppNotificationController.class})
+@RestControllerAdvice(assignableTypes = {ChatController.class, InAppNotificationController.class,
+        PushPreferenceController.class})
 public class ChatErrorAdvice {
     private final Clock clock;
     public ChatErrorAdvice(Clock clock) { this.clock = clock; }
@@ -33,4 +35,5 @@ public class ChatErrorAdvice {
         return ResponseEntity.badRequest().body(ErrorResponse.of("VALIDATION_FAILED",
                 "Invalid chat request", Instant.now(clock), RequestIdHolder.get()));
     }
+
 }

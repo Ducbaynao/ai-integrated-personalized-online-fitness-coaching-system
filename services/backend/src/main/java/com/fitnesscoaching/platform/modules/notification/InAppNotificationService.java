@@ -29,16 +29,18 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
     private final CoachingAuthorityQuery authority;
     private final CoachingNotificationAccessQuery coachingNotifications;
     private final ApplicationEventPublisher events;
+    private final PushQueueWriter push;
 
     public InAppNotificationService(JdbcTemplate jdbc, CurrentCoachingContextQuery contexts,
                                     UserAccountStatusQuery accounts, TrainerCoachingEligibilityQuery trainers,
                                     CoachingAuthorityQuery authority,
                                     CoachingNotificationAccessQuery coachingNotifications,
-                                    ApplicationEventPublisher events) {
+                                    ApplicationEventPublisher events, PushQueueWriter push) {
         this.jdbc = jdbc; this.contexts = contexts; this.accounts = accounts; this.trainers = trainers;
         this.authority = authority;
         this.coachingNotifications = coachingNotifications;
         this.events = events;
+        this.push = push;
     }
 
     public record Item(UUID id, String eventType, String title, String body, UUID messageId,
@@ -73,6 +75,7 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                     INSERT INTO fitness.notification_deliveries(notification_id,channel,status)
                     VALUES (?,'IN_APP','DELIVERED')
                     """, id);
+            push.queue(id, recipient, type);
             events.publishEvent(new LifecycleNotificationWriter.Changed(recipient, id));
         }
     }
@@ -119,6 +122,7 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                 INSERT INTO fitness.notification_deliveries(notification_id,channel,status)
                 VALUES (?,'IN_APP','DELIVERED')
                 """, id);
+        push.queue(id, recipient, "CHAT_MESSAGE");
         return id;
     }
 

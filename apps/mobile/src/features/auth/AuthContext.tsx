@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { authApi, registerSessionExpiredHandler } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
 import { clearQueryCache } from '@/services/queryClient';
+import { pushApi } from '@/services/pushApi';
 import {
   ApiError,
   CurrentUserResponse,
@@ -189,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async (): Promise<void> => {
     try {
+      try { await pushApi.unregister(); } catch { /* Offline logout still clears local credentials. */ }
       await authApi.logout();
     } finally {
       clearQueryCache();

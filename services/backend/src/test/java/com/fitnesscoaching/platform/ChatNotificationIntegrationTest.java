@@ -2,9 +2,13 @@ package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.chat.ChatFailure;
 import com.fitnesscoaching.platform.modules.chat.ChatService;
+import com.fitnesscoaching.platform.modules.chat.ChatObjectStorage;
+import com.fitnesscoaching.platform.modules.chat.ClamdAttachmentScanner;
 import com.fitnesscoaching.platform.modules.chat.ChatUpdatesSocket;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
+import com.fitnesscoaching.platform.modules.notification.ExpoPushGateway;
+import com.fitnesscoaching.platform.modules.notification.PushDeliveryWorker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +17,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -30,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +46,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@TestPropertySource(properties = {"app.scheduling.enabled=false", "push.expo.enabled=true"})
 class ChatNotificationIntegrationTest {
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
@@ -57,10 +66,212 @@ class ChatNotificationIntegrationTest {
 
     @Autowired ChatService chat;
     @Autowired InAppNotificationService notifications;
+    @Autowired PushDeliveryWorker pushWorker;
     @Autowired CoachingLifecycleUseCase lifecycle;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ChatUpdatesSocket socket;
+    @MockitoBean ChatObjectStorage storage;
+    @MockitoBean ClamdAttachmentScanner scanner;
+    @MockitoBean ExpoPushGateway expo;
+
+    @Test void pushStartsOffThenQueuesOnlyAfterOptInAndTracksProviderSeparatelyFromDevice() throws Exception {
+        UUID student = student(), trainer = trainer(), device = UUID.randomUUID();
+        activate(student, trainer);
+        mvc.perform(get("/api/v1/notifications/me/push/preferences")
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        chat.send(student, student, "Before opt-in", UUID.randomUUID());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.push_delivery_attempts", Integer.class)).isZero();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/notifications/me/push/devices/{id}", device)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                .content("{\"expoPushToken\":\"ExpoPushToken[test-token]\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/notifications/me/push/preferences/CHAT")
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                .content("{\"enabled\":true,\"timezone\":\"+07:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("PUSH_TIMEZONE_INVALID"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/notifications/me/push/preferences/CHAT")
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                .content("{\"enabled\":true,\"timezone\":\"Asia/Ho_Chi_Minh\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
+        UUID key = UUID.randomUUID();
+        ChatService.Message message = chat.send(student, student, "After opt-in", key);
+        assertThat(chat.send(student, student, "After opt-in", key).id()).isEqualTo(message.id());
+        UUID notice = jdbc.queryForObject("""
+                SELECT n.id FROM fitness.notifications n WHERE n.related_entity_id=? AND n.recipient_user_id=?
+                """, UUID.class, message.id(), trainer);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                Integer.class, notice)).isEqualTo(1);
+        when(expo.send("ExpoPushToken[test-token]", notice))
+                .thenReturn(new ExpoPushGateway.Result(true, "expo-ticket-1", null));
+        pushWorker.dispatch();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("TICKET_ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT read_at FROM fitness.notifications WHERE id=?",
+                java.sql.Timestamp.class, notice)).isNull();
+        jdbc.update("UPDATE fitness.push_delivery_attempts SET attempted_at=clock_timestamp()-interval '1 minute', "
+                + "next_attempt_at=clock_timestamp()-interval '1 minute' "
+                + "WHERE notification_id=?", notice);
+        when(expo.receipt("expo-ticket-1"))
+                .thenReturn(new ExpoPushGateway.Result(true, "expo-ticket-1", null));
+        pushWorker.inspectReceipts();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("PROVIDER_ACCEPTED");
+        mvc.perform(get("/api/v1/notifications/me/push/deliveries/{id}", notice)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PROVIDER_ACCEPTED"));
+        mvc.perform(post("/api/v1/notifications/me/push/devices/{device}/received/{notice}", device, notice)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("DEVICE_ACKNOWLEDGED");
+        assertThat(jdbc.queryForObject("SELECT read_at FROM fitness.notifications WHERE id=?",
+                java.sql.Timestamp.class, notice)).isNull();
+    }
+
+    @Test void pausedTrainerCannotReceiveQueuedPushOrAcknowledgeIt() throws Exception {
+        UUID student = student(), trainer = trainer(), device = UUID.randomUUID();
+        UUID relationship = activate(student, trainer);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/notifications/me/push/devices/{id}", device)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                .content("{\"expoPushToken\":\"ExpoPushToken[other-token]\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/v1/notifications/me/push/preferences/CHAT")
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))).contentType("application/json")
+                .content("{\"enabled\":true,\"timezone\":\"Etc/UTC\"}"))
+                .andExpect(status().isOk());
+        ChatService.Message message = chat.send(student, student, "Pending", UUID.randomUUID());
+        UUID notice = jdbc.queryForObject("SELECT id FROM fitness.notifications WHERE related_entity_id=?",
+                UUID.class, message.id());
+        lifecycle.relationshipAction(student, relationship, "PAUSE", 1, null, UUID.randomUUID());
+        pushWorker.dispatch();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("SKIPPED");
+        verify(expo, never()).send("ExpoPushToken[other-token]", notice);
+        mvc.perform(get("/api/v1/notifications/me/push/deliveries/{id}", notice)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/notifications/me/push/devices/{device}/received/{notice}", device, notice)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test void competingPushWorkersDoNotSubmitTheSameNoticeTwice() throws Exception {
+        UUID student = student(), trainer = trainer(), device = UUID.randomUUID();
+        activate(student, trainer);
+        jdbc.update("INSERT INTO fitness.push_devices(user_id,device_key,expo_token) VALUES (?,?,?)",
+                trainer, device, "ExpoPushToken[race-token]");
+        jdbc.update("""
+                INSERT INTO fitness.notification_preferences(user_id,event_type,channel,enabled,timezone)
+                VALUES (?,'CHAT','PUSH',true,'Etc/UTC')
+                """, trainer);
+        ChatService.Message message = chat.send(student, student, "One push", UUID.randomUUID());
+        UUID notice = jdbc.queryForObject("SELECT id FROM fitness.notifications WHERE related_entity_id=?",
+                UUID.class, message.id());
+        CountDownLatch providerEntered = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(expo.send("ExpoPushToken[race-token]", notice)).thenAnswer(invocation -> {
+            providerEntered.countDown();
+            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test latch timed out");
+            return new ExpoPushGateway.Result(true, "ticket-race", null);
+        });
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var first = workers.submit(pushWorker::dispatch);
+            assertThat(providerEntered.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = workers.submit(pushWorker::dispatch);
+            second.get(10, TimeUnit.SECONDS); // Claimed state is committed; provider I/O holds no row lock.
+            release.countDown();
+            first.get(10, TimeUnit.SECONDS);
+        } finally { release.countDown(); }
+        verify(expo, times(1)).send("ExpoPushToken[race-token]", notice);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("TICKET_ACCEPTED");
+    }
+
+    @Test void attachmentUploadReplayScannerAndDownloadRecheckAuthority() throws Exception {
+        UUID student = student(), trainer = trainer();
+        UUID relationship = activate(student, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        when(storage.get(anyString())).thenReturn(png);
+        UUID key = UUID.randomUUID();
+        String sent = mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "photo.png", "image/png", png))
+                        .param("commandKey", key.toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.attachmentName").value("photo.png"))
+                .andReturn().getResponse().getContentAsString();
+        UUID attachment = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.attachmentId"));
+        UUID message = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.id"));
+        assertThat(notifications.list(trainer, 0, 20).items()).filteredOn(item -> item.eventType().equals("CHAT_MESSAGE"))
+                .singleElement().satisfies(item -> assertThat(item.body()).isEqualTo("Bạn có tin nhắn mới")
+                        .doesNotContain("photo.png"));
+        mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "photo.png", "image/png", png))
+                        .param("commandKey", key.toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(message.toString()));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.message_attachments WHERE message_id=?",
+                Integer.class, message)).isEqualTo(1);
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk());
+        UUID outsider = user("Outsider");
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(outsider.toString()))))
+                .andExpect(status().isNotFound());
+        lifecycle.relationshipAction(student, relationship, "PAUSE", 1, null, UUID.randomUUID());
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk());
+    }
+
+    @Test void jpegAliasIsStoredCanonicallyOnlyWhenBytesHaveJpegSignature() throws Exception {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] jpeg = new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "picture.jpg", "image/jpg", jpeg))
+                        .param("commandKey", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.attachmentContentType").value("image/jpeg"));
+        mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "fake.jpg", "image/jpg", "%PDF-1.7".getBytes()))
+                        .param("commandKey", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test void scannerDenialAndSpoofedTypeCommitNoMessageOrObject() throws Exception {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] pdf = "%PDF-1.7".getBytes();
+        mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "fake.png", "image/png", pdf))
+                        .param("commandKey", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.doThrow(new com.fitnesscoaching.platform.modules.chat.ChatFailure(
+                "CHAT_ATTACHMENT_REJECTED", 400)).when(scanner).requireClean(any());
+        mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "bad.pdf", "application/pdf", pdf))
+                        .param("commandKey", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.messages WHERE sender_id=?", Integer.class,
+                student)).isZero();
+        verify(storage, never()).put(anyString(), any(), anyString());
+    }
 
     @Test void httpChatNotificationAndPostCommitSignalRespectPeriodAuthority() throws Exception {
         UUID student = student(), trainer = trainer();

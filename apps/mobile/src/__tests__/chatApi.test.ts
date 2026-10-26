@@ -1,7 +1,7 @@
 import { chatApi } from '@/services/chatApi';
-import { request } from '@/services/apiClient';
+import { downloadAuthenticated, request } from '@/services/apiClient';
 
-jest.mock('@/services/apiClient', () => ({ request: jest.fn() }));
+jest.mock('@/services/apiClient', () => ({ request: jest.fn(), downloadAuthenticated: jest.fn() }));
 
 describe('B08 chat and in-app notification API', () => {
   beforeEach(() => { jest.clearAllMocks(); (request as jest.Mock).mockResolvedValue({}); });
@@ -32,5 +32,26 @@ describe('B08 chat and in-app notification API', () => {
     expect(request).toHaveBeenNthCalledWith(1, '/chat/messages/message-1/receipts', { method: 'POST', body: { kind: 'DELIVERED' } });
     expect(request).toHaveBeenNthCalledWith(2, '/chat/messages/message-1/receipts', { method: 'POST', body: { kind: 'READ' } });
     expect(request).toHaveBeenNthCalledWith(3, '/notifications/me/notice-1/read', { method: 'POST' });
+  });
+
+  it('serializes a real multipart file and stable command key without JSON wrapping', async () => {
+    const file = { uri: 'file:///picked.pdf', name: 'plan.pdf', mimeType: 'application/pdf', size: 1024 };
+    const localBlob = new Blob(['%PDF-1.7']);
+    const localFetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true,
+      blob: async () => localBlob } as Response);
+    const append = jest.spyOn(FormData.prototype, 'append');
+    await chatApi.sendAttachment('student-1', file, 'same-key');
+    const [path, options] = (request as jest.Mock).mock.calls[0];
+    expect(path).toBe('/chat/students/student-1/attachments');
+    expect(options.method).toBe('POST');
+    expect(options.body).toBeInstanceOf(FormData);
+    expect(append).toHaveBeenCalledWith('commandKey', 'same-key');
+    expect(append).toHaveBeenCalledWith('file', expect.any(Blob), file.name);
+    expect((append.mock.calls.find(call => call[0] === 'file')?.[1] as Blob).type).toBe(file.mimeType);
+    expect(localFetch).toHaveBeenCalledWith(file.uri);
+    append.mockRestore();
+    localFetch.mockRestore();
+    await chatApi.attachmentContent('attachment-1');
+    expect(downloadAuthenticated).toHaveBeenCalledWith('/chat/attachments/attachment-1/content');
   });
 });

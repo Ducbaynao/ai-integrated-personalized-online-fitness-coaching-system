@@ -107,5 +107,5 @@ Current appointment, proposed slot, timezone, conflict result, recurrence scope 
 
 ## ST-19 Chat
 
-Conversation header gắn Trainer/Student và Coaching Relationship. Có context attachment cho workout, proposal hoặc measurement. Khi relationship kết thúc, quyền gửi/đọc tuân policy và history retention.
+Conversation theo Coaching Period: Student giữ lịch sử của mình, Trainer chỉ xem period hiện hành có quyền. Local candidate cho chọn JPEG/PNG/PDF tối đa 10 MiB, xem tên/kích thước, gửi lại đúng command key sau lỗi mạng chưa rõ; tải tệp qua backend sau khi kiểm quyền và quét, không mở URL storage. Notification preview không chứa tên tệp/nội dung. Khi quan hệ kết thúc, quyền gửi/đọc tuân policy; retention/account erasure chưa được chốt.
 

@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.common.exception;
 
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +31,18 @@ public class GlobalExceptionHandler {
 
     public GlobalExceptionHandler(Clock clock) {
         this.clock = clock;
+    }
+
+    // Multipart parsing happens before Spring knows the target controller, so a controller-scoped
+    // advice cannot turn Tomcat's file-size failure into the attachment contract error.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ignored,
+            HttpServletRequest request) {
+        String path = request.getRequestURI();
+        boolean chatAttachment = path.startsWith("/api/v1/chat/students/") && path.endsWith("/attachments");
+        return ResponseEntity.badRequest().body(ErrorResponse.of(
+                chatAttachment ? "CHAT_ATTACHMENT_SIZE_INVALID" : "VALIDATION_FAILED",
+                "Upload exceeds the permitted size", Instant.now(clock), RequestIdHolder.get()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -10,6 +10,19 @@ import { chatApi, ChatConversation, ChatMessage, SendChatBody } from '@/services
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { useChatUpdates } from './useChatUpdates';
+import * as DocumentPicker from 'expo-document-picker';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { pushApi, PushDeliveryState } from '@/services/pushApi';
+
+type PendingAttachment = { uri: string; name: string; mimeType: string; size: number; commandKey: string };
+const attachmentTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+
+function discardPickedCopy(uri: string) {
+  // DocumentPicker is configured to copy into its private cache. Never delete an external URI.
+  if (!uri.startsWith('file://') || !uri.includes('/cache/DocumentPicker/')) return;
+  try { new File(uri).delete(); } catch { /* Expo may revoke access to a picked cache file. */ }
+}
 
 const key = (actor: string, role: string, resource: string, id?: string) => ['chat', actor, role, resource, id];
 const messageStatus: Record<ChatMessage['status'], string> = {
@@ -67,6 +80,9 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<SendChatBody | null>(null);
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
+  const [attachmentError, setAttachmentError] = useState('');
+  const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
   const deliveredOnDevice = useRef(new Set<string>());
   const detail = useQuery({ queryKey: key(actor, role, 'detail', conversationId),
     gcTime: 0,
@@ -90,6 +106,55 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
       }
     },
   });
+  const sendFile = useMutation({ mutationFn: (file: PendingAttachment) => chatApi.sendAttachment(targetStudent!, file, file.commandKey),
+    onSuccess: async (result, file) => {
+      discardPickedCopy(file.uri);
+      setAttachment(null); setAttachmentError('');
+      await cache.invalidateQueries({ queryKey: ['chat', actor, role] });
+      if (!conversationId) router.replace(`/chat/${result.conversationId}` as never);
+    },
+    onError: (error, file) => {
+      if (error instanceof ApiError && [403, 404, 409].includes(error.status)) {
+        discardPickedCopy(file.uri);
+        setAttachment(null);
+        cache.removeQueries({ queryKey: ['chat', actor, role] });
+      }
+    },
+  });
+  const chooseAttachment = async () => {
+    const picked = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true });
+    if (picked.canceled) return;
+    const file = picked.assets[0];
+    const mimeType = file?.mimeType === 'image/jpg' ? 'image/jpeg' : file?.mimeType;
+    if (!file || !mimeType || !attachmentTypes.includes(mimeType) || !file.size || file.size > 10 * 1024 * 1024) {
+      if (file) discardPickedCopy(file.uri);
+      setAttachmentError('Chỉ chọn JPEG, PNG hoặc PDF tối đa 10 MiB.');
+      return;
+    }
+    if (attachment) discardPickedCopy(attachment.uri);
+    setAttachmentError('');
+    setAttachment({ uri: file.uri, name: file.name, mimeType, size: file.size, commandKey: createCommandKey() });
+  };
+  const openAttachment = async (message: ChatMessage) => {
+    if (!message.attachmentId) return;
+    setDownloadBusy(message.id); setAttachmentError('');
+    const extension = message.attachmentContentType === 'application/pdf' ? '.pdf'
+      : message.attachmentContentType === 'image/png' ? '.png' : '.jpg';
+    const temporary = new File(Paths.cache, `chat-${message.attachmentId}${extension}`);
+    try {
+      const bytes = await chatApi.attachmentContent(message.attachmentId);
+      temporary.create({ overwrite: true });
+      await temporary.write(bytes);
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(temporary.uri, { mimeType: message.attachmentContentType ?? undefined });
+      else setAttachmentError('Thiết bị chưa hỗ trợ mở tệp.');
+    } catch (error) {
+      if (error instanceof ApiError && [403, 404].includes(error.status)) cache.removeQueries({ queryKey: ['chat', actor, role] });
+      setAttachmentError(errorText(error));
+    } finally {
+      try { temporary.delete(); } catch { /* Ephemeral cache cleanup. */ }
+      setDownloadBusy(null);
+    }
+  };
   const receipt = useMutation({ mutationFn: ({ id, kind }: { id: string; kind: 'DELIVERED' | 'READ' }) => chatApi.receipt(id, kind),
     onSuccess: () => cache.invalidateQueries({ queryKey: key(actor, role, 'messages', conversationId) }),
   });
@@ -128,11 +193,16 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
     {conversationId && detail.data && !detail.data.sendAllowed ? <CoachingState title="Hội thoại chỉ đọc" message="Kỳ huấn luyện này không còn cho phép gửi tin. Lịch sử của bạn vẫn được giữ nguyên." /> : null}
     {!concealed && !messages.isError && visibleMessages.map(message => <CoachingCard key={message.id}>
       <Text style={[styles.body, { color: theme.textPrimary }]}>{message.body}</Text>
+      {message.attachmentId ? <CoachingButton label={`Mở tệp ${message.attachmentName ?? 'đính kèm'}`}
+        secondary busy={downloadBusy === message.id} disabled={!!downloadBusy}
+        onPress={() => { void openAttachment(message); }} /> : null}
       <Text style={[styles.label, { color: theme.textSecondary }]}>{message.senderId === actor ? 'Bạn' : 'Đối phương'} · {new Date(message.sentAt).toLocaleString('vi-VN')} · {messageStatus[message.status]}</Text>
       {message.senderId !== actor && !message.readAt ? <CoachingButton label="Đánh dấu đã đọc" secondary onPress={() => receipt.mutate({ id: message.id, kind: 'READ' })} /> : null}
     </CoachingCard>)}
     {messages.hasNextPage && !messages.isError ? <CoachingButton label="Tải tin cũ" secondary onPress={() => messages.fetchNextPage()} /> : null}
     {send.isError ? <CoachingState title="Chưa gửi được" message={errorText(send.error)} /> : null}
+    {attachmentError ? <CoachingState title="Tệp đính kèm" message={attachmentError} /> : null}
+    {sendFile.isError ? <CoachingState title="Chưa gửi được tệp" message={errorText(sendFile.error)} /> : null}
     {!concealed && (!conversationId || detail.data?.sendAllowed) ? <View>
       <Text style={[styles.label, { color: theme.textPrimary }]}>Tin nhắn văn bản</Text>
       <TextInput testID="chat-draft" accessibilityLabel="Nội dung tin nhắn" value={draft} onChangeText={setDraft}
@@ -140,6 +210,14 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
       <CoachingButton label={pending && send.isError ? 'Thử gửi lại' : 'Gửi tin nhắn'} busy={send.isPending}
         disabled={send.isPending || (!pending && !draft.trim())} onPress={submit} />
       {pending && send.isError ? <CoachingButton label="Sửa tin nhắn" secondary onPress={() => setPending(null)} /> : null}
+      <CoachingButton label="Chọn JPEG, PNG hoặc PDF" secondary onPress={() => { void chooseAttachment(); }} />
+      {attachment ? <View>
+        <Text style={[styles.body, { color: theme.textPrimary }]}>{attachment.name} · {Math.ceil(attachment.size / 1024)} KiB</Text>
+        <CoachingButton label={sendFile.isError ? 'Thử gửi lại tệp' : 'Gửi tệp đính kèm'}
+          busy={sendFile.isPending} disabled={sendFile.isPending}
+          onPress={() => sendFile.mutate(attachment)} />
+        <CoachingButton label="Bỏ tệp đã chọn" secondary onPress={() => { discardPickedCopy(attachment.uri); setAttachment(null); setAttachmentError(''); }} />
+      </View> : null}
     </View> : null}
   </ScrollView></SafeAreaView>;
 }
@@ -150,6 +228,8 @@ export function NotificationsScreen() {
   const router = useRouter();
   const cache = useQueryClient();
   const theme = getSemanticColors(useColorScheme() === 'dark');
+  const [delivery, setDelivery] = useState<{ actor: string; role: string; id: string; items: PushDeliveryState[] } | null>(null);
+  const [deliveryFailure, setDeliveryFailure] = useState<{ actor: string; role: string; message: string } | null>(null);
   const query = useInfiniteQuery({ queryKey: key(actor, role, 'notifications'), enabled: !!actor,
     gcTime: 0,
     initialPageParam: 0, queryFn: ({ pageParam }) => chatApi.notifications(pageParam),
@@ -162,17 +242,43 @@ export function NotificationsScreen() {
   });
   const rows = query.data?.pages.flatMap(page => page.items) ?? [];
   const concealed = query.isError && query.error instanceof ApiError && [403, 404].includes(query.error.status);
-  useEffect(() => { if (concealed) cache.removeQueries({ queryKey: ['chat', actor, role] }); }, [concealed, actor, role, cache]);
+  const visibleDelivery = !concealed && delivery?.actor === actor && delivery.role === role ? delivery : null;
+  const deliveryError = !concealed && deliveryFailure?.actor === actor && deliveryFailure.role === role ? deliveryFailure.message : '';
+  useEffect(() => { if (concealed) {
+    cache.removeQueries({ queryKey: ['chat', actor, role] });
+    cache.removeQueries({ queryKey: ['push-preferences', actor, role] });
+  } }, [concealed, actor, role, cache]);
+  const showDelivery = async (id: string) => {
+    setDeliveryFailure(null);
+    try { setDelivery({ actor, role, id, items: await pushApi.deliveries(id) }); }
+    catch (error) {
+      setDelivery(null);
+      if (error instanceof ApiError && [403, 404].includes(error.status)) {
+        cache.removeQueries({ queryKey: ['chat', actor, role] });
+        cache.removeQueries({ queryKey: ['push-preferences', actor, role] });
+      }
+      setDeliveryFailure({ actor, role, message: errorText(error) });
+    }
+  };
   return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-notifications" style={styles.screen} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Thông báo trong ứng dụng</Text>
     <CoachingButton label="Mở tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
+    <CoachingButton label="Tùy chọn thông báo đẩy" secondary onPress={() => router.push('/notifications/push' as never)} />
     {query.isPending ? <CoachingState busy title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
     {query.isError ? <CoachingState title="Không thể tải thông báo" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
+    {deliveryError ? <CoachingState title="Không thể xem trạng thái push" message={deliveryError} /> : null}
     {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có thông báo" message="Tin nhắn và cập nhật lịch hẹn sẽ xuất hiện ở đây." /> : null}
     {!query.isError && rows.map(item => <CoachingCard key={item.id}>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.title}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.body}</Text>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
+      <CoachingButton label="Xem trạng thái push" secondary onPress={() => { void showDelivery(item.id); }} />
+      {visibleDelivery?.id === item.id ? <Text style={[styles.body, { color: theme.textSecondary }]}>
+        {visibleDelivery.items.length ? visibleDelivery.items.map(state => ({
+          QUEUED: 'Đang chờ', TICKET_ACCEPTED: 'Expo đã nhận', PROVIDER_ACCEPTED: 'Nhà cung cấp đã nhận',
+          DEVICE_ACKNOWLEDGED: 'Ứng dụng trên thiết bị đã xác nhận', FAILED: 'Gửi thất bại', SKIPPED: 'Không gửi do quyền/tùy chọn',
+        }[state.status])).join(', ') : 'Không có thiết bị được bật push khi sự kiện xảy ra.'}
+      </Text> : null}
       {item.relatedEntityType === 'APPOINTMENT_REQUEST' && item.relatedEntityId
         ? <CoachingButton label="Xem yêu cầu lịch hẹn" secondary onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'APPOINTMENT' && item.relatedEntityId

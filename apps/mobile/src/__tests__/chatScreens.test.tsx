@@ -5,13 +5,19 @@ import { ChatInboxScreen, ConversationScreen, NotificationsScreen } from '@/feat
 import { useAuth } from '@/features/auth/AuthContext';
 import { chatApi } from '@/services/chatApi';
 import { ApiError } from '@/types/auth';
+import * as DocumentPicker from 'expo-document-picker';
 
 const mockPush = jest.fn();
+const mockDeletePicked = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: jest.fn() }) }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('@/features/chat/useChatUpdates', () => ({ useChatUpdates: jest.fn() }));
+jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
+jest.mock('expo-file-system', () => ({ Paths: { cache: {} }, File: jest.fn().mockImplementation(() => ({ delete: mockDeletePicked })) }));
+jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
 jest.mock('@/services/chatApi', () => ({ chatApi: {
   conversations: jest.fn(), conversation: jest.fn(), messages: jest.fn(), send: jest.fn(),
+  sendAttachment: jest.fn(), attachmentContent: jest.fn(),
   receipt: jest.fn(), notifications: jest.fn(), readNotification: jest.fn(),
 } }));
 
@@ -92,6 +98,27 @@ describe('B08 chat screens', () => {
     await settle();
     expect(chatApi.send).toHaveBeenCalledTimes(2);
     expect((chatApi.send as jest.Mock).mock.calls[0]).toEqual((chatApi.send as jest.Mock).mock.calls[1]);
+  });
+
+  it('picks a supported attachment and retries uncertain upload with the same file and command key', async () => {
+    (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({ canceled: false, assets: [{
+      uri: 'file:///private/cache/DocumentPicker/photo.png', name: 'photo.png', mimeType: 'image/jpg', size: 1024,
+    }] });
+    (chatApi.sendAttachment as jest.Mock).mockRejectedValueOnce(new ApiError(0, 'offline'))
+      .mockResolvedValueOnce({ id: 'message-file', conversationId: 'conversation-1' });
+    const tree = render(<ConversationScreen studentId="student-1" />);
+    await renderer.act(async () => {
+      tree.root.findByProps({ accessibilityLabel: 'Chọn JPEG, PNG hoặc PDF' }).props.onPress();
+      await Promise.resolve();
+    });
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Gửi tệp đính kèm' }).props.onPress());
+    await settle();
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Thử gửi lại tệp' }).props.onPress());
+    await settle();
+    expect(chatApi.sendAttachment).toHaveBeenCalledTimes(2);
+    expect((chatApi.sendAttachment as jest.Mock).mock.calls[0]).toEqual((chatApi.sendAttachment as jest.Mock).mock.calls[1]);
+    expect((chatApi.sendAttachment as jest.Mock).mock.calls[0][1].mimeType).toBe('image/jpeg');
+    expect(mockDeletePicked).toHaveBeenCalledTimes(1);
   });
 
   it('conceals inaccessible conversation content and send action', async () => {
