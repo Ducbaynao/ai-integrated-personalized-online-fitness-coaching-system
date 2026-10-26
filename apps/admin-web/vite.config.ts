@@ -9,7 +9,10 @@ export default defineConfig(({ mode }) => {
     server: env.ADMIN_API_PROXY_TARGET
       ? {
           proxy: {
-            '/api': env.ADMIN_API_PROXY_TARGET,
+            '/api': {
+              target: env.ADMIN_API_PROXY_TARGET,
+              changeOrigin: true,
+            },
           },
         }
       : undefined,
