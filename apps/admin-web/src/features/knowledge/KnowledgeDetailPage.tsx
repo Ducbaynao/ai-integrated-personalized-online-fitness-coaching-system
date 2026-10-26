@@ -102,6 +102,8 @@ export function KnowledgeDetailPage() {
           tone: 'danger',
         })
       }
+      setActiveAction(null)
+      setActionReason('')
     } finally {
       setBusy(false)
     }
@@ -176,9 +178,9 @@ export function KnowledgeDetailPage() {
             </thead>
             <tbody>
               {versions.map((ver) => {
-                const canReview = ver.status === 'PENDING_REVIEW' || ver.status === 'DRAFT'
-                const canPublish = ver.status === 'APPROVED' && ver.technicalReadiness === 'READY'
-                const canArchive = ver.status === 'PUBLISHED'
+                const canReview = ver.status === 'DRAFT' || ver.status === 'PENDING_REVIEW'
+                const canPublish = ver.status === 'DRAFT' || ver.status === 'APPROVED'
+                const canArchive = ver.status === 'ACTIVE' || ver.status === 'PUBLISHED'
 
                 return (
                   <tr key={ver.id}>

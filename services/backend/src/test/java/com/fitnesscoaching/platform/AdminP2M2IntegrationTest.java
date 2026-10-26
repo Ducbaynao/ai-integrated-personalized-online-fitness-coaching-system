@@ -594,6 +594,7 @@ class AdminP2M2IntegrationTest {
         assertThat(latestAudit.get("after_data").toString()).contains("Emergency maintenance");
 
         // 2. Student queries AI while disabled -> 503 SERVICE UNAVAILABLE
+        int runsBeforeBlockedQuery = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fitness.ai_runs", Integer.class);
         F01KnowledgeQueryApiRequest queryReq = new F01KnowledgeQueryApiRequest(
                 "Nen an bao nhieu gam protein?", "vi", null, UUID.randomUUID());
 
@@ -603,8 +604,15 @@ class AdminP2M2IntegrationTest {
                         .content(objectMapper.writeValueAsString(queryReq)))
                 .andExpect(status().isServiceUnavailable());
 
-        // CRITICAL CHECK: ZERO requests transmitted over HTTP to mock FastAPI server
+        // CRITICAL CHECK 1: ZERO requests transmitted over HTTP to mock FastAPI server
         assertThat(providerCallCount.get()).isEqualTo(0);
+
+        // CRITICAL CHECK 2: ZERO AI Run rows created in PostgreSQL for blocked query
+        int runsAfterBlockedQuery = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fitness.ai_runs", Integer.class);
+        assertThat(runsAfterBlockedQuery).isEqualTo(runsBeforeBlockedQuery);
+        Integer correlationRuns = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fitness.ai_runs WHERE correlation_id = ?", Integer.class, queryReq.correlationId());
+        assertThat(correlationRuns).isEqualTo(0);
 
         // 3. Toggle ON via Admin API
         ToggleAiFeatureApiRequest enableReq = new ToggleAiFeatureApiRequest(true, "Maintenance concluded");

@@ -15,13 +15,20 @@ export interface KnowledgeDocument {
 
 export type KnowledgeVersionStatus =
   | 'DRAFT'
+  | 'ACTIVE'
+  | 'ARCHIVED'
   | 'PENDING_REVIEW'
   | 'APPROVED'
   | 'REJECTED'
   | 'PUBLISHED'
-  | 'ARCHIVED'
 
-export type TechnicalReadiness = 'READY' | 'NOT_READY' | 'HOLD'
+export type TechnicalReadiness =
+  | 'DRAFT_STAGED'
+  | 'TECHNICAL_VERIFICATION_PASSED'
+  | 'HELD_AS_DRAFT'
+  | 'READY'
+  | 'NOT_READY'
+  | 'HOLD'
 
 export interface KnowledgeVersion {
   id: string
