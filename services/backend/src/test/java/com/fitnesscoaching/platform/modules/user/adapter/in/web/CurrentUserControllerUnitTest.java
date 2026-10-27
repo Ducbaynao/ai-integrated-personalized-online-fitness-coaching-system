@@ -17,6 +17,7 @@ import com.fitnesscoaching.platform.modules.user.application.model.UserSettingsV
 import com.fitnesscoaching.platform.modules.user.application.port.in.GetCurrentUserUseCase;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UpdateCurrentUserCommand;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UpdateCurrentUserUseCase;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountDataExportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -68,6 +69,9 @@ class CurrentUserControllerUnitTest {
 
     @MockitoBean
     private UpdateCurrentUserUseCase updateCurrentUserUseCase;
+
+    @MockitoBean
+    private AccountDataExportService accountDataExportService;
 
     @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;

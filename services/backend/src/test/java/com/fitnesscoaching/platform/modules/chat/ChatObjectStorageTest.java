@@ -13,6 +13,7 @@ import java.net.URI;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ChatObjectStorageTest {
     @Test void privateDisposableObjectRoundTrip() {
@@ -35,6 +36,9 @@ class ChatObjectStorageTest {
             storage.put(key, bytes, "image/png");
             assertThat(storage.get(key)).containsExactly(bytes);
             storage.delete(key);
+            assertThatThrownBy(() -> storage.get(key))
+                    .isInstanceOf(ChatFailure.class)
+                    .hasMessage("CHAT_ATTACHMENT_STORAGE_UNAVAILABLE");
         }
     }
 }
