@@ -5,6 +5,7 @@ import math
 import random
 import re
 import time
+import unicodedata
 from datetime import UTC, datetime
 from typing import Any
 
@@ -128,6 +129,58 @@ def normalize_text_for_comparison(text: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
+_SUBSTANCES_RE = [re.compile(p, re.IGNORECASE) for p in [
+    r"\bsteroids?\b", r"\banabolics?\b", r"\bdoping\b", r"\bpeds?\b", r"chat kich thich"
+]]
+
+_ACTIONABLE_USAGE_RE = [re.compile(p, re.IGNORECASE) for p in [
+    r"su dung", r"cach dung", r"huong dan dung", r"tiem", r"chich", r"uong", r"nap",
+    r"lieu luong", r"lieu dung", r"chu ky", r"\bcycle\b", r"\bstack\b", r"\bpct\b", r"\bdosage\b",
+    r"how to (?:use|take|inject|cycle)",
+]]
+
+_EVASION_RE = [re.compile(p, re.IGNORECASE) for p in [
+    r"tranh phat hien", r"khong bi phat hien", r"ne kiem tra", r"qua mat", r"che dau",
+    r"beat (?:the )?test", r"pass (?:the )?(?:doping )?test", r"undetected", r"evade",
+]]
+
+_MEDICAL_RX_RE = [re.compile(p, re.IGNORECASE) for p in [
+    r"ke don", r"boc thuoc", r"chua khoi benh", r"dieu tri benh ly", r"prescribe",
+]]
+
+
+def _normalize_question_for_policy(text: str) -> str:
+    nfkd = unicodedata.normalize("NFD", text or "")
+    stripped = "".join(c for c in nfkd if unicodedata.category(c) != "Mn").replace("đ", "d").replace("Đ", "d")
+    return re.sub(r"\s+", " ", stripped.lower()).strip()
+
+
+def is_f01_policy_blocked(question: str) -> bool:
+    """Deterministic policy guardrail check (DEC-A13).
+
+    Enforces safety restrictions against guidance on the use, dosage, cycling, administration,
+    or detection evasion of WADA-prohibited substances / PEDs / doping, and actionable medical prescriptions.
+    Permits educational, descriptive, and regulatory queries (e.g. WADA rules, health risks).
+    """
+    norm = _normalize_question_for_policy(question)
+    if not norm:
+        return False
+
+    # 1. Actionable medical prescription requests
+    if any(p.search(norm) for p in _MEDICAL_RX_RE):
+        return True
+
+    # 2. Prohibited performance enhancing substances / doping
+    has_substance = any(p.search(norm) for p in _SUBSTANCES_RE)
+    if not has_substance:
+        return False
+
+    has_usage = any(p.search(norm) for p in _ACTIONABLE_USAGE_RE)
+    has_evasion = any(p.search(norm) for p in _EVASION_RE)
+
+    return has_usage or has_evasion
+
+
 class OpenAiKnowledgeProvider(F01KnowledgeProvider):
     """Real OpenAI generation provider for F01 General Fitness Knowledge inquiries.
 
@@ -176,7 +229,39 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                 ),
             )
 
-        # 2. Retrieve evidence chunks from Spring Boot backend
+        # 2. Deterministic policy guardrail (DEC-A13 / Rule blocking before model invocation)
+        if is_f01_policy_blocked(envelope.question):
+            return F01KnowledgeQueryResult(
+                runId=envelope.requestId,
+                correlationId=envelope.correlationId,
+                runStatus="REJECTED_BY_VALIDATOR",
+                resultType="BLOCKED",
+                reasonCode="RULE_BLOCKED",
+                limitations=[
+                    "Chính sách an toàn hệ thống cấm hướng dẫn sử dụng các chất kích thích nằm trong danh mục cấm WADA hoặc tư vấn điều trị y khoa."
+                ],
+                missingData=[],
+                asOf=now_str,
+                error=ErrorDto(
+                    code="POLICY_GUARDRAIL_TRIGGERED",
+                    message="Nội dung câu hỏi chạm ngưỡng chính sách an toàn dược lý / doping.",
+                ),
+                usage=UsageDto(
+                    promptTokens=0,
+                    completionTokens=0,
+                    totalTokens=0,
+                    latencyMs=int((time.monotonic() - start_mono) * 1000),
+                ),
+                generationMetadata=GenerationMetadataDto(
+                    schemaVersion="1.0.0",
+                    promptVersion=settings.f01_prompt_version,
+                    ruleVersion=settings.f01_rule_version,
+                    provider="openai",
+                    model=settings.openai_model,
+                ),
+            )
+
+        # 3. Retrieve evidence chunks from Spring Boot backend
         retrieval_res = await self.retriever.retrieve(
             query=envelope.question,
             allowed_source_ids=envelope.knowledgeScope.allowedSourceIds,
