@@ -1802,6 +1802,43 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  /users/me/data-export:
+    get:
+      tags: [Current User]
+      operationId: exportOwnAccountData
+      summary: Stream the authenticated active account's own data as a private ZIP
+      description: >-
+        Includes account details and settings, push preferences, and Chat messages
+        and clean attachment bytes sent by this actor in conversations they may
+        currently read. It excludes the other participant's messages and files.
+        Former Trainers do not regain access to closed-period conversations through
+        export. The server creates no reusable archive URL or stored ZIP. It rechecks
+        active account and Chat authority while streaming. If authority is lost,
+        no further entry bytes or ZIP central directory are intentionally written
+        after the failed check, but bytes already sent cannot be recalled and
+        earlier entries may still be extractable. The client must discard a
+        partial response; an incomplete ZIP is not a security boundary. Request
+        and response must not be cached. Attachment objects are currently loaded
+        fully into backend memory (at most 10 MiB per attachment) before the ZIP
+        writer emits them in 64 KiB chunks; this is not streaming from S3.
+      responses:
+        '200':
+          description: Complete ZIP archive when the stream finishes successfully
+          headers:
+            Cache-Control: { schema: { type: string, enum: [no-store] } }
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: Account unavailable or no longer active (ACCOUNT_DATA_NOT_FOUND)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: Attachment storage unavailable before response commit. If failure occurs after streaming begins, the connection is aborted and the incomplete ZIP must be discarded.
+
   /student-profiles:
     post:
       tags: [Student Profile]

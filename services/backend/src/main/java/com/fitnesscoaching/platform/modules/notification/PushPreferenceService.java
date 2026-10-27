@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.time.Instant;
 
 @Service
-public class PushPreferenceService {
+public class PushPreferenceService implements PushPreferenceQuery {
     private final JdbcTemplate jdbc;
     private final UserAccountStatusQuery accounts;
     private final InAppNotificationService notices;
@@ -59,6 +59,9 @@ public class PushPreferenceService {
                 rs.getTime(4) == null ? null : rs.getTime(4).toLocalTime().toString(),
                 rs.getTime(5) == null ? null : rs.getTime(5).toLocalTime().toString()), actor);
     }
+
+    @Override
+    public List<Preference> preferencesForExport(UUID actor) { return list(actor); }
 
     @Transactional
     public Preference set(UUID actor, String eventType, boolean enabled, String timezone,

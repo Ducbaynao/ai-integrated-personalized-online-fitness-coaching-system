@@ -9,6 +9,7 @@ import com.fitnesscoaching.platform.modules.coaching.application.port.in.Coachin
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationService;
 import com.fitnesscoaching.platform.modules.notification.ExpoPushGateway;
 import com.fitnesscoaching.platform.modules.notification.PushDeliveryWorker;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountDataExportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +30,11 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.UUID;
 import java.util.Map;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.zip.ZipInputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,9 +43,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.Mockito.*;
 
@@ -71,6 +80,7 @@ class ChatNotificationIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ChatUpdatesSocket socket;
+    @Autowired AccountDataExportService dataExport;
     @MockitoBean ChatObjectStorage storage;
     @MockitoBean ClamdAttachmentScanner scanner;
     @MockitoBean ExpoPushGateway expo;
@@ -250,6 +260,139 @@ class ChatNotificationIntegrationTest {
                         .param("commandKey", UUID.randomUUID().toString())
                         .with(jwt().jwt(j -> j.subject(student.toString()))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test void disabledParticipantsCannotReadRetainedAttachmentOrNoticeAndQueuedPushIsSkipped() throws Exception {
+        UUID student = student(), trainer = trainer(), device = UUID.randomUUID();
+        activate(student, trainer);
+        jdbc.update("INSERT INTO fitness.push_devices(user_id,device_key,expo_token) VALUES (?,?,?)",
+                trainer, device, "ExpoPushToken[lifecycle-test]");
+        jdbc.update("""
+                INSERT INTO fitness.notification_preferences(user_id,event_type,channel,enabled,timezone)
+                VALUES (?,'CHAT','PUSH',true,'Etc/UTC')
+                """, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        when(storage.get(anyString())).thenReturn(png);
+        String sent = mvc.perform(multipart("/api/v1/chat/students/{id}/attachments", student)
+                        .file(new MockMultipartFile("file", "photo.png", "image/png", png))
+                        .param("commandKey", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID attachment = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.attachmentId"));
+        UUID message = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.id"));
+        UUID notice = jdbc.queryForObject("""
+                SELECT id FROM fitness.notifications WHERE recipient_user_id=? AND related_entity_id=?
+                """, UUID.class, trainer, message);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                Integer.class, notice)).isEqualTo(1);
+
+        jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?", trainer);
+        org.mockito.Mockito.clearInvocations(storage);
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/notifications/me")
+                        .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        pushWorker.dispatch();
+        verify(expo, never()).send(anyString(), org.mockito.ArgumentMatchers.eq(notice));
+        verify(storage, never()).get(anyString());
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE notification_id=?",
+                String.class, notice)).isEqualTo("SKIPPED");
+
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?", student);
+        mvc.perform(get("/api/v1/chat/attachments/{id}/content", attachment)
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.message_attachments ma
+                JOIN fitness.media_files mf ON mf.id=ma.media_id
+                WHERE ma.id=? AND mf.deleted_at IS NULL
+                """, Integer.class, attachment)).isEqualTo(1);
+    }
+
+    @Test void accountExportContainsOnlyOwnAuthorizedMessagesAndAttachmentBytes() throws Exception {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        when(storage.get(anyString())).thenReturn(png);
+        chat.send(student, student, "My own text", UUID.randomUUID());
+        ChatService.Message own = chat.sendAttachment(student, student, "mine.png", "image/png",
+                png, UUID.randomUUID());
+        chat.send(trainer, student, "Trainer private reply", UUID.randomUUID());
+        ChatService.Message other = chat.sendAttachment(trainer, student, "theirs.png", "image/png",
+                png, UUID.randomUUID());
+
+        var archive = new ByteArrayOutputStream();
+        dataExport.writeExport(student, archive);
+        Map<String, byte[]> entries = new HashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(archive.toByteArray()))) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) entries.put(entry.getName(), zip.readAllBytes());
+        }
+        assertThat(entries.keySet()).contains("account.json", "push-preferences.json", "sent-messages.ndjson",
+                "attachments/" + own.attachmentId() + ".png")
+                .doesNotContain("attachments/" + other.attachmentId() + ".png");
+        assertThat(new String(entries.get("sent-messages.ndjson"), StandardCharsets.UTF_8))
+                .contains("My own text", "mine.png").doesNotContain("Trainer private reply", "theirs.png");
+        assertThat(entries.get("attachments/" + own.attachmentId() + ".png")).containsExactly(png);
+        assertThat(new String(entries.get("account.json"), StandardCharsets.UTF_8))
+                .contains(student.toString()).doesNotContain("password_hash", "expo_token");
+
+        var streamed = mvc.perform(get("/api/v1/users/me/data-export")
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(request().asyncStarted()).andReturn();
+        mvc.perform(asyncDispatch(streamed)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+
+        jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?", student);
+        assertThatThrownBy(() -> dataExport.writeExport(student, new ByteArrayOutputStream()))
+                .isInstanceOf(AccountDataExportService.AccountDataUnavailable.class);
+        mvc.perform(get("/api/v1/users/me/data-export")
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_DATA_NOT_FOUND"));
+    }
+
+    @Test void accountExportStopsStreamingWhenAccountIsDisabledMidResponse() {
+        UUID student = student();
+        java.io.OutputStream disablingClient = new java.io.OutputStream() {
+            private boolean disabled;
+            @Override public void write(int value) {
+                if (!disabled) {
+                    disabled = true;
+                    jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?", student);
+                }
+            }
+            @Override public void write(byte[] bytes, int offset, int length) {
+                if (length > 0) write(bytes[offset]);
+            }
+        };
+        assertThatThrownBy(() -> dataExport.writeExport(student, disablingClient))
+                .isInstanceOf(AccountDataExportService.AccountDataUnavailable.class);
+    }
+
+    @Test void formerTrainerCannotUseExportToBypassClosedPeriodReadAuthority() throws Exception {
+        UUID student = student(), trainer = trainer();
+        UUID relationship = activate(student, trainer);
+        chat.send(trainer, student, "Former-period text", UUID.randomUUID());
+        lifecycle.relationshipAction(student, relationship, "PAUSE", 1, null, UUID.randomUUID());
+        var archive = new ByteArrayOutputStream();
+        dataExport.writeExport(trainer, archive);
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(archive.toByteArray()))) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if ("sent-messages.ndjson".equals(entry.getName())) {
+                    assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).isEmpty();
+                }
+            }
+        }
     }
 
     @Test void scannerDenialAndSpoofedTypeCommitNoMessageOrObject() throws Exception {

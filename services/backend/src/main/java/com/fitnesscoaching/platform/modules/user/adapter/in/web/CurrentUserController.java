@@ -10,7 +10,11 @@ import com.fitnesscoaching.platform.modules.user.application.port.in.GetCurrentU
 import com.fitnesscoaching.platform.modules.user.application.port.in.UpdateCurrentUserCommand;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UpdateCurrentUserUseCase;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UpdateUserSettingsCommand;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountDataExportService;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.util.UUID;
 
@@ -28,13 +33,28 @@ public class CurrentUserController {
 
     private final GetCurrentUserUseCase getCurrentUserUseCase;
     private final UpdateCurrentUserUseCase updateCurrentUserUseCase;
+    private final AccountDataExportService dataExport;
 
     public CurrentUserController(
             GetCurrentUserUseCase getCurrentUserUseCase,
-            UpdateCurrentUserUseCase updateCurrentUserUseCase
+            UpdateCurrentUserUseCase updateCurrentUserUseCase,
+            AccountDataExportService dataExport
     ) {
         this.getCurrentUserUseCase = getCurrentUserUseCase;
         this.updateCurrentUserUseCase = updateCurrentUserUseCase;
+        this.dataExport = dataExport;
+    }
+
+    @GetMapping("/me/data-export")
+    public ResponseEntity<StreamingResponseBody> exportOwnData(@AuthenticationPrincipal Jwt jwt) {
+        UUID actor = UUID.fromString(jwt.getSubject());
+        dataExport.requireActive(actor);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=account-export.zip")
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.VARY, HttpHeaders.AUTHORIZATION)
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(output -> dataExport.writeExport(actor, output));
     }
 
     @GetMapping("/me")

@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class ChatService {
+public class ChatService implements ChatOwnedExportQuery {
     private final JdbcTemplate jdbc;
     private final CurrentCoachingContextQuery contexts;
     private final UserAccountStatusQuery accounts;
@@ -177,6 +177,52 @@ public class ChatService {
     public record AttachmentContent(byte[] bytes, String contentType, String filename) {}
     private record AttachmentRow(UUID conversationId, String objectKey, String contentType,
                                  String filename, long sizeBytes) {}
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OwnMessage> ownMessages(UUID actor) {
+        requireAccount(actor);
+        return jdbc.query("""
+                SELECT m.id,m.conversation_id,m.body,m.sent_at,
+                       CASE WHEN mf.id IS NOT NULL THEN ma.id END,mf.original_filename,mf.content_type
+                FROM fitness.messages m
+                JOIN fitness.conversations c ON c.id=m.conversation_id
+                LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
+                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id AND mf.deleted_at IS NULL
+                WHERE m.sender_id=? AND c.coaching_period_id IS NOT NULL
+                ORDER BY m.sent_at,m.id
+                """, (rs, row) -> new OwnMessage(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
+                rs.getString(3), rs.getTimestamp(4).toInstant(), rs.getObject(5, UUID.class),
+                rs.getString(6), rs.getString(7)), actor).stream()
+                .filter(message -> {
+                    try { detail(actor, message.conversationId()); return true; }
+                    catch (ChatFailure concealed) { return false; }
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void requireOwnMessageReadable(UUID actor, UUID messageId) {
+        requireAccount(actor);
+        List<UUID> conversations = jdbc.query("""
+                SELECT conversation_id FROM fitness.messages WHERE id=? AND sender_id=?
+                """, (rs, row) -> rs.getObject(1, UUID.class), messageId, actor);
+        if (conversations.isEmpty()) throw fail("CHAT_MESSAGE_NOT_FOUND", 404);
+        detail(actor, conversations.getFirst());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AttachmentContent ownAttachment(UUID actor, UUID attachmentId) {
+        requireAccount(actor);
+        boolean sentByActor = Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.message_attachments ma
+                  JOIN fitness.messages m ON m.id=ma.message_id
+                  WHERE ma.id=? AND m.sender_id=?)
+                """, Boolean.class, attachmentId, actor));
+        if (!sentByActor) throw fail("CHAT_ATTACHMENT_NOT_FOUND", 404);
+        return download(actor, attachmentId);
+    }
 
     @Transactional(readOnly = true)
     public Page<Conversation> conversations(UUID actor, int page, int size) {
