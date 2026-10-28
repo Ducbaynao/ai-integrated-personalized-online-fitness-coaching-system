@@ -126,6 +126,40 @@ if (fs.existsSync(fixturesDir)) {
   }
 }
 
+// 3. F02 fixtures verification
+const f02FixturesDir = path.join(schemasDir, 'fixtures', 'f02');
+if (fs.existsSync(f02FixturesDir)) {
+  const f02ProposalValidator = compiledSchemas.get('f02-workout-proposal.schema.json');
+  const f02TestCases = [
+    { file: 'valid-workout-proposal.json', validator: f02ProposalValidator, expectValid: true, desc: 'Valid F02 1-week workout plan proposal' },
+    { file: 'invalid-workout-proposal-duration-weeks.json', validator: f02ProposalValidator, expectValid: false, desc: 'Invalid F02 proposal exceeding 1 week' },
+  ];
+
+  for (const tc of f02TestCases) {
+    const fixturePath = path.join(f02FixturesDir, tc.file);
+    if (!fs.existsSync(fixturePath)) {
+      failures.push(`F02 Fixture missing: ${tc.file}`);
+      continue;
+    }
+    try {
+      const data = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+      if (!tc.validator) {
+        failures.push(`Validator not found for fixture: ${tc.file}`);
+        continue;
+      }
+      const isValid = tc.validator(data);
+      fixtureCount++;
+      if (tc.expectValid && !isValid) {
+        failures.push(`Fixture failed unexpectedly [${tc.desc}]: ${ajv.errorsText(tc.validator.errors)}`);
+      } else if (!tc.expectValid && isValid) {
+        failures.push(`Fixture passed but was expected to fail [${tc.desc}] (${tc.file})`);
+      }
+    } catch (err) {
+      failures.push(`Fixture parse error [${tc.file}]: ${err.message}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI schema and contract validation failed:');
   for (const failure of failures) {

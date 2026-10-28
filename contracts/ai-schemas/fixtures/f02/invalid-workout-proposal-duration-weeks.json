@@ -1,0 +1,13 @@
+{
+  "recommendationType": "WORKOUT_PLAN_PROPOSAL",
+  "summary": "Invalid 4-week proposal exceeding Phase 2 scope",
+  "reasoning": ["Invalid test case"],
+  "usedData": ["test"],
+  "missingData": [],
+  "confidence": 0.5,
+  "plan": {
+    "name": "Invalid Multi-Week Plan",
+    "durationWeeks": 4,
+    "sessions": []
+  }
+}
