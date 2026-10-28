@@ -5,7 +5,12 @@ info:
   description: >-
     Executable REST contract for implemented platform capabilities. Spring Boot
     is the business authority. Creating a Trainer Profile or submitting a Trainer
-    Application does not grant coaching authority.
+    Application does not grant coaching authority. Signed bearer JWTs are also
+    checked against the current PostgreSQL account status on every new authenticated
+    request: non-ACTIVE or missing accounts receive 401 UNAUTHORIZED, including
+    previously issued tokens. Refresh with a non-ACTIVE account receives
+    401 INVALID_REFRESH_TOKEN. Public endpoints without bearer credentials and
+    authenticated internal service routes retain their separate access rules.
   license:
     name: License decision pending
 servers:
@@ -4753,7 +4758,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     Unauthenticated:
-      description: Authentication is missing or invalid
+      description: Authentication is missing or invalid; a previously issued bearer token for a non-ACTIVE or missing account is invalid at the next request (UNAUTHORIZED).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -4778,7 +4783,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     InvalidRefreshToken:
-      description: Refresh token is invalid, expired, revoked, or reused
+      description: Refresh token is invalid, expired, revoked, reused, or its account is no longer ACTIVE
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }

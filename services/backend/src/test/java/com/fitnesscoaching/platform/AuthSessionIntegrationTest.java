@@ -53,6 +53,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -307,6 +308,218 @@ class AuthSessionIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("ok")));
+    }
+
+    @Test
+    @DisplayName("A disabled Student or Trainer cannot reuse an issued access or refresh token on any HTTP entry")
+    void disabledAccountCutsOffPreviouslyIssuedTokens() throws Exception {
+        for (String role : List.of("STUDENT", "TRAINER")) {
+            String email = role.toLowerCase() + ".cutoff@example.com";
+            UUID userId = registerAndConfirm(email, "StrongPassword123!");
+            assignRole(userId, role);
+            Map<String, Object> session = login(email, "StrongPassword123!", role + " device");
+            String bearer = "Bearer " + session.get("accessToken");
+            String refresh = (String) session.get("refreshToken");
+
+            mockMvc.perform(get("/api/v1/users/me").header("Authorization", bearer))
+                    .andExpect(status().isOk());
+            jdbcTemplate.update("UPDATE fitness.users SET status='DISABLED'::fitness.account_status WHERE id=?", userId);
+
+            for (String path : List.of("/api/v1/users/me", "/api/v1/users/me/data-export",
+                    "/api/v1/chat/attachments/" + UUID.randomUUID() + "/content")) {
+                mockMvc.perform(get(path).header("Authorization", bearer))
+                        .andExpect(status().isUnauthorized())
+                        .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
+            }
+            mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refresh, null))))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode", is("INVALID_REFRESH_TOKEN")));
+            Integer liveRefreshTokens = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM fitness.refresh_tokens WHERE user_id=? AND revoked_at IS NULL",
+                    Integer.class, userId);
+            assertThat(liveRefreshTokens).isZero();
+        }
+    }
+
+    @Test
+    @DisplayName("A 401 for a disabled account commits refresh revocation and its reason")
+    void disabledRefreshRevocationSurvivesTheErrorResponse() throws Exception {
+        String email = "refresh.revocation.durable@example.com";
+        UUID userId = registerAndConfirm(email, "StrongPassword123!");
+        String refresh = (String) login(email, "StrongPassword123!", "Device").get("refreshToken");
+        String otherDeviceRefresh = (String) login(email, "StrongPassword123!", "Other device")
+                .get("refreshToken");
+        jdbcTemplate.update("UPDATE fitness.users SET status='DISABLED'::fitness.account_status WHERE id=?", userId);
+
+        mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refresh, null))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("INVALID_REFRESH_TOKEN")));
+
+        // This is a new PostgreSQL connection after the HTTP transaction has completed.
+        try (Connection reader = jdbcTemplate.getDataSource().getConnection();
+             var query = reader.prepareStatement("""
+                     SELECT token_hash, revoked_at, revoke_reason
+                     FROM fitness.refresh_tokens WHERE user_id=? ORDER BY token_hash
+                     """)) {
+            query.setObject(1, userId);
+            try (var rows = query.executeQuery()) {
+                var revokedHashes = new java.util.HashSet<String>();
+                while (rows.next()) {
+                    revokedHashes.add(rows.getString("token_hash"));
+                    assertThat(rows.getTimestamp("revoked_at")).isNotNull();
+                    assertThat(rows.getString("revoke_reason")).isEqualTo("ACCOUNT_UNAVAILABLE");
+                }
+                assertThat(revokedHashes).containsExactlyInAnyOrder(
+                        TokenHasher.sha256Hex(refresh), TokenHasher.sha256Hex(otherDeviceRefresh));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("A database failure after revocation rolls the whole refresh transaction back")
+    void refreshDatabaseFailureDoesNotClaimCommittedRevocation() throws Exception {
+        String email = "refresh.revocation.failure@example.com";
+        UUID userId = registerAndConfirm(email, "StrongPassword123!");
+        String refresh = (String) login(email, "StrongPassword123!", "Device").get("refreshToken");
+        String tokenHash = TokenHasher.sha256Hex(refresh);
+        jdbcTemplate.update("UPDATE fitness.users SET status='DISABLED'::fitness.account_status WHERE id=?", userId);
+
+        // Fail the next write *after* revokeActiveForUser has updated the token row.
+        // This disposable-container trigger is removed even if an assertion fails.
+        jdbcTemplate.execute("""
+                CREATE FUNCTION fitness.test_fail_refresh_unavailable_event() RETURNS trigger
+                LANGUAGE plpgsql AS $$ BEGIN
+                  IF NEW.event_type = 'REFRESH_ACCOUNT_UNAVAILABLE' THEN
+                    RAISE EXCEPTION 'injected refresh audit failure';
+                  END IF;
+                  RETURN NEW;
+                END $$
+                """);
+        jdbcTemplate.execute("""
+                CREATE TRIGGER test_fail_refresh_unavailable_event
+                BEFORE INSERT ON fitness.security_events FOR EACH ROW
+                EXECUTE FUNCTION fitness.test_fail_refresh_unavailable_event()
+                """);
+        try {
+            mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refresh, null))))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.errorCode", is("INTERNAL_SERVER_ERROR")));
+
+            try (Connection reader = jdbcTemplate.getDataSource().getConnection();
+                 var query = reader.prepareStatement("""
+                         SELECT revoked_at FROM fitness.refresh_tokens WHERE token_hash=?
+                         """)) {
+                query.setString(1, tokenHash);
+                try (var rows = query.executeQuery()) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getTimestamp("revoked_at")).isNull();
+                }
+            }
+        } finally {
+            jdbcTemplate.execute("DROP TRIGGER test_fail_refresh_unavailable_event ON fitness.security_events");
+            jdbcTemplate.execute("DROP FUNCTION fitness.test_fail_refresh_unavailable_event()");
+        }
+
+        mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refresh, null))))
+                .andExpect(status().isUnauthorized());
+        try (Connection reader = jdbcTemplate.getDataSource().getConnection();
+             var query = reader.prepareStatement("""
+                     SELECT revoked_at, revoke_reason FROM fitness.refresh_tokens WHERE token_hash=?
+                     """)) {
+            query.setString(1, tokenHash);
+            try (var rows = query.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getTimestamp("revoked_at")).isNotNull();
+                assertThat(rows.getString("revoke_reason")).isEqualTo("ACCOUNT_UNAVAILABLE");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("An in-flight request may observe ACTIVE before disable commits, but the next request cannot")
+    void cutoffBeginsAtDisableCommitForNewRequests() throws Exception {
+        String email = "cutoff.commit@example.com";
+        UUID userId = registerAndConfirm(email, "StrongPassword123!");
+        assignRole(userId, "STUDENT");
+        String bearer = "Bearer " + login(email, "StrongPassword123!", "Device").get("accessToken");
+
+        try (Connection writer = jdbcTemplate.getDataSource().getConnection()) {
+            writer.setAutoCommit(false);
+            try {
+                try (var statement = writer.prepareStatement(
+                        "UPDATE fitness.users SET status='DISABLED'::fitness.account_status WHERE id=?")) {
+                    statement.setObject(1, userId);
+                    assertThat(statement.executeUpdate()).isEqualTo(1);
+                }
+                // A separate request can still observe the committed ACTIVE row while the writer is open.
+                mockMvc.perform(get("/api/v1/users/me").header("Authorization", bearer))
+                        .andExpect(status().isOk());
+                writer.commit();
+            } finally {
+                writer.rollback();
+            }
+        }
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", bearer))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Refresh waits for a concurrent Account disable writer and cannot issue a replacement")
+    void refreshLosesToCommittedDisable() throws Exception {
+        String email = "refresh.disable.race@example.com";
+        UUID userId = registerAndConfirm(email, "StrongPassword123!");
+        String refresh = (String) login(email, "StrongPassword123!", "Device").get("refreshToken");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Connection writer = jdbcTemplate.getDataSource().getConnection()) {
+            writer.setAutoCommit(false);
+            int writerPid;
+            try (var pid = writer.createStatement(); var rs = pid.executeQuery("SELECT pg_backend_pid()")) {
+                rs.next();
+                writerPid = rs.getInt(1);
+            }
+            try {
+                try (var statement = writer.prepareStatement(
+                        "UPDATE fitness.users SET status='DISABLED'::fitness.account_status WHERE id=?")) {
+                    statement.setObject(1, userId);
+                    assertThat(statement.executeUpdate()).isEqualTo(1);
+                }
+                Future<MvcResult> request = executor.submit(() -> mockMvc.perform(post("/api/v1/auth/token-refreshes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refresh, null))))
+                        .andReturn());
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                boolean blocked = false;
+                while (System.nanoTime() < deadline && !blocked) {
+                    blocked = Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                            SELECT EXISTS (SELECT 1 FROM pg_stat_activity a
+                              WHERE ? = ANY(pg_blocking_pids(a.pid)))
+                            """, Boolean.class, writerPid));
+                    Thread.yield();
+                }
+                assertThat(blocked).as("refresh must wait on the Account row lock").isTrue();
+                assertThat(request.isDone()).isFalse();
+                writer.commit();
+                MvcResult result = request.get(10, TimeUnit.SECONDS);
+                assertThat(result.getResponse().getStatus()).isEqualTo(401);
+                assertThat(result.getResponse().getContentAsString()).contains("INVALID_REFRESH_TOKEN");
+            } finally {
+                writer.rollback();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+        Integer liveRefreshTokens = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.refresh_tokens WHERE user_id=? AND revoked_at IS NULL",
+                Integer.class, userId);
+        assertThat(liveRefreshTokens).isZero();
     }
 
     @Test

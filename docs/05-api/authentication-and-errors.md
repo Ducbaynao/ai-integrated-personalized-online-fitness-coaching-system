@@ -6,6 +6,30 @@ The initial identity flow uses email/password and returns short-lived Access Tok
 
 ### M1B session behavior
 
+**Account auth cutoff (local checkpoint):** Every new bearer-token authentication checks
+the JWT signature/issuer/expiry and reads the current Account status from PostgreSQL,
+without an ACTIVE-status cache. A token issued before a committed transition away
+from `ACTIVE` receives `401 UNAUTHORIZED` on the next HTTP request, including export
+and attachment download; the same decoder protects the Chat WebSocket handshake.
+Refresh of a non-ACTIVE account remains `401 INVALID_REFRESH_TOKEN` and revokes its
+remaining refresh tokens. This revocation and its security event commit despite the
+`InvalidRefreshTokenException` response; a database write failure rolls the transaction
+back and returns a server error instead. Login with correct credentials remains
+`403 ACCOUNT_UNAVAILABLE`.
+Login and refresh re-read Account status under a PostgreSQL shared row lock before
+issuing a token pair; a concurrent disable update either waits for issuance to
+commit or wins first, in which case issuance is rejected. The lock is held only
+for the session transaction, not for later API requests.
+Public requests without a bearer token and internal service authentication are not
+subject to a user-account lookup. A request authenticated before the disable commit,
+or bytes already sent by a stream, cannot be recalled; the export stream additionally
+rechecks Account and Chat authority between chunks. Account erasure and retention
+policy are separate, unimplemented work. The current Account API has no transition from
+`DISABLED` back to `ACTIVE` (email confirmation only activates `PENDING_VERIFICATION`).
+Do not introduce reactivation without defining session invalidation: the current
+status-only JWT check is not a permanent revocation marker for a previously issued
+access token if an operator changes the database status back to `ACTIVE` before expiry.
+
 - `POST /auth/sessions` accepts an email, password, and optional device name. Only an `ACTIVE` account can create a session.
 - Access tokens are signed HS256 JWTs containing the issuer, User ID subject, issue/expiry timestamps, token ID, email, and the roles currently available to the account. The default access-token lifetime is 15 minutes.
 - Refresh tokens are opaque 256-bit random values. The raw value is returned only in the successful response; PostgreSQL stores only its SHA-256 hash. The default lifetime is 30 days.
@@ -27,7 +51,7 @@ The initial identity flow uses email/password and returns short-lived Access Tok
 - **Repeated & Concurrent Idempotency**: Subsequent or concurrent logout requests for the same token return HTTP `204 No Content`. Only the first successful revocation mutates the database row and emits the `SESSION_REVOKED` audit record and `SESSION_LOGOUT` security event; subsequent calls perform 0 row updates and omit duplicate audit entries.
 - **Targeted Scope & Session Isolation**: The logout operation itself revokes strictly the presented session (the single refresh token passed in `LogoutRequest`). Other sessions and devices belonging to the user remain active immediately after logout. Multi-device logout and Admin force-revocation remain deferred.
 - **Replay Protection vs. Immediate Session State**: Refresh tokens revoked via logout cannot be refreshed. If an adversary or faulty client later attempts to use that already-revoked token at `POST /auth/token-refreshes`, that subsequent request triggers the existing M1B token-reuse policy: all remaining active refresh tokens for that user are revoked with reason `REUSE_DETECTED`, and a critical security event `REFRESH_TOKEN_REUSE` is recorded. In normal operation where the revoked token is discarded, other sessions remain active indefinitely until their own expiration or logout.
-- **Stateless Access Token Lifecycle**: Access tokens are stateless HS256 JWTs that remain cryptographically valid until expiration; the platform intentionally does not maintain a server-side token blacklist. Clients are strictly responsible for clearing locally stored access and refresh tokens upon receiving HTTP `204 No Content`.
+- **Stateless Access Token Lifecycle**: Access tokens are signed HS256 JWTs without a server-side token blacklist. Logout of one session does not revoke its already-issued access token before expiry, but every new authenticated request also requires the account to remain `ACTIVE`. Clients clear locally stored access and refresh tokens after HTTP `204 No Content`.
 
 ### Current User profile and settings (M1)
 

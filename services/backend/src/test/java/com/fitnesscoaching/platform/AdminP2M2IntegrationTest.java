@@ -482,10 +482,10 @@ class AdminP2M2IntegrationTest {
                         .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER")))
                 .andExpect(status().isForbidden());
 
-        // 3. Suspended owner attempts to read run -> 401/403 Account Unavailable
+        // 3. Suspended owner is rejected at the shared bearer-token boundary.
         mockMvc.perform(get("/api/v1/ai/runs/" + runId)
                         .header("Authorization", bearer(SUSPENDED_USER_ID, "STUDENT")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // 4. When F01 is disabled by Kill Switch, owner can STILL read historical run
         jdbcTemplate.update("UPDATE fitness.feature_flags SET enabled = false WHERE code = 'F01_GENERAL_KNOWLEDGE'");

@@ -491,7 +491,7 @@ class TrainerProfileIntegrationTest {
     }
 
     @Test
-    @DisplayName("Suspended account returns 403 ACCOUNT_UNAVAILABLE")
+    @DisplayName("Suspended account's bearer token returns 401 UNAUTHORIZED")
     void suspendedAccount_returns403() throws Exception {
         UUID userId = insertUser("suspended@example.com", "Suspended User", AccountStatus.SUSPENDED);
         String token = createAccessToken(userId, "suspended@example.com", Collections.emptyList());
@@ -500,13 +500,13 @@ class TrainerProfileIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"publicSlug\": \"suspended-coach\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         mockMvc.perform(get("/api/v1/trainer-profiles/me")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test

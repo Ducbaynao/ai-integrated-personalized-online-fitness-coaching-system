@@ -89,6 +89,7 @@ class AuthSessionServiceTest {
         UserAccountRecord user = activeUser();
         CurrentUserView projection = userProjection(user.id(), List.of("STUDENT"));
         when(userAccountPort.findByEmailIgnoreCase("athlete@example.com")).thenReturn(Optional.of(user));
+        when(userAccountPort.lockStatusForSessionIssue(user.id())).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(passwordEncoder.matches("StrongPassword123!", user.passwordHash())).thenReturn(true);
         when(currentUserQuery.findCurrentUserById(user.id())).thenReturn(Optional.of(projection));
         when(accessTokenIssuer.issue(projection, NOW))
@@ -110,6 +111,20 @@ class AuthSessionServiceTest {
                 .doesNotContain(result.refreshToken());
         assertThat(storedToken.getValue().deviceName()).isEqualTo("Pixel 9");
         verify(userAccountPort).updateLastLogin(user.id(), NOW);
+    }
+
+    @Test
+    @DisplayName("Login cannot issue a session when Account changed to DISABLED after the initial lookup")
+    void loginRechecksLockedAccountStatus() {
+        UserAccountRecord user = activeUser();
+        when(userAccountPort.findByEmailIgnoreCase(user.email())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("StrongPassword123!", user.passwordHash())).thenReturn(true);
+        when(userAccountPort.lockStatusForSessionIssue(user.id())).thenReturn(Optional.of(AccountStatus.DISABLED));
+
+        assertThatThrownBy(() -> service.login(new LoginCommand(user.email(), "StrongPassword123!", null)))
+                .isInstanceOf(AccountUnavailableException.class);
+        verify(accessTokenIssuer, never()).issue((CurrentUserView) any(), any());
+        verify(refreshTokenPort, never()).saveAndFlush(any());
     }
 
     @Test
@@ -163,6 +178,7 @@ class AuthSessionServiceTest {
                 NOW.minusSeconds(60), NOW.plusSeconds(3600), null, null, null);
         when(refreshTokenPort.findByTokenHash(existing.tokenHash())).thenReturn(Optional.of(existing));
         when(userAccountPort.findById(user.id())).thenReturn(Optional.of(user));
+        when(userAccountPort.lockStatusForSessionIssue(user.id())).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(refreshTokenPort.revokeForRotation(existingId, NOW)).thenReturn(1);
         when(currentUserQuery.findCurrentUserById(user.id())).thenReturn(Optional.of(projection));
         when(accessTokenIssuer.issue(projection, NOW))
@@ -177,6 +193,24 @@ class AuthSessionServiceTest {
         assertThat(replacement.getValue().rotatedFromId()).isEqualTo(existingId);
         assertThat(replacement.getValue().deviceName()).isEqualTo("Pixel 9");
         assertThat(result.user().roles()).containsExactly("STUDENT");
+    }
+
+    @Test
+    @DisplayName("Refresh cannot issue a new pair when Account changed to DISABLED after token lookup")
+    void refreshRechecksLockedAccountStatus() {
+        UserAccountRecord user = activeUser();
+        String rawToken = "refresh-before-disable";
+        RefreshTokenRecord existing = new RefreshTokenRecord(UUID.randomUUID(), user.id(),
+                TokenHasher.sha256Hex(rawToken), null, NOW.minusSeconds(60), NOW.plusSeconds(3600),
+                null, null, null);
+        when(refreshTokenPort.findByTokenHash(existing.tokenHash())).thenReturn(Optional.of(existing));
+        when(userAccountPort.findById(user.id())).thenReturn(Optional.of(user));
+        when(userAccountPort.lockStatusForSessionIssue(user.id())).thenReturn(Optional.of(AccountStatus.DISABLED));
+
+        assertThatThrownBy(() -> service.refresh(new RefreshSessionCommand(rawToken, null)))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(refreshTokenPort).revokeActiveForUser(user.id(), NOW, "ACCOUNT_UNAVAILABLE");
+        verify(accessTokenIssuer, never()).issue((CurrentUserView) any(), any());
     }
 
     @Test
@@ -213,6 +247,7 @@ class AuthSessionServiceTest {
                 NOW.minusSeconds(60), NOW.plusSeconds(3600), null, null, null);
         when(refreshTokenPort.findByTokenHash(existing.tokenHash())).thenReturn(Optional.of(existing));
         when(userAccountPort.findById(user.id())).thenReturn(Optional.of(user));
+        when(userAccountPort.lockStatusForSessionIssue(user.id())).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(refreshTokenPort.revokeForRotation(existing.id(), NOW)).thenReturn(0);
 
         assertThatThrownBy(() -> service.refresh(new RefreshSessionCommand(rawToken, null)))

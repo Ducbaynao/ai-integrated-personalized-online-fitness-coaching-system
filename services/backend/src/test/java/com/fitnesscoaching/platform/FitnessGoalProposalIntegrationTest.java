@@ -776,12 +776,12 @@ class FitnessGoalProposalIntegrationTest {
         // 1. Cannot list proposals
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/me")
                         .header("Authorization", "Bearer " + studentToken))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // 2. Cannot view proposal detail
         mockMvc.perform(get("/api/v1/fitness-goal-proposals/{proposalId}", proposalId)
                         .header("Authorization", "Bearer " + studentToken))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // 3. Cannot decide proposal
         DecideGoalProposalRequest decideReq = new DecideGoalProposalRequest(ProposalDecision.ACCEPT, null);
@@ -789,7 +789,7 @@ class FitnessGoalProposalIntegrationTest {
                         .header("Authorization", "Bearer " + studentToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(decideReq)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

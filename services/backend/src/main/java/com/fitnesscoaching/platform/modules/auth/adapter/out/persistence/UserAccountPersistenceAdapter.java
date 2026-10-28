@@ -2,6 +2,8 @@ package com.fitnesscoaching.platform.modules.auth.adapter.out.persistence;
 
 import com.fitnesscoaching.platform.modules.auth.application.port.out.UserAccountPort;
 import com.fitnesscoaching.platform.modules.auth.domain.UserAccountRecord;
+import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -12,9 +14,11 @@ import java.util.UUID;
 public class UserAccountPersistenceAdapter implements UserAccountPort {
 
     private final UserAccountJpaRepository repository;
+    private final JdbcTemplate jdbc;
 
-    public UserAccountPersistenceAdapter(UserAccountJpaRepository repository) {
+    public UserAccountPersistenceAdapter(UserAccountJpaRepository repository, JdbcTemplate jdbc) {
         this.repository = repository;
+        this.jdbc = jdbc;
     }
 
     @Override
@@ -37,6 +41,14 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
     @Override
     public Optional<UserAccountRecord> findById(UUID id) {
         return repository.findById(id).map(this::toRecord);
+    }
+
+    @Override
+    public Optional<AccountStatus> lockStatusForSessionIssue(UUID id) {
+        // JDBC avoids returning a previously hydrated JPA entity after waiting for a concurrent status writer.
+        // The caller's transaction holds this shared lock through refresh rotation / login issuance.
+        return jdbc.query("SELECT status FROM fitness.users WHERE id = ? FOR SHARE",
+                (rs, row) -> AccountStatus.valueOf(rs.getString(1)), id).stream().findFirst();
     }
 
     @Override

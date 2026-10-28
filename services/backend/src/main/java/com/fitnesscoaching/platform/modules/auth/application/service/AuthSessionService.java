@@ -88,7 +88,8 @@ public class AuthSessionService implements LoginUseCase, RefreshSessionUseCase, 
             recordLoginFailure(user == null ? null : user.id(), now);
             throw new InvalidCredentialsException();
         }
-        if (user.status() != AccountStatus.ACTIVE) {
+        if (user.status() != AccountStatus.ACTIVE
+                || userAccountPort.lockStatusForSessionIssue(user.id()).orElse(null) != AccountStatus.ACTIVE) {
             recordSecurityEvent(user.id(), "LOGIN_ACCOUNT_UNAVAILABLE", "MEDIUM", now);
             throw new AccountUnavailableException();
         }
@@ -131,7 +132,7 @@ public class AuthSessionService implements LoginUseCase, RefreshSessionUseCase, 
         }
 
         UserAccountRecord user = userAccountPort.findById(existing.userId()).orElse(null);
-        if (user == null || user.status() != AccountStatus.ACTIVE) {
+        if (user == null || userAccountPort.lockStatusForSessionIssue(existing.userId()).orElse(null) != AccountStatus.ACTIVE) {
             refreshTokenPort.revokeActiveForUser(existing.userId(), now, "ACCOUNT_UNAVAILABLE");
             recordSecurityEvent(existing.userId(), "REFRESH_ACCOUNT_UNAVAILABLE", "MEDIUM", now);
             throw new InvalidRefreshTokenException();

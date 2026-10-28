@@ -458,7 +458,7 @@ class ContentManagementIntegrationTest {
                         .header("Authorization", suspendedToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"guidelines\",\"allowedSourceIds\":[\"WHO-PA-SB-2020\"]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // Case 6C: Active Student user is ALLOWED (HTTP 200)
         UUID studentUserId = UUID.randomUUID();

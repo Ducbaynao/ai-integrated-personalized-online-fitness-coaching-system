@@ -247,6 +247,10 @@ class ExerciseCatalogIntegrationTest {
 
     private String bearer(String role) {
         UUID userId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?, ?, 'fixture-hash', 'Catalog reader', 'ACTIVE'::fitness.account_status)
+                """, userId, userId + "@example.com");
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(jwtProperties.getIssuer())

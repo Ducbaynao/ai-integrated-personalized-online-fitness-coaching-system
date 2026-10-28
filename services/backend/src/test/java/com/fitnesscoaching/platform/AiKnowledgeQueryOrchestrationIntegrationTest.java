@@ -912,11 +912,11 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
         assertThat(latestRun.status()).isEqualTo(AiRunStatus.SUCCEEDED);
         assertThat(latestRun.completedAt()).isNotNull();
 
-        // Verify polling via GET /api/v1/ai/runs/{runId} is also blocked with 403 ACCOUNT_UNAVAILABLE
+        // HTTP polling is rejected at the bearer-token boundary after account disablement.
         mockMvc.perform(get("/api/v1/ai/runs/" + latestRun.id())
                         .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test
@@ -1010,8 +1010,8 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                         .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         // Verify zero AI runs were created for this request
         Integer count = jdbcTemplate.queryForObject(

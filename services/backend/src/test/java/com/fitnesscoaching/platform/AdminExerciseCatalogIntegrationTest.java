@@ -199,8 +199,8 @@ class AdminExerciseCatalogIntegrationTest {
         jdbcTemplate.update("UPDATE fitness.users SET status='SUSPENDED'::fitness.account_status WHERE id=?", ADMIN_ID);
         mockMvc.perform(get("/api/v1/admin/exercises/metadata")
                         .header("Authorization", bearer(ADMIN_ID, "ADMIN")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test
@@ -552,6 +552,11 @@ class AdminExerciseCatalogIntegrationTest {
     }
 
     private String bearer(UUID userId, String role) {
+        jdbcTemplate.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?, ?, 'fixture-hash', 'Catalog reader', 'ACTIVE'::fitness.account_status)
+                ON CONFLICT (id) DO NOTHING
+                """, userId, userId + "@example.com");
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder().issuer(jwtProperties.getIssuer())
                 .subject(userId.toString()).issuedAt(now).expiresAt(now.plus(15, ChronoUnit.MINUTES))
