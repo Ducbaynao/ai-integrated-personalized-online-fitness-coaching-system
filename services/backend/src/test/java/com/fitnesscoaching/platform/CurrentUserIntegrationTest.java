@@ -291,7 +291,7 @@ class CurrentUserIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me returns empty permissions for inactive accounts")
+    @DisplayName("GET /api/v1/users/me rejects bearer tokens for inactive accounts")
     void getCurrentUser_inactiveAccountReturnsEmptyPermissions() throws Exception {
         UUID userId = insertUser("admin.suspended@example.com", "Suspended Admin", null, AccountStatus.SUSPENDED);
         assignRole(userId, "ADMIN");
@@ -299,8 +299,8 @@ class CurrentUserIntegrationTest {
         String token = createAccessToken(userId, "admin.suspended@example.com", List.of("ADMIN"));
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of())));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test
@@ -600,7 +600,7 @@ class CurrentUserIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/me returns canCoach=false when account status is not ACTIVE")
+    @DisplayName("GET /api/v1/users/me rejects a suspended Trainer before capability projection")
     void getCurrentUser_trainerAccountSuspended_canCoachIsFalse() throws Exception {
         UUID userId = insertUser("coach_suspended_acc@example.com", "Suspended Account", "+84903333333", AccountStatus.SUSPENDED);
         assignRole(userId, "TRAINER");
@@ -610,8 +610,8 @@ class CurrentUserIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.capabilities.canCoach", is(false)));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test

@@ -483,11 +483,11 @@ class AiRunF01PersistenceIntegrationTest {
                 .isInstanceOf(com.fitnesscoaching.platform.common.exception.AccountUnavailableException.class)
                 .hasMessageContaining("not active");
 
-        // And HTTP polling returns 403 ACCOUNT_UNAVAILABLE
+        // HTTP polling is rejected before domain dispatch when Account is disabled.
         mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
                         .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         // Reactivate student account
         jdbcTemplate.update("UPDATE fitness.users SET status = 'ACTIVE'::fitness.account_status WHERE id = ?", STUDENT_USER_ID);

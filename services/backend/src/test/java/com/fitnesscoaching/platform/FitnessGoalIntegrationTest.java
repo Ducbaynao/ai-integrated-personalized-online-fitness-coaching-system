@@ -1886,8 +1886,8 @@ class FitnessGoalIntegrationTest {
                         .content("""
                                 { "reason": "Attempting pause while suspended" }
                                 """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         String dbStatus = jdbcTemplate.queryForObject(
                 "SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);
@@ -1910,8 +1910,8 @@ class FitnessGoalIntegrationTest {
                         .content("""
                                 { "reason": "Attempting resume while suspended" }
                                 """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         String dbStatusPaused = jdbcTemplate.queryForObject(
                 "SELECT status::text FROM fitness.fitness_goals WHERE id = ?", String.class, goalId);

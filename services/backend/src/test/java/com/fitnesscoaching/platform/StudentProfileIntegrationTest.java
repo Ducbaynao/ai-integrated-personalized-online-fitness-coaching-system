@@ -350,7 +350,7 @@ class StudentProfileIntegrationTest {
     }
 
     @Test
-    @DisplayName("CORRECTION 2: Token is valid but account is SUSPENDED -> 403 ACCOUNT_UNAVAILABLE")
+    @DisplayName("Suspended account's previously issued token is rejected with 401")
     void suspendedAccount_returns403() throws Exception {
         UUID userId = insertUser("suspended@example.com", "Suspended User", AccountStatus.SUSPENDED);
         String token = createAccessToken(userId, "suspended@example.com", Collections.emptyList());
@@ -359,20 +359,20 @@ class StudentProfileIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availableDaysPerWeek\": 3}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         mockMvc.perform(get("/api/v1/student-profiles/me")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
 
         mockMvc.perform(patch("/api/v1/student-profiles/me")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availableDaysPerWeek\": 4}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test

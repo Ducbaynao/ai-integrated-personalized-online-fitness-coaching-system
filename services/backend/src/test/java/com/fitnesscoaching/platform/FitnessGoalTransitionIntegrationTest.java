@@ -478,7 +478,7 @@ class FitnessGoalTransitionIntegrationTest {
     }
 
     @Test
-    @DisplayName("Direct goal transition: suspended student receives 403 ACCOUNT_UNAVAILABLE")
+    @DisplayName("Direct goal transition: suspended student's bearer token receives 401")
     void createGoalTransition_suspendedStudent_throws403AccountUnavailable() throws Exception {
         UUID studentId = createActiveStudentUser("student.suspended@example.com");
         String token = createAccessToken(studentId, "student.suspended@example.com", List.of("STUDENT"));
@@ -507,8 +507,8 @@ class FitnessGoalTransitionIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode", is("UNAUTHORIZED")));
     }
 
     @Test
