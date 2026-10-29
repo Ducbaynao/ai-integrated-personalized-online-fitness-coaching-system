@@ -1,7 +1,7 @@
 # Bảng Đối Chiếu Hiện Trạng & Checklist Nghiệm Thu Milestone P2-M2
 
 > **Milestone:** P2-M2 — RAG, Rules & AI Pipeline Tối Thiểu  
-> **Repository:** `D:\Projectsi-integrated-personalized-online-fitness-coaching-system`  
+> **Repository:** `D:\Projects/ai-integrated-personalized-online-fitness-coaching-system`
 > **Branch thực hiện:** `test/f01-trainer-openai-e2e-20261027`  
 > **Commit nền (Base commit):** `f53357c71cd51f8309dce02c1943421fd8a3e67a` (Merge PR #112 trên `origin/main`)  
 > **Ngày cập nhật:** 2026-10-27  
@@ -22,7 +22,7 @@
 | **P2-M2.7** | Bất biến quyền riêng tư & Minimization | **PASS** | PostgreSQL `ai_context_snapshots`: `actor_role = TRAINER`, `student = null` trong các ca F01 |
 | **P2-M2.8** | Tái xác thực quyền trước giao hàng (Revalidation) | **PASS** | Báo cáo drill: 11 tests unit + 8 tests integration Testcontainers PostgreSQL PASS 100% |
 | **P2-M2.9** | Durable Recovery (Orphan Sweeper) | **PASS (Test)\* / NOT RUN (Drill)** | 9/9 integration tests Testcontainers PASS; \*Live runtime crash drill trên dev là **NOT RUN** |
-| **P2-M2.10** | Evaluation Runner Tối Thiểu (A-49) | **PASS (Khung A-49)** | Khung runner A-49 PASS; Benchmark tập Holdout 60 ca A-52 là bài đánh giá release ở P2-M6 |
+| **P2-M2.10** | Evaluation Runner & Retrieval Benchmark Ban Đầu (A-49 / A-27) | **PASS (Khung A-49 & Baseline A-27)** | Khung runner A-49 PASS; Baseline retrieval A-27 (42 candidate cases, run-20261019234346-dcc3c0); Benchmark tập Holdout 60 ca A-52 là bài đánh giá release ở P2-M6 |
 
 ---
 
@@ -52,6 +52,7 @@
 - **Yêu cầu:** Điều hướng từ Trainer Home, tra cứu, ràng buộc input, chặn chính sách, hiển thị lỗi và nút thử lại.
 - **Trạng thái:** **PASS (Simulated Provider)**.
 - **Bằng chứng:** Báo cáo PR #112, 7 ảnh artifacts tại `docs/08-ai/artifacts/f01-trainer-live-validation/`, 31 unit tests Mobile PASS 100%.
+- **Lưu ý cơ chế thử lại (TR-05):** Thao tác bấm nút "Thử lại" trên Pixel 8 Emulator đã gửi lại thành công request và tạo bản ghi AI Run mới trong PostgreSQL; tuy nhiên vì câu hỏi vẫn giữ nguyên trigger lỗi giả lập, run retry này vẫn có trạng thái `FAILED (MODEL_ERROR)`. Khả năng phục hồi sang trạng thái `INFORMATION` thành công khi upstream hết lỗi được kiểm chứng độc lập bằng unit test `AiKnowledgeScreen.test.tsx` (không quy đồng thành "retry live thành công sang INFORMATION").
 
 ### P2-M2.6 — F01 Trainer Mobile (Live OpenAI Thật)
 - **Yêu cầu:** Đánh giá trích dẫn nguyên văn và chất lượng câu trả lời với OpenAI thật trên luồng Mobile Trainer → Spring → FastAPI → OpenAI.
@@ -78,11 +79,25 @@
 - **Bằng chứng:** 9 tests trong `AiRunOrphanRecoveryIntegrationTest.java` PASS 100% trên Testcontainers PostgreSQL (chứng minh row locking `FOR UPDATE SKIP LOCKED`, chống race condition, bảo toàn token usage NULL).
 - **Phân định:** Việc diễn tập kill process trực tiếp trên live dev environment được giữ trạng thái **NOT RUN** (là bài kiểm tra thực địa vận hành, không thay thế bằng integration test).
 
-### P2-M2.10 — Evaluation Runner & Benchmark (A-49 / A-52)
-- **Yêu cầu:** Khung đánh giá tự động có rubric và bộ kiểm thử đối soát version.
-- **Trạng thái:** **PASS (Khung Runner A-49)**; **Phân định rõ với Benchmark Holdout Release**.
-- **Bằng chứng:** Khung runner và tài liệu `docs/08-ai/f01-a49-evaluation-runner-guide.md` đã hoàn thành (A-49). Cần phân biệt rõ: việc sở hữu khung runner không đồng nghĩa toàn bộ benchmark release đã được chạy; bài đánh giá benchmark chất lượng tổng thể trên tập Holdout 60 ca (A-52) thuộc kế hoạch bàn giao Milestone **P2-M6**.
-
+### P2-M2.10 — Evaluation Runner & Retrieval Benchmark Ban Đầu (A-49 / A-27 / A-52)
+- **Yêu cầu:** Khung đánh giá tự động có rubric và baseline benchmark truy xuất/trích dẫn ban đầu.
+- **Trạng thái:** **PASS (Khung Runner A-49 & Baseline Retrieval A-27)**; **Phân định với Benchmark Holdout Release**.
+- **Bằng chứng:**
+  - Khung runner và rubric: `docs/08-ai/f01-a49-evaluation-runner-guide.md` và `tools/run-f01-evaluation.mjs` (24/24 unit tests PASS).
+  - Benchmark retrieval ban đầu (A-27): Báo cáo `docs/08-ai/f01-a27-expanded-corpus-inventory-and-baseline-report.md` ghi nhận baseline run ID `run-20261019234346-dcc3c0`.
+  - Dataset & Phạm vi A-27: Tập candidate manifest `data/evaluation/f01-evaluation-manifest.json` gồm 114 ca (4 nguồn: `WHO-PA-SB-2020` [24 ca], `NIDDK-WEIGHT-FACTORS-2023` [18 ca], `ISSN` [30 ca], `NIH-ODS` [42 ca]).
+  - Đối soát trên môi trường testbed với 2 nguồn ACTIVE (`--source=WHO-PA-SB-2020,NIDDK-WEIGHT-FACTORS-2023`) gồm **42 ca candidate** (`WHO-PA-SB-2020`: 24 ca, `NIDDK-WEIGHT-FACTORS-2023`: 18 ca).
+  - Phân bổ độ phủ theo snapshot runtime `data/evaluation/coverage-snapshot-testbed-9docs.json` (trên 9 tài liệu active, 29 chunks không gian vector `openai/text-embedding-3-small/1536`):
+    - **Full Coverage:** 21 ca (100% tài liệu kỳ vọng active).
+    - **Partial Coverage:** 5 ca (ít nhất 1 tài liệu kỳ vọng active).
+    - **No Coverage:** 16 ca (loại trừ hợp lệ khỏi tính điểm retrieval do chưa có tài liệu kỳ vọng active).
+    - **Số ca đánh giá retrieval (`evaluable_retrieval_cases`):** 26 ca (21 full + 5 partial).
+  - Kết quả chỉ số retrieval A-49 trên 26 ca đánh giá:
+    - Document Hit@5 = 0.8846 (23 / 26 hits; nhóm Full Coverage: 0.9524, 20 / 21 hits).
+    - Document Recall@5 = 0.8077 (nhóm Full Coverage: 0.9286).
+    - MRR@5 = 0.6744 (nhóm Full Coverage: 0.7857).
+  - Giới hạn: 72 ca thuộc nguồn `ISSN` (30 ca) và `NIH-ODS` (42 ca) chưa được nạp vào testbed runtime.
+  - Phân định rõ: Đây là preliminary development baseline (`NO_INDEPENDENT_HOLDOUT_YET`), hoàn toàn phân biệt với bài đánh giá chất lượng thế hệ tổng thể trên tập độc lập Holdout 60 ca (A-52 release gate) thuộc Milestone **P2-M6**. Việc sở hữu runner và baseline ban đầu không đồng nghĩa hoàn thành toàn bộ benchmark release hay tự đóng P2-M2.
 ---
 
 ## 3. Tổng Hợp Điều Kiện Nghiệm Thu & Khuyến Nghị
@@ -91,7 +106,7 @@
 - [x] Không retrieve DRAFT/ARCHIVED: Đạt.
 - [x] Truy được nguồn/version đã dùng: Đạt (đối soát nguyên văn citations).
 - [x] Query không có bằng chứng trả giới hạn: Đạt (TR-OAI-03 trả `INSUFFICIENT_DATA`).
-- [x] Provider error có fallback: Đạt (TR-05 lỗi 502 và retry thành công).
+- [x] Provider error có fallback: Đạt (TR-05 kích hoạt lại run retry trong DB; phục hồi sang INFORMATION được chứng minh qua unit test).
 - [x] Không có đường ghi business state từ FastAPI: Đạt (Spring Boot độc quyền ghi).
 - [x] F01 kiến thức chung xuyên suốt: Đạt (Mobile Trainer → Spring → FastAPI → OpenAI).
 
