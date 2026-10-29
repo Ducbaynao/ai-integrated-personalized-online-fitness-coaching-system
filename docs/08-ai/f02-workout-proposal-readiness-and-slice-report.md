@@ -119,17 +119,17 @@
   - `test_internal_workout_proposal_endpoint_requires_auth`: PASS
 
 ### 3.3. Spring Boot Backend Tests (PostgreSQL Testcontainers)
-Toàn bộ 34 ca kiểm thử backend đều chạy thành công trên PostgreSQL Testcontainers với Flyway migrations:
+Toàn bộ 36 ca kiểm thử backend đều chạy thành công trên PostgreSQL Testcontainers với Flyway migrations:
 
 | Test Class | Số ca | Kết quả | Chi tiết kiểm chứng |
 | :--- | :---: | :---: | :--- |
 | `AiWorkoutProposalRealFastApiIntegrationTest` | 4 | **PASS (4/4)** | **Đa tầng thực tế (Real HTTP)**:<br>1. Client -> Spring -> `HttpF02AiServiceClient` -> Real Uvicorn FastAPI Process -> Validator -> DB -> Accept -> Workout Plan ACTIVE aggregateVersion=1.<br>2. Form chọn 4 ngày -> FastAPI sinh 4 buổi -> Database lưu đúng 4 bản ghi `workout_plan_sessions`.<br>3. `HUMAN_COACH`: Trainer sinh đề xuất -> Student bị chặn 403 -> Trainer chấp thuận thành công APPLIED.<br>4. Rejection: Student từ chối đề xuất -> chuyển REJECTED -> không tạo bất kỳ plan nào trong DB. |
-| `AiWorkoutProposalFullSliceIntegrationTest` | 10 | **PASS (10/10)** | 1. `SELF_DIRECTED`: Tạo proposal -> PENDING -> Accept -> APPLIED -> Workout Plan ACTIVE aggregateVersion=1.<br>2. `HUMAN_COACH`: Phân quyền chấp thuận thuộc về huấn luyện viên phụ trách.<br>3. `Reject`: Từ chối -> REJECTED -> không tạo plan.<br>4. `Idempotency`: Replay cùng key & payload trả receipt; khác payload trả 409 conflict; key mới trên proposal đã áp dụng trả 409.<br>5. `Expired`: Đề xuất quá hạn 7 ngày ném 409 conflict.<br>6. `Active Plan Conflict`: Đã có active plan -> ném `ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS` và rollback toàn vẹn (proposal giữ PENDING, không lưu application).<br>7. **Concurrent Double-Accept (Race Condition)**: 2 luồng đồng thời gọi accept cùng commandKey -> Thread 1 thực thi tạo plan (`replayed=false`), Thread 2 chờ khóa và replay (`replayed=true`) -> chỉ tạo đúng 1 plan trong DB.<br>8. **Period Transition**: Coaching period chuyển giao trước khi accept -> ném `AiRunLifecycleConflictException`.<br>9. **Mode Transition**: Đổi chế độ từ SELF_DIRECTED sang HUMAN_COACH -> student bị chặn thẩm quyền.<br>10. **Revoked Authority Replay**: Actor đã bị tước quyền không thể replay dữ liệu đã áp dụng trước đó. |
+| `AiWorkoutProposalFullSliceIntegrationTest` | 11 | **PASS (11/11)** | 1. `SELF_DIRECTED`: Tạo proposal -> PENDING -> Accept -> APPLIED -> Workout Plan ACTIVE aggregateVersion=1.<br>2. `HUMAN_COACH`: Phân quyền chấp thuận thuộc về huấn luyện viên phụ trách.<br>3. `Reject`: Từ chối -> REJECTED -> không tạo plan.<br>4. `Idempotency`: Replay cùng key & payload trả receipt; khác payload trả 409 conflict; key mới trên proposal đã áp dụng trả 409.<br>5. `Expired`: Đề xuất quá hạn 7 ngày ném 409 conflict.<br>6. `Active Plan Conflict`: Đã có active plan -> ném `ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS` và rollback toàn vẹn (proposal giữ PENDING, không lưu application).<br>7. **Concurrent Double-Accept (Race Condition)**: 2 luồng đồng thời gọi accept cùng commandKey -> Thread 1 thực thi tạo plan (`replayed=false`), Thread 2 chờ khóa và replay (`replayed=true`) -> chỉ tạo đúng 1 plan trong DB.<br>8. **Period Transition**: Coaching period chuyển giao trước khi accept -> ném `AiRunLifecycleConflictException`.<br>9. **Mode Transition**: Đổi chế độ từ SELF_DIRECTED sang HUMAN_COACH -> student bị chặn thẩm quyền.<br>10. **Revoked Authority Replay**: Actor đã bị tước quyền không thể replay dữ liệu đã áp dụng trước đó.<br>11. **Audit Failure Rollback**: Giả lập lỗi audit `AI_RECOMMENDATION_APPLIED` qua trigger PostgreSQL -> toàn bộ transaction rollback hoàn toàn (không tạo plan, recommendation vẫn PENDING, không có application receipt). |
 | `AiWorkoutProposalPersistenceIntegrationTest` | 4 | **PASS (4/4)** | 1. Lưu & đọc PENDING.<br>2. Cập nhật APPLIED & lưu Application.<br>3. Trigger DB chặn sai lệch quyền quyết định.<br>4. Trigger DB chặn EVALUATION run tạo recommendation nghiệp vụ. |
-| `AiWorkoutProposalServiceUnitTest` | 8 | **PASS (8/8)** | Quyền quyết định Student/Trainer, chặn 403, validation reject, replay trùng key, conflict khác payload, reject reason. |
+| `AiWorkoutProposalServiceUnitTest` | 9 | **PASS (9/9)** | Quyền quyết định Student/Trainer, chặn 403, validation reject, replay trùng key, conflict khác payload, reject reason, ngoại lệ khi audit ghi log thất bại. |
 | `AiWorkoutProposalControllerUnitTest` | 4 | **PASS (4/4)** | MockMvc 4 endpoints: POST workout-proposals, GET detail, POST accept, POST reject. |
 | `F02RuntimeOutputValidatorUnitTest` | 4 | **PASS (4/4)** | Schema hợp lệ, kiểm tra catalog qua `lockAuthoringReferences`, từ chối >1 tuần (D02), xử lý JSON hỏng. |
-| **Tổng cộng Backend** | **34** | **PASS (34/34)** | **100% PASS** |
+| **Tổng cộng Backend** | **36** | **PASS (36/36)** | **100% PASS** |
 
 ### 3.4. React Native Mobile Tests (Jest / TypeScript)
 - Lệnh kiểm tra kiểu: `npm --prefix apps/mobile run typecheck`
@@ -144,10 +144,39 @@ Toàn bộ 34 ca kiểm thử backend đều chạy thành công trên PostgreSQ
 | `studentWorkoutPlanScreens.test.tsx` | 15 | **PASS (15/15)** | Toàn bộ các luồng màn hình học viên kế thừa đều an toàn, không hồi quy khi tích hợp nút Đề xuất AI. |
 | **Tổng cộng Mobile** | **30** | **PASS (30/30)** | **100% PASS** |
 
-### 3.5. Trạng thái Kiểm chứng Giao diện Thực tế trên Thiết bị (Mobile Runtime Status)
-- **Trạng thái:** `NOT RUN / BLOCKED (Headless Environment Limit)`
-- **Lý do:** Môi trường thực thi hiện tại là máy chủ dòng lệnh không mở giao diện đồ họa trực tiếp cho trình giả lập Android Emulator / Expo Go. Không dùng API-only để giả mạo là đã chạy giao diện Mobile tương tác thực.
-- Toàn bộ luồng UI đã được bao phủ bởi 30 test cases rendering trên Mobile component và 4 ca kiểm thử HTTP đa tầng từ MockMvc qua Spring đến FastAPI và PostgreSQL.
+### 3.5. Đối Soát Trạng Thái Kiểm Chứng Giao Diện Thực Tế Trên Thiết Bị (Mobile Runtime Status)
+
+#### 3.5.1. Trạng thái tại thời điểm nghiệm thu lát cắt ban đầu (2026-10-27, commit `a0f2f2a`)
+- **Trạng thái ghi nhận:** `NOT RUN / BLOCKED (Headless Environment Limit)`.
+- **Lý do:** Tại thời điểm hoàn thiện code ban đầu, môi trường thực thi là máy chủ dòng lệnh chưa khởi chạy GUI giả lập Android Emulator / Expo Go. Luồng UI khi đó được kiểm chứng thông qua 30 test cases rendering component và 4 ca HTTP đa tầng.
+
+#### 3.5.2. Phiên diễn tập Mobile Runtime bổ sung (Thực hiện trong quá trình hoàn thiện PR #116 trên baseline commit `7954b4e` / `d8d8062`)
+- **Môi trường & Kiến trúc kết nối:** Android Emulator (`Pixel_8` AVD, API 34) kết nối với toàn bộ local services:
+  $$	ext{Mobile App (:8081)} \longrightarrow 	ext{Spring Boot (:8080)} \longrightarrow 	ext{FastAPI (:8000)} \longrightarrow 	ext{PostgreSQL (:5433)}$$
+- **Đối tượng tham gia & Bối cảnh:**
+  - Huấn luyện viên: `Coach Alex Smoke` (`1cb982ef-b7e6-493c-86f9-fe4994f8ad93`)
+  - Học viên: `Smoke Student` (`5c6f49c6-f4f6-4941-b217-2574b3830395`)
+  - Kỳ huấn luyện: `bdeccc87-beaf-43df-b475-807be044ed0b` (Chế độ `HUMAN_COACH`)
+  - Kế hoạch tạo mới & kích hoạt: Plan ID `bb2a6813-6fae-400a-bfbf-52938143cb74`
+- **Kết quả kiểm chứng:** **PASS (Trong phạm vi được chứng minh: Trainer / HUMAN_COACH, cấu hình 4 buổi/tuần, Accept-and-Apply tạo Workout Plan ACTIVE)**.
+- **Bằng chứng Artifacts (Đã đối soát và lưu trữ tại `docs/08-ai/artifacts/f02-mobile-runtime-validation/`):**
+  1. [`mobile_f02_01_trainer_program_screen.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_01_trainer_program_screen.png): Màn hình Quản lý chương trình của Trainer với học viên Smoke Student, hiển thị nút "Đề xuất giáo án AI (F02)".
+  2. [`mobile_f02_02_modal_open.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_02_modal_open.png): Mở modal F02, chọn cấu hình 4 buổi/tuần, hiển thị ghi chú mục tiêu và khuyến cáo phi y tế.
+  3. [`mobile_f02_03_proposal_generated.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_03_proposal_generated.png): Đề xuất được sinh thành công (trạng thái `PENDING`), hiển thị nhãn độ tin cậy tự đánh giá từ mô hình, căn cứ đề xuất, dữ liệu thiếu và giới hạn.
+  4. [`mobile_f02_04_sessions_and_actions.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_04_sessions_and_actions.png): Cuộn xem chi tiết 4 buổi tập với bài tập/prescriptions và các nút "Từ chối" / "Duyệt & Áp dụng giáo án".
+  5. [`mobile_f02_05_plan_applied_active.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_05_plan_applied_active.png): Bấm duyệt thành công, transaction Accept-and-Apply kích hoạt giáo án `bb2a6813-6fae-400a-bfbf-52938143cb74` và ứng dụng tự động điều hướng sang màn hình xem giáo án đang hoạt động (`ACTIVE`).
+  6. [`mobile_f02_06_trainer_program_with_active_plan.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_06_trainer_program_with_active_plan.png): Màn hình Trainer Program cập nhật hiển thị giáo án vừa áp dụng trong danh mục "Giáo án đang áp dụng".
+  7. [`mobile_f02_07_applied_receipt_modal.png`](./artifacts/f02-mobile-runtime-validation/mobile_f02_07_applied_receipt_modal.png): Mở lại modal trên recommendation này, hiển thị badge "Trạng thái: APPLIED" kèm mã biên nhận kế hoạch.
+
+#### 3.5.3. Ranh giới Phân định Kỹ thuật & Giới hạn Kết luận (Boundary Constraints)
+1. **Mở lại Modal vs. Idempotent Command Replay ở Backend:** Việc mở lại modal và hiển thị badge `APPLIED` là do client truy vấn lại trạng thái hiện hành từ server; đây **không** phải là bằng chứng trực tiếp chứng minh cơ chế replay idempotent của command. Khả năng replay idempotent (gửi lại command với cùng `idempotencyKey` nhận lại biên nhận mà không tạo trùng kế hoạch) và xử lý tranh chấp song song (2 request accept đồng thời) được bảo đảm và chứng minh độc lập qua các ca kiểm thử tích hợp chuyên biệt trong `AiWorkoutProposalFullSliceIntegrationTest` (bên cạnh các ca kiểm tra thẩm quyền theo chế độ, chuyển dịch kỳ huấn luyện và transactional rollback khi audit thất bại).
+2. **Dữ liệu phân quyền và Exercise Catalog:** Quyền `WORKOUT_PLAN:MANAGE` và 4 biến thể bài tập (`a0000000-0000-4000-8000-000000000001` .. `0004`) được nạp vào cơ sở dữ liệu dưới dạng **test fixtures** nhằm phục vụ diễn tập; đây **không** phải là bằng chứng cho thấy danh mục bài tập thực tế đã sẵn sàng trên môi trường sản xuất. Trước khi nạp fixtures, hệ thống đã chặn thành công đề xuất với lỗi `AiOutputValidationException: WORKOUT_PLAN_EXERCISE_UNAVAILABLE`, chứng minh output validator hoạt động nghiêm ngặt.
+3. **Giới hạn không suy rộng:** Kết quả đạt được chỉ chứng minh tính đúng đắn cho ca tương tác: Trainer/HUMAN_COACH, đề xuất 4 buổi, Accept-and-Apply. Tuyệt đối **không suy rộng** sang:
+   - Học viên tự quản (`Student / SELF_DIRECTED`) trên Mobile runtime thực tế.
+   - Luồng thao tác Từ chối (`REJECT`) hoặc xử lý xung đột (`CONFLICT`) trên Mobile runtime thực tế.
+   - Provider AI thật (phiên chạy sử dụng `SimulatedF02WorkoutProvider` với chi phí $0.00).
+   - Mức độ sẵn sàng phát hành production.
+4. **Phạm vi còn lại của P2-M3:** Lát cắt F02 hiện tại tập trung vào chu trình trọn vẹn từ đề xuất đến phê duyệt nguyên khối. Chức năng chỉnh sửa từng bài tập/sets/reps ngay trên bản thảo trước khi duyệt, và nghiệp vụ lưu trữ/thay thế giáo án đang hoạt động (`ACTIVE`) phức tạp thuộc về các lát cắt tiếp theo của Milestone P2-M3. Báo cáo này **không tuyên bố hoàn tất toàn bộ Milestone P2-M3**.
 
 ---
 
@@ -177,7 +206,7 @@ feat(ai,workout,mobile): implement F02 1-week workout plan proposal slice
 - Implement Spring Boot HttpF02AiServiceClient and F02RuntimeOutputValidator
 - Implement atomic Accept-and-Apply transaction with findByIdForUpdate, authority guards, mode transition checks, and idempotency replay
 - Add React Native Expo AiWorkoutProposalModal with 3/4 days selection, medical disclaimers, self-assessment confidence labels, and error banner
-- Add 34 backend unit/integration tests (including real FastAPI process multi-tier tests and concurrency race tests) and 30 mobile tests
+- Add 36 backend unit/integration tests (including real FastAPI process multi-tier tests, concurrency race tests, and transactional audit failure rollback) and 30 mobile tests
 ```
 
 ### Nội dung PR Description Đề xuất:
@@ -201,7 +230,7 @@ Triển khai hoàn chỉnh lát cắt F02 (Đề xuất giáo án tập luyện 
    - Thêm modal `AiWorkoutProposalModal.tsx` trên cả Student và Trainer screens.
    - Cung cấp cảnh báo phi y tế cho trường văn bản tự do và gắn nhãn "Độ tự tin từ mô hình (tự đánh giá, chưa qua kiểm chứng lâm sàng)".
 5. **Kiểm chứng:**
-   - 34/34 Backend tests PASS (bao gồm `AiWorkoutProposalRealFastApiIntegrationTest` chạy qua HTTP tới tiến trình FastAPI Uvicorn thật).
+   - 36/36 Backend tests PASS (bao gồm `AiWorkoutProposalRealFastApiIntegrationTest` chạy qua HTTP tới tiến trình FastAPI Uvicorn thật và rollback khi audit thất bại).
    - 30/30 Mobile tests PASS và 0 lỗi TypeScript.
    - Không phát sinh chi phí OpenAI ($0.00 spend).
 ```
