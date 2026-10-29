@@ -261,6 +261,35 @@ export function AiWorkoutProposalModal({
             <WorkoutCard testID="ai-proposal-error-banner">
               <Text style={[styles.errorTitle, { color: theme.dangerText }]}>Lỗi xử lý</Text>
               <Text style={[styles.errorBody, { color: theme.textPrimary }]}>{errorMessage}</Text>
+              {proposal ? (
+                <TouchableOpacity
+                  testID="reload-ai-proposal-button"
+                  style={[styles.smallActionBtn, { borderColor: theme.border, marginTop: 8, alignSelf: 'flex-start' }]}
+                  onPress={async () => {
+                    try {
+                      const latest = await aiWorkoutProposalApi.getRecommendation(proposal.recommendationId);
+                      setProposal({
+                        ...proposal,
+                        revision: latest.revision,
+                        isCustomized: latest.isCustomized,
+                        title: latest.title,
+                        explanation: latest.explanation,
+                        structuredPayload: latest.structuredPayload,
+                        originalPayload: latest.originalPayload ?? proposal.originalPayload,
+                      });
+                      setErrorMessage(null);
+                      setIsEditing(false);
+                      setEditablePayload(null);
+                    } catch (e) {
+                      setErrorMessage(getWorkoutProposalErrorMessage(e));
+                    }
+                  }}
+                >
+                  <Text style={[styles.smallActionBtnText, { color: theme.primary }]}>
+                    Tải lại đề xuất
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </WorkoutCard>
           ) : null}
 
