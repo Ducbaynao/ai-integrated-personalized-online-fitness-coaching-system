@@ -44,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -292,6 +293,56 @@ class AiWorkoutProposalServiceUnitTest {
         assertThatThrownBy(() -> service.acceptRecommendation(cmd))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
                 .hasMessageContaining("Idempotency conflict");
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Audit service failure bubbles up to trigger transaction rollback")
+    void acceptRecommendation_auditServiceFailure_throwsException() {
+        UUID recId = UUID.randomUUID();
+        UUID createdPlanId = UUID.randomUUID();
+        UUID createdVersionId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String proposalPayload = """
+                {
+                  "name": "Weekly Strength",
+                  "description": "4-day split",
+                  "weeklySchedule": []
+                }
+                """;
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("Proposed Workout Plan")
+                .explanation("Details")
+                .structuredPayload(proposalPayload)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+
+        when(workoutPlanCommandUseCase.createDraft(any()))
+                .thenReturn(new CommandResult(createdPlanId, createdVersionId, 1, WorkoutPlanStatus.DRAFT, 0L, now, false));
+        when(workoutPlanCommandUseCase.activate(any()))
+                .thenReturn(new CommandResult(createdPlanId, createdVersionId, 1, WorkoutPlanStatus.ACTIVE, 1L, now, false));
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        doThrow(new RuntimeException("Audit persistence failed")).when(auditService).recordAudit(any());
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-fail-audit", "Note");
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Audit persistence failed");
     }
 
     @Test

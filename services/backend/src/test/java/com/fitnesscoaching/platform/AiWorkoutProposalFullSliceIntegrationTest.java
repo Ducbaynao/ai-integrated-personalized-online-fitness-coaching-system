@@ -395,6 +395,64 @@ class AiWorkoutProposalFullSliceIntegrationTest {
     }
 
     @Test
+    @DisplayName("Audit failure during accept: rolls back entire transaction leaving recommendation PENDING with no new plan or application")
+    void auditFailureDuringAccept_rollsBackEntireTransaction() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                studentId, studentId, "gen-audit-fail-test", Map.of()
+        ));
+
+        // Install temporary trigger on fitness.audit_logs to simulate failure during mandatory audit recording
+        jdbc.execute("""
+            CREATE OR REPLACE FUNCTION fitness.test_fail_audit_trigger() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.action = 'AI_RECOMMENDATION_APPLIED' THEN
+                    RAISE EXCEPTION 'Simulated mandatory audit failure';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """);
+        jdbc.execute("""
+            CREATE TRIGGER trg_test_fail_audit
+            BEFORE INSERT ON fitness.audit_logs
+            FOR EACH ROW EXECUTE FUNCTION fitness.test_fail_audit_trigger();
+        """);
+
+        try {
+            // Attempt to accept proposal -> must fail when recording immutable audit inside transaction
+            assertThatThrownBy(() -> proposalService.acceptRecommendation(new AcceptRecommendationCommand(
+                    studentId, proposal.recommendationId(), "accept-audit-fail-key", "Note"
+            ))).isInstanceOf(Exception.class)
+                    .hasMessageContaining("Simulated mandatory audit failure");
+
+            // Independent reads outside test transaction:
+            // 1. Recommendation must STILL be PENDING
+            AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+            assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+            assertThat(rec.decidedBy()).isNull();
+            assertThat(rec.targetEntityId()).isNull();
+
+            // 2. No application / receipt row created
+            assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+
+            // 3. No workout plan or versions created for this student
+            Integer planCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.workout_plans WHERE student_id = ?",
+                    Integer.class,
+                    studentId
+            );
+            assertThat(planCount).isZero();
+
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS trg_test_fail_audit ON fitness.audit_logs;");
+            jdbc.execute("DROP FUNCTION IF EXISTS fitness.test_fail_audit_trigger();");
+        }
+    }
+
+    @Test
     @DisplayName("Concurrent double-accept: exactly one succeeds as primary, second succeeds as replay, only 1 plan created")
     void concurrentDoubleAccept_createsExactlyOnePlan() throws Exception {
         UUID studentId = person("STUDENT");
