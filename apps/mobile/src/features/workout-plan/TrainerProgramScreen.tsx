@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AiWorkoutProposalModal } from './components/AiWorkoutProposalModal';
 import { ScrollView, Text, useColorScheme } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ export function TrainerProgramScreen({ relationshipId }: { relationshipId: strin
   const sharingQuery = useSharingSummary(relationshipId);
   const relationship = relationshipQuery.data?.relationship ?? null;
   const studentId = relationship?.studentId ?? '';
+  const [isAiProposalVisible, setIsAiProposalVisible] = useState(false);
   const planPermission = sharingQuery.data?.items.find((item) => item.dataScope === 'WORKOUT_PLAN');
   const historyPermission = sharingQuery.data?.items.find((item) => item.dataScope === 'WORKOUT_PLAN_HISTORY');
   const canView = planPermission?.state === 'ALLOWED' && ['VIEW', 'CONTRIBUTE', 'MANAGE'].includes(planPermission.accessLevel ?? '');
@@ -69,8 +71,20 @@ export function TrainerProgramScreen({ relationshipId }: { relationshipId: strin
       <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.readContext === 'HISTORICAL' ? 'Bản ghi lịch sử' : 'Kế hoạch hiện tại'} · {plan.decisionOwnerType === 'TRAINER' ? 'Huấn luyện viên sở hữu quyết định' : 'Học viên sở hữu quyết định'}</Text>
       <CoachingButton label="Xem kế hoạch" secondary onPress={() => router.push(`/students/${studentId}/workout-plans/${plan.id}?relationshipId=${relationshipId}` as never)} />
     </CoachingCard>) : null}
+    {canManage && relationship.status === 'ACTIVE' ? <CoachingButton testID="trainer-ai-proposal-button" label="Đề xuất giáo án 1 tuần (AI)" secondary onPress={() => setIsAiProposalVisible(true)} /> : null}
     {canManage && relationship.status === 'ACTIVE' ? <CoachingButton testID="create-plan-button" label="Tạo kế hoạch mới" onPress={() => router.push(`/coaching/${relationshipId}/workout-plans/new` as never)} /> : null}
     {plansQuery.hasNextPage ? <CoachingButton label={plansQuery.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm kế hoạch'} busy={plansQuery.isFetchingNextPage} disabled={plansQuery.isFetchingNextPage} secondary onPress={() => plansQuery.fetchNextPage()} /> : null}
     <CoachingButton label="Quay lại quan hệ" secondary onPress={() => router.back()} />
+      <AiWorkoutProposalModal
+      visible={isAiProposalVisible}
+      studentId={studentId}
+      isTrainer={true}
+      onClose={() => setIsAiProposalVisible(false)}
+      onPlanApplied={(planId) => {
+        setIsAiProposalVisible(false);
+        plansQuery.refetch();
+        router.push(`/students/${studentId}/workout-plans/${planId}?relationshipId=${relationshipId}` as never);
+      }}
+    />
   </ScrollView>;
 }

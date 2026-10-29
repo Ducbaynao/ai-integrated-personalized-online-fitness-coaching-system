@@ -3940,6 +3940,138 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/F01KnowledgeQueryResponse' }
 
+  /ai/workout-proposals:
+    post:
+      tags: [AI Workout Proposal (F02)]
+      operationId: generateWorkoutProposal
+      summary: Generate 1-week workout plan proposal (F02)
+      description: >-
+        Requests an AI-assisted 1-week workout plan proposal.
+        In SELF_DIRECTED mode, the student requests for self.
+        In HUMAN_COACH mode, the assigned trainer requests for the student.
+        Returns a PENDING recommendation with structured proposal payload.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkoutProposalRequest' }
+      responses:
+        '200':
+          description: Proposal generated successfully in PENDING status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutProposalResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /ai/recommendations/{recommendationId}:
+    get:
+      tags: [AI Recommendations]
+      operationId: getRecommendationDetail
+      summary: Get AI recommendation detail by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recommendation detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiRecommendationDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/recommendations/{recommendationId}/accept:
+    post:
+      tags: [AI Recommendations]
+      operationId: acceptRecommendation
+      summary: Atomic accept-and-apply recommendation
+      description: >-
+        Executes atomic Accept-and-Apply transaction. Locks recommendation,
+        verifies authority and expiry, executes domain commands, and records application receipt.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcceptRecommendationRequest' }
+      responses:
+        '200':
+          description: Recommendation accepted and applied successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptRecommendationResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Conflict (expired recommendation, status not PENDING, or active plan conflict)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/recommendations/{recommendationId}/reject:
+    post:
+      tags: [AI Recommendations]
+      operationId: rejectRecommendation
+      summary: Reject recommendation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectRecommendationRequest' }
+      responses:
+        '200':
+          description: Recommendation rejected successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectRecommendationResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /admin/content/knowledge/import:
     post:
       tags: [Admin Content Knowledge]
@@ -9362,6 +9494,85 @@ components:
       required: [enabled]
       properties:
         enabled: { type: boolean }
+        reason: { type: string }
+
+    WorkoutProposalRequest:
+      type: object
+      properties:
+        studentId: { type: string, format: uuid }
+        preferences:
+          type: object
+          additionalProperties: true
+
+    WorkoutProposalResponse:
+      type: object
+      required: [recommendationId, aiRunId, status, decisionAuthority, title, explanation, expiresAt, createdAt, structuredPayload]
+      properties:
+        recommendationId: { type: string, format: uuid }
+        aiRunId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, EXPIRED, APPLIED] }
+        decisionAuthority: { type: string, enum: [STUDENT, TRAINER] }
+        title: { type: string }
+        explanation: { type: string }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        structuredPayload: { type: string }
+
+    AiRecommendationDetailResponse:
+      type: object
+      required: [recommendationId, aiRunId, studentId, recommendationType, title, explanation, structuredPayload, status, decisionAuthority, expiresAt, createdAt, updatedAt]
+      properties:
+        recommendationId: { type: string, format: uuid }
+        aiRunId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        coachingPeriodId: { type: string, format: uuid }
+        recommendationType: { type: string }
+        title: { type: string }
+        explanation: { type: string }
+        structuredPayload: { type: string }
+        status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, EXPIRED, APPLIED] }
+        decisionAuthority: { type: string, enum: [STUDENT, TRAINER] }
+        targetEntityType: { type: string }
+        targetEntityId: { type: string, format: uuid }
+        decisionReason: { type: string }
+        decidedBy: { type: string, format: uuid }
+        decidedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AcceptRecommendationRequest:
+      type: object
+      required: [commandKey]
+      properties:
+        commandKey: { type: string }
+        decisionNote: { type: string }
+
+    AcceptRecommendationResponse:
+      type: object
+      required: [recommendationId, status, appliedBy, resultingEntityType, resultingEntityId, appliedAt, replayed]
+      properties:
+        recommendationId: { type: string, format: uuid }
+        status: { type: string, enum: [APPLIED] }
+        appliedBy: { type: string, format: uuid }
+        resultingEntityType: { type: string }
+        resultingEntityId: { type: string, format: uuid }
+        appliedAt: { type: string, format: date-time }
+        replayed: { type: boolean }
+
+    RejectRecommendationRequest:
+      type: object
+      properties:
+        reason: { type: string }
+
+    RejectRecommendationResponse:
+      type: object
+      required: [recommendationId, status, rejectedBy, rejectedAt]
+      properties:
+        recommendationId: { type: string, format: uuid }
+        status: { type: string, enum: [REJECTED] }
+        rejectedBy: { type: string, format: uuid }
+        rejectedAt: { type: string, format: date-time }
         reason: { type: string }
 
 security:

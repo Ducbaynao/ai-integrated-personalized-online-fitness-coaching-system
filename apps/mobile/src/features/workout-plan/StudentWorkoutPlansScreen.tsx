@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { AiWorkoutProposalModal } from './components/AiWorkoutProposalModal';
 import { ScrollView, Text, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -12,6 +13,7 @@ export function StudentWorkoutPlansScreen() {
   const router = useRouter();
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
+  const [isAiProposalVisible, setIsAiProposalVisible] = useState(false);
   const currentQuery = useCurrentWorkoutPlan(studentId);
   const listQuery = useWorkoutPlans(studentId);
   const current = currentQuery.data;
@@ -48,6 +50,7 @@ export function StudentWorkoutPlansScreen() {
       </> : null}
     </WorkoutCard>
 
+    <WorkoutButton testID="ai-workout-proposal-button" label="Đề xuất giáo án 1 tuần (AI)" secondary onPress={() => setIsAiProposalVisible(true)} hint="AI hỗ trợ thiết kế giáo án phù hợp mục tiêu" />
     <WorkoutButton testID="create-workout-plan-button" label="Tạo kế hoạch mới" onPress={() => router.push('/workout-plans/new' as never)} hint="Backend sẽ kiểm tra chế độ SELF_DIRECTED khi lưu" />
 
     <WorkoutCard testID="workout-plan-list">
@@ -63,5 +66,17 @@ export function StudentWorkoutPlansScreen() {
       </WorkoutCard>)}
       {listQuery.hasNextPage ? <WorkoutButton label={listQuery.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm kế hoạch'} busy={listQuery.isFetchingNextPage} disabled={listQuery.isFetchingNextPage} secondary onPress={() => listQuery.fetchNextPage()} /> : null}
     </WorkoutCard>
+      <AiWorkoutProposalModal
+      visible={isAiProposalVisible}
+      studentId={studentId}
+      isTrainer={false}
+      onClose={() => setIsAiProposalVisible(false)}
+      onPlanApplied={(planId) => {
+        setIsAiProposalVisible(false);
+        currentQuery.refetch();
+        listQuery.refetch();
+        router.push(`/workout-plans/${planId}` as never);
+      }}
+    />
   </ScrollView>;
 }

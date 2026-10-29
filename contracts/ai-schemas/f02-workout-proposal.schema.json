@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f02-workout-proposal.schema.json",
+  "title": "F02 1-Week Workout Plan Proposal",
+  "description": "Structured payload for F02 AI 1-week workout plan recommendations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recommendationType",
+    "summary",
+    "reasoning",
+    "usedData",
+    "missingData",
+    "confidence",
+    "plan"
+  ],
+  "properties": {
+    "recommendationType": {
+      "type": "string",
+      "const": "WORKOUT_PLAN_PROPOSAL"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reasoning": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "usedData": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "missingData": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "durationWeeks",
+        "sessions"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string"
+        },
+        "durationWeeks": {
+          "type": "integer",
+          "const": 1
+        },
+        "sessions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "weekNumber",
+              "dayNumber",
+              "sequenceNumber",
+              "name",
+              "prescriptions"
+            ],
+            "properties": {
+              "weekNumber": {
+                "type": "integer",
+                "const": 1
+              },
+              "dayNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7
+              },
+              "sequenceNumber": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "focus": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "estimatedDurationMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300
+              },
+              "supervision": {
+                "type": "string",
+                "enum": ["SELF_PERFORMABLE", "COACH_OPTIONAL", "COACH_REQUIRED"]
+              },
+              "notes": {
+                "type": "string"
+              },
+              "prescriptions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "exerciseVariationId",
+                    "sequenceNumber",
+                    "targetSets"
+                  ],
+                  "properties": {
+                    "exerciseVariationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sequenceNumber": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "targetSets": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "targetRepsMin": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
+                    "targetRepsMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
+                    "targetLoad": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "restSeconds": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 600
+                    },
+                    "durationSeconds": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 7200
+                    },
+                    "instructions": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

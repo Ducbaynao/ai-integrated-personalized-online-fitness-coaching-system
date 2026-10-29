@@ -1,0 +1,103 @@
+{
+  "recommendationType": "WORKOUT_PLAN_PROPOSAL",
+  "summary": "1-Week Starter Resistance Training Plan focusing on upper/lower body balance and mobility.",
+  "reasoning": [
+    "Student has an active Muscle Gain goal and 3 days per week availability.",
+    "Session volume is calibrated for progressive overload with 3-4 sets per movement pattern."
+  ],
+  "usedData": [
+    "student_profile.fitness_level: BEGINNER",
+    "fitness_goal.goal_type: MUSCLE_GAIN",
+    "coaching_period.mode: SELF_DIRECTED"
+  ],
+  "missingData": [
+    "recent_1rm_assessments",
+    "detailed_injury_history"
+  ],
+  "limitations": [
+    "Plan assumes basic gym dumbbell and barbell access.",
+    "Loads should be self-regulated using RPE 7-8."
+  ],
+  "confidence": 0.92,
+  "plan": {
+    "name": "1-Week Foundations Full Body & Split",
+    "description": "Balanced 3-day strength split designed to establish baseline technique.",
+    "durationWeeks": 1,
+    "sessions": [
+      {
+        "weekNumber": 1,
+        "dayNumber": 1,
+        "sequenceNumber": 1,
+        "name": "Day 1: Upper Body Foundations",
+        "focus": "Upper body horizontal push and pull",
+        "estimatedDurationMinutes": 50,
+        "supervision": "SELF_PERFORMABLE",
+        "notes": "Warm up with 5 minutes of arm swings and band pull-aparts.",
+        "prescriptions": [
+          {
+            "exerciseVariationId": "a0000000-0000-4000-8000-000000000001",
+            "sequenceNumber": 1,
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "targetLoad": 20.0,
+            "restSeconds": 90,
+            "instructions": "Keep shoulder blades retracted and lower bar with control."
+          },
+          {
+            "exerciseVariationId": "a0000000-0000-4000-8000-000000000002",
+            "sequenceNumber": 2,
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "instructions": "Maintain neutral spine during the pull."
+          }
+        ]
+      },
+      {
+        "weekNumber": 1,
+        "dayNumber": 3,
+        "sequenceNumber": 2,
+        "name": "Day 2: Lower Body & Core",
+        "focus": "Squat and hinge movement patterns",
+        "estimatedDurationMinutes": 55,
+        "supervision": "SELF_PERFORMABLE",
+        "notes": "Ensure ankle and hip mobility warm-up.",
+        "prescriptions": [
+          {
+            "exerciseVariationId": "a0000000-0000-4000-8000-000000000003",
+            "sequenceNumber": 1,
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "targetLoad": 40.0,
+            "restSeconds": 120,
+            "instructions": "Break at hips and knees simultaneously, maintain depth to parallel."
+          }
+        ]
+      },
+      {
+        "weekNumber": 1,
+        "dayNumber": 5,
+        "sequenceNumber": 3,
+        "name": "Day 3: Full Body Conditioning",
+        "focus": "Compound endurance and posterior chain",
+        "estimatedDurationMinutes": 45,
+        "supervision": "SELF_PERFORMABLE",
+        "notes": "Pace steadily throughout sets.",
+        "prescriptions": [
+          {
+            "exerciseVariationId": "a0000000-0000-4000-8000-000000000004",
+            "sequenceNumber": 1,
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "instructions": "Full extension at the top of each rep."
+          }
+        ]
+      }
+    ]
+  }
+}
