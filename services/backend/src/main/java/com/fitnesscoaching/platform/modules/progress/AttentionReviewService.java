@@ -543,7 +543,9 @@ public class AttentionReviewService {
     }
     private UUID listPeriod(UUID actor,UUID student) {
         if (actor.equals(student)) { requireStudent(actor); return null; }
-        if (accounts.getAccountStatus(actor).orElse(null)!=AccountStatus.ACTIVE || !trainers.canCoach(actor))
+        if (accounts.getAccountStatus(actor).orElse(null)!=AccountStatus.ACTIVE
+                || accounts.getAccountStatus(student).orElse(null)!=AccountStatus.ACTIVE
+                || !trainers.canCoach(actor))
             throw fail("ATTENTION_NOT_FOUND",404);
         var context=contexts.findEffectiveContext(student,false).orElse(null);
         if (context==null || context.mode()!=CurrentCoachingContextQuery.Mode.HUMAN_COACH
@@ -553,6 +555,7 @@ public class AttentionReviewService {
     }
     private void requireTrainer(UUID actor,UUID student,UUID period,boolean workoutEvidence,boolean lock) {
         if (period==null || accounts.getAccountStatus(actor).orElse(null)!=AccountStatus.ACTIVE
+                || accounts.getAccountStatus(student).orElse(null)!=AccountStatus.ACTIVE
                 || !trainers.canCoach(actor)) throw fail("ATTENTION_NOT_FOUND",404);
         var context=contexts.findEffectiveContext(student,lock).orElse(null);
         if (context==null || context.mode()!=CurrentCoachingContextQuery.Mode.HUMAN_COACH

@@ -190,6 +190,33 @@ class AttentionReviewIntegrationTest {
         assertThat(service.signal(student,signal.id()).id()).isEqualTo(signal.id());
     }
 
+    @Test void disabledStudentConcealsAttentionAndReviewFromCurrentTrainer() throws Exception {
+        UUID student=student(), trainer=trainer();
+        activate(student,trainer);
+        service.confirmTimezone(student,"Etc/UTC",UUID.randomUUID());
+        service.evaluate();
+        var task=service.reviews(student,student,0,20).items().getFirst();
+        mvc.perform(get("/api/v1/students/{id}/review-tasks",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(task.id().toString()));
+
+        jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?",student);
+        mvc.perform(get("/api/v1/students/{id}/review-tasks",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/review-tasks/{id}",task.id())
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/students/{id}/attention-signals",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/students/{id}/attention-return-status",student)
+                .with(jwt().jwt(j->j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_review_tasks WHERE id=?",
+                Integer.class,task.id())).isEqualTo(1);
+    }
+
     @Test void invalidTimezoneAndStaleReviewCommandHaveStableHttpErrors() throws Exception {
         UUID student=student(),trainer=trainer();
         activate(student,trainer);
