@@ -77,6 +77,8 @@ Knowledge Document owns ordered Knowledge Versions. A version owns chunks and em
 
 Admin Role maps to Permissions. Moderation Case, Support Case, Privileged Data Access, Data Correction Action, Feature Flag, System Configuration, Job Execution, and Integration Status are explicit platform records. Audit Log is append-only from the Admin UI perspective and identifies actor, action, target, before/after or change reference, request/correlation, reason, and time as policy permits.
 
+V50 is a **local, default-off candidate** for Account Erasure, not proof of completed deletion. One Account-owned request has a private status capability, fenced worker lease, per-object S3 work items and immutable events; Chat, Notification, Auth and Audit effects run through owner ports. Ambiguous legacy media ownership is concealed but needs review rather than an inferred object delete. Restricted audit correction requires an append-only fingerprint event; other changes to audit history remain forbidden. `DOMAIN_REVIEW_PENDING` explicitly means that other domain-owned PII and backup/provider copies have not been verified clean. There is no hold mutation authority or operational backup lifecycle yet.
+
 ## Index candidates
 
 Indexes follow measured queries. Likely candidates include:

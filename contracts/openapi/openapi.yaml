@@ -1844,6 +1844,84 @@ paths:
         '503':
           description: Attachment storage unavailable before response commit. If failure occurs after streaming begins, the connection is aborted and the incomplete ZIP must be discarded.
 
+  /account-erasure-requests:
+    post:
+      tags: [Current User]
+      operationId: requestOwnAccountErasure
+      summary: Disable the active account and request asynchronous active-data erasure
+      description: >-
+        Only the current active account may request erasure. The command atomically
+        disables the account, revokes active refresh and push tokens, conceals
+        sender-authored Chat content/attachments and records durable object work. Bearer tokens
+        stop working on subsequent requests. The client must generate and retain
+        a cryptographically random 32-byte base64url statusKey and commandKey
+        before sending; after cutoff, only the request-specific status capability
+        can read progress. Same actor/key/body maps to one DB request, but bearer
+        replay after DISABLED is denied by the global authentication cutoff.
+        This candidate command is disabled by default until Account/A01 and all
+        domain-owned data gates are complete. DOMAIN_REVIEW_PENDING means the
+        Account/Chat/Notification scope was minimized, not that all active PII
+        was cleaned. A versioned/suspended or unverified-replica bucket leaves
+        object work in storage review rather than VERIFIED; HEAD 404 after a
+        delete marker is insufficient evidence of physical removal. The 30-day
+        worklist/tombstone period begins only after verified deletion and is not
+        a grace period for object bytes. The 24-hour target is not a guarantee
+        of completion.
+        Backup and provider copies remain unverified; no hold mutation is exposed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountErasureRequest' }
+      responses:
+        '202':
+          description: Cutoff committed; active-data cleanup may still be pending.
+          headers:
+            Cache-Control: { schema: { type: string, enum: [no-store] } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountErasureState' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: Account unavailable (ACCOUNT_ERASURE_NOT_FOUND).
+        '409':
+          description: Different command or status capability for an existing request (ACCOUNT_ERASURE_IDEMPOTENCY_CONFLICT).
+        '503':
+          description: Account erasure command disabled until all domain and A01 gates are complete (ACCOUNT_ERASURE_UNAVAILABLE).
+
+  /account-erasure-requests/{requestId}:
+    get:
+      tags: [Current User]
+      operationId: getOwnAccountErasureStatus
+      security: []
+      summary: Read only the erasure progress using its private status capability
+      description: >-
+        This is not an account-data read and does not reactivate a disabled JWT.
+        A wrong request ID or status key is concealed as the same 404. The key
+        must be transmitted in a private header, never a URL, and the response
+        is no-store. ACTIVE_DATA_CLEANED, if reached, never means backup or
+        Expo/provider copies have been verified erased.
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: X-Erasure-Status-Key
+          in: header
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$', writeOnly: true }
+      responses:
+        '200':
+          description: Request progress only, without account or Chat data.
+          headers:
+            Cache-Control: { schema: { type: string, enum: [no-store] } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountErasureState' }
+        '404':
+          description: No request with this capability (ACCOUNT_ERASURE_NOT_FOUND).
+
   /student-profiles:
     post:
       tags: [Student Profile]
@@ -7390,6 +7468,37 @@ components:
                   type: boolean
                   description: Derived from canonical coaching eligibility policy; requires active account, active TRAINER role, active profile, VERIFIED status, and ACTIVE activity status.
             settings: { $ref: '#/components/schemas/UserSettings' }
+
+    AccountErasureRequest:
+      type: object
+      additionalProperties: false
+      required: [commandKey, statusKey]
+      properties:
+        commandKey: { type: string, format: uuid }
+        statusKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          description: Cryptographically random 32 bytes, unpadded base64url; retain privately for status reads after bearer cutoff.
+          writeOnly: true
+
+    AccountErasureState:
+      type: object
+      additionalProperties: false
+      required: [id, status, requestedAt, targetAt, backupState, providerState]
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [REQUESTED, PROCESSING, RETRYABLE, HELD, DOMAIN_REVIEW_PENDING, ACTIVE_DATA_CLEANED]
+          description: DOMAIN_REVIEW_PENDING is incomplete. ACTIVE_DATA_CLEANED is reserved for verified coverage of every active-data owner and is not produced by the current default-off worker.
+        requestedAt: { type: string, format: date-time }
+        targetAt:
+          type: string
+          format: date-time
+          description: Approved 24-hour processing target, not an SLA or proof of completion.
+        activeCleanedAt: { type: [string, 'null'], format: date-time }
+        backupState: { type: string, enum: [BACKUP_UNVERIFIED] }
+        providerState: { type: string, enum: [PROVIDER_UNVERIFIED] }
 
     UpdateCurrentUserRequest:
       type: object

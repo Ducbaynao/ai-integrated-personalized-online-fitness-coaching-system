@@ -10,6 +10,8 @@ import com.fitnesscoaching.platform.modules.notification.InAppNotificationServic
 import com.fitnesscoaching.platform.modules.notification.ExpoPushGateway;
 import com.fitnesscoaching.platform.modules.notification.PushDeliveryWorker;
 import com.fitnesscoaching.platform.modules.user.application.service.AccountDataExportService;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureService;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureWorker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,7 +57,8 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@TestPropertySource(properties = {"app.scheduling.enabled=false", "push.expo.enabled=true"})
+@TestPropertySource(properties = {"app.scheduling.enabled=false", "push.expo.enabled=true",
+        "account.erasure.request-enabled=true", "account.erasure.worker-enabled=false"})
 class ChatNotificationIntegrationTest {
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
@@ -81,6 +84,8 @@ class ChatNotificationIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ChatUpdatesSocket socket;
     @Autowired AccountDataExportService dataExport;
+    @Autowired AccountErasureService erasure;
+    @Autowired AccountErasureWorker erasureWorker;
     @MockitoBean ChatObjectStorage storage;
     @MockitoBean ClamdAttachmentScanner scanner;
     @MockitoBean ExpoPushGateway expo;
@@ -358,6 +363,129 @@ class ChatNotificationIntegrationTest {
                         .with(jwt().jwt(j -> j.subject(student.toString()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("ACCOUNT_DATA_NOT_FOUND"));
+    }
+
+    @Test void erasureKeepsOtherPartysMessageButConcealsAndDeletesOnlySendersObject() {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        ChatService.Message sent = chat.sendAttachment(student, student, "private.png", "image/png",
+                png, UUID.randomUUID());
+        ChatService.Message other = chat.send(trainer, student, "Retained trainer message", UUID.randomUUID());
+        chat.acknowledge(student, other.id(), "READ");
+        jdbc.update("""
+                UPDATE fitness.conversation_members SET is_muted=true,last_read_at=clock_timestamp()
+                WHERE conversation_id=? AND user_id=?
+                """, sent.conversationId(), student);
+        byte[] secret = new byte[32];
+        new java.security.SecureRandom().nextBytes(secret);
+        String key = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+        var request = erasure.request(student, UUID.randomUUID(), key);
+        assertThat(jdbc.queryForObject("SELECT body FROM fitness.messages WHERE id=?",
+                String.class, sent.id())).isNull();
+        assertThat(jdbc.queryForObject("SELECT body FROM fitness.messages WHERE id=?",
+                String.class, other.id())).isEqualTo("Retained trainer message");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.media_files mf JOIN fitness.message_attachments ma ON ma.media_id=mf.id
+                WHERE ma.id=? AND mf.deleted_at IS NOT NULL
+                """, Integer.class, sent.attachmentId())).isEqualTo(1);
+        assertThat(erasureWorker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request.id())).isEqualTo("DOMAIN_REVIEW_PENDING");
+        var page = chat.messages(trainer, sent.conversationId(), 0, 20);
+        var redacted = page.items().stream().filter(m -> m.id().equals(sent.id())).findFirst().orElseThrow();
+        var retained = page.items().stream().filter(m -> m.id().equals(other.id())).findFirst().orElseThrow();
+        assertThat(redacted.senderId()).isNull();
+        assertThat(redacted.body()).isNull();
+        assertThat(redacted.attachmentId()).isNull();
+        assertThat(retained.body()).isEqualTo("Retained trainer message");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.message_read_receipts
+                WHERE user_id=? AND (delivered_at IS NOT NULL OR read_at IS NOT NULL)
+                """, Integer.class, student)).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.conversation_members
+                WHERE user_id=? AND (last_read_at IS NOT NULL OR is_muted)
+                """, Integer.class, student)).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.account_erasure_objects WHERE request_id=? AND status='VERIFIED'
+                """, Integer.class, request.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.notifications WHERE recipient_user_id=?",
+                Integer.class, student)).isZero();
+    }
+
+    @Test void legacyAttachmentWithoutVerifiedOwnerIsConcealedButNotPhysicallyDeleted() {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        var sent = chat.sendAttachment(student, student, "legacy.png", "image/png", png, UUID.randomUUID());
+        jdbc.update("""
+                UPDATE fitness.media_files mf SET owner_user_id=NULL
+                FROM fitness.message_attachments ma WHERE ma.media_id=mf.id AND ma.id=?
+                """, sent.attachmentId());
+        byte[] secret = new byte[32];
+        new java.security.SecureRandom().nextBytes(secret);
+        String key = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+        var request = erasure.request(student, UUID.randomUUID(), key);
+        assertThat(jdbc.queryForObject("SELECT body FROM fitness.messages WHERE id=?",
+                String.class, sent.id())).isNull();
+        assertThat(jdbc.queryForObject("""
+                SELECT o.status FROM fitness.account_erasure_objects o
+                JOIN fitness.message_attachments ma ON ma.media_id=o.media_id
+                WHERE o.request_id=? AND ma.id=?
+                """, String.class, request.id(), sent.attachmentId())).isEqualTo("OWNER_REVIEW_REQUIRED");
+        assertThat(chat.messages(trainer, sent.conversationId(), 0, 10).items().getFirst().attachmentId()).isNull();
+        assertThat(erasureWorker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request.id())).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.account_erasure_objects
+                WHERE request_id=? AND status='VERIFIED'
+                """, Integer.class, request.id())).isZero();
+    }
+
+    @Test void mediaReferencedByTwoMessagesIsConcealedAndRequiresOwnerReview() {
+        UUID student = student(), trainer = trainer();
+        activate(student, trainer);
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1};
+        when(storage.bucket()).thenReturn("private-chat-test");
+        var sent = chat.sendAttachment(student, student, "shared.png", "image/png", png, UUID.randomUUID());
+        var other = chat.send(trainer, student, "Keep this message", UUID.randomUUID());
+        UUID media = jdbc.queryForObject("""
+                SELECT media_id FROM fitness.message_attachments WHERE id=?
+                """, UUID.class, sent.attachmentId());
+        UUID secondLink = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.message_attachments(id,message_id,media_id)
+                VALUES (?,?,?)
+                """, secondLink, other.id(), media);
+        String objectKey = jdbc.queryForObject("SELECT object_key FROM fitness.media_files WHERE id=?",
+                String.class, media);
+        byte[] secret = new byte[32];
+        new java.security.SecureRandom().nextBytes(secret);
+        var request = erasure.request(student, UUID.randomUUID(),
+                java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret));
+        assertThat(jdbc.queryForObject("SELECT body FROM fitness.messages WHERE id=?",
+                String.class, sent.id())).isNull();
+        assertThat(jdbc.queryForObject("SELECT body FROM fitness.messages WHERE id=?",
+                String.class, other.id())).isEqualTo("Keep this message");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?
+                """, String.class, request.id(), media)).isEqualTo("OWNER_REVIEW_REQUIRED");
+        assertThatThrownBy(() -> chat.download(trainer, sent.attachmentId()))
+                .isInstanceOf(ChatFailure.class).hasMessage("CHAT_ATTACHMENT_NOT_FOUND");
+        assertThatThrownBy(() -> chat.download(trainer, secondLink))
+                .isInstanceOf(ChatFailure.class).hasMessage("CHAT_ATTACHMENT_NOT_FOUND");
+        assertThat(erasureWorker.processOne()).isTrue();
+        verify(storage, never()).deleteAndVerify("private-chat-test", objectKey);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request.id())).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(chat.messages(trainer, other.conversationId(), 0, 10).items().stream()
+                .filter(row -> row.id().equals(other.id())).findFirst().orElseThrow().body())
+                .isEqualTo("Keep this message");
     }
 
     @Test void accountExportStopsStreamingWhenAccountIsDisabledMidResponse() {

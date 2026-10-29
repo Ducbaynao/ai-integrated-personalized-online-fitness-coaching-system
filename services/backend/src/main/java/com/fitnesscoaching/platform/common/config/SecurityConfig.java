@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verifications/confirmations").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/sessions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token-refreshes").permitAll()
+                        // Only the high-entropy request-specific status capability survives bearer cutoff.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/account-erasure-requests/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/internal/**").permitAll()
                         .anyRequest().authenticated()
