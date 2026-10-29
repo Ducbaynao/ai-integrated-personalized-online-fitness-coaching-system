@@ -173,6 +173,74 @@ class AccountErasureHttpIntegrationTest {
                 Integer.class, request)).isGreaterThanOrEqualTo(2);
     }
 
+    @Test void legacyChatProvidersAreConcealedAndRetainedForObjectReview() throws Exception {
+        UUID user = UUID.randomUUID(), conversation = UUID.randomUUID(), message = UUID.randomUUID();
+        UUID unsupported = UUID.randomUUID(), unknownBucket = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?,?,'hash','Legacy Sender','ACTIVE')
+                """, user, user + "@example.com");
+        jdbc.update("""
+                INSERT INTO fitness.conversations(id,conversation_type,created_by)
+                VALUES (?,'SUPPORT',?)
+                """, conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.messages(id,conversation_id,sender_id,message_type)
+                VALUES (?,?,?,'IMAGE')
+                """, message, conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                    content_type,size_bytes,media_purpose,visibility,scan_status)
+                VALUES (?,?,'LEGACY_STORE','legacy-bucket','legacy/known','image/png',1,
+                    'CHAT_ATTACHMENT','PRIVATE','CLEAN')
+                """, unsupported, user);
+        jdbc.update("""
+                INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                    content_type,size_bytes,media_purpose,visibility,scan_status)
+                VALUES (?,?,'LEGACY_STORE',NULL,'legacy/unknown','image/png',1,
+                    'CHAT_ATTACHMENT','PRIVATE','CLEAN')
+                """, unknownBucket, user);
+        jdbc.update("INSERT INTO fitness.message_attachments(message_id,media_id) VALUES (?,?)",
+                message, unsupported);
+        jdbc.update("INSERT INTO fitness.message_attachments(message_id,media_id) VALUES (?,?)",
+                message, unknownBucket);
+
+        String response = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
+                .readTree(response).get("id").asText());
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?
+                """, String.class, request, unsupported)).isEqualTo("STORAGE_REVIEW_REQUIRED");
+        assertThat(jdbc.queryForObject("""
+                SELECT last_error_code FROM fitness.account_erasure_objects
+                WHERE request_id=? AND media_id=?
+                """, String.class, request, unsupported)).isEqualTo("STORAGE_PROVIDER_UNSUPPORTED");
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?
+                """, String.class, request, unknownBucket)).isEqualTo("OWNER_REVIEW_REQUIRED");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.media_files WHERE id IN (?,?) AND deleted_at IS NOT NULL
+                """, Integer.class, unsupported, unknownBucket)).isEqualTo(2);
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_requests WHERE id=?
+                """, String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("""
+                SELECT last_error_code FROM fitness.account_erasure_requests WHERE id=?
+                """, String.class, request)).isEqualTo("STORAGE_PROVIDER_UNSUPPORTED");
+        assertThat(jdbc.queryForObject("SELECT sender_id FROM fitness.messages WHERE id=?",
+                UUID.class, message)).isEqualTo(user);
+        assertThat(jdbc.queryForObject("SELECT display_name FROM fitness.users WHERE id=?",
+                String.class, user)).isEqualTo("Legacy Sender");
+        org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                .deleteAndVerify(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
     @Test void objectFailureRemainsRetryableAndTwoWorkersCannotClaimSameRequest() throws Exception {
         UUID user = UUID.randomUUID(), media = UUID.randomUUID(), command = UUID.randomUUID();
         String statusKey = newStatusKey();

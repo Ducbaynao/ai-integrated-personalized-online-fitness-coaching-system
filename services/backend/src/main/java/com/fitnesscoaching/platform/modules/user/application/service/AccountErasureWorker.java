@@ -128,8 +128,15 @@ public class AccountErasureWorker {
                                 SELECT EXISTS(SELECT 1 FROM fitness.account_erasure_objects
                                               WHERE request_id=? AND status='STORAGE_REVIEW_REQUIRED')
                                 """, Boolean.class, request.id())));
+                boolean unsupportedProvider = storageReview && Boolean.TRUE.equals(transactions.execute(ignored ->
+                        jdbc.queryForObject("""
+                                SELECT EXISTS(SELECT 1 FROM fitness.account_erasure_objects
+                                              WHERE request_id=? AND status='STORAGE_REVIEW_REQUIRED'
+                                                AND last_error_code='STORAGE_PROVIDER_UNSUPPORTED')
+                                """, Boolean.class, request.id())));
                 release(request, ambiguous ? "DOMAIN_REVIEW_PENDING" : "PROCESSING",
-                        storageReview ? "STORAGE_TOPOLOGY_UNVERIFIED"
+                        unsupportedProvider ? "STORAGE_PROVIDER_UNSUPPORTED"
+                                : storageReview ? "STORAGE_TOPOLOGY_UNVERIFIED"
                                 : ambiguous ? "LEGACY_MEDIA_OWNER_UNVERIFIED" : null);
                 return true;
             }

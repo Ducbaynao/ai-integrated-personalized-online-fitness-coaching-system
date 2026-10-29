@@ -18,17 +18,16 @@ public class ChatAccountErasureService implements ChatAccountErasure {
     public List<ObjectReference> concealAndListSentObjects(UUID userId) {
         List<ObjectReference> objects = jdbc.query("""
                 SELECT DISTINCT mf.id,mf.bucket_name,mf.object_key,
-                       mf.owner_user_id,
+                       mf.storage_provider,mf.owner_user_id,
                        (SELECT count(*) FROM fitness.message_attachments all_links
                         WHERE all_links.media_id=mf.id)
                 FROM fitness.messages m
                 JOIN fitness.message_attachments ma ON ma.message_id=m.id
                 JOIN fitness.media_files mf ON mf.id=ma.media_id
-                WHERE m.sender_id=? AND mf.storage_provider='S3'
+                WHERE m.sender_id=?
                 """, (rs, row) -> new ObjectReference(rs.getObject(1, UUID.class),
-                rs.getString(2), rs.getString(3),
-                userId.equals(rs.getObject(4, UUID.class)) && rs.getLong(5) == 1
-                        && rs.getString(2) != null), userId);
+                rs.getString(2), rs.getString(3), rs.getString(4),
+                userId.equals(rs.getObject(5, UUID.class)) && rs.getLong(6) == 1), userId);
         jdbc.update("""
                 UPDATE fitness.media_files mf SET deleted_at=COALESCE(mf.deleted_at,clock_timestamp())
                 FROM fitness.message_attachments ma JOIN fitness.messages m ON m.id=ma.message_id

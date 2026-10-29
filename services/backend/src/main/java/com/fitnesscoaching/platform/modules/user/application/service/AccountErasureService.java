@@ -84,12 +84,16 @@ public class AccountErasureService {
             sessions.revokeForErasure(actor, at);
             notifications.revokePushAndHideInbox(actor);
             for (var object : chat.concealAndListSentObjects(actor)) {
+                boolean ownedS3 = object.ownerVerified() && "S3".equals(object.storageProvider())
+                        && object.bucket() != null;
+                String state = !object.ownerVerified() || object.bucket() == null
+                        ? "OWNER_REVIEW_REQUIRED" : ownedS3 ? "PENDING" : "STORAGE_REVIEW_REQUIRED";
                 jdbc.update("""
                         INSERT INTO fitness.account_erasure_objects
-                            (request_id,media_id,bucket_name,object_key,status)
-                        VALUES (?,?,?,?,?) ON CONFLICT (request_id,media_id) DO NOTHING
-                        """, id, object.mediaId(), object.bucket(), object.key(),
-                        object.ownerVerified() ? "PENDING" : "OWNER_REVIEW_REQUIRED");
+                            (request_id,media_id,bucket_name,object_key,status,last_error_code)
+                        VALUES (?,?,?,?,?,?) ON CONFLICT (request_id,media_id) DO NOTHING
+                        """, id, object.mediaId(), object.bucket(), object.key(), state,
+                        "STORAGE_REVIEW_REQUIRED".equals(state) ? "STORAGE_PROVIDER_UNSUPPORTED" : null);
             }
             jdbc.update("""
                     INSERT INTO fitness.user_account_status_history(user_id,from_status,to_status,changed_by,reason)
