@@ -173,6 +173,9 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 .title(title)
                 .explanation(explanation)
                 .structuredPayload(rawJson)
+                .originalPayload(rawJson)
+                .revision(1)
+                .isCustomized(false)
                 .status(AiRecommendationStatus.PENDING)
                 .decisionAuthority(authority)
                 .targetEntityType("WORKOUT_PLAN")
@@ -221,6 +224,120 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         }
 
         return rec;
+    }
+
+    @Override
+    @Transactional
+    public UpdateDraftResult updateDraft(UpdateDraftCommand command) {
+        if (command == null || command.actorId() == null || command.recommendationId() == null) {
+            throw new IllegalArgumentException("Invalid update draft command parameters.");
+        }
+        if (command.structuredPayload() == null || command.structuredPayload().isBlank()) {
+            throw new IllegalArgumentException("Structured payload is required for draft update.");
+        }
+
+        AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
+                .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + command.recommendationId()));
+
+        // 1. Verify current coaching context and decision authority
+        var currentContext = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
+        if (currentContext == null) {
+            throw new AiRunAccessDeniedException("Active coaching context required to edit draft.");
+        }
+
+        if (rec.coachingPeriodId() != null && !rec.coachingPeriodId().equals(currentContext.periodId())) {
+            throw new AiRunLifecycleConflictException("Coaching period has transitioned since recommendation was generated.");
+        }
+
+        if (currentContext.mode() == CurrentCoachingContextQuery.Mode.HUMAN_COACH) {
+            if (rec.decisionAuthority() != AiDecisionAuthority.TRAINER) {
+                throw new AiRunAccessDeniedException("Coaching mode has transitioned to HUMAN_COACH; student decision authority is invalid.");
+            }
+            if (currentContext.trainerId() == null || !command.actorId().equals(currentContext.trainerId())) {
+                throw new AiRunAccessDeniedException("Only the currently assigned coach has authority to edit this draft.");
+            }
+        } else {
+            // SELF_DIRECTED
+            if (rec.decisionAuthority() != AiDecisionAuthority.STUDENT) {
+                throw new AiRunAccessDeniedException("Coaching mode has transitioned to SELF_DIRECTED; trainer decision authority is invalid.");
+            }
+            if (!command.actorId().equals(rec.studentId())) {
+                throw new AiRunAccessDeniedException("Only the student has authority to edit this draft.");
+            }
+        }
+
+        // 2. Status and Expiration Checks
+        if (rec.status() != AiRecommendationStatus.PENDING) {
+            throw new AiRunLifecycleConflictException("Recommendation is in status " + rec.status() + " and cannot be edited.");
+        }
+
+        Instant now = Instant.now();
+        if (rec.isExpired(now)) {
+            throw new AiRunLifecycleConflictException("Recommendation has expired and cannot be edited.");
+        }
+
+        // 3. Optimistic Locking / Revision Check
+        if (rec.revision() != command.expectedRevision()) {
+            throw new AiRunLifecycleConflictException("Revision conflict: expected revision "
+                    + command.expectedRevision() + " but current is " + rec.revision());
+        }
+
+        // 4. Strict Output Validation on Modified Payload
+        F02RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(command.structuredPayload());
+        if (!validation.isValid()) {
+            throw new AiOutputValidationException("Draft payload validation failed: " + validation.failureReason());
+        }
+
+        // 5. Determine updated Title and Explanation
+        String updatedTitle = command.title() != null && !command.title().isBlank() ? command.title() : rec.title();
+        String updatedExplanation = command.explanation() != null && !command.explanation().isBlank() ? command.explanation() : rec.explanation();
+        try {
+            JsonNode root = objectMapper.readTree(command.structuredPayload());
+            if ((command.title() == null || command.title().isBlank()) && root.has("plan") && root.get("plan").has("name")) {
+                updatedTitle = root.get("plan").get("name").asText(updatedTitle);
+            }
+            if ((command.explanation() == null || command.explanation().isBlank()) && root.has("summary")) {
+                updatedExplanation = root.get("summary").asText(updatedExplanation);
+            }
+        } catch (Exception ignored) {}
+
+        int newRevision = rec.revision() + 1;
+
+        // 6. Persist Updated Draft
+        recommendationRepository.updateDraft(
+                rec.id(),
+                newRevision,
+                updatedTitle,
+                updatedExplanation,
+                command.structuredPayload(),
+                command.actorId()
+        );
+
+        // 7. Record Immutable Audit
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(command.actorId())
+                .actorRole(rec.decisionAuthority().name())
+                .action("AI_RECOMMENDATION_DRAFT_UPDATED")
+                .targetType("AI_RECOMMENDATION")
+                .targetId(rec.id())
+                .beforeDataJson(rec.structuredPayload())
+                .afterDataJson(command.structuredPayload())
+                .occurredAt(now)
+                .build());
+
+        String orig = rec.originalPayload() != null ? rec.originalPayload() : rec.structuredPayload();
+
+        return new UpdateDraftResult(
+                rec.id(),
+                newRevision,
+                true,
+                rec.status(),
+                updatedTitle,
+                updatedExplanation,
+                command.structuredPayload(),
+                orig,
+                now
+        );
     }
 
     @Override
@@ -274,12 +391,16 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                         ? payload.path("decisionNote").asText() : "";
 
                 if (command.commandKey() != null && command.commandKey().equals(savedKey)) {
-                    // Check payload identity
+                    // Check payload identity and revision consistency
                     boolean actorMatches = command.actorId().toString().equals(savedActor);
                     String cmdNote = command.decisionNote() != null ? command.decisionNote() : "";
                     boolean noteMatches = cmdNote.equals(savedNote);
+                    int savedRev = payload.has("appliedRevision") ? payload.path("appliedRevision").asInt() : 1;
+                    boolean revMatches = (command.expectedRevision() != null)
+                            ? command.expectedRevision() == savedRev
+                            : savedRev == 1;
 
-                    if (actorMatches && noteMatches) {
+                    if (actorMatches && noteMatches && revMatches) {
                         log.info("Replaying identical AcceptRecommendationCommand for key: {}", command.commandKey());
                         return new AcceptRecommendationResult(
                                 rec.id(),
@@ -307,6 +428,25 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         Instant now = Instant.now();
         if (rec.isExpired(now)) {
             throw new AiRunLifecycleConflictException("Recommendation has expired and cannot be accepted.");
+        }
+
+        // Verify revision: if provided, it must match current revision.
+        // If draft has been modified beyond v1, expectedRevision is mandatory to prevent
+        // applying an altered draft when caller only saw earlier revisions.
+        if (command.expectedRevision() != null) {
+            if (rec.revision() != command.expectedRevision()) {
+                throw new AiRunLifecycleConflictException("Revision conflict: expected revision "
+                        + command.expectedRevision() + " but current is " + rec.revision());
+            }
+        } else if (rec.revision() > 1) {
+            throw new AiRunLifecycleConflictException("Revision conflict: draft has been modified to revision "
+                    + rec.revision() + "; expectedRevision is required when accepting.");
+        }
+
+        // Re-validate payload with output validator inside transactional boundary before applying
+        F02RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(rec.structuredPayload());
+        if (!validation.isValid()) {
+            throw new AiOutputValidationException("Recommendation cannot be applied because payload is no longer valid: " + validation.failureReason());
         }
 
         // Parse structured payload into WorkoutSessionTemplates
@@ -345,7 +485,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 draftResult.planId()
         );
 
-        // 4. Save Application Record with full payload tracking
+        // 4. Save Application Record with full payload tracking including revision and provenance
         String appPayloadJson;
         try {
             appPayloadJson = objectMapper.writeValueAsString(Map.of(
@@ -353,7 +493,9 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                     "actorId", command.actorId().toString(),
                     "decisionNote", command.decisionNote() != null ? command.decisionNote() : "",
                     "createdPlanId", draftResult.planId().toString(),
-                    "planVersionId", draftResult.planVersionId() != null ? draftResult.planVersionId().toString() : ""
+                    "planVersionId", draftResult.planVersionId() != null ? draftResult.planVersionId().toString() : "",
+                    "appliedRevision", rec.revision(),
+                    "isCustomized", rec.isCustomized()
             ));
         } catch (Exception e) {
             appPayloadJson = "{}";

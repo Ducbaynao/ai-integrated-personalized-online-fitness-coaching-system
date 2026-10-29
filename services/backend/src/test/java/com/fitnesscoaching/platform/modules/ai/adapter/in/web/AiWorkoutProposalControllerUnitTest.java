@@ -11,6 +11,7 @@ import com.fitnesscoaching.platform.common.web.RequestIdFilter;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.AcceptRecommendationResult;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.RejectRecommendationResult;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.UpdateDraftResult;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.WorkoutProposalResult;
 import com.fitnesscoaching.platform.modules.ai.domain.AiDecisionAuthority;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRecommendation;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -114,6 +116,9 @@ class AiWorkoutProposalControllerUnitTest {
                 .status(AiRecommendationStatus.PENDING)
                 .decisionAuthority(AiDecisionAuthority.STUDENT)
                 .structuredPayload("{\"key\":\"value\"}")
+                .originalPayload("{\"key\":\"value\"}")
+                .revision(1)
+                .isCustomized(false)
                 .build();
 
         when(proposalUseCase.getRecommendation(actorId, recId)).thenReturn(rec);
@@ -123,7 +128,52 @@ class AiWorkoutProposalControllerUnitTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(recId.toString()))
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.title").value("Sample Recommendation"));
+                .andExpect(jsonPath("$.title").value("Sample Recommendation"))
+                .andExpect(jsonPath("$.revision").value(1))
+                .andExpect(jsonPath("$.isCustomized").value(false));
+    }
+
+    @Test
+    @DisplayName("PUT /ai/recommendations/{id}/draft: Updates draft successfully")
+    void updateDraft_returns200() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        UUID recId = UUID.randomUUID();
+
+        UpdateDraftResult result = new UpdateDraftResult(
+                recId,
+                2,
+                true,
+                AiRecommendationStatus.PENDING,
+                "Customized Plan",
+                "Customized Exp",
+                "{\"plan\":{\"name\":\"Customized Plan\"}}",
+                "{\"plan\":{\"name\":\"Original Plan\"}}",
+                Instant.now()
+        );
+
+        when(proposalUseCase.updateDraft(any())).thenReturn(result);
+
+        String requestBody = """
+                {
+                    "expectedRevision": 1,
+                    "title": "Customized Plan",
+                    "explanation": "Customized Exp",
+                    "structuredPayload": {
+                        "plan": {"name": "Customized Plan"}
+                    }
+                }
+                """;
+
+        mockMvc.perform(put("/ai/recommendations/" + recId + "/draft")
+                        .with(jwt().jwt(j -> j.subject(actorId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationId").value(recId.toString()))
+                .andExpect(jsonPath("$.revision").value(2))
+                .andExpect(jsonPath("$.isCustomized").value(true))
+                .andExpect(jsonPath("$.title").value("Customized Plan"))
+                .andExpect(jsonPath("$.structuredPayload.plan.name").value("Customized Plan"));
     }
 
     @Test
@@ -148,7 +198,8 @@ class AiWorkoutProposalControllerUnitTest {
         String requestBody = """
                 {
                     "commandKey": "accept-cmd-1",
-                    "decisionNote": "Approved"
+                    "decisionNote": "Approved",
+                    "expectedRevision": 1
                 }
                 """;
 

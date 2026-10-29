@@ -115,4 +115,39 @@ class F02RuntimeOutputValidatorUnitTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.failureReason()).contains("Malformed JSON");
     }
+
+    @Test
+    @DisplayName("Prescription with negative restSeconds or durationSeconds fails validation")
+    void negativePrescriptionFields_failsValidation() {
+        String invalidJson = """
+                {
+                    "recommendationType": "WORKOUT_PLAN_PROPOSAL",
+                    "plan": {
+                        "name": "Invalid Plan",
+                        "durationWeeks": 1,
+                        "sessions": [
+                            {
+                                "weekNumber": 1,
+                                "dayNumber": 1,
+                                "sequenceNumber": 1,
+                                "name": "Day 1",
+                                "prescriptions": [
+                                    {
+                                        "exerciseVariationId": "00000000-0000-0000-0000-000000000001",
+                                        "sequenceNumber": 1,
+                                        "targetSets": 3,
+                                        "restSeconds": -10
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+                """;
+
+        F02RuntimeOutputValidator.ValidationResult result = validator.validate(invalidJson);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.failureReason()).contains("restSeconds cannot be negative.");
+    }
 }

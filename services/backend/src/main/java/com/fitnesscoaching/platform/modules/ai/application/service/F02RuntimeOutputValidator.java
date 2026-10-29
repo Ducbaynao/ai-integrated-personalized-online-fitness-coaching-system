@@ -135,6 +135,16 @@ public class F02RuntimeOutputValidator {
                         && prescription.get("targetRepsMax").asInt() < prescription.get("targetRepsMin").asInt()) {
                     return ValidationResult.invalid("targetRepsMax cannot be less than targetRepsMin.");
                 }
+
+                if (prescription.has("restSeconds") && prescription.get("restSeconds").asInt() < 0) {
+                    return ValidationResult.invalid("restSeconds cannot be negative.");
+                }
+                if (prescription.has("durationSeconds") && prescription.get("durationSeconds").asInt() < 0) {
+                    return ValidationResult.invalid("durationSeconds cannot be negative.");
+                }
+                if (prescription.has("targetLoad") && prescription.get("targetLoad").asDouble() < 0) {
+                    return ValidationResult.invalid("targetLoad cannot be negative.");
+                }
             }
         }
 

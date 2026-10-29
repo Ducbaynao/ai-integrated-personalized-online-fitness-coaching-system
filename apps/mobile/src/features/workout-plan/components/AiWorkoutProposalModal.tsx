@@ -11,8 +11,18 @@ import {
 } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { aiWorkoutProposalApi, getWorkoutProposalErrorMessage } from '@/services/aiWorkoutProposalApi';
-import { WorkoutProposalPayload, WorkoutProposalResponse } from '@/types/aiWorkoutProposal';
-import { WorkoutButton, WorkoutCard, WorkoutState } from './WorkoutUi';
+import {
+  WorkoutProposalPayload,
+  WorkoutProposalResponse,
+  WorkoutProposalSession,
+} from '@/types/aiWorkoutProposal';
+import { WorkoutButton, WorkoutCard } from './WorkoutUi';
+
+interface ModalProposalState extends WorkoutProposalResponse {
+  revision?: number;
+  isCustomized?: boolean;
+  originalPayload?: WorkoutProposalPayload;
+}
 
 interface Props {
   visible: boolean;
@@ -38,13 +48,20 @@ export function AiWorkoutProposalModal({
 
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDeciding, setIsDeciding] = useState<boolean>(false);
-  const [proposal, setProposal] = useState<WorkoutProposalResponse | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [showOriginalComparison, setShowOriginalComparison] = useState<boolean>(false);
+
+  const [proposal, setProposal] = useState<ModalProposalState | null>(null);
+  const [editablePayload, setEditablePayload] = useState<WorkoutProposalPayload | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [appliedPlanId, setAppliedPlanId] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setErrorMessage(null);
+    setIsEditing(false);
+    setShowOriginalComparison(false);
     try {
       const res = await aiWorkoutProposalApi.generate({
         studentId,
@@ -53,12 +70,114 @@ export function AiWorkoutProposalModal({
           note: preferencesNote.trim(),
         },
       });
-      setProposal(res);
+      setProposal({
+        ...res,
+        revision: 1,
+        isCustomized: false,
+        originalPayload: res.structuredPayload,
+      });
     } catch (err) {
       setErrorMessage(getWorkoutProposalErrorMessage(err));
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleStartEdit = () => {
+    if (!proposal?.structuredPayload) return;
+    setEditablePayload(JSON.parse(JSON.stringify(proposal.structuredPayload)));
+    setIsEditing(true);
+    setErrorMessage(null);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditablePayload(null);
+    setErrorMessage(null);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!proposal || !editablePayload) return;
+    setIsSavingDraft(true);
+    setErrorMessage(null);
+    try {
+      const currentRev = proposal.revision ?? 1;
+      const res = await aiWorkoutProposalApi.updateDraft(proposal.recommendationId, {
+        expectedRevision: currentRev,
+        title: editablePayload.plan.name,
+        explanation: editablePayload.summary,
+        structuredPayload: editablePayload,
+      });
+
+      setProposal({
+        ...proposal,
+        revision: res.revision,
+        isCustomized: res.isCustomized,
+        title: res.title,
+        explanation: res.explanation,
+        structuredPayload: res.structuredPayload,
+        originalPayload: res.originalPayload ?? proposal.originalPayload,
+      });
+      setIsEditing(false);
+      setEditablePayload(null);
+    } catch (err) {
+      setErrorMessage(getWorkoutProposalErrorMessage(err));
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handleUpdateSession = (sessionIndex: number, updates: Partial<WorkoutProposalSession>) => {
+    if (!editablePayload) return;
+    const newSessions = [...editablePayload.plan.sessions];
+    newSessions[sessionIndex] = {
+      ...newSessions[sessionIndex],
+      ...updates,
+    };
+    setEditablePayload({
+      ...editablePayload,
+      plan: {
+        ...editablePayload.plan,
+        sessions: newSessions,
+      },
+    });
+  };
+
+  const handleUpdatePrescription = (
+    sessionIndex: number,
+    prescriptionIndex: number,
+    field: string,
+    value: string
+  ) => {
+    if (!editablePayload) return;
+    const newSessions = [...editablePayload.plan.sessions];
+    const newPrescriptions = [...newSessions[sessionIndex].prescriptions];
+    const currentP = { ...newPrescriptions[prescriptionIndex] };
+
+    if (field === 'targetSets') {
+      currentP.targetSets = parseInt(value, 10) || 1;
+    } else if (field === 'targetRepsMin') {
+      currentP.targetRepsMin = value ? parseInt(value, 10) || undefined : undefined;
+    } else if (field === 'targetRepsMax') {
+      currentP.targetRepsMax = value ? parseInt(value, 10) || undefined : undefined;
+    } else if (field === 'restSeconds') {
+      currentP.restSeconds = value ? parseInt(value, 10) || undefined : undefined;
+    } else if (field === 'instructions') {
+      currentP.instructions = value;
+    }
+
+    newPrescriptions[prescriptionIndex] = currentP;
+    newSessions[sessionIndex] = {
+      ...newSessions[sessionIndex],
+      prescriptions: newPrescriptions,
+    };
+    setEditablePayload({
+      ...editablePayload,
+      plan: {
+        ...editablePayload.plan,
+        sessions: newSessions,
+      },
+    });
   };
 
   const handleAccept = async () => {
@@ -68,7 +187,9 @@ export function AiWorkoutProposalModal({
     try {
       const res = await aiWorkoutProposalApi.accept(
         proposal.recommendationId,
-        decisionNote.trim() || undefined
+        decisionNote.trim() || undefined,
+        undefined,
+        proposal.revision ?? 1
       );
       setProposal({
         ...proposal,
@@ -106,6 +227,12 @@ export function AiWorkoutProposalModal({
   };
 
   const payload: WorkoutProposalPayload | null = proposal?.structuredPayload ?? null;
+  const originalPayload: WorkoutProposalPayload | null = proposal?.originalPayload ?? null;
+  const hasAuthority = proposal
+    ? proposal.decisionAuthority === 'TRAINER'
+      ? isTrainer
+      : !isTrainer
+    : false;
 
   return (
     <Modal
@@ -134,6 +261,35 @@ export function AiWorkoutProposalModal({
             <WorkoutCard testID="ai-proposal-error-banner">
               <Text style={[styles.errorTitle, { color: theme.dangerText }]}>Lỗi xử lý</Text>
               <Text style={[styles.errorBody, { color: theme.textPrimary }]}>{errorMessage}</Text>
+              {proposal ? (
+                <TouchableOpacity
+                  testID="reload-ai-proposal-button"
+                  style={[styles.smallActionBtn, { borderColor: theme.border, marginTop: 8, alignSelf: 'flex-start' }]}
+                  onPress={async () => {
+                    try {
+                      const latest = await aiWorkoutProposalApi.getRecommendation(proposal.recommendationId);
+                      setProposal({
+                        ...proposal,
+                        revision: latest.revision,
+                        isCustomized: latest.isCustomized,
+                        title: latest.title,
+                        explanation: latest.explanation,
+                        structuredPayload: latest.structuredPayload,
+                        originalPayload: latest.originalPayload ?? proposal.originalPayload,
+                      });
+                      setErrorMessage(null);
+                      setIsEditing(false);
+                      setEditablePayload(null);
+                    } catch (e) {
+                      setErrorMessage(getWorkoutProposalErrorMessage(e));
+                    }
+                  }}
+                >
+                  <Text style={[styles.smallActionBtnText, { color: theme.primary }]}>
+                    Tải lại đề xuất
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </WorkoutCard>
           ) : null}
 
@@ -218,6 +374,27 @@ export function AiWorkoutProposalModal({
                       Thẩm quyền: {proposal.decisionAuthority}
                     </Text>
                   </View>
+                  <View style={[styles.badge, { backgroundColor: theme.surfaceSubtle }]} testID="ai-proposal-revision-badge">
+                    <Text style={[styles.badgeText, { color: theme.textPrimary }]}>
+                      v{proposal.revision ?? 1}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: proposal.isCustomized ? theme.primary : theme.surfaceSubtle },
+                    ]}
+                    testID="ai-proposal-provenance-badge"
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        { color: proposal.isCustomized ? theme.textOnPrimary : theme.textSecondary },
+                      ]}
+                    >
+                      {proposal.isCustomized ? 'Đã tùy chỉnh' : 'Đề xuất AI gốc'}
+                    </Text>
+                  </View>
                 </View>
 
                 <Text style={[styles.h2, { color: theme.textPrimary }]}>
@@ -232,10 +409,233 @@ export function AiWorkoutProposalModal({
                     Độ tự tin từ mô hình (tự đánh giá, chưa qua kiểm chứng lâm sàng): {(payload.confidence * 100).toFixed(0)}%
                   </Text>
                 ) : null}
+
+                {/* Draft editing and comparison controls for PENDING */}
+                {proposal.status === 'PENDING' && !isEditing ? (
+                  <View style={styles.draftControlsRow}>
+                    {hasAuthority ? (
+                      <TouchableOpacity
+                        testID="start-edit-draft-button"
+                        style={[styles.smallActionBtn, { borderColor: theme.border }]}
+                        onPress={handleStartEdit}
+                      >
+                        <Text style={[styles.smallActionBtnText, { color: theme.primary }]}>
+                          Chỉnh sửa bản thảo
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {proposal.isCustomized && originalPayload ? (
+                      <TouchableOpacity
+                        testID="toggle-original-comparison-button"
+                        style={[styles.smallActionBtn, { borderColor: theme.border }]}
+                        onPress={() => setShowOriginalComparison(!showOriginalComparison)}
+                      >
+                        <Text style={[styles.smallActionBtnText, { color: theme.textSecondary }]}>
+                          {showOriginalComparison ? 'Ẩn bản AI gốc' : 'So sánh với bản AI gốc'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
               </WorkoutCard>
 
+              {/* Original AI Proposal comparison view */}
+              {showOriginalComparison && originalPayload ? (
+                <WorkoutCard testID="original-ai-proposal-card">
+                  <View style={[styles.badge, { backgroundColor: theme.surfaceSubtle, alignSelf: 'flex-start', marginBottom: 6 }]}>
+                    <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
+                      Bản gốc từ AI (chưa sửa)
+                    </Text>
+                  </View>
+                  <Text style={[styles.h3, { color: theme.textPrimary }]}>
+                    {originalPayload.plan.name}
+                  </Text>
+                  <Text style={[styles.body, { color: theme.textSecondary }]}>
+                    {originalPayload.summary}
+                  </Text>
+                  {originalPayload.plan.sessions.map((s, idx) => (
+                    <Text key={idx} style={[styles.bulletItem, { color: theme.textSecondary }]}>
+                      • {s.name} ({s.prescriptions.length} bài tập)
+                    </Text>
+                  ))}
+                </WorkoutCard>
+              ) : null}
+
+              {/* Editing Form when isEditing is true */}
+              {isEditing && editablePayload ? (
+                <WorkoutCard testID="ai-proposal-edit-form">
+                  <Text style={[styles.h3, { color: theme.primary }]}>Chỉnh sửa bản thảo giáo án</Text>
+
+                  <Text style={[styles.label, { color: theme.textPrimary, marginTop: 8 }]}>
+                    Tên kế hoạch:
+                  </Text>
+                  <TextInput
+                    testID="edit-plan-name-input"
+                    style={[
+                      styles.textInput,
+                      { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                    ]}
+                    value={editablePayload.plan.name}
+                    onChangeText={(val) =>
+                      setEditablePayload({
+                        ...editablePayload,
+                        plan: { ...editablePayload.plan, name: val },
+                      })
+                    }
+                  />
+
+                  <Text style={[styles.label, { color: theme.textPrimary, marginTop: 8 }]}>
+                    Tóm tắt & mục tiêu:
+                  </Text>
+                  <TextInput
+                    testID="edit-plan-summary-input"
+                    style={[
+                      styles.textInput,
+                      { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                    ]}
+                    multiline
+                    numberOfLines={2}
+                    value={editablePayload.summary}
+                    onChangeText={(val) =>
+                      setEditablePayload({
+                        ...editablePayload,
+                        summary: val,
+                      })
+                    }
+                  />
+
+                  <Text style={[styles.h3, { color: theme.textPrimary, marginTop: 12 }]}>
+                    Chi tiết các buổi tập ({editablePayload.plan.sessions.length} buổi)
+                  </Text>
+
+                  {editablePayload.plan.sessions.map((session, sIdx) => (
+                    <View key={sIdx} style={[styles.editSessionBlock, { borderColor: theme.border }]}>
+                      <Text style={[styles.label, { color: theme.textPrimary }]}>
+                        Buổi {sIdx + 1}: Tên buổi tập
+                      </Text>
+                      <TextInput
+                        testID={`edit-session-name-${sIdx}`}
+                        style={[
+                          styles.textInput,
+                          { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                        ]}
+                        value={session.name}
+                        onChangeText={(val) => handleUpdateSession(sIdx, { name: val })}
+                      />
+
+                      <Text style={[styles.label, { color: theme.textPrimary }]}>Trọng tâm:</Text>
+                      <TextInput
+                        testID={`edit-session-focus-${sIdx}`}
+                        style={[
+                          styles.textInput,
+                          { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                        ]}
+                        value={session.focus ?? ''}
+                        onChangeText={(val) => handleUpdateSession(sIdx, { focus: val })}
+                      />
+
+                      <Text style={[styles.label, { color: theme.textPrimary }]}>Thời lượng (phút):</Text>
+                      <TextInput
+                        testID={`edit-session-duration-${sIdx}`}
+                        keyboardType="numeric"
+                        style={[
+                          styles.textInput,
+                          { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                        ]}
+                        value={session.estimatedDurationMinutes ? String(session.estimatedDurationMinutes) : ''}
+                        onChangeText={(val) =>
+                          handleUpdateSession(sIdx, { estimatedDurationMinutes: parseInt(val, 10) || undefined })
+                        }
+                      />
+
+                      {session.prescriptions.map((p, pIdx) => (
+                        <View key={pIdx} style={[styles.editPrescriptionRow, { borderTopColor: theme.border }]}>
+                          <Text style={[styles.prescriptionTitle, { color: theme.textPrimary }]}>
+                            Bài {pIdx + 1} (ID: {p.exerciseVariationId.slice(0, 8)}...)
+                          </Text>
+                          <View style={styles.prescriptionInputRow}>
+                            <View style={styles.halfInput}>
+                              <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Số hiệp:</Text>
+                              <TextInput
+                                testID={`edit-prescription-sets-${sIdx}-${pIdx}`}
+                                keyboardType="numeric"
+                                style={[
+                                  styles.textInput,
+                                  { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                                ]}
+                                value={String(p.targetSets)}
+                                onChangeText={(val) => handleUpdatePrescription(sIdx, pIdx, 'targetSets', val)}
+                              />
+                            </View>
+                            <View style={styles.halfInput}>
+                              <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Số lần (min):</Text>
+                              <TextInput
+                                testID={`edit-prescription-reps-min-${sIdx}-${pIdx}`}
+                                keyboardType="numeric"
+                                style={[
+                                  styles.textInput,
+                                  { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                                ]}
+                                value={p.targetRepsMin ? String(p.targetRepsMin) : ''}
+                                onChangeText={(val) => handleUpdatePrescription(sIdx, pIdx, 'targetRepsMin', val)}
+                              />
+                            </View>
+                            <View style={styles.halfInput}>
+                              <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Số lần (max):</Text>
+                              <TextInput
+                                testID={`edit-prescription-reps-max-${sIdx}-${pIdx}`}
+                                keyboardType="numeric"
+                                style={[
+                                  styles.textInput,
+                                  { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                                ]}
+                                value={p.targetRepsMax ? String(p.targetRepsMax) : ''}
+                                onChangeText={(val) => handleUpdatePrescription(sIdx, pIdx, 'targetRepsMax', val)}
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.prescriptionInputRow}>
+                            <View style={styles.fullInput}>
+                              <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Nghỉ giữa hiệp (giây):</Text>
+                              <TextInput
+                                testID={`edit-prescription-rest-${sIdx}-${pIdx}`}
+                                keyboardType="numeric"
+                                style={[
+                                  styles.textInput,
+                                  { color: theme.textPrimary, borderColor: theme.border, backgroundColor: theme.surfaceSubtle },
+                                ]}
+                                value={p.restSeconds ? String(p.restSeconds) : ''}
+                                onChangeText={(val) => handleUpdatePrescription(sIdx, pIdx, 'restSeconds', val)}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+
+                  <View style={styles.editActionRow}>
+                    <WorkoutButton
+                      testID="save-draft-button"
+                      label={isSavingDraft ? 'Đang lưu bản thảo...' : 'Lưu bản thảo'}
+                      busy={isSavingDraft}
+                      disabled={isSavingDraft}
+                      onPress={handleSaveDraft}
+                    />
+                    <WorkoutButton
+                      testID="cancel-edit-draft-button"
+                      label="Hủy chỉnh sửa"
+                      secondary
+                      disabled={isSavingDraft}
+                      onPress={handleCancelEdit}
+                    />
+                  </View>
+                </WorkoutCard>
+              ) : null}
+
               {/* Reasoning */}
-              {payload?.reasoning && payload.reasoning.length > 0 ? (
+              {!isEditing && payload?.reasoning && payload.reasoning.length > 0 ? (
                 <WorkoutCard testID="ai-proposal-reasoning-card">
                   <Text style={[styles.h3, { color: theme.textPrimary }]}>Căn cứ đề xuất</Text>
                   {payload.reasoning.map((item, idx) => (
@@ -247,7 +647,7 @@ export function AiWorkoutProposalModal({
               ) : null}
 
               {/* Missing data & limitations */}
-              {payload?.missingData && payload.missingData.length > 0 ? (
+              {!isEditing && payload?.missingData && payload.missingData.length > 0 ? (
                 <WorkoutCard testID="ai-proposal-missing-data-card">
                   <Text style={[styles.h3, { color: theme.warningText }]}>
                     Dữ liệu còn thiếu
@@ -260,7 +660,7 @@ export function AiWorkoutProposalModal({
                 </WorkoutCard>
               ) : null}
 
-              {payload?.limitations && payload.limitations.length > 0 ? (
+              {!isEditing && payload?.limitations && payload.limitations.length > 0 ? (
                 <WorkoutCard testID="ai-proposal-limitations-card">
                   <Text style={[styles.h3, { color: theme.textSecondary }]}>Giới hạn lâm sàng & thực hành</Text>
                   {payload.limitations.map((item, idx) => (
@@ -271,8 +671,8 @@ export function AiWorkoutProposalModal({
                 </WorkoutCard>
               ) : null}
 
-              {/* Sessions & Prescriptions */}
-              {payload?.plan?.sessions ? (
+              {/* Sessions & Prescriptions View Mode */}
+              {!isEditing && payload?.plan?.sessions ? (
                 <WorkoutCard testID="ai-proposal-sessions-card">
                   <Text style={[styles.h3, { color: theme.textPrimary }]}>
                     Lịch tập 1 tuần ({payload.plan.sessions.length} buổi)
@@ -302,13 +702,15 @@ export function AiWorkoutProposalModal({
               ) : null}
 
               {/* Decision Section */}
-              {proposal.status === 'PENDING' ? (
+              {!isEditing && proposal.status === 'PENDING' ? (
                 <WorkoutCard testID="ai-proposal-decision-card">
                   <Text style={[styles.h3, { color: theme.textPrimary }]}>Quyết định thẩm quyền</Text>
                   <Text style={[styles.body, { color: theme.textSecondary }]}>
                     {proposal.decisionAuthority === 'TRAINER' && !isTrainer
                       ? 'Lưu ý: Bạn đang ở chế độ Huấn luyện viên. Chỉ Huấn luyện viên phụ trách mới có thẩm quyền chấp thuận đề xuất này.'
-                      : 'Khi chấp thuận, kế hoạch 1 tuần sẽ được tự động tạo và kích hoạt trong hệ thống.'}
+                      : 'Khi chấp thuận, kế hoạch 1 tuần (phiên bản v' +
+                        (proposal.revision ?? 1) +
+                        ') sẽ được tự động tạo và kích hoạt trong hệ thống.'}
                   </Text>
 
                   <Text style={[styles.label, { color: theme.textPrimary, marginTop: 8 }]}>
@@ -335,14 +737,14 @@ export function AiWorkoutProposalModal({
                       testID="accept-ai-proposal-button"
                       label={isDeciding ? 'Đang áp dụng...' : 'Chấp thuận & Áp dụng'}
                       busy={isDeciding}
-                      disabled={isDeciding}
+                      disabled={isDeciding || !hasAuthority}
                       onPress={handleAccept}
                     />
                     <WorkoutButton
                       testID="reject-ai-proposal-button"
                       label="Từ chối đề xuất"
                       secondary
-                      disabled={isDeciding}
+                      disabled={isDeciding || !hasAuthority}
                       onPress={handleReject}
                     />
                   </View>
@@ -448,16 +850,17 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 8,
   },
   badge: {
-    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 4,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   metaText: {
@@ -466,7 +869,7 @@ const styles = StyleSheet.create({
   bulletItem: {
     fontSize: 13,
     lineHeight: 18,
-    marginVertical: 2,
+    marginBottom: 4,
   },
   sessionBlock: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -479,24 +882,73 @@ const styles = StyleSheet.create({
   },
   sessionMeta: {
     fontSize: 12,
-    marginBottom: 4,
+    marginTop: 2,
   },
   prescriptionRow: {
-    paddingVertical: 2,
+    marginTop: 4,
   },
   prescriptionText: {
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
   },
   decisionActions: {
-    marginTop: 12,
+    flexDirection: 'row',
     gap: 8,
+    marginTop: 12,
   },
   errorTitle: {
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   errorBody: {
     fontSize: 13,
+    lineHeight: 18,
+  },
+  draftControlsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  smallActionBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  smallActionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  editSessionBlock: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 8,
+  },
+  editPrescriptionRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  prescriptionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  prescriptionInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  halfInput: {
+    flex: 1,
+  },
+  fullInput: {
+    flex: 1,
+  },
+  editActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
 });

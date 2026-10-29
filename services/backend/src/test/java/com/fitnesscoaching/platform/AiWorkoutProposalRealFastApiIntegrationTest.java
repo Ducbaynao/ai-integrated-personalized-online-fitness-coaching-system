@@ -458,4 +458,103 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
         AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.REJECTED);
     }
+
+    @Test
+    @DisplayName("Multi-Tier Edit Draft: Real FastAPI -> PUT /draft increments revision -> accept applies edited plan")
+    void multiTier_editDraft_andApplyEditedVersion_succeeds() throws Exception {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+        String studentToken = generateToken(studentId, "STUDENT");
+
+        UUID otherTrainerId = person("TRAINER");
+        String otherTrainerToken = generateToken(otherTrainerId, "TRAINER");
+
+        // 1. Generate Proposal via REST API -> calls Real FastAPI
+        WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
+                studentId, "real-fastapi-edit-gen-1", Map.of("daysPerWeek", 3)
+        );
+
+        String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("PENDING")))
+                .andReturn().getResponse().getContentAsString();
+
+        var genJson = objectMapper.readTree(genResponseStr);
+        UUID recId = UUID.fromString(genJson.get("recommendationId").asText());
+        String originalPayloadStr = objectMapper.writeValueAsString(genJson.get("structuredPayload"));
+
+        // 2. Unauthorized actor (Trainer) tries to edit Student's SELF_DIRECTED draft -> 403 Forbidden
+        String modifiedPayloadStr = originalPayloadStr.replace("1-Week Full Body Starter", "Customized Real HTTP Plan");
+        String updateReqJson = """
+                {
+                    "expectedRevision": 1,
+                    "title": "Customized Real HTTP Plan",
+                    "explanation": "Customized details",
+                    "structuredPayload": %s
+                }
+                """.formatted(modifiedPayloadStr);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/ai/recommendations/" + recId + "/draft")
+                        .header("Authorization", "Bearer " + otherTrainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateReqJson))
+                .andExpect(status().isForbidden());
+
+        // 3. Authorized Student edits draft -> 200 OK, revision moves to 2, isCustomized: true
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/ai/recommendations/" + recId + "/draft")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateReqJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revision", is(2)))
+                .andExpect(jsonPath("$.isCustomized", is(true)))
+                .andExpect(jsonPath("$.title", is("Customized Real HTTP Plan")));
+
+        // 4. Stale Revision Accept -> expectedRevision = 1 fails with 409 Conflict
+        AcceptRecommendationApiRequest staleAcceptReq = new AcceptRecommendationApiRequest(
+                "stale-key-1", "Attempting stale accept", 1
+        );
+        mockMvc.perform(post("/api/v1/ai/recommendations/" + recId + "/accept")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(staleAcceptReq)))
+                .andExpect(status().isConflict());
+
+        // 5. Valid Accept -> expectedRevision = 2 succeeds with 200 APPLIED
+        AcceptRecommendationApiRequest validAcceptReq = new AcceptRecommendationApiRequest(
+                "valid-key-edit", "Accepting revision 2", 2
+        );
+        mockMvc.perform(post("/api/v1/ai/recommendations/" + recId + "/accept")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validAcceptReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("APPLIED")))
+                .andExpect(jsonPath("$.replayed", is(false)));
+
+        // 6. Verify resulting plan in database has the modified name
+        var activePlan = workoutPlanQuery.current(studentId, studentId);
+        assertThat(activePlan.plan().name()).isEqualTo("Customized Real HTTP Plan");
+
+        // 7. Replay with matching key & expectedRevision: 2 -> returns replayed: true
+        mockMvc.perform(post("/api/v1/ai/recommendations/" + recId + "/accept")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validAcceptReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.replayed", is(true)));
+
+        // 8. Replay with matching key but differing expectedRevision: 1 -> 409 Conflict
+        AcceptRecommendationApiRequest diffRevReplayReq = new AcceptRecommendationApiRequest(
+                "valid-key-edit", "Accepting revision 2", 1
+        );
+        mockMvc.perform(post("/api/v1/ai/recommendations/" + recId + "/accept")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(diffRevReplayReq)))
+                .andExpect(status().isConflict());
+    }
 }
