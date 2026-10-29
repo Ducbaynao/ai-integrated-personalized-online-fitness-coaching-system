@@ -594,4 +594,115 @@ class AiWorkoutProposalFullSliceIntegrationTest {
                 studentId, proposal.recommendationId(), "replay-key-auth", "Accepted"
         ))).isInstanceOf(Exception.class);
     }
+
+    @Test
+    @DisplayName("Full slice Edit Draft: Student modifies proposal -> increments revision to 2 -> accept applies modified version")
+    void editDraft_andApplyEditedVersion_succeeds() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        // 1. Generate Proposal
+        GenerateProposalCommand genCmd = new GenerateProposalCommand(
+                studentId, studentId, "gen-key-edit-1", Map.of("daysPerWeek", 3)
+        );
+        WorkoutProposalResult proposal = proposalService.generateProposal(genCmd);
+        assertThat(proposal.recommendationId()).isNotNull();
+
+        // 2. Modify draft payload
+        String originalJson = proposal.structuredPayload();
+        String modifiedJson = originalJson.replace("1-Week Full Body Starter", "Customized Strength Plan");
+
+        AiWorkoutProposalUseCase.UpdateDraftCommand editCmd = new AiWorkoutProposalUseCase.UpdateDraftCommand(
+                studentId,
+                proposal.recommendationId(),
+                1,
+                "Customized Strength Plan",
+                "Customized description",
+                modifiedJson
+        );
+        AiWorkoutProposalUseCase.UpdateDraftResult editResult = proposalService.updateDraft(editCmd);
+
+        assertThat(editResult.revision()).isEqualTo(2);
+        assertThat(editResult.isCustomized()).isTrue();
+        assertThat(editResult.title()).isEqualTo("Customized Strength Plan");
+        assertThat(editResult.originalPayload()).isEqualTo(originalJson);
+
+        // Verify in DB directly
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.revision()).isEqualTo(2);
+        assertThat(rec.isCustomized()).isTrue();
+        assertThat(rec.lastModifiedBy()).isEqualTo(studentId);
+        assertThat(rec.title()).isEqualTo("Customized Strength Plan");
+
+        // 3. Accept modified proposal with expectedRevision = 2
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-key-edit-1", "Applying edited plan", 2
+        );
+        AcceptRecommendationResult acceptResult = proposalService.acceptRecommendation(acceptCmd);
+        assertThat(acceptResult.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // 4. Verify resulting plan has modified title
+        var activePlan = workoutPlanQuery.current(studentId, studentId);
+        assertThat(activePlan).isNotNull();
+        assertThat(activePlan.plan().name()).isEqualTo("Customized Strength Plan");
+
+        // 5. Verify application receipt has appliedRevision: 2, isCustomized: true
+        var appOpt = recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId());
+        assertThat(appOpt).isPresent();
+        assertThat(appOpt.get().applicationPayload()).contains("\"appliedRevision\": 2");
+        assertThat(appOpt.get().applicationPayload()).contains("\"isCustomized\": true");
+    }
+
+    @Test
+    @DisplayName("Full slice Edit Draft: Stale revision conflict throws 409 and does not overwrite")
+    void editDraft_staleRevision_throwsConflict() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-1", Map.of("daysPerWeek", 3))
+        );
+
+        // Edit once -> moves to revision 2
+        proposalService.updateDraft(new AiWorkoutProposalUseCase.UpdateDraftCommand(
+                studentId, proposal.recommendationId(), 1, "Rev 2", "Desc", proposal.structuredPayload()
+        ));
+
+        // Stale edit with expectedRevision = 1
+        assertThatThrownBy(() -> proposalService.updateDraft(new AiWorkoutProposalUseCase.UpdateDraftCommand(
+                studentId, proposal.recommendationId(), 1, "Stale Rev 1", "Desc", proposal.structuredPayload()
+        )))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Revision conflict: expected revision 1 but current is 2");
+    }
+
+    @Test
+    @DisplayName("Full slice Accept Recommendation: Stale revision causes conflict and rolls back")
+    void acceptRecommendation_staleRevision_causesConflictAndRollback() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-acc", Map.of("daysPerWeek", 3))
+        );
+
+        // Edit to revision 2
+        proposalService.updateDraft(new AiWorkoutProposalUseCase.UpdateDraftCommand(
+                studentId, proposal.recommendationId(), 1, "Rev 2", "Desc", proposal.structuredPayload()
+        ));
+
+        // Attempt to accept with expectedRevision = 1
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-stale", "Note", 1
+        );
+
+        assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Revision conflict: expected revision 1 but current is 2");
+
+        // Verify recommendation remains PENDING and no active plan is created
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThatThrownBy(() -> workoutPlanQuery.current(studentId, studentId)).isInstanceOf(WorkoutPlanFailure.class);
+    }
 }

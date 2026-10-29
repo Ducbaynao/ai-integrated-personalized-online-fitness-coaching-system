@@ -5,6 +5,8 @@ import {
   AiRecommendationDetail,
   AcceptRecommendationResponse,
   RejectRecommendationResponse,
+  UpdateRecommendationDraftRequest,
+  UpdateRecommendationDraftResponse,
 } from '@/types/aiWorkoutProposal';
 import { ApiError } from '@/types/auth';
 
@@ -12,7 +14,7 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const code = error.errorResponse?.errorCode;
     if (code === 'ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS') {
-      return 'Học viên đã có một kế hoạch tập luyện đang áp dụng. Hãy kết thúc hoặc lưu trữ kế hoạch cũ trước khi áp dụng đề xuất mới.';
+      return 'Học viên đã có một kế hoạch tập luyện đang áp dụng. Hệ thống không cho phép áp dụng đồng thời nhiều kế hoạch tập luyện.';
     }
     if (code === 'AI_RUN_LIFECYCLE_CONFLICT') {
       if (error.message.includes('expired')) {
@@ -23,6 +25,9 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
       }
       if (error.message.includes('Idempotency conflict')) {
         return 'Xung đột thao tác (trùng khóa lệnh nhưng nội dung khác nhau).';
+      }
+      if (error.message.includes('Revision conflict')) {
+        return 'Bản thảo đã bị chỉnh sửa ở một phiên khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.';
       }
       return 'Xung đột trạng thái đề xuất giáo án. Vui lòng tải lại trang và thử lại.';
     }
@@ -62,10 +67,17 @@ export const aiWorkoutProposalApi = {
     });
   },
 
-  accept(recommendationId: string, decisionNote?: string, commandKey = createCommandKey()) {
+  updateDraft(recommendationId: string, input: UpdateRecommendationDraftRequest) {
+    return request<UpdateRecommendationDraftResponse>(`/ai/recommendations/${recommendationId}/draft`, {
+      method: 'PUT',
+      body: input,
+    });
+  },
+
+  accept(recommendationId: string, decisionNote?: string, commandKey = createCommandKey(), expectedRevision?: number) {
     return request<AcceptRecommendationResponse>(`/ai/recommendations/${recommendationId}/accept`, {
       method: 'POST',
-      body: { commandKey, decisionNote },
+      body: { commandKey, decisionNote, expectedRevision },
     });
   },
 

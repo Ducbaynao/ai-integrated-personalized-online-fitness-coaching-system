@@ -25,6 +25,15 @@ public interface AiRecommendationRepository {
             UUID targetEntityId
     );
 
+    void updateDraft(
+            UUID id,
+            int newRevision,
+            String title,
+            String explanation,
+            String structuredPayload,
+            UUID lastModifiedBy
+    );
+
     AiRecommendationApplication saveApplication(AiRecommendationApplication application);
 
     Optional<AiRecommendationApplication> findApplicationByRecommendationId(UUID recommendationId);

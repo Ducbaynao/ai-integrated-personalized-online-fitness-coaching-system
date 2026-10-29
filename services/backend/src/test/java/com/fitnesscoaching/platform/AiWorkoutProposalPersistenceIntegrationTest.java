@@ -216,4 +216,44 @@ class AiWorkoutProposalPersistenceIntegrationTest {
                 .isInstanceOf(org.springframework.dao.DataAccessException.class)
                 .hasMessageContaining("Evaluation run cannot create business recommendation");
     }
+
+    @Test
+    @DisplayName("Update draft persists revision, original_payload provenance and customized flag")
+    void updateDraft_persistsRevisionAndProvenance() {
+        UUID studentId = createTestUserAndStudent();
+        UUID runId = createTestRun(studentId, false, "BUSINESS_ASSISTANCE");
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+        String originalPayload = "{\"plan\":{\"name\":\"Original Plan\"}}";
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .aiRunId(runId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_PLAN_PROPOSAL")
+                .title("Original Plan")
+                .explanation("Original Details")
+                .structuredPayload(originalPayload)
+                .originalPayload(originalPayload)
+                .revision(1)
+                .isCustomized(false)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        recommendationRepository.save(rec);
+
+        String modifiedPayload = "{\"plan\":{\"name\":\"Customized Plan\"}}";
+        recommendationRepository.updateDraft(recId, 2, "Customized Plan", "Customized Details", modifiedPayload, studentId);
+
+        AiRecommendation updated = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(updated.revision()).isEqualTo(2);
+        assertThat(updated.isCustomized()).isTrue();
+        assertThat(updated.lastModifiedBy()).isEqualTo(studentId);
+        assertThat(updated.title()).isEqualTo("Customized Plan");
+        assertThat(updated.explanation()).isEqualTo("Customized Details");
+        assertThat(updated.structuredPayload()).contains("Customized Plan");
+        assertThat(updated.originalPayload()).contains("Original Plan");
+    }
 }

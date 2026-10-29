@@ -14,6 +14,8 @@ public interface AiWorkoutProposalUseCase {
 
     AiRecommendation getRecommendation(UUID actorId, UUID recommendationId);
 
+    UpdateDraftResult updateDraft(UpdateDraftCommand command);
+
     AcceptRecommendationResult acceptRecommendation(AcceptRecommendationCommand command);
 
     RejectRecommendationResult rejectRecommendation(RejectRecommendationCommand command);
@@ -37,12 +39,38 @@ public interface AiWorkoutProposalUseCase {
             String structuredPayload
     ) {}
 
+    record UpdateDraftCommand(
+            UUID actorId,
+            UUID recommendationId,
+            int expectedRevision,
+            String title,
+            String explanation,
+            String structuredPayload
+    ) {}
+
+    record UpdateDraftResult(
+            UUID recommendationId,
+            int revision,
+            boolean isCustomized,
+            AiRecommendationStatus status,
+            String title,
+            String explanation,
+            String structuredPayload,
+            String originalPayload,
+            Instant updatedAt
+    ) {}
+
     record AcceptRecommendationCommand(
             UUID actorId,
             UUID recommendationId,
             String commandKey,
-            String decisionNote
-    ) {}
+            String decisionNote,
+            Integer expectedRevision
+    ) {
+        public AcceptRecommendationCommand(UUID actorId, UUID recommendationId, String commandKey, String decisionNote) {
+            this(actorId, recommendationId, commandKey, decisionNote, null);
+        }
+    }
 
     record AcceptRecommendationResult(
             UUID recommendationId,

@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.ai.application.service;
 
 import tools.jackson.databind.ObjectMapper;
+import com.fitnesscoaching.platform.common.exception.AiOutputValidationException;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.AiRunNotFoundException;
@@ -10,6 +11,8 @@ import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProp
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.GenerateProposalCommand;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.RejectRecommendationCommand;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.RejectRecommendationResult;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.UpdateDraftCommand;
+import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.UpdateDraftResult;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.WorkoutProposalResult;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRecommendationRepository;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunRepository;
@@ -98,80 +101,79 @@ class AiWorkoutProposalServiceUnitTest {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "SELF_DIRECTED", null));
         when(contextBuilder.buildRequest(eq(studentId), any(), any()))
-                .thenReturn(new F02AiServiceClient.F02ServiceRequest(
-                        studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of()
-                ));
-        when(outputValidator.validate(any()))
-                .thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
-
+                .thenReturn(new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "INTERMEDIATE", "GENERAL_FITNESS", List.of(), Map.of(), List.of()));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
         when(recommendationRepository.save(any(AiRecommendation.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-1", Map.of());
+        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-key-1", Map.of("daysPerWeek", 3));
         WorkoutProposalResult result = service.generateProposal(cmd);
 
         assertThat(result).isNotNull();
+        assertThat(result.recommendationId()).isNotNull();
         assertThat(result.status()).isEqualTo(AiRecommendationStatus.PENDING);
         assertThat(result.decisionAuthority()).isEqualTo(AiDecisionAuthority.STUDENT);
+        assertThat(result.title()).isNotBlank();
+        assertThat(result.explanation()).isNotBlank();
+        assertThat(result.expiresAt()).isNotNull();
+
         verify(aiRunRepository).create(any(AiRun.class));
         verify(recommendationRepository).save(any(AiRecommendation.class));
         verify(auditService).recordAudit(any());
     }
 
     @Test
-    @DisplayName("SELF_DIRECTED mode: Non-student actor is forbidden from generating proposal")
+    @DisplayName("SELF_DIRECTED mode: Trainer requests proposal -> Access Denied")
     void selfDirected_trainerGeneratesProposal_throwsAccessDenied() {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "SELF_DIRECTED", null));
 
-        GenerateProposalCommand cmd = new GenerateProposalCommand(trainerId, studentId, "cmd-1", Map.of());
-
+        GenerateProposalCommand cmd = new GenerateProposalCommand(trainerId, studentId, "cmd-key-2", Map.of());
         assertThatThrownBy(() -> service.generateProposal(cmd))
                 .isInstanceOf(AiRunAccessDeniedException.class)
-                .hasMessageContaining("only the student may request");
+                .hasMessageContaining("In SELF_DIRECTED mode, only the student may request a workout proposal.");
 
         verify(aiRunRepository, never()).create(any());
     }
 
     @Test
-    @DisplayName("HUMAN_COACH mode: Assigned trainer generates proposal successfully")
+    @DisplayName("HUMAN_COACH mode: Assigned coach generates proposal successfully")
     void humanCoach_assignedTrainerGeneratesProposal_succeeds() {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "HUMAN_COACH", trainerId));
         when(contextBuilder.buildRequest(eq(studentId), any(), any()))
-                .thenReturn(new F02AiServiceClient.F02ServiceRequest(
-                        studentId, periodId, "HUMAN_COACH", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of()
-                ));
-        when(outputValidator.validate(any()))
-                .thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
-
+                .thenReturn(new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "HUMAN_COACH", "ADVANCED", "MUSCLE_GAIN", List.of(), Map.of(), List.of()));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
         when(recommendationRepository.save(any(AiRecommendation.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        GenerateProposalCommand cmd = new GenerateProposalCommand(trainerId, studentId, "cmd-2", Map.of());
+        GenerateProposalCommand cmd = new GenerateProposalCommand(trainerId, studentId, "cmd-key-3", Map.of("daysPerWeek", 4));
         WorkoutProposalResult result = service.generateProposal(cmd);
 
         assertThat(result).isNotNull();
         assertThat(result.status()).isEqualTo(AiRecommendationStatus.PENDING);
         assertThat(result.decisionAuthority()).isEqualTo(AiDecisionAuthority.TRAINER);
+
+        verify(aiRunRepository).create(any(AiRun.class));
         verify(recommendationRepository).save(any(AiRecommendation.class));
     }
 
     @Test
-    @DisplayName("HUMAN_COACH mode: Student is forbidden from generating proposal directly")
+    @DisplayName("HUMAN_COACH mode: Student requests proposal -> Access Denied")
     void humanCoach_studentGeneratesProposal_throwsAccessDenied() {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "HUMAN_COACH", trainerId));
 
-        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-3", Map.of());
-
+        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-key-4", Map.of());
         assertThatThrownBy(() -> service.generateProposal(cmd))
                 .isInstanceOf(AiRunAccessDeniedException.class)
-                .hasMessageContaining("only the assigned coach may request");
+                .hasMessageContaining("In HUMAN_COACH mode, only the assigned coach may request a workout proposal.");
+
+        verify(aiRunRepository, never()).create(any());
     }
 
     @Test
-    @DisplayName("Accept recommendation: Atomic accept-and-apply creates and activates plan")
+    @DisplayName("Accept recommendation: Atomically invokes workout commands, updates recommendation, saves receipt and audit")
     void acceptRecommendation_succeeds() {
         UUID recId = UUID.randomUUID();
         UUID createdPlanId = UUID.randomUUID();
@@ -185,6 +187,7 @@ class AiWorkoutProposalServiceUnitTest {
         AiRecommendation rec = AiRecommendation.builder()
                 .id(recId)
                 .studentId(studentId)
+                .coachingPeriodId(periodId)
                 .status(AiRecommendationStatus.PENDING)
                 .decisionAuthority(AiDecisionAuthority.STUDENT)
                 .title("1-Week Plan")
@@ -195,6 +198,7 @@ class AiWorkoutProposalServiceUnitTest {
 
         when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
         when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
 
         when(workoutPlanCommandUseCase.createDraft(any()))
                 .thenReturn(new CommandResult(createdPlanId, createdVersionId, 1, WorkoutPlanStatus.DRAFT, 0L, now, false));
@@ -206,7 +210,7 @@ class AiWorkoutProposalServiceUnitTest {
                         periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
                 )));
 
-        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", "Looks great!");
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", "Looks great!", 1);
         AcceptRecommendationResult result = service.acceptRecommendation(cmd);
 
         assertThat(result.recommendationId()).isEqualTo(recId);
@@ -214,6 +218,7 @@ class AiWorkoutProposalServiceUnitTest {
         assertThat(result.resultingEntityId()).isEqualTo(createdPlanId);
         assertThat(result.replayed()).isFalse();
 
+        verify(outputValidator).validate(proposalPayload);
         verify(workoutPlanCommandUseCase).createDraft(any());
         verify(workoutPlanCommandUseCase).activate(any());
         verify(recommendationRepository).updateDecision(eq(recId), eq(AiRecommendationStatus.APPLIED), eq(studentId), any(), eq("Looks great!"), eq("WORKOUT_PLAN"), eq(createdPlanId));
@@ -222,11 +227,180 @@ class AiWorkoutProposalServiceUnitTest {
     }
 
     @Test
-    @DisplayName("Accept recommendation: Replaying identical commandKey returns replayed receipt without re-executing domain commands")
+    @DisplayName("Update draft: Validates customized proposal, increments revision and records audit")
+    void selfDirected_studentUpdatesDraft_succeeds() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String originalPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("Original Plan")
+                .explanation("Original Exp")
+                .structuredPayload(originalPayload)
+                .originalPayload(originalPayload)
+                .revision(1)
+                .isCustomized(false)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
+
+        String modifiedPayload = originalPayload.replace("Session 1", "Modified Session 1");
+        UpdateDraftCommand cmd = new UpdateDraftCommand(studentId, recId, 1, "Customized Plan", "Customized Exp", modifiedPayload);
+
+        UpdateDraftResult result = service.updateDraft(cmd);
+
+        assertThat(result.recommendationId()).isEqualTo(recId);
+        assertThat(result.revision()).isEqualTo(2);
+        assertThat(result.isCustomized()).isTrue();
+        assertThat(result.title()).isEqualTo("Customized Plan");
+        assertThat(result.explanation()).isEqualTo("Customized Exp");
+        assertThat(result.structuredPayload()).isEqualTo(modifiedPayload);
+        assertThat(result.originalPayload()).isEqualTo(originalPayload);
+
+        verify(recommendationRepository).updateDraft(recId, 2, "Customized Plan", "Customized Exp", modifiedPayload, studentId);
+        verify(auditService).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Update draft: Revision conflict throws lifecycle conflict exception")
+    void updateDraft_revisionConflict_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(2)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .structuredPayload("{}")
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
+
+        UpdateDraftCommand cmd = new UpdateDraftCommand(studentId, recId, 1, "New Title", "New Exp", "{}");
+
+        assertThatThrownBy(() -> service.updateDraft(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Revision conflict: expected revision 1 but current is 2");
+
+        verify(recommendationRepository, never()).updateDraft(any(), any(int.class), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Update draft: Output validator failure throws AiOutputValidationException")
+    void updateDraft_outputValidationFails_throwsAiOutputValidationException() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .structuredPayload("{}")
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.invalid("Invalid variation"));
+
+        UpdateDraftCommand cmd = new UpdateDraftCommand(studentId, recId, 1, "New Title", "New Exp", "{\"invalid\":true}");
+
+        assertThatThrownBy(() -> service.updateDraft(cmd))
+                .isInstanceOf(AiOutputValidationException.class)
+                .hasMessageContaining("Draft payload validation failed: Invalid variation");
+
+        verify(recommendationRepository, never()).updateDraft(any(), any(int.class), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Revision conflict on accept throws lifecycle conflict exception")
+    void acceptRecommendation_expectedRevisionMismatch_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(2)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .structuredPayload("{}")
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "cmd-1", "Note", 1);
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Revision conflict: expected revision 1 but current is 2");
+
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Re-validation fails before applying throws AiOutputValidationException")
+    void acceptRecommendation_outputValidationFailsOnApply_throwsAiOutputValidationException() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .structuredPayload("{}")
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.invalid("Exercise variation retired"));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "cmd-1", "Note", 1);
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiOutputValidationException.class)
+                .hasMessageContaining("Recommendation cannot be applied because payload is no longer valid: Exercise variation retired");
+
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Idempotent replay returns same result without creating new plan")
     void acceptRecommendation_idempotentReplay() {
         UUID recId = UUID.randomUUID();
-        UUID planId = UUID.randomUUID();
-        Instant appliedAt = Instant.now().minus(1, ChronoUnit.HOURS);
+        UUID existingPlanId = UUID.randomUUID();
+        Instant now = Instant.now();
 
         AiRecommendation rec = AiRecommendation.builder()
                 .id(recId)
@@ -238,33 +412,42 @@ class AiWorkoutProposalServiceUnitTest {
                 .build();
 
         when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+
+        String savedPayload = """
+                {
+                  "commandKey": "accept-cmd-1",
+                  "actorId": "%s",
+                  "decisionNote": "Approved"
+                }
+                """.formatted(studentId);
+
+        AiRecommendationApplication app = new AiRecommendationApplication(
+                UUID.randomUUID(), recId, studentId, "WORKOUT_PLAN", existingPlanId, savedPayload, now
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(app));
+
         when(coachingContextQuery.findEffectiveContext(studentId, false))
                 .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
-                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, appliedAt, null
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
                 )));
-        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(
-                new AiRecommendationApplication(
-                        UUID.randomUUID(), recId, studentId, "WORKOUT_PLAN", planId,
-                        "{\"commandKey\":\"accept-cmd-1\",\"actorId\":\"" + studentId + "\",\"decisionNote\":\"\",\"createdPlanId\":\"" + planId + "\"}",
-                        appliedAt
-                )
-        ));
 
-        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", null);
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", "Approved");
         AcceptRecommendationResult result = service.acceptRecommendation(cmd);
 
+        assertThat(result.recommendationId()).isEqualTo(recId);
         assertThat(result.replayed()).isTrue();
-        assertThat(result.resultingEntityId()).isEqualTo(planId);
+        assertThat(result.resultingEntityId()).isEqualTo(existingPlanId);
+
         verify(workoutPlanCommandUseCase, never()).createDraft(any());
         verify(workoutPlanCommandUseCase, never()).activate(any());
     }
 
     @Test
-    @DisplayName("Accept recommendation: Replay with conflicting payload throws lifecycle conflict")
+    @DisplayName("Accept recommendation: Idempotency conflict with different payload throws exception")
     void acceptRecommendation_idempotencyConflict() {
         UUID recId = UUID.randomUUID();
-        UUID planId = UUID.randomUUID();
-        Instant appliedAt = Instant.now().minus(1, ChronoUnit.HOURS);
+        UUID existingPlanId = UUID.randomUUID();
+        Instant now = Instant.now();
 
         AiRecommendation rec = AiRecommendation.builder()
                 .id(recId)
@@ -276,40 +459,132 @@ class AiWorkoutProposalServiceUnitTest {
                 .build();
 
         when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+
+        String savedPayload = """
+                {
+                  "commandKey": "accept-cmd-1",
+                  "actorId": "%s",
+                  "decisionNote": "Initial Approval"
+                }
+                """.formatted(studentId);
+
+        AiRecommendationApplication app = new AiRecommendationApplication(
+                UUID.randomUUID(), recId, studentId, "WORKOUT_PLAN", existingPlanId, savedPayload, now
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(app));
+
         when(coachingContextQuery.findEffectiveContext(studentId, false))
                 .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
-                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, appliedAt, null
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
                 )));
-        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(
-                new AiRecommendationApplication(
-                        UUID.randomUUID(), recId, studentId, "WORKOUT_PLAN", planId,
-                        "{\"commandKey\":\"accept-cmd-1\",\"actorId\":\"" + studentId + "\",\"decisionNote\":\"Old note\",\"createdPlanId\":\"" + planId + "\"}",
-                        appliedAt
-                )
-        ));
 
-        // Different decisionNote -> conflict
-        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", "Different note!");
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-cmd-1", "Differing note");
+
         assertThatThrownBy(() -> service.acceptRecommendation(cmd))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
                 .hasMessageContaining("Idempotency conflict");
     }
 
     @Test
-    @DisplayName("Accept recommendation: Audit service failure bubbles up to trigger transaction rollback")
+    @DisplayName("Accept recommendation: Missing expectedRevision when draft modified throws conflict")
+    void acceptRecommendation_whenDraftModifiedAndExpectedRevisionMissing_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("Modified Plan")
+                .explanation("Details")
+                .structuredPayload("{}")
+                .revision(2)
+                .isCustomized(true)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Command without expectedRevision (null)
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-cmd-missing-rev", "Approving without specifying revision"
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("expectedRevision is required when accepting");
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Replay with differing expectedRevision throws lifecycle conflict")
+    void acceptRecommendation_replayWithDifferentRevision_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID existingPlanId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.APPLIED)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("Applied Plan")
+                .explanation("Details")
+                .structuredPayload("{}")
+                .revision(2)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+
+        String savedPayload = """
+                {
+                  "commandKey": "accept-cmd-rev-diff",
+                  "actorId": "%s",
+                  "decisionNote": "Initial Approval",
+                  "appliedRevision": 2
+                }
+                """.formatted(studentId);
+
+        AiRecommendationApplication app = new AiRecommendationApplication(
+                UUID.randomUUID(), recId, studentId, "WORKOUT_PLAN", existingPlanId, savedPayload, now
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(app));
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Replay with expectedRevision = 1 (differing from appliedRevision 2)
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-cmd-rev-diff", "Initial Approval", 1
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Idempotency conflict");
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Audit service failure bubbles up and aborts execution")
     void acceptRecommendation_auditServiceFailure_throwsException() {
         UUID recId = UUID.randomUUID();
         UUID createdPlanId = UUID.randomUUID();
         UUID createdVersionId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        String proposalPayload = """
-                {
-                  "name": "Weekly Strength",
-                  "description": "4-day split",
-                  "weeklySchedule": []
-                }
-                """;
+        String proposalPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
 
         AiRecommendation rec = AiRecommendation.builder()
                 .id(recId)
@@ -325,6 +600,7 @@ class AiWorkoutProposalServiceUnitTest {
 
         when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
         when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
 
         when(workoutPlanCommandUseCase.createDraft(any()))
                 .thenReturn(new CommandResult(createdPlanId, createdVersionId, 1, WorkoutPlanStatus.DRAFT, 0L, now, false));

@@ -20,6 +20,10 @@ public record AiRecommendation(
         Instant decidedAt,
         String decisionNote,
         Instant expiresAt,
+        int revision,
+        String originalPayload,
+        boolean isCustomized,
+        UUID lastModifiedBy,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -48,6 +52,10 @@ public record AiRecommendation(
         private Instant decidedAt;
         private String decisionNote;
         private Instant expiresAt;
+        private int revision = 1;
+        private String originalPayload;
+        private boolean isCustomized = false;
+        private UUID lastModifiedBy;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -67,10 +75,15 @@ public record AiRecommendation(
         public Builder decidedAt(Instant decidedAt) { this.decidedAt = decidedAt; return this; }
         public Builder decisionNote(String decisionNote) { this.decisionNote = decisionNote; return this; }
         public Builder expiresAt(Instant expiresAt) { this.expiresAt = expiresAt; return this; }
+        public Builder revision(int revision) { this.revision = revision; return this; }
+        public Builder originalPayload(String originalPayload) { this.originalPayload = originalPayload; return this; }
+        public Builder isCustomized(boolean isCustomized) { this.isCustomized = isCustomized; return this; }
+        public Builder lastModifiedBy(UUID lastModifiedBy) { this.lastModifiedBy = lastModifiedBy; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(Instant updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public AiRecommendation build() {
+            String orig = originalPayload != null ? originalPayload : structuredPayload;
             return new AiRecommendation(
                     id != null ? id : UUID.randomUUID(),
                     aiRunId,
@@ -88,6 +101,10 @@ public record AiRecommendation(
                     decidedAt,
                     decisionNote,
                     expiresAt,
+                    revision,
+                    orig,
+                    isCustomized,
+                    lastModifiedBy,
                     createdAt != null ? createdAt : Instant.now(),
                     updatedAt != null ? updatedAt : Instant.now()
             );

@@ -23,6 +23,11 @@ public record AiRecommendationDetailApiResponse(
         Instant decidedAt,
         String decisionNote,
         Instant expiresAt,
+        int revision,
+        boolean isCustomized,
+        UUID lastModifiedBy,
         Instant createdAt,
-        JsonNode structuredPayload
+        Instant updatedAt,
+        JsonNode structuredPayload,
+        JsonNode originalPayload
 ) {}

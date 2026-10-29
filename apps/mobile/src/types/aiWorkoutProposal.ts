@@ -67,6 +67,10 @@ export interface AiRecommendationDetail {
   title: string;
   explanation: string;
   structuredPayload: WorkoutProposalPayload;
+  originalPayload?: WorkoutProposalPayload;
+  revision: number;
+  isCustomized: boolean;
+  lastModifiedBy?: string;
   status: AiRecommendationStatus;
   decisionAuthority: AiDecisionAuthority;
   targetEntityType?: string;
@@ -76,11 +80,32 @@ export interface AiRecommendationDetail {
   decisionNote?: string;
   expiresAt: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateRecommendationDraftRequest {
+  expectedRevision: number;
+  title?: string;
+  explanation?: string;
+  structuredPayload: WorkoutProposalPayload;
+}
+
+export interface UpdateRecommendationDraftResponse {
+  recommendationId: string;
+  revision: number;
+  isCustomized: boolean;
+  status: 'PENDING';
+  title: string;
+  explanation: string;
+  updatedAt: string;
+  structuredPayload: WorkoutProposalPayload;
+  originalPayload: WorkoutProposalPayload;
 }
 
 export interface AcceptRecommendationRequest {
   commandKey: string;
   decisionNote?: string;
+  expectedRevision?: number;
 }
 
 export interface AcceptRecommendationResponse {

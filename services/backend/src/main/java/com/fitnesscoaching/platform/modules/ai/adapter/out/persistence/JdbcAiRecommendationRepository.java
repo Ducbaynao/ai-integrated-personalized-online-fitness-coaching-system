@@ -41,6 +41,10 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
             toInstant(rs.getTimestamp("decided_at")),
             rs.getString("decision_note"),
             toInstant(rs.getTimestamp("expires_at")),
+            rs.getInt("revision"),
+            rs.getString("original_payload"),
+            rs.getBoolean("is_customized"),
+            (UUID) rs.getObject("last_modified_by"),
             toInstant(rs.getTimestamp("created_at")),
             toInstant(rs.getTimestamp("updated_at"))
     );
@@ -64,18 +68,21 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
         UUID id = recommendation.id() != null ? recommendation.id() : UUID.randomUUID();
         Timestamp now = Timestamp.from(recommendation.createdAt() != null ? recommendation.createdAt() : Instant.now());
         Timestamp expires = recommendation.expiresAt() != null ? Timestamp.from(recommendation.expiresAt()) : null;
+        String origPayload = recommendation.originalPayload() != null ? recommendation.originalPayload() : recommendation.structuredPayload();
 
         String sql = """
             INSERT INTO fitness.ai_recommendations (
                 id, ai_run_id, student_id, coaching_period_id, recommendation_type,
                 title, explanation, structured_payload, status, decision_authority,
                 target_entity_type, target_entity_id, decided_by, decided_at, decision_note,
-                expires_at, created_at, updated_at
+                expires_at, revision, original_payload, is_customized, last_modified_by,
+                created_at, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?::jsonb, ?::fitness.recommendation_status, ?,
                 ?, ?, ?, ?, ?,
-                ?, ?, ?
+                ?, ?, ?::jsonb, ?, ?,
+                ?, ?
             )
             """;
 
@@ -97,6 +104,10 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 recommendation.decidedAt() != null ? Timestamp.from(recommendation.decidedAt()) : null,
                 recommendation.decisionNote(),
                 expires,
+                recommendation.revision(),
+                origPayload,
+                recommendation.isCustomized(),
+                recommendation.lastModifiedBy(),
                 now,
                 now
         );
@@ -154,6 +165,39 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 decisionNote,
                 targetEntityType,
                 targetEntityId,
+                Timestamp.from(Instant.now()),
+                id
+        );
+    }
+
+    @Override
+    public void updateDraft(
+            UUID id,
+            int newRevision,
+            String title,
+            String explanation,
+            String structuredPayload,
+            UUID lastModifiedBy
+    ) {
+        String sql = """
+            UPDATE fitness.ai_recommendations
+            SET revision = ?,
+                title = ?,
+                explanation = ?,
+                structured_payload = ?::jsonb,
+                is_customized = true,
+                last_modified_by = ?,
+                updated_at = ?
+            WHERE id = ?
+            """;
+
+        jdbcTemplate.update(
+                sql,
+                newRevision,
+                title,
+                explanation,
+                structuredPayload,
+                lastModifiedBy,
                 Timestamp.from(Instant.now()),
                 id
         );

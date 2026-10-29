@@ -3996,6 +3996,48 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /ai/recommendations/{recommendationId}/draft:
+    put:
+      tags: [AI Recommendations]
+      operationId: updateRecommendationDraft
+      summary: Update draft workout proposal before approval
+      description: >-
+        Updates draft proposal content prior to approval, incrementing revision and preserving AI provenance.
+        Enforces optimistic locking via expectedRevision.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRecommendationDraftRequest' }
+      responses:
+        '200':
+          description: Draft updated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateRecommendationDraftResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Revision conflict or recommendation is not PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /ai/recommendations/{recommendationId}/accept:
     post:
       tags: [AI Recommendations]
@@ -9520,7 +9562,7 @@ components:
 
     AiRecommendationDetailResponse:
       type: object
-      required: [recommendationId, aiRunId, studentId, recommendationType, title, explanation, structuredPayload, status, decisionAuthority, expiresAt, createdAt, updatedAt]
+      required: [recommendationId, aiRunId, studentId, recommendationType, title, explanation, structuredPayload, status, decisionAuthority, expiresAt, revision, isCustomized, createdAt, updatedAt]
       properties:
         recommendationId: { type: string, format: uuid }
         aiRunId: { type: string, format: uuid }
@@ -9529,7 +9571,17 @@ components:
         recommendationType: { type: string }
         title: { type: string }
         explanation: { type: string }
-        structuredPayload: { type: string }
+        structuredPayload:
+          anyOf:
+            - type: object
+            - type: string
+        originalPayload:
+          anyOf:
+            - type: object
+            - type: string
+        revision: { type: integer, minimum: 1 }
+        isCustomized: { type: boolean }
+        lastModifiedBy: { type: string, format: uuid }
         status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, EXPIRED, APPLIED] }
         decisionAuthority: { type: string, enum: [STUDENT, TRAINER] }
         targetEntityType: { type: string }
@@ -9547,6 +9599,42 @@ components:
       properties:
         commandKey: { type: string }
         decisionNote: { type: string }
+        expectedRevision:
+          type: integer
+          minimum: 1
+          description: Expected draft revision being accepted. Mandatory if draft has been modified beyond v1 to prevent silent application of mutated versions.
+
+    UpdateRecommendationDraftRequest:
+      type: object
+      required: [expectedRevision, structuredPayload]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        title: { type: string }
+        explanation: { type: string }
+        structuredPayload:
+          anyOf:
+            - type: object
+            - type: string
+
+    UpdateRecommendationDraftResponse:
+      type: object
+      required: [recommendationId, revision, isCustomized, status, title, explanation, structuredPayload, originalPayload, updatedAt]
+      properties:
+        recommendationId: { type: string, format: uuid }
+        revision: { type: integer, minimum: 1 }
+        isCustomized: { type: boolean }
+        status: { type: string, enum: [PENDING] }
+        title: { type: string }
+        explanation: { type: string }
+        structuredPayload:
+          anyOf:
+            - type: object
+            - type: string
+        originalPayload:
+          anyOf:
+            - type: object
+            - type: string
+        updatedAt: { type: string, format: date-time }
 
     AcceptRecommendationResponse:
       type: object
