@@ -255,11 +255,12 @@ public class ChatService implements ChatOwnedExportQuery {
         detail(actor, conversationId);
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
-                       r.delivered_at,r.read_at,ma.id,mf.original_filename,mf.content_type,mf.size_bytes
+                       r.delivered_at,r.read_at,CASE WHEN mf.id IS NOT NULL THEN ma.id END,
+                       mf.original_filename,mf.content_type,mf.size_bytes
                        FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
                 LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
-                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id
+                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id AND mf.deleted_at IS NULL
                 WHERE m.conversation_id=? ORDER BY m.sent_at DESC,m.id DESC LIMIT ? OFFSET ?
                 """, (rs, row) -> mapMessage(rs), conversationId, size + 1, (long) page * size);
         boolean more = rows.size() > size;
@@ -374,11 +375,12 @@ public class ChatService implements ChatOwnedExportQuery {
     private Message message(UUID id) {
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
-                       r.delivered_at,r.read_at,ma.id,mf.original_filename,mf.content_type,mf.size_bytes
+                       r.delivered_at,r.read_at,CASE WHEN mf.id IS NOT NULL THEN ma.id END,
+                       mf.original_filename,mf.content_type,mf.size_bytes
                        FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
                 LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
-                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id
+                LEFT JOIN fitness.media_files mf ON mf.id=ma.media_id AND mf.deleted_at IS NULL
                 WHERE m.id=?
                 """, (rs, row) -> mapMessage(rs), id);
         if (rows.isEmpty()) throw fail("CHAT_MESSAGE_NOT_FOUND", 404);
