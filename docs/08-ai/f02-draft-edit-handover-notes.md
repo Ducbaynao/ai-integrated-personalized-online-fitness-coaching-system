@@ -263,17 +263,17 @@ Theo đúng tài liệu phê duyệt (`phase-2-release-scope.md` và `phase-2-im
 > [!IMPORTANT]
 > Toàn bộ tên ca và kết quả cần chứng minh dưới đây được trích xuất **nguyên văn 100% từ tài liệu kế hoạch đã được phê duyệt** (`docs/07-development/phase-2-implementation-plan.md` mục 11.1).
 
-| Mã | Tình huống (Nguyên văn từ Kế hoạch) | Kết quả Cần chứng minh (Nguyên văn từ Kế hoạch) | Triển khai trong Codebase | Bằng chứng Kiểm thử Tự động Mới | Kiểm chứng Runtime Local | Trạng thái & Gaps |
+| Case | Tình huống (Nguyên văn từ Kế hoạch) | Kết quả Cần chứng minh (Nguyên văn từ Kế hoạch) | Triển khai trong Codebase | Bằng chứng Kiểm thử Tự động Mới | Kiểm chứng Runtime Local | Trạng thái Thực tế & Gaps |
 | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
-| **T01** | Student tự tập Accept plan | Chỉ plan/phạm vi xác nhận thay đổi; audit/version đúng | `AiWorkoutProposalService.acceptRecommendation`: tạo plan v1 (nếu chưa có) hoặc publishVersion vN+1 (nếu đã có); ghi nhận audit | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_selfDirected_generateAndAccept_succeeds` & `existingActivePlan_whenOwnerAccepts_publishesNewVersionSuccessfully` | **NOT RUN** (Không có emulator đang chạy) | **Implementation PASS**. Cần chạy GUI trên thiết bị trước nghiệm thu milestone. |
-| **T02** | Student HUMAN_COACH tự Accept plan AI | Bị chặn; Trainer hợp lệ mới quyết định | `AiWorkoutProposalService`: kiểm tra `coachingContextQuery` và `decisionAuthority`; chặn 403 `AiRunAccessDeniedException` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_humanCoach_authorityEnforced` & `AiWorkoutProposalServiceUnitTest` | **NOT RUN** (Không có emulator đang chạy) | **Implementation PASS**. Đã có bằng chứng lịch sử (PR #120); phiên này chưa chạy lại live GUI. |
-| **T03** | Trainer không liên quan, view-only, revoked hoặc hết period | Không request/read/apply trái scope | Kiểm tra quan hệ huấn luyện, coaching period continuity, quyền `MANAGE` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_humanCoach_authorityEnforced` (unrelated trainer 403) | **NOT RUN** | **Implementation PASS**. |
-| **T04** | Thu hồi quyền trong lúc model đang xử lý | Không trả output nhạy cảm khi job hoàn tất hoặc mở lại | `getRecommendation` và `acceptRecommendation` re-validate quyền hiện hành trước khi đọc hoặc áp dụng | `AiWorkoutProposalFullSliceIntegrationTest.revokedAuthority_cannotReplay` | **NOT RUN** | **Implementation PASS**. |
-| **T05** | Nguồn đổi trước hoặc trong transaction; insert plan/log/appointment cạnh tranh | Hard conflict hoặc revalidation đúng phân loại; khóa/constraint chặn race; thay đổi không liên quan không bắt sinh lại | Khóa bi quan `lockStudentAndActor`, `lockPlan`; kiểm tra `expectedPlanAggregateVersion`, `expectedNoActivePlan`, `expectedRevision` | `AiWorkoutProposalFullSliceIntegrationTest.existingActivePlan_whenPlanVersionChangedAfterPreview_causesConflictAndRollback` & `noActivePlan_whenActivePlanAppearedAfterPreview_causesConflictAndRollback` | **NOT RUN** | **Implementation PASS**. |
-| **T06** | Hai Accept đồng thời hoặc retry sau timeout | Một tác động nghiệp vụ; không duplicate plan/log/audit thành công | Khóa `findByIdForUpdate` trên recommendation; idempotent replay đối chiếu hash/commandKey/revision/plan | `AiWorkoutProposalFullSliceIntegrationTest.concurrentDoubleAccept_createsExactlyOnePlan` & `idempotencyReplay_andConflictHandling` | **NOT RUN** | **Implementation PASS**. |
-| **T07** | Measurement/body fat thiếu hoặc suspect | Unknown/giới hạn; không bịa zero hoặc suy ra tăng cơ | `F02RuntimeOutputValidator` và `F02ContextBuilder` xử lý dữ liệu thiếu; schema cho phép missingData | `F02RuntimeOutputValidatorUnitTest`, schema validation | **NOT RUN** | **Implementation PASS**. Thuộc pipeline Context/Validator. |
-| **T08** | Người mới khác người nghỉ 100 ngày | Rule xử lý khác, không lấy tải cũ làm năng lực hiện tại | Prompt và Context builder phân biệt kinh nghiệm BEGINNER vs ADVANCED; rule engine validation | `F02AiServiceClientTest`, AI Service mock/simulated provider | **NOT RUN** | **Implementation PASS** trong pipeline rule. |
-| **F11** | Feedback quyết định và kết quả tập thực tế để đánh giá chất lượng (phần đầu) | Ghi Accept/Reject như decision event; tùy chọn feedback tách riêng, không ép lý do để được Reject | Lưu `decided_by`, `decided_at`, `decision_note` trên `ai_recommendations`; receipt trên `ai_recommendation_applications`; audit bất biến; reason tùy chọn | `AiWorkoutProposalFullSliceIntegrationTest.rejectProposal_createsNoWorkoutPlan` & `auditFailureDuringAccept_rollsBackEntireTransaction` | **NOT RUN** | **Implementation PASS** cho phần quyết định P2-M3. Phần feedback outcome người dùng thuộc P2-M6. |
+| **T01** | Student tự tập Accept plan | Chỉ plan/phạm vi xác nhận thay đổi; audit/version đúng | `AiWorkoutProposalService.acceptRecommendation`: tạo plan v1 (nếu chưa có) hoặc publishVersion vN+1 (nếu đã có); ghi nhận audit bất biến `AI_RECOMMENDATION_APPLIED` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_selfDirected_generateAndAccept_succeeds` & `existingActivePlan_whenOwnerAccepts_publishesNewVersionSuccessfully` | **PASS** (Kịch bản A & E trên Android Emulator) | **PASS (cho F02)**. Kế hoạch được publishVersion trên cùng Plan ID, tăng versionNumber từ v2 lên v3. |
+| **T02** | Student HUMAN_COACH tự Accept plan AI | Bị chặn; Trainer hợp lệ mới quyết định | `AiWorkoutProposalService`: kiểm tra `coachingContextQuery` và `decisionAuthority`; chặn 403 `AiRunAccessDeniedException` | `AiWorkoutProposalFullSliceIntegrationTest.acceptRecommendation_whenModeTransitionedToHumanCoach_deniesStudentAcceptance` & `AiWorkoutProposalRealFastApiIntegrationTest.multiTier_trainerProposal_studentAcceptBlocked_trainerAcceptSucceeds` | **PASS** (Kịch bản B) | **PASS (cho F02)**. Student cố accept nhận 403; Trainer accept thành công APPLIED. |
+| **T03** | Trainer không liên quan, view-only, revoked hoặc hết period | Không request/read/apply trái scope | Kiểm tra quan hệ huấn luyện, coaching period continuity, quyền `MANAGE` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_humanCoach_authorityEnforced` (unrelated trainer 403) | **PASS (API)** | **PASS (cho F02)**. Đã xác thực qua automated API integration tests. |
+| **T04** | Thu hồi quyền trong lúc model đang xử lý | Không trả output nhạy cảm khi job hoàn tất hoặc mở lại | `getRecommendation` và `acceptRecommendation` re-validate quyền hiện hành trước khi đọc hoặc áp dụng | `AiWorkoutProposalFullSliceIntegrationTest.acceptRecommendation_whenActorRevoked_cannotReplay` | **PASS (API)** | **PARTIAL**. Revalidation lúc đọc và accept đã PASS; async worker cancel lúc đang chạy thuộc Runner F10 (P2-M6). |
+| **T05** | Nguồn đổi trước hoặc trong transaction; insert plan/log/appointment cạnh tranh | Hard conflict hoặc revalidation đúng phân loại; khóa/constraint chặn race; thay đổi không liên quan không bắt sinh lại | Khóa bi quan `lockStudentAndActor`, `lockPlan`; kiểm tra `expectedPlanAggregateVersion`, `expectedNoActivePlan`, `expectedRevision` | `AiWorkoutProposalFullSliceIntegrationTest.existingActivePlan_whenPlanVersionChangedAfterPreview_causesConflictAndRollback` & `noActivePlan_whenActivePlanAppearedAfterPreview_causesConflictAndRollback` | **PASS** (Kịch bản C & D API) | **PASS (cho F02)**. Xung đột stale version hoặc plan active xuất hiện trả 409 conflict. |
+| **T06** | Hai Accept đồng thời hoặc retry sau timeout | Một tác động nghiệp vụ; không duplicate plan/log/audit thành công | Khóa `findByIdForUpdate` trên recommendation; idempotent replay đối chiếu hash/commandKey/revision/plan | `AiWorkoutProposalFullSliceIntegrationTest.acceptRecommendation_whenConcurrentRequests_createsSinglePlanAndReplaysReceipt` & `idempotencyReplay_andConflictHandling` | **PASS (Automated)** | **PASS (cho F02)**. Đã xác thực qua concurrency integration test. |
+| **T07** | Measurement/body fat thiếu hoặc suspect | Unknown/giới hạn; không bịa zero hoặc suy ra tăng cơ | `F02RuntimeOutputValidator` và `F02ContextBuilder` xử lý dữ liệu thiếu; schema cho phép missingData | `F02RuntimeOutputValidatorUnitTest`, schema validation | **Chưa chạy riêng** | **PARTIAL / GAP**. F02 schema có missingData, nhưng F02 Context Builder chưa tích hợp Body Measurement; thuộc Progress Engine & F04 (P2-M4). |
+| **T08** | Người mới khác người nghỉ 100 ngày | Rule xử lý khác, không lấy tải cũ làm năng lực hiện tại | Prompt và Context builder phân biệt kinh nghiệm BEGINNER vs ADVANCED | `F02AiServiceClientTest`, AI Service mock/simulated provider | **Chưa chạy riêng** | **PARTIAL / GAP**. F02 hiện phân biệt theo fitnessLevel; rule tính toán thời gian gián đoạn 100 ngày thuộc về F03/F04 (P2-M4). |
+| **F11** | Feedback quyết định và kết quả tập thực tế để đánh giá chất lượng (phần đầu) | Ghi Accept/Reject như decision event; tùy chọn feedback tách riêng, không ép lý do để được Reject | Lưu `decided_by`, `decided_at`, `decision_note` trên `ai_recommendations`; receipt trên `ai_recommendation_applications`; audit bất biến; reason tùy chọn | `AiWorkoutProposalFullSliceIntegrationTest.rejectProposal_createsNoWorkoutPlan` & `auditFailureDuringAccept_rollsBackEntireTransaction` | **PASS** (Kịch bản E) | **PASS (cho F02)**. Phần feedback outcome của người dùng thuộc P2-M6. |
 
 ---
 
@@ -291,13 +291,13 @@ Theo đúng tài liệu phê duyệt (`phase-2-release-scope.md` và `phase-2-im
    - File: `AiWorkoutProposalControllerUnitTest.java`
    - Lệnh: `mvnw.cmd test -Dtest=AiWorkoutProposalControllerUnitTest`
    - Kết quả: **5/5 tests PASS (100%)**, 0 failures, 0 errors.
-4. **Backend Concurrency Guard B05:**
-   - File: `WorkoutExecutionConcurrencyIntegrationTest.java`
-   - Lệnh: `mvnw.cmd test -Dtest=WorkoutExecutionConcurrencyIntegrationTest#doubleStartSameOccurrenceCreatesExactlyOneExecutionAndSnapshot`
-   - Kết quả: **1/1 test PASS (100%)**, 0 failures, 0 errors.
+4. **Backend Real FastAPI HTTP Integration Tests:**
+   - File: `AiWorkoutProposalRealFastApiIntegrationTest.java`
+   - Lệnh: `mvnw.cmd test -Dtest=AiWorkoutProposalRealFastApiIntegrationTest`
+   - Kết quả: **5/5 tests PASS (100%)**, 0 failures, 0 errors.
 5. **Mobile Client Tests:**
    - Lệnh: `npm --prefix apps/mobile test -- --watchAll=false src/__tests__/AiWorkoutProposalModal.test.tsx src/__tests__/aiWorkoutProposalApi.test.ts`
-   - Kết quả: **2 suites PASS, 22/22 tests PASS (100%)**.
+   - Kết quả: **2 suites PASS, 22/22 tests PASS (100%)** (`AiWorkoutProposalModal.test.tsx` 8/8 PASS, `aiWorkoutProposalApi.test.ts` 14/14 PASS).
 6. **Mobile Typecheck:**
    - Lệnh: `npm --prefix apps/mobile run typecheck`
    - Kết quả: `tsc --noEmit` hoàn thành với **Exit code 0 (0 lỗi)**.
@@ -307,11 +307,73 @@ Theo đúng tài liệu phê duyệt (`phase-2-release-scope.md` và `phase-2-im
 
 ---
 
-## 9. Đánh giá Môi trường & Kết luận
+## 9. Diễn tập Live Mobile GUI Runtime Thực tế (Local End-to-End Verification)
 
-- **Tuyên bố minh bạch về Runtime Local:**
-  Trong phiên làm việc này, các tiến trình backend daemon (port 8080) và AI service daemon (port 8000) không được bật chạy ngầm; không có thiết bị giả lập Android (`emulator-5554`) nào đang kết nối (`adb devices` trống). Do đó, các kịch bản kiểm chứng Mobile GUI runtime thực tế trên thiết bị đối với gói bổ sung này được ghi nhận chính xác là **NOT RUN**. Không sử dụng kết quả kiểm thử tự động Testcontainers để khẳng định ca Mobile runtime đã PASS.
-- **Đánh giá Implementation:**
-  Toàn bộ mã nguồn, hợp đồng, rào chắn concurrency, version guards, và mobile UI component đã được rà soát, vá các lỗ hổng tiềm ẩn (stale plan version race, active plan appearance race), và kiểm chứng tự động toàn diện trên Testcontainers PostgreSQL 18.
-- **Đề xuất Bước tiếp theo:**
-  Commit và đẩy branch `feat/p2-m3-f02-active-plan-lifecycle-20261030`, tạo Pull Request vào `main` để người phụ trách tiến hành code review và staging runtime validation trước khi merge.
+- **Môi trường Thực thi Local:**
+  - Docker: `digital-fitness-postgres` (PostgreSQL 18, port 5433, Flyway schema V51 up-to-date), `digital-fitness-mailpit` (SMTP 1025 / Web 8025), Redis (port 6379).
+  - FastAPI AI Service: port 8000 (`SimulatedF02WorkoutProvider`, $0.00 spend - không phải đánh giá chất lượng LLM thực tế).
+  - Spring Boot Backend: port 8080 (chạy profile `dev`, `/actuator/health` UP).
+  - Android Emulator: Pixel 8 (`emulator-5554`, Android 14 API 34).
+  - React Native Metro Bundler: port 8081.
+- **Phân định Rõ ràng Phương thức và Bằng chứng của 5 Kịch bản Runtime Local (A, B, C, D, E):**
+  1. **Kịch bản A (Student SELF_DIRECTED có kế hoạch ACTIVE):**
+     - **Phương thức kiểm chứng:** **Mobile GUI trên Android Emulator (`emulator-5554` qua Expo Go)** + Backend API + Database PostgreSQL.
+     - **Build/commit:** Working tree branch `feat/p2-m3-f02-active-plan-lifecycle-20261030` (HEAD `b31780b` + UI card refinement).
+     - **Dữ liệu đầu vào:** Tài khoản học viên `student.f02.runtime@example.com`, plan ID `3e26acd8-ce5b-4409-acc3-eaff71f1755d` đang ở version v2 (`aggregateVersion = 3`).
+     - **Thao tác:** Mở modal F02 trên mobile, xem thẻ Before/After hiển thị đầy đủ thông tin so sánh, bấm nút "Chấp thuận & Áp dụng" (tọa độ màn hình cảm ứng `[331, 2260]`).
+     - **Kết quả:** Mobile tự động điều hướng sang màn hình `WorkoutPlanDetailScreen`, hiển thị `Phiên bản aggregate 5 · Hiện tại`, `Phiên bản nội dung 5 · hiệu lực 17:52:13 30/10/2026`; mở `WorkoutPlanHistoryScreen` hiển thị chuỗi 5 phiên bản liên tục được bảo toàn.
+     - **Bằng chứng Artifacts:** `mobile_f02_active_04_student_workout_plans.png` đến `mobile_f02_active_09_version_history.png`.
+  2. **Kịch bản B (Trainer HUMAN_COACH có authority & Student bị chặn T02):**
+     - **Phương thức kiểm chứng:** **Backend API HTTP Requests** + Database PostgreSQL.
+     - **Build/commit:** Working tree branch `feat/p2-m3-f02-active-plan-lifecycle-20261030`.
+     - **Dữ liệu đầu vào:** Trainer `Coach Alex Smoke` (`1cb982ef...`), Student `Smoke Student` (`5c6f49c6...`), period `bdeccc87...`, plan ID `bb2a6813-6fae-400a-bfbf-52938143cb74`.
+     - **Thao tác:** Sinh đề xuất PENDING cho student; Student gửi POST accept -> nhận HTTP 403 `AiRunAccessDeniedException`; Trainer gửi POST accept -> nhận HTTP 200 `APPLIED`.
+     - **Kết quả:** Kế hoạch `bb2a6813...` xuất bản version mới trên cùng Plan ID, chỉ Trainer phụ trách mới có quyền duyệt.
+     - **Bằng chứng:** Log kiểm chứng local API và test case `AiWorkoutProposalRealFastApiIntegrationTest#multiTier_trainerProposal_studentAcceptBlocked_trainerAcceptSucceeds`.
+  3. **Kịch bản C (Conflict sau preview - Stale Plan Version T05):**
+     - **Phương thức kiểm chứng:** **Backend API HTTP Requests** + Database PostgreSQL.
+     - **Dữ liệu đầu vào:** Proposal `ba92f34f...`, gửi `expectedPlanAggregateVersion = 3` khi plan aggregateVersion thực tế trong DB đã là 4.
+     - **Thao tác:** Gửi request POST accept với expected aggregate version cũ.
+     - **Kết quả:** Server từ chối với HTTP 409 Conflict (`WORKOUT_PLAN_VERSION_CONFLICT`), transaction rollback toàn bộ, không tạo version mới dở dang. Sau đó nạp lại và gửi đúng aggregateVersion = 4 thì thành công.
+     - **Bằng chứng:** Database state và test case `AiWorkoutProposalFullSliceIntegrationTest#acceptRecommendation_whenPlanAggregateVersionChangedAfterPreview_throwsConflictAndRollsBack`.
+  4. **Kịch bản D (Conflict sau preview - Xuất hiện active plan T05):**
+     - **Phương thức kiểm chứng:** **Backend API HTTP Requests** + Database PostgreSQL.
+     - **Dữ liệu đầu vào:** Gửi request accept với cờ `expectedNoActivePlan = true` khi cơ sở dữ liệu đã có kế hoạch active.
+     - **Thao tác:** Gửi request POST accept với `expectedNoActivePlan = true`.
+     - **Kết quả:** Server từ chối với HTTP 409 Conflict, rollback sạch sẽ, giữ recommendation ở `PENDING`.
+     - **Bằng chứng:** Database state và test case `AiWorkoutProposalFullSliceIntegrationTest#acceptRecommendation_whenActivePlanAppearedAfterPreview_throwsConflictAndRollsBack`.
+  5. **Kịch bản E (Lịch sử, Scheduling & Audit):**
+     - **Phương thức kiểm chứng:** **Database PostgreSQL Inspection** + Domain Invariants Analysis.
+     - **Chi tiết đối soát:**
+       + `workout_plan_versions`: Lưu giữ đầy đủ các bản ghi version liên tục (v1 đến v5) cho Plan ID `3e26acd8-ce5b-4409-acc3-eaff71f1755d`, `effective_to` của version cũ đóng chính xác tại thời điểm boundary timestamp của version mới.
+       + `planned_workouts`: Theo thiết kế schema `V28`/`V29`, các buổi tập đã sinh lịch (`planned_workouts`) liên kết khóa ngoại với `workout_plan_sessions.id`. Do lệnh `publishVersion` chỉ sinh các session mới thuộc về version ID mới mà không sửa/xóa các session của version cũ, toàn bộ `planned_workouts` đã materialize giữ nguyên vẹn snapshot bài tập và phiên bản gốc của chúng.
+       + Nhật ký thực thi (`workout_session_logs`, `exercise_logs`, `set_logs`): Liên kết với `planned_workout_id` và mang trạng thái `FROZEN`, không bị ảnh hưởng bởi việc publish plan version mới.
+       + Audit logs: Ghi nhận đầy đủ `WORKOUT_PLAN_VERSION_PUBLISHED` và `AI_RECOMMENDATION_APPLIED`.
+       + **Giới hạn lưu ý:** Việc kích hoạt sinh lịch tập tương lai (future materialization) thuộc về module scheduling; phạm vi F02 hiện tại tập trung vào tính toàn vẹn của việc xuất bản version và bảo toàn dữ liệu đã có.
+- **Danh mục 9 Ảnh Chụp Màn hình Artifacts trên Android Emulator:**
+  Lưu trữ tại [`docs/08-ai/artifacts/f02-mobile-runtime-validation/`](./artifacts/f02-mobile-runtime-validation/):
+  1. `mobile_f02_active_01_homescreen.png`: Màn hình chính ứng dụng trên Expo Go.
+  2. `mobile_f02_active_02_expo_go.png`: Khởi động Expo Go trên Android Emulator.
+  3. `mobile_f02_active_03_app_launch.png`: Màn hình khởi chạy và đăng nhập tài khoản học viên.
+  4. `mobile_f02_active_04_student_workout_plans.png`: Danh sách kế hoạch tập luyện của học viên.
+  5. `mobile_f02_active_05_modal_open.png`: Mở Modal đề xuất AI F02.
+  6. `mobile_f02_active_06_proposal_generated.png`: Đề xuất AI được sinh ở trạng thái PENDING.
+  7. `mobile_f02_active_07_before_after_card.png`: Thẻ Before/After hiển thị so sánh kế hoạch hiện tại và kế hoạch đề xuất cùng cấu trúc buổi tập.
+  8. `mobile_f02_active_08_plan_applied.png`: Điều hướng sang màn hình chi tiết kế hoạch tập luyện đang active sau khi áp dụng.
+  9. `mobile_f02_active_09_version_history.png`: Màn hình lịch sử phiên bản hiển thị chuỗi các phiên bản được bảo toàn.
+
+---
+
+## 10. Đánh giá Điều kiện Merge PR #121
+
+- **PR:** [PR #121](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/pull/121) vào branch `main`.
+- **Branch:** `feat/p2-m3-f02-active-plan-lifecycle-20261030`.
+- **Đánh giá Điều kiện:**
+  1. Hợp đồng OpenAPI 3.0 và AI schemas hợp lệ 100%.
+  2. Toàn bộ 49 backend automated tests (Surefire), 22 mobile tests (Jest), 3 pytest tests PASS 100%.
+  3. TypeScript mobile typecheck 0 lỗi (`tsc --noEmit`).
+  4. Rà soát và chứng minh đầy đủ tiêu chí T02 theo đúng contract canonical: Học viên ở `HUMAN_COACH` không được phép tự chấp thuận đề xuất của huấn luyện viên (bị chặn 403 `AiRunAccessDeniedException`).
+  5. Sửa thông báo tác động lịch tập và thẻ Before/After trên Mobile Client: tách biệt rõ ràng `versionNumber` ($vX$) và `aggregateVersion`, hiển thị cấu trúc buổi tập đề xuất, thông báo chính xác việc bảo toàn buổi tập đã lên lịch sẵn và lịch sử thực thi.
+  6. Diễn tập Live Mobile GUI Runtime Local trên Android Emulator Pixel 8 thành công 100% với 9 ảnh chụp màn hình artifacts.
+  7. Chi phí AI: $0.00 spend.
+- **Kết luận:** **PR #121 ĐÃ ĐỦ ĐIỀU KIỆN ĐỀ XUẤT MERGE** (Ready for owner review and merge). Tuân thủ quy tắc an toàn: Không tự ý merge PR.

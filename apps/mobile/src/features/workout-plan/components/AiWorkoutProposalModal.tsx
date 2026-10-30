@@ -727,16 +727,34 @@ export function AiWorkoutProposalModal({
                         Kế hoạch hiện tại (Trước):
                       </Text>
                       <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
-                        {currentActivePlan.plan.name} (v{currentActivePlan.currentVersion?.versionNumber ?? currentActivePlan.plan.aggregateVersion})
+                        {currentActivePlan.plan.name} (Phiên bản công bố: {currentActivePlan.currentVersion?.versionNumber ? `v${currentActivePlan.currentVersion.versionNumber}` : 'Chưa có phiên bản'}) · Chủ thể: {currentActivePlan.plan.decisionOwnerType === 'TRAINER' ? 'Huấn luyện viên' : 'Học viên tự quản'}
                       </Text>
+                      <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 2, fontSize: 12 }]}>
+                        [ID: {currentActivePlan.plan.id.slice(0, 8)}... · Aggregate Version: {currentActivePlan.plan.aggregateVersion}]
+                      </Text>
+
                       <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 8 }]}>
                         Kế hoạch đề xuất (Sau khi áp dụng):
                       </Text>
                       <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
-                        {proposal.title} (v{(currentActivePlan.currentVersion?.versionNumber ?? currentActivePlan.plan.aggregateVersion) + 1})
+                        {proposal.title} (Phiên bản xuất bản mới: v{(currentActivePlan.currentVersion?.versionNumber ?? 0) + 1}{proposal.structuredPayload?.plan?.sessions ? ` · ${proposal.structuredPayload.plan.sessions.length} buổi/tuần` : ''})
                       </Text>
-                      <Text style={[styles.body, { color: theme.textSecondary, marginTop: 6, fontSize: 13 }]}>
-                        • Tác động xếp lịch: Giữ nguyên lịch sử các buổi tập đã lên lịch/hoàn thành. Các buổi tập mới sẽ áp dụng phiên bản v{(currentActivePlan.currentVersion?.versionNumber ?? currentActivePlan.plan.aggregateVersion) + 1}.
+
+                      {proposal.structuredPayload?.plan?.sessions ? (
+                        <>
+                          <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 4 }]}>
+                            Cấu trúc buổi tập đề xuất:
+                          </Text>
+                          {proposal.structuredPayload.plan.sessions.map((s, idx) => (
+                            <Text key={idx} style={[styles.bulletItem, { color: theme.textSecondary, marginLeft: 4 }]}>
+                              • Buổi {s.dayNumber ?? (idx + 1)}: {s.name} ({s.prescriptions.length} bài tập{s.focus ? ` · ${s.focus}` : ''})
+                            </Text>
+                          ))}
+                        </>
+                      ) : null}
+
+                      <Text style={[styles.body, { color: theme.primary, marginTop: 6, fontSize: 13, fontStyle: 'italic' }]}>
+                        • Phạm vi tác động lịch tập: Toàn bộ buổi tập đã lên lịch sẵn (materialized) và lịch sử tập luyện đã thực hiện được giữ nguyên vẹn không bị ghi đè. Các đợt tạo lịch tập mới tiếp theo sẽ áp dụng theo cấu trúc của phiên bản xuất bản mới này.
                       </Text>
                     </View>
                   ) : (
@@ -747,13 +765,28 @@ export function AiWorkoutProposalModal({
                       <Text style={[styles.body, { color: theme.textPrimary }]}>
                         Chưa có kế hoạch nào đang áp dụng.
                       </Text>
+
                       <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 8 }]}>
                         Kế hoạch đề xuất (Sau khi áp dụng):
                       </Text>
                       <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
-                        {proposal.title} (Kích hoạt mới v1)
+                        {proposal.title} (Kích hoạt mới v1{proposal.structuredPayload?.plan?.sessions ? ` · ${proposal.structuredPayload.plan.sessions.length} buổi/tuần` : ''})
                       </Text>
-                      <Text style={[styles.body, { color: theme.textSecondary, marginTop: 6, fontSize: 13 }]}>
+
+                      {proposal.structuredPayload?.plan?.sessions ? (
+                        <>
+                          <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 4 }]}>
+                            Cấu trúc buổi tập đề xuất:
+                          </Text>
+                          {proposal.structuredPayload.plan.sessions.map((s, idx) => (
+                            <Text key={idx} style={[styles.bulletItem, { color: theme.textSecondary, marginLeft: 4 }]}>
+                              • Buổi {s.dayNumber ?? (idx + 1)}: {s.name} ({s.prescriptions.length} bài tập{s.focus ? ` · ${s.focus}` : ''})
+                            </Text>
+                          ))}
+                        </>
+                      ) : null}
+
+                      <Text style={[styles.body, { color: theme.primary, marginTop: 6, fontSize: 13, fontStyle: 'italic' }]}>
                         • Kế hoạch mới sẽ được kích hoạt ngay sau khi chấp thuận.
                       </Text>
                     </View>
