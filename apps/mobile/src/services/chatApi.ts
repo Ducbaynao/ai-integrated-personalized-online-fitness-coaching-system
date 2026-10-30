@@ -11,7 +11,13 @@ export type ChatMessage = {
   deliveredAt: string | null; readAt: string | null;
   attachmentId: string | null; attachmentName: string | null;
   attachmentContentType: string | null; attachmentSize: number | null;
+  linkedResourceType: ChatLinkedResourceType | null;
+  linkedResourceId: string | null; linkedResourceParentId: string | null;
+  linkedResourceAvailable: boolean;
 };
+export type ChatLinkedResourceType = 'WORKOUT_PLAN_VERSION' | 'PLANNED_WORKOUT' | 'APPOINTMENT';
+export type ChatLinkedResource = { type: ChatLinkedResourceType; resourceId: string; parentId: string | null };
+export type SendChatLinkedResource = ChatLinkedResource & { commandKey: string };
 export type ChatNotification = {
   id: string; eventType: string; title: string; body: string;
   messageId: string | null; relatedEntityType: string | null; relatedEntityId: string | null;
@@ -31,6 +37,13 @@ export const chatApi = {
   },
   send(studentId: string, body: SendChatBody) {
     return request<ChatMessage>(`/chat/students/${encodeURIComponent(studentId)}/messages`, { method: 'POST', body });
+  },
+  sendLinked(studentId: string, body: SendChatLinkedResource) {
+    return request<ChatMessage>(`/chat/students/${encodeURIComponent(studentId)}/linked-resources`,
+      { method: 'POST', body });
+  },
+  openLinked(messageId: string) {
+    return request<ChatLinkedResource>(`/chat/messages/${encodeURIComponent(messageId)}/linked-resource`);
   },
   async sendAttachment(studentId: string, file: { uri: string; name: string; mimeType: string; size: number }, commandKey: string) {
     const body = new FormData();

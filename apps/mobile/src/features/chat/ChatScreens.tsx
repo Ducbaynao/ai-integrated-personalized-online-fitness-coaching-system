@@ -6,7 +6,10 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
 import { createCommandKey } from '@/services/coachingApi';
-import { chatApi, ChatConversation, ChatMessage, SendChatBody } from '@/services/chatApi';
+import { chatApi, ChatConversation, ChatMessage, ChatLinkedResource, SendChatBody, SendChatLinkedResource } from '@/services/chatApi';
+import { workoutPlanApi } from '@/services/workoutPlanApi';
+import { workoutScheduleApi } from '@/services/workoutScheduleApi';
+import { appointmentApi } from '@/services/appointmentApi';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { useChatUpdates } from './useChatUpdates';
@@ -82,6 +85,8 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
   const [pending, setPending] = useState<SendChatBody | null>(null);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [attachmentError, setAttachmentError] = useState('');
+  const [showLinks, setShowLinks] = useState(false);
+  const [pendingLink, setPendingLink] = useState<SendChatLinkedResource | null>(null);
   const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
   const deliveredOnDevice = useRef(new Set<string>());
   const detail = useQuery({ queryKey: key(actor, role, 'detail', conversationId),
@@ -93,6 +98,39 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
     initialPageParam: 0, queryFn: ({ pageParam }) => chatApi.messages(conversationId!, pageParam),
     getNextPageParam: last => last.hasMore ? last.page + 1 : undefined, refetchInterval: 15000 });
   const targetStudent = conversationId ? detail.data?.studentId : studentId;
+  const linkWindow = useMemo(() => {
+    const from = new Date();
+    from.setDate(from.getDate() - 7);
+    const until = new Date();
+    until.setDate(until.getDate() + 30);
+    return { from: from.toISOString(), until: until.toISOString() };
+  }, []);
+  const plans = useQuery({ queryKey: key(actor, role, 'link-plans', targetStudent),
+    enabled: showLinks && !!targetStudent, queryFn: () => workoutPlanApi.list(0, 20, targetStudent) });
+  const workouts = useQuery({ queryKey: key(actor, role, 'link-workouts', targetStudent),
+    enabled: showLinks && !!targetStudent, queryFn: () => role === 'TRAINER'
+      ? workoutScheduleApi.listForTrainer(targetStudent!, linkWindow.from, linkWindow.until)
+      : workoutScheduleApi.list(linkWindow.from, linkWindow.until) });
+  const appointments = useQuery({ queryKey: key(actor, role, 'link-appointments', targetStudent),
+    enabled: showLinks && !!targetStudent, queryFn: () => appointmentApi.appointments(linkWindow.from, linkWindow.until) });
+  const sendLink = useMutation({ mutationFn: (body: SendChatLinkedResource) => chatApi.sendLinked(targetStudent!, body),
+    onSuccess: async result => {
+      setPendingLink(null); setShowLinks(false);
+      await cache.invalidateQueries({ queryKey: ['chat', actor, role] });
+      if (!conversationId) router.replace(`/chat/${result.conversationId}` as never);
+    },
+    onError: error => {
+      if (error instanceof ApiError && [403, 404, 409].includes(error.status)) {
+        setPendingLink(null); setShowLinks(false);
+        cache.removeQueries({ queryKey: ['chat', actor, role] });
+      }
+    },
+  });
+  const chooseLink = (link: ChatLinkedResource) => {
+    const body = { ...link, commandKey: createCommandKey() };
+    setPendingLink(body);
+    sendLink.mutate(body);
+  };
   const send = useMutation({ mutationFn: (body: SendChatBody) => chatApi.send(targetStudent!, body),
     onSuccess: async result => {
       setPending(null); setDraft('');
@@ -196,6 +234,10 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
       {message.attachmentId ? <CoachingButton label={`Mở tệp ${message.attachmentName ?? 'đính kèm'}`}
         secondary busy={downloadBusy === message.id} disabled={!!downloadBusy}
         onPress={() => { void openAttachment(message); }} /> : null}
+      {message.linkedResourceType ? message.linkedResourceAvailable
+        ? <CoachingButton label="Mở tài nguyên được chia sẻ" secondary
+          onPress={() => router.push(`/chat/linked/${message.id}` as never)} />
+        : <Text style={[styles.body, { color: theme.textSecondary }]}>Tài nguyên không còn khả dụng.</Text> : null}
       <Text style={[styles.label, { color: theme.textSecondary }]}>{message.senderId === actor ? 'Bạn' : 'Đối phương'} · {new Date(message.sentAt).toLocaleString('vi-VN')} · {messageStatus[message.status]}</Text>
       {message.senderId !== actor && !message.readAt ? <CoachingButton label="Đánh dấu đã đọc" secondary onPress={() => receipt.mutate({ id: message.id, kind: 'READ' })} /> : null}
     </CoachingCard>)}
@@ -203,6 +245,8 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
     {send.isError ? <CoachingState title="Chưa gửi được" message={errorText(send.error)} /> : null}
     {attachmentError ? <CoachingState title="Tệp đính kèm" message={attachmentError} /> : null}
     {sendFile.isError ? <CoachingState title="Chưa gửi được tệp" message={errorText(sendFile.error)} /> : null}
+    {sendLink.isError ? <CoachingState title="Chưa gửi được liên kết" message={errorText(sendLink.error)}
+      onRetry={pendingLink ? () => sendLink.mutate(pendingLink) : undefined} /> : null}
     {!concealed && (!conversationId || detail.data?.sendAllowed) ? <View>
       <Text style={[styles.label, { color: theme.textPrimary }]}>Tin nhắn văn bản</Text>
       <TextInput testID="chat-draft" accessibilityLabel="Nội dung tin nhắn" value={draft} onChangeText={setDraft}
@@ -218,8 +262,76 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
           onPress={() => sendFile.mutate(attachment)} />
         <CoachingButton label="Bỏ tệp đã chọn" secondary onPress={() => { discardPickedCopy(attachment.uri); setAttachment(null); setAttachmentError(''); }} />
       </View> : null}
+      <CoachingButton label={showLinks ? 'Đóng danh sách tài nguyên' : 'Chia sẻ tài nguyên'} secondary
+        onPress={() => setShowLinks(value => !value)} />
+      {showLinks ? <View>
+        <Text style={[styles.label, { color: theme.textPrimary }]}>Chỉ chọn tài nguyên hai bên được xem trong kỳ huấn luyện hiện hành.</Text>
+        {plans.isPending || workouts.isPending || appointments.isPending
+          ? <CoachingState busy title="Đang tải tài nguyên" message="Vui lòng chờ." /> : null}
+        {plans.isError || workouts.isError || appointments.isError
+          ? <CoachingState title="Không thể tải tài nguyên" message="Kiểm tra quyền và thử lại."
+            onRetry={() => { void plans.refetch(); void workouts.refetch(); void appointments.refetch(); }} /> : null}
+        {!plans.isError && plans.data?.items.filter(plan => plan.currentVersionId && plan.currentVersionLockedAt).map(plan =>
+          <CoachingButton key={plan.id} label={`Gửi phiên bản kế hoạch: ${plan.name}`} secondary
+            disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'WORKOUT_PLAN_VERSION',
+              resourceId: plan.currentVersionId!, parentId: plan.id })} />)}
+        {!workouts.isError && workouts.data?.items.map(workout =>
+          <CoachingButton key={workout.occurrenceId} label={`Gửi lịch tập: ${new Date(workout.plannedStartAt).toLocaleString('vi-VN')}`}
+            secondary disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'PLANNED_WORKOUT',
+              resourceId: workout.occurrenceId, parentId: null })} />)}
+        {!appointments.isError && appointments.data?.items.filter(item => item.studentId === targetStudent).map(item =>
+          <CoachingButton key={item.appointmentId} label={`Gửi lịch hẹn: ${new Date(item.startAt).toLocaleString('vi-VN')}`}
+            secondary disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'APPOINTMENT',
+              resourceId: item.appointmentId, parentId: null })} />)}
+        {plans.data?.items.length === 0 && workouts.data?.items.length === 0 && appointments.data?.items.length === 0
+          ? <CoachingState title="Chưa có tài nguyên" message="Không tìm thấy tài nguyên trong phạm vi đang xem." /> : null}
+      </View> : null}
     </View> : null}
   </ScrollView></SafeAreaView>;
+}
+
+export function ChatLinkedResourceScreen({ messageId }: { messageId: string }) {
+  const { actor, role } = useActor();
+  const cache = useQueryClient();
+  const theme = getSemanticColors(useColorScheme() === 'dark');
+  const router = useRouter();
+  const link = useQuery({ queryKey: key(actor, role, 'linked-resource', messageId), gcTime: 0,
+    enabled: !!actor && !!messageId, queryFn: () => chatApi.openLinked(messageId), refetchOnMount: 'always' });
+  const source = useQuery({ queryKey: key(actor, role, 'linked-source', messageId), gcTime: 0,
+    enabled: !!link.data && !link.isError,
+    queryFn: async () => {
+      const item = link.data!;
+      if (item.type === 'WORKOUT_PLAN_VERSION') {
+        if (!item.parentId) throw new Error('Missing plan ID');
+        const plan = await workoutPlanApi.detail(item.parentId);
+        const version = await workoutPlanApi.version(item.parentId, item.resourceId);
+        return { title: plan.plan.name, summary: `Phiên bản ${version.version.versionNumber} · ${version.sessions.length} buổi tập` };
+      }
+      if (item.type === 'PLANNED_WORKOUT') {
+        const workout = await workoutScheduleApi.detail(item.resourceId);
+        return { title: 'Lịch tập', summary: new Date(workout.plannedStartAt).toLocaleString('vi-VN') };
+      }
+      const appointment = await appointmentApi.detail(item.resourceId);
+      return { title: 'Lịch hẹn huấn luyện', summary: new Date(appointment.startAt).toLocaleString('vi-VN') };
+    },
+  });
+  const denied = [link.error, source.error].some(error => error instanceof ApiError && [403, 404].includes(error.status));
+  useEffect(() => { if (denied) cache.removeQueries({ queryKey: ['chat', actor, role] }); }, [denied, cache, actor, role]);
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+    <ScrollView testID="chat-linked-resource" contentContainerStyle={styles.content}>
+      <Text style={[styles.title, { color: theme.textPrimary }]}>Tài nguyên được chia sẻ</Text>
+      <CoachingButton label="Quay lại" secondary onPress={() => router.back()} />
+      {link.isPending || source.isPending && !link.isError ? <CoachingState busy title="Đang kiểm tra quyền" message="Vui lòng chờ." /> : null}
+      {denied ? <CoachingState title="Không còn quyền xem" message="Tài nguyên không còn khả dụng trong kỳ huấn luyện hiện hành." /> : null}
+      {!denied && (link.isError || source.isError) ? <CoachingState title="Không thể mở tài nguyên" message="Kiểm tra kết nối và thử lại."
+        onRetry={() => { void link.refetch(); void source.refetch(); }} /> : null}
+      {!denied && !link.isError && !source.isError && source.data ? <CoachingCard>
+        <Text style={[styles.h2, { color: theme.textPrimary }]}>{source.data.title}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>{source.data.summary}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu hiện hành; quyền được kiểm tra mỗi lần mở.</Text>
+      </CoachingCard> : null}
+    </ScrollView>
+  </SafeAreaView>;
 }
 
 export function NotificationsScreen() {

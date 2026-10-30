@@ -6,6 +6,8 @@ import com.fitnesscoaching.platform.modules.notification.ChatNotificationWriter;
 import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.trainer.application.port.in.TrainerCoachingEligibilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutChatResourceQuery;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.AppointmentChatResourceQuery;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -31,14 +33,18 @@ public class ChatService implements ChatOwnedExportQuery {
     private final ApplicationEventPublisher events;
     private final ClamdAttachmentScanner scanner;
     private final ChatObjectStorage storage;
+    private final WorkoutChatResourceQuery workoutResources;
+    private final AppointmentChatResourceQuery appointmentResources;
 
     public ChatService(JdbcTemplate jdbc, CurrentCoachingContextQuery contexts, UserAccountStatusQuery accounts,
                        StudentCapabilityQuery students, TrainerCoachingEligibilityQuery trainers,
                        ChatNotificationWriter notifications, ApplicationEventPublisher events,
-                       ClamdAttachmentScanner scanner, ChatObjectStorage storage) {
+                       ClamdAttachmentScanner scanner, ChatObjectStorage storage,
+                       WorkoutChatResourceQuery workoutResources, AppointmentChatResourceQuery appointmentResources) {
         this.jdbc = jdbc; this.contexts = contexts; this.accounts = accounts; this.students = students;
         this.trainers = trainers; this.notifications = notifications; this.events = events;
         this.scanner = scanner; this.storage = storage;
+        this.workoutResources = workoutResources; this.appointmentResources = appointmentResources;
     }
 
     public record Conversation(UUID id, UUID coachingPeriodId, UUID studentId, UUID trainerId,
@@ -46,7 +52,9 @@ public class ChatService implements ChatOwnedExportQuery {
     public record Message(UUID id, UUID conversationId, UUID senderId, String body, String status,
                           Instant sentAt, Instant deliveredAt, Instant readAt,
                           UUID attachmentId, String attachmentName, String attachmentContentType,
-                          Long attachmentSize) {}
+                          Long attachmentSize, String linkedResourceType, UUID linkedResourceId,
+                          UUID linkedResourceParentId, boolean linkedResourceAvailable) {}
+    public record LinkedResource(String type, UUID resourceId, UUID parentId) {}
     public record Page<T>(List<T> items, int page, int size, boolean hasMore) {}
     public record Changed(UUID studentId, UUID trainerId, UUID periodId, UUID conversationId) {}
     private record Receipt(String hash, UUID messageId) {}
@@ -94,6 +102,104 @@ public class ChatService implements ChatOwnedExportQuery {
         notifications.messageCommitted(recipient, id, context.periodId(), student, context.trainerId());
         events.publishEvent(new Changed(student, context.trainerId(), context.periodId(), conversation.id()));
         return message(id);
+    }
+
+    @Transactional
+    public Message sendLinked(UUID actor, UUID student, String type, UUID resourceId,
+                              UUID parentId, UUID commandKey) {
+        if (commandKey == null || resourceId == null || !validLinkedShape(type, parentId))
+            throw fail("VALIDATION_FAILED", 400);
+        var context = current(student, true);
+        if (!actor.equals(student) && !actor.equals(context.trainerId()))
+            throw fail("CHAT_CONVERSATION_NOT_FOUND", 404);
+        requireParticipant(actor, student, context.trainerId());
+        if (!canReadLinked(actor, student, context.periodId(), type, resourceId, parentId)
+                || !canReadLinked(actor.equals(student) ? context.trainerId() : student,
+                    student, context.periodId(), type, resourceId, parentId))
+            throw fail("CHAT_LINK_NOT_FOUND", 404);
+        String receiptHash = hash(student + ":LINK:" + type + ":" + resourceId + ":" + parentId);
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?::text,0))", actor + ":" + commandKey);
+        List<Receipt> receipts = jdbc.query("SELECT payload_hash,message_id FROM fitness.chat_command_receipts "
+                + "WHERE actor_id=? AND command_key=?",
+                (rs, row) -> new Receipt(rs.getString(1), rs.getObject(2, UUID.class)), actor, commandKey);
+        if (!receipts.isEmpty()) {
+            if (!receiptHash.equals(receipts.getFirst().hash())) throw fail("CHAT_IDEMPOTENCY_CONFLICT", 409);
+            Message prior = message(receipts.getFirst().messageId());
+            if (!context.periodId().equals(conversationById(prior.conversationId()).coachingPeriodId()))
+                throw fail("CHAT_CONVERSATION_NOT_FOUND", 404);
+            return visibleMessage(actor, student, context.periodId(), prior);
+        }
+        Conversation conversation = ensureConversation(context.periodId(), context.relationshipId(), student,
+                context.trainerId(), actor);
+        UUID id = UUID.randomUUID();
+        String messageType = "WORKOUT_PLAN_VERSION".equals(type) ? "WORKOUT_SHARE" : "SCHEDULE_SHARE";
+        String label = switch (type) {
+            case "WORKOUT_PLAN_VERSION" -> "Phiên bản kế hoạch tập";
+            case "PLANNED_WORKOUT" -> "Buổi tập đã lên lịch";
+            default -> "Lịch hẹn huấn luyện";
+        };
+        jdbc.update("""
+                INSERT INTO fitness.messages(id,conversation_id,sender_id,message_type,body,status,
+                  shared_entity_type,shared_entity_id,shared_parent_id)
+                VALUES (?,?,?,?::fitness.message_type,?,'SENT',?,?,?)
+                """, id, conversation.id(), actor, messageType, label, type, resourceId, parentId);
+        jdbc.update("UPDATE fitness.conversations SET updated_at=clock_timestamp() WHERE id=?", conversation.id());
+        UUID recipient = actor.equals(student) ? context.trainerId() : student;
+        jdbc.update("INSERT INTO fitness.message_read_receipts(message_id,user_id) VALUES (?,?)", id, recipient);
+        jdbc.update("INSERT INTO fitness.chat_command_receipts(actor_id,command_key,payload_hash,message_id) "
+                + "VALUES (?,?,?,?)", actor, commandKey, receiptHash, id);
+        notifications.messageCommitted(recipient, id, context.periodId(), student, context.trainerId());
+        events.publishEvent(new Changed(student, context.trainerId(), context.periodId(), conversation.id()));
+        return visibleMessage(actor, student, context.periodId(), message(id));
+    }
+
+    @Transactional(readOnly = true)
+    public LinkedResource openLinked(UUID actor, UUID messageId) {
+        requireAccount(actor);
+        Message row = message(messageId);
+        Conversation conversation = detail(actor, row.conversationId());
+        if (row.linkedResourceType() == null || row.linkedResourceId() == null
+                || !linkedAvailable(actor, conversation.studentId(), conversation, row))
+            throw fail("CHAT_LINK_NOT_FOUND", 404);
+        return new LinkedResource(row.linkedResourceType(), row.linkedResourceId(), row.linkedResourceParentId());
+    }
+
+    private static boolean validLinkedShape(String type, UUID parentId) {
+        return switch (type == null ? "" : type) {
+            case "WORKOUT_PLAN_VERSION" -> parentId != null;
+            case "PLANNED_WORKOUT", "APPOINTMENT" -> parentId == null;
+            default -> false;
+        };
+    }
+
+    private boolean canReadLinked(UUID actor, UUID student, UUID period, String type, UUID id, UUID parentId) {
+        return switch (type == null ? "" : type) {
+            case "WORKOUT_PLAN_VERSION" -> workoutResources.canReadPublishedVersion(actor, student, period, parentId, id);
+            case "PLANNED_WORKOUT" -> workoutResources.canReadOccurrence(actor, student, period, id);
+            case "APPOINTMENT" -> appointmentResources.canRead(actor, student, period, id);
+            default -> false;
+        };
+    }
+
+    private Message visibleMessage(UUID actor, UUID student, UUID period, Message raw) {
+        if (raw.linkedResourceType() == null) return raw;
+        Conversation conversation = conversationById(raw.conversationId());
+        boolean available = raw.linkedResourceId() != null && period.equals(conversation.coachingPeriodId())
+                && linkedAvailable(actor, student, conversation, raw);
+        return new Message(raw.id(), raw.conversationId(), raw.senderId(), raw.body(), raw.status(), raw.sentAt(),
+                raw.deliveredAt(), raw.readAt(), raw.attachmentId(), raw.attachmentName(),
+                raw.attachmentContentType(), raw.attachmentSize(), raw.linkedResourceType(),
+                available ? raw.linkedResourceId() : null,
+                available ? raw.linkedResourceParentId() : null, available);
+    }
+
+    private boolean linkedAvailable(UUID actor, UUID student, Conversation conversation, Message raw) {
+        if (!withSendAllowed(actor, conversation).sendAllowed()) return false;
+        UUID recipient = actor.equals(student) ? conversation.trainerId() : student;
+        return canReadLinked(actor, student, conversation.coachingPeriodId(), raw.linkedResourceType(),
+                    raw.linkedResourceId(), raw.linkedResourceParentId())
+                && canReadLinked(recipient, student, conversation.coachingPeriodId(), raw.linkedResourceType(),
+                    raw.linkedResourceId(), raw.linkedResourceParentId());
     }
 
     @Transactional
@@ -252,11 +358,12 @@ public class ChatService implements ChatOwnedExportQuery {
     @Transactional(readOnly = true)
     public Page<Message> messages(UUID actor, UUID conversationId, int page, int size) {
         validatePage(page, size);
-        detail(actor, conversationId);
+        Conversation conversation = detail(actor, conversationId);
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
                        r.delivered_at,r.read_at,CASE WHEN mf.id IS NOT NULL THEN ma.id END,
-                       mf.original_filename,mf.content_type,mf.size_bytes
+                       mf.original_filename,mf.content_type,mf.size_bytes,
+                       m.shared_entity_type,m.shared_entity_id,m.shared_parent_id
                        FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
                 LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
@@ -264,7 +371,9 @@ public class ChatService implements ChatOwnedExportQuery {
                 WHERE m.conversation_id=? ORDER BY m.sent_at DESC,m.id DESC LIMIT ? OFFSET ?
                 """, (rs, row) -> mapMessage(rs), conversationId, size + 1, (long) page * size);
         boolean more = rows.size() > size;
-        return new Page<>(more ? rows.subList(0, size) : rows, page, size, more);
+        var visible = (more ? rows.subList(0, size) : rows).stream()
+                .map(row -> visibleMessage(actor, conversation.studentId(), conversation.coachingPeriodId(), row)).toList();
+        return new Page<>(visible, page, size, more);
     }
 
     @Transactional
@@ -291,7 +400,7 @@ public class ChatService implements ChatOwnedExportQuery {
                 """, kind, messageId);
         events.publishEvent(new Changed(conversation.studentId(), conversation.trainerId(),
                 conversation.coachingPeriodId(), conversation.id()));
-        return message(messageId);
+        return visibleMessage(actor, conversation.studentId(), conversation.coachingPeriodId(), message(messageId));
     }
 
     private CurrentCoachingContextQuery.CurrentCoachingContext current(UUID student, boolean lock) {
@@ -376,7 +485,8 @@ public class ChatService implements ChatOwnedExportQuery {
         List<Message> rows = jdbc.query("""
                 SELECT m.id,m.conversation_id,m.sender_id,m.body,m.status::text,m.sent_at,
                        r.delivered_at,r.read_at,CASE WHEN mf.id IS NOT NULL THEN ma.id END,
-                       mf.original_filename,mf.content_type,mf.size_bytes
+                       mf.original_filename,mf.content_type,mf.size_bytes,
+                       m.shared_entity_type,m.shared_entity_id,m.shared_parent_id
                        FROM fitness.messages m
                 LEFT JOIN fitness.message_read_receipts r ON r.message_id=m.id
                 LEFT JOIN fitness.message_attachments ma ON ma.message_id=m.id
@@ -393,7 +503,8 @@ public class ChatService implements ChatOwnedExportQuery {
                 rs.getTimestamp(6).toInstant(), rs.getTimestamp(7) == null ? null : rs.getTimestamp(7).toInstant(),
                 rs.getTimestamp(8) == null ? null : rs.getTimestamp(8).toInstant(),
                 rs.getObject(9, UUID.class), rs.getString(10), rs.getString(11),
-                rs.getObject(12) == null ? null : rs.getLong(12));
+                rs.getObject(12) == null ? null : rs.getLong(12), rs.getString(13),
+                rs.getObject(14, UUID.class), rs.getObject(15, UUID.class), rs.getString(13) != null);
     }
 
     private static void validatePage(int page, int size) {
