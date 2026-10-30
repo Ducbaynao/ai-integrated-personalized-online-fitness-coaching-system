@@ -89,6 +89,21 @@ describe('aiWorkoutProposalApi', () => {
       expect(getWorkoutProposalErrorMessage(err)).toContain('đang áp dụng');
     });
 
+    it('maps WORKOUT_PLAN_SUCCESSOR_REQUIRED to successor guidance', () => {
+      const err = makeError(409, 'Conflict', 'WORKOUT_PLAN_SUCCESSOR_REQUIRED');
+      expect(getWorkoutProposalErrorMessage(err)).toContain('kế thừa');
+    });
+
+    it('maps WORKOUT_PLAN_VERSION_CONFLICT to refresh guidance', () => {
+      const err = makeError(409, 'Conflict', 'WORKOUT_PLAN_VERSION_CONFLICT');
+      expect(getWorkoutProposalErrorMessage(err)).toContain('thay đổi');
+    });
+
+    it('maps WORKOUT_PLAN_ACCESS_DENIED to permission guidance', () => {
+      const err = makeError(403, 'Forbidden', 'WORKOUT_PLAN_ACCESS_DENIED');
+      expect(getWorkoutProposalErrorMessage(err)).toContain('không có quyền');
+    });
+
     it('maps AI_RUN_LIFECYCLE_CONFLICT for expired proposals', () => {
       const err = makeError(409, 'Recommendation has expired', 'AI_RUN_LIFECYCLE_CONFLICT');
       expect(getWorkoutProposalErrorMessage(err)).toContain('hết hạn');

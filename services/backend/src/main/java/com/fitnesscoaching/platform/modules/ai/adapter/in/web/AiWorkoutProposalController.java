@@ -204,7 +204,10 @@ public class AiWorkoutProposalController {
                 recommendationId,
                 request.commandKey(),
                 request.decisionNote(),
-                request.expectedRevision()
+                request.expectedRevision(),
+                request.expectedPlanId(),
+                request.expectedPlanAggregateVersion(),
+                request.expectedNoActivePlan()
         ));
 
         return ResponseEntity.ok(new AcceptRecommendationApiResponse(

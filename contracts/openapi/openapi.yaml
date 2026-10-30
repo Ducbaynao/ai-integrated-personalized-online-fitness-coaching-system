@@ -9603,6 +9603,20 @@ components:
           type: integer
           minimum: 1
           description: Expected draft revision being accepted. Mandatory if draft has been modified beyond v1 to prevent silent application of mutated versions.
+        expectedPlanId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Expected active workout plan ID being updated.
+        expectedPlanAggregateVersion:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Expected aggregate version of the active workout plan being updated.
+        expectedNoActivePlan:
+          type: boolean
+          nullable: true
+          description: If true, asserts student has no active plan at accept time; rejects with conflict if active plan appeared.
 
     UpdateRecommendationDraftRequest:
       type: object

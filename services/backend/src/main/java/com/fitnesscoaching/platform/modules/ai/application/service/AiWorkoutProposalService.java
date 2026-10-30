@@ -20,10 +20,14 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
+import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
+import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanSummary;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.ActivateCommand;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CommandResult;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CreateDraftCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.PublishVersionCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanQueryUseCase;
 import com.fitnesscoaching.platform.modules.workout.domain.ExercisePrescription;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionTemplate;
 import org.slf4j.Logger;
@@ -51,6 +55,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
     private final F02ContextBuilder contextBuilder;
     private final F02RuntimeOutputValidator outputValidator;
     private final WorkoutPlanCommandUseCase workoutPlanCommandUseCase;
+    private final WorkoutPlanQueryUseCase workoutPlanQueryUseCase;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final CurrentCoachingContextQuery coachingContextQuery;
@@ -62,6 +67,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
             F02ContextBuilder contextBuilder,
             F02RuntimeOutputValidator outputValidator,
             WorkoutPlanCommandUseCase workoutPlanCommandUseCase,
+            WorkoutPlanQueryUseCase workoutPlanQueryUseCase,
             AuditService auditService,
             ObjectMapper objectMapper,
             CurrentCoachingContextQuery coachingContextQuery
@@ -72,6 +78,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         this.contextBuilder = contextBuilder;
         this.outputValidator = outputValidator;
         this.workoutPlanCommandUseCase = workoutPlanCommandUseCase;
+        this.workoutPlanQueryUseCase = workoutPlanQueryUseCase;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.coachingContextQuery = coachingContextQuery;
@@ -400,7 +407,19 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                             ? command.expectedRevision() == savedRev
                             : savedRev == 1;
 
-                    if (actorMatches && noteMatches && revMatches) {
+                    boolean planIdMatches = true;
+                    if (command.expectedPlanId() != null) {
+                        String savedPlanId = payload.has("expectedPlanId") ? payload.path("expectedPlanId").asText() : "";
+                        planIdMatches = command.expectedPlanId().toString().equals(savedPlanId);
+                    }
+
+                    boolean planVerMatches = true;
+                    if (command.expectedPlanAggregateVersion() != null) {
+                        long savedPlanVer = payload.has("expectedPlanAggregateVersion") ? payload.path("expectedPlanAggregateVersion").asLong() : -1L;
+                        planVerMatches = command.expectedPlanAggregateVersion() == savedPlanVer;
+                    }
+
+                    if (actorMatches && noteMatches && revMatches && planIdMatches && planVerMatches) {
                         log.info("Replaying identical AcceptRecommendationCommand for key: {}", command.commandKey());
                         return new AcceptRecommendationResult(
                                 rec.id(),
@@ -454,27 +473,86 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         String planName = rec.title();
         String planDescription = rec.explanation();
 
-        // 1. Create Draft Workout Plan
-        CreateDraftCommand draftCmd = new CreateDraftCommand(
-                rec.studentId(),
-                command.actorId(),
-                planName,
-                planDescription,
-                sessionTemplates,
-                command.commandKey() + ":DRAFT"
-        );
-        CommandResult draftResult = workoutPlanCommandUseCase.createDraft(draftCmd);
+        // Check if student already has an ACTIVE workout plan
+        Optional<PlanDetail> activePlanOpt = workoutPlanQueryUseCase.findActive(command.actorId(), rec.studentId());
 
-        // 2. Activate Workout Plan
-        ActivateCommand activateCmd = new ActivateCommand(
-                draftResult.planId(),
-                command.actorId(),
-                0L,
-                command.commandKey() + ":ACTIVATE"
-        );
-        workoutPlanCommandUseCase.activate(activateCmd);
+        // Plan version and preview guards:
+        if (Boolean.TRUE.equals(command.expectedNoActivePlan()) && activePlanOpt.isPresent()) {
+            throw new AiRunLifecycleConflictException("Active workout plan appeared after proposal was previewed; "
+                    + "please reload the proposal to review changes before accepting.");
+        }
 
-        // 3. Update Recommendation Status to APPLIED
+        if (command.expectedPlanId() != null) {
+            if (activePlanOpt.isEmpty()) {
+                throw new AiRunLifecycleConflictException("Expected active workout plan " + command.expectedPlanId()
+                        + " is no longer active; please reload the proposal before accepting.");
+            }
+            if (!activePlanOpt.get().plan().id().equals(command.expectedPlanId())) {
+                throw new AiRunLifecycleConflictException("Active workout plan has changed since preview (expected plan "
+                        + command.expectedPlanId() + " but found " + activePlanOpt.get().plan().id()
+                        + "); please reload the proposal before accepting.");
+            }
+        }
+
+        if (command.expectedPlanAggregateVersion() != null) {
+            if (activePlanOpt.isEmpty()) {
+                throw new AiRunLifecycleConflictException("Expected active workout plan aggregate version "
+                        + command.expectedPlanAggregateVersion() + " but no active plan is currently running.");
+            }
+            long currentAggregateVersion = activePlanOpt.get().plan().aggregateVersion();
+            if (currentAggregateVersion != command.expectedPlanAggregateVersion()) {
+                throw new AiRunLifecycleConflictException("Workout plan version conflict: expected plan aggregate version "
+                        + command.expectedPlanAggregateVersion() + " but current is " + currentAggregateVersion
+                        + "; please reload to review changes before accepting.");
+            }
+        }
+
+        UUID resultingPlanId;
+        UUID resultingPlanVersionId;
+        String action;
+
+        if (activePlanOpt.isPresent()) {
+            PlanSummary activePlan = activePlanOpt.get().plan();
+
+            // When an ACTIVE workout plan exists, execute significant version publication
+            PublishVersionCommand publishCmd = new PublishVersionCommand(
+                    activePlan.id(),
+                    command.actorId(),
+                    activePlan.aggregateVersion(),
+                    command.commandKey() + ":PUBLISH",
+                    "AI_WORKOUT_PROPOSAL_APPLIED",
+                    planName != null && !planName.isBlank() ? planName : "AI Workout Plan Proposal Update",
+                    sessionTemplates
+            );
+            CommandResult publishResult = workoutPlanCommandUseCase.publishVersion(publishCmd);
+            resultingPlanId = publishResult.planId();
+            resultingPlanVersionId = publishResult.planVersionId();
+            action = "PUBLISHED_NEW_VERSION";
+        } else {
+            // Student has NO active plan: create draft and activate
+            CreateDraftCommand draftCmd = new CreateDraftCommand(
+                    rec.studentId(),
+                    command.actorId(),
+                    planName,
+                    planDescription,
+                    sessionTemplates,
+                    command.commandKey() + ":DRAFT"
+            );
+            CommandResult draftResult = workoutPlanCommandUseCase.createDraft(draftCmd);
+
+            ActivateCommand activateCmd = new ActivateCommand(
+                    draftResult.planId(),
+                    command.actorId(),
+                    0L,
+                    command.commandKey() + ":ACTIVATE"
+            );
+            workoutPlanCommandUseCase.activate(activateCmd);
+            resultingPlanId = draftResult.planId();
+            resultingPlanVersionId = draftResult.planVersionId();
+            action = "CREATED_NEW_PLAN";
+        }
+
+        // Update Recommendation Status to APPLIED
         recommendationRepository.updateDecision(
                 rec.id(),
                 AiRecommendationStatus.APPLIED,
@@ -482,21 +560,31 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 now,
                 command.decisionNote(),
                 "WORKOUT_PLAN",
-                draftResult.planId()
+                resultingPlanId
         );
 
-        // 4. Save Application Record with full payload tracking including revision and provenance
+        // Save Application Record with full payload tracking including revision, action and provenance
         String appPayloadJson;
         try {
-            appPayloadJson = objectMapper.writeValueAsString(Map.of(
-                    "commandKey", command.commandKey() != null ? command.commandKey() : "",
-                    "actorId", command.actorId().toString(),
-                    "decisionNote", command.decisionNote() != null ? command.decisionNote() : "",
-                    "createdPlanId", draftResult.planId().toString(),
-                    "planVersionId", draftResult.planVersionId() != null ? draftResult.planVersionId().toString() : "",
-                    "appliedRevision", rec.revision(),
-                    "isCustomized", rec.isCustomized()
-            ));
+            java.util.Map<String, Object> payloadMap = new java.util.HashMap<>();
+            payloadMap.put("commandKey", command.commandKey() != null ? command.commandKey() : "");
+            payloadMap.put("actorId", command.actorId().toString());
+            payloadMap.put("decisionNote", command.decisionNote() != null ? command.decisionNote() : "");
+            payloadMap.put("createdPlanId", resultingPlanId.toString());
+            payloadMap.put("planVersionId", resultingPlanVersionId != null ? resultingPlanVersionId.toString() : "");
+            payloadMap.put("appliedRevision", rec.revision());
+            payloadMap.put("isCustomized", rec.isCustomized());
+            payloadMap.put("action", action);
+            if (command.expectedPlanId() != null) {
+                payloadMap.put("expectedPlanId", command.expectedPlanId().toString());
+            }
+            if (command.expectedPlanAggregateVersion() != null) {
+                payloadMap.put("expectedPlanAggregateVersion", command.expectedPlanAggregateVersion());
+            }
+            if (command.expectedNoActivePlan() != null) {
+                payloadMap.put("expectedNoActivePlan", command.expectedNoActivePlan());
+            }
+            appPayloadJson = objectMapper.writeValueAsString(payloadMap);
         } catch (Exception e) {
             appPayloadJson = "{}";
         }
@@ -506,13 +594,13 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 rec.id(),
                 command.actorId(),
                 "WORKOUT_PLAN",
-                draftResult.planId(),
+                resultingPlanId,
                 appPayloadJson,
                 now
         );
         recommendationRepository.saveApplication(application);
 
-        // 5. Record Immutable Audit
+        // Record Immutable Audit
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(command.actorId())
                 .actorRole(rec.decisionAuthority().name())
@@ -529,7 +617,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 AiRecommendationStatus.APPLIED,
                 command.actorId(),
                 "WORKOUT_PLAN",
-                draftResult.planId(),
+                resultingPlanId,
                 now,
                 false
         );

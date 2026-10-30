@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { aiWorkoutProposalApi, getWorkoutProposalErrorMessage } from '@/services/aiWorkoutProposalApi';
+import { workoutPlanApi } from '@/services/workoutPlanApi';
+import { WorkoutPlanDetail } from '@/types/workoutPlan';
 import {
   WorkoutProposalPayload,
   WorkoutProposalResponse,
@@ -56,6 +58,7 @@ export function AiWorkoutProposalModal({
   const [editablePayload, setEditablePayload] = useState<WorkoutProposalPayload | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [appliedPlanId, setAppliedPlanId] = useState<string | null>(null);
+  const [currentActivePlan, setCurrentActivePlan] = useState<WorkoutPlanDetail | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -63,19 +66,23 @@ export function AiWorkoutProposalModal({
     setIsEditing(false);
     setShowOriginalComparison(false);
     try {
-      const res = await aiWorkoutProposalApi.generate({
-        studentId,
-        preferences: {
-          daysPerWeek,
-          note: preferencesNote.trim(),
-        },
-      });
+      const [res, activePlan] = await Promise.all([
+        aiWorkoutProposalApi.generate({
+          studentId,
+          preferences: {
+            daysPerWeek,
+            note: preferencesNote.trim(),
+          },
+        }),
+        workoutPlanApi.current(studentId).catch(() => null),
+      ]);
       setProposal({
         ...res,
         revision: 1,
         isCustomized: false,
         originalPayload: res.structuredPayload,
       });
+      setCurrentActivePlan(activePlan);
     } catch (err) {
       setErrorMessage(getWorkoutProposalErrorMessage(err));
     } finally {
@@ -189,7 +196,10 @@ export function AiWorkoutProposalModal({
         proposal.recommendationId,
         decisionNote.trim() || undefined,
         undefined,
-        proposal.revision ?? 1
+        proposal.revision ?? 1,
+        currentActivePlan ? currentActivePlan.plan.id : undefined,
+        currentActivePlan ? currentActivePlan.plan.aggregateVersion : undefined,
+        currentActivePlan ? false : true
       );
       setProposal({
         ...proposal,
@@ -267,7 +277,10 @@ export function AiWorkoutProposalModal({
                   style={[styles.smallActionBtn, { borderColor: theme.border, marginTop: 8, alignSelf: 'flex-start' }]}
                   onPress={async () => {
                     try {
-                      const latest = await aiWorkoutProposalApi.getRecommendation(proposal.recommendationId);
+                      const [latest, activePlan] = await Promise.all([
+                        aiWorkoutProposalApi.getRecommendation(proposal.recommendationId),
+                        workoutPlanApi.current(studentId).catch(() => null),
+                      ]);
                       setProposal({
                         ...proposal,
                         revision: latest.revision,
@@ -277,6 +290,7 @@ export function AiWorkoutProposalModal({
                         structuredPayload: latest.structuredPayload,
                         originalPayload: latest.originalPayload ?? proposal.originalPayload,
                       });
+                      setCurrentActivePlan(activePlan);
                       setErrorMessage(null);
                       setIsEditing(false);
                       setEditablePayload(null);
@@ -701,6 +715,85 @@ export function AiWorkoutProposalModal({
                 </WorkoutCard>
               ) : null}
 
+              {/* Before / After & Plan Impact Card */}
+              {!isEditing && proposal.status === 'PENDING' ? (
+                <WorkoutCard testID="ai-proposal-plan-impact-card">
+                  <Text style={[styles.h3, { color: theme.textPrimary }]}>
+                    Đối chiếu kế hoạch & Tác động (Before / After)
+                  </Text>
+                  {currentActivePlan ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
+                        Kế hoạch hiện tại (Trước):
+                      </Text>
+                      <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
+                        {currentActivePlan.plan.name} (Phiên bản công bố: {currentActivePlan.currentVersion?.versionNumber ? `v${currentActivePlan.currentVersion.versionNumber}` : 'Chưa có phiên bản'}) · Chủ thể: {currentActivePlan.plan.decisionOwnerType === 'TRAINER' ? 'Huấn luyện viên' : 'Học viên tự quản'}
+                      </Text>
+                      <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 2, fontSize: 12 }]}>
+                        [ID: {currentActivePlan.plan.id.slice(0, 8)}... · Aggregate Version: {currentActivePlan.plan.aggregateVersion}]
+                      </Text>
+
+                      <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 8 }]}>
+                        Kế hoạch đề xuất (Sau khi áp dụng):
+                      </Text>
+                      <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
+                        {proposal.title} (Phiên bản xuất bản mới: v{(currentActivePlan.currentVersion?.versionNumber ?? 0) + 1}{proposal.structuredPayload?.plan?.sessions ? ` · ${proposal.structuredPayload.plan.sessions.length} buổi/tuần` : ''})
+                      </Text>
+
+                      {proposal.structuredPayload?.plan?.sessions ? (
+                        <>
+                          <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 4 }]}>
+                            Cấu trúc buổi tập đề xuất:
+                          </Text>
+                          {proposal.structuredPayload.plan.sessions.map((s, idx) => (
+                            <Text key={idx} style={[styles.bulletItem, { color: theme.textSecondary, marginLeft: 4 }]}>
+                              • Buổi {s.dayNumber ?? (idx + 1)}: {s.name} ({s.prescriptions.length} bài tập{s.focus ? ` · ${s.focus}` : ''})
+                            </Text>
+                          ))}
+                        </>
+                      ) : null}
+
+                      <Text style={[styles.body, { color: theme.primary, marginTop: 6, fontSize: 13, fontStyle: 'italic' }]}>
+                        • Phạm vi tác động lịch tập: Toàn bộ buổi tập đã lên lịch sẵn (materialized) và lịch sử tập luyện đã thực hiện được giữ nguyên vẹn không bị ghi đè. Các đợt tạo lịch tập mới tiếp theo sẽ áp dụng theo cấu trúc của phiên bản xuất bản mới này.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
+                        Kế hoạch hiện tại (Trước):
+                      </Text>
+                      <Text style={[styles.body, { color: theme.textPrimary }]}>
+                        Chưa có kế hoạch nào đang áp dụng.
+                      </Text>
+
+                      <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 8 }]}>
+                        Kế hoạch đề xuất (Sau khi áp dụng):
+                      </Text>
+                      <Text style={[styles.body, { color: theme.textPrimary, fontWeight: '600' }]}>
+                        {proposal.title} (Kích hoạt mới v1{proposal.structuredPayload?.plan?.sessions ? ` · ${proposal.structuredPayload.plan.sessions.length} buổi/tuần` : ''})
+                      </Text>
+
+                      {proposal.structuredPayload?.plan?.sessions ? (
+                        <>
+                          <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 4 }]}>
+                            Cấu trúc buổi tập đề xuất:
+                          </Text>
+                          {proposal.structuredPayload.plan.sessions.map((s, idx) => (
+                            <Text key={idx} style={[styles.bulletItem, { color: theme.textSecondary, marginLeft: 4 }]}>
+                              • Buổi {s.dayNumber ?? (idx + 1)}: {s.name} ({s.prescriptions.length} bài tập{s.focus ? ` · ${s.focus}` : ''})
+                            </Text>
+                          ))}
+                        </>
+                      ) : null}
+
+                      <Text style={[styles.body, { color: theme.primary, marginTop: 6, fontSize: 13, fontStyle: 'italic' }]}>
+                        • Kế hoạch mới sẽ được kích hoạt ngay sau khi chấp thuận.
+                      </Text>
+                    </View>
+                  )}
+                </WorkoutCard>
+              ) : null}
+
               {/* Decision Section */}
               {!isEditing && proposal.status === 'PENDING' ? (
                 <WorkoutCard testID="ai-proposal-decision-card">
@@ -708,9 +801,9 @@ export function AiWorkoutProposalModal({
                   <Text style={[styles.body, { color: theme.textSecondary }]}>
                     {proposal.decisionAuthority === 'TRAINER' && !isTrainer
                       ? 'Lưu ý: Bạn đang ở chế độ Huấn luyện viên. Chỉ Huấn luyện viên phụ trách mới có thẩm quyền chấp thuận đề xuất này.'
-                      : 'Khi chấp thuận, kế hoạch 1 tuần (phiên bản v' +
+                      : 'Khi chấp thuận đề xuất 1 tuần (phiên bản v' +
                         (proposal.revision ?? 1) +
-                        ') sẽ được tự động tạo và kích hoạt trong hệ thống.'}
+                        '):\n• Nếu chưa có giáo án đang áp dụng: Kế hoạch mới sẽ được tạo và kích hoạt.\n• Nếu đã có giáo án đang áp dụng: Phiên bản mới sẽ được xuất bản cho giáo án hiện tại. Lịch sử các buổi tập đã thực hiện và buổi tập đang diễn ra được bảo toàn nguyên vẹn.'}
                   </Text>
 
                   <Text style={[styles.label, { color: theme.textPrimary, marginTop: 8 }]}>

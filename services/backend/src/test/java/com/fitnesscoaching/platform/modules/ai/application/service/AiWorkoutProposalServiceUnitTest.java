@@ -28,6 +28,14 @@ import com.fitnesscoaching.platform.modules.coaching.application.port.in.Current
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.Mode;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CommandResult;
+import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
+import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanSummary;
+import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.ReadContext;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.PublishVersionCommand;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanQueryUseCase;
+import com.fitnesscoaching.platform.modules.workout.domain.DecisionOwnerType;
+import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanError;
+import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanFailure;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutPlanStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +74,8 @@ class AiWorkoutProposalServiceUnitTest {
     @Mock
     private WorkoutPlanCommandUseCase workoutPlanCommandUseCase;
     @Mock
+    private WorkoutPlanQueryUseCase workoutPlanQueryUseCase;
+    @Mock
     private AuditService auditService;
     @Mock
     private CurrentCoachingContextQuery coachingContextQuery;
@@ -89,6 +99,7 @@ class AiWorkoutProposalServiceUnitTest {
                 contextBuilder,
                 outputValidator,
                 workoutPlanCommandUseCase,
+                workoutPlanQueryUseCase,
                 auditService,
                 objectMapper,
                 coachingContextQuery
@@ -594,7 +605,7 @@ class AiWorkoutProposalServiceUnitTest {
                 .decisionAuthority(AiDecisionAuthority.STUDENT)
                 .title("Proposed Workout Plan")
                 .explanation("Details")
-                .structuredPayload(proposalPayload)
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
                 .expiresAt(now.plus(7, ChronoUnit.DAYS))
                 .build();
 
@@ -649,5 +660,324 @@ class AiWorkoutProposalServiceUnitTest {
         assertThat(result.decisionNote()).isEqualTo("Volume too high for this week");
         verify(recommendationRepository).updateDecision(eq(recId), eq(AiRecommendationStatus.REJECTED), eq(studentId), any(), eq("Volume too high for this week"), any(), any());
         verify(auditService).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation when active plan exists (SELF_DIRECTED): Publishes new version on existing plan")
+    void selfDirected_studentAcceptsProposal_whenActivePlanExists_publishesNewVersion() {
+        UUID recId = UUID.randomUUID();
+        UUID activePlanId = UUID.randomUUID();
+        UUID newVersionId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String proposalPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Updated Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        PlanSummary activeSummary = new PlanSummary(
+                activePlanId, studentId, null, periodId, "Current Active Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        when(workoutPlanCommandUseCase.publishVersion(any()))
+                .thenReturn(new CommandResult(activePlanId, newVersionId, 2, WorkoutPlanStatus.ACTIVE, 2L, now, false));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-publish-key", "Apply update", 1);
+        AcceptRecommendationResult result = service.acceptRecommendation(cmd);
+
+        assertThat(result.recommendationId()).isEqualTo(recId);
+        assertThat(result.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(result.resultingEntityId()).isEqualTo(activePlanId);
+        assertThat(result.replayed()).isFalse();
+
+        verify(workoutPlanCommandUseCase).publishVersion(any(PublishVersionCommand.class));
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+        verify(workoutPlanCommandUseCase, never()).activate(any());
+        verify(recommendationRepository).updateDecision(eq(recId), eq(AiRecommendationStatus.APPLIED), eq(studentId), any(), eq("Apply update"), eq("WORKOUT_PLAN"), eq(activePlanId));
+        verify(recommendationRepository).saveApplication(any(AiRecommendationApplication.class));
+        verify(auditService).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation when active plan exists (HUMAN_COACH): Trainer publishes new version on managed plan")
+    void humanCoach_trainerAcceptsProposal_whenActivePlanExists_publishesNewVersion() {
+        UUID recId = UUID.randomUUID();
+        UUID activePlanId = UUID.randomUUID();
+        UUID newVersionId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String proposalPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "HUMAN_COACH", "INTERMEDIATE", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.TRAINER)
+                .title("Trainer 1-Week Update")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, now, null
+                )));
+
+        PlanSummary activeSummary = new PlanSummary(
+                activePlanId, studentId, null, periodId, "Trainer Active Plan", "Running", "TRAINER",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.TRAINER, trainerId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(trainerId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        when(workoutPlanCommandUseCase.publishVersion(any()))
+                .thenReturn(new CommandResult(activePlanId, newVersionId, 2, WorkoutPlanStatus.ACTIVE, 2L, now, false));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(trainerId, recId, "accept-trainer-key", "Trainer approved", 1);
+        AcceptRecommendationResult result = service.acceptRecommendation(cmd);
+
+        assertThat(result.recommendationId()).isEqualTo(recId);
+        assertThat(result.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(result.resultingEntityId()).isEqualTo(activePlanId);
+
+        verify(workoutPlanCommandUseCase).publishVersion(any(PublishVersionCommand.class));
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: When publishVersion fails due to successor required conflict, failure bubbles up")
+    void acceptRecommendation_whenPublishVersionThrowsSuccessorRequired_bubblesUp() {
+        UUID recId = UUID.randomUUID();
+        UUID activePlanId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String proposalPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload(proposalPayload)
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        PlanSummary activeSummary = new PlanSummary(
+                activePlanId, studentId, null, periodId, "Trainer Owned Plan", "Running", "TRAINER",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.TRAINER, trainerId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        when(workoutPlanCommandUseCase.publishVersion(any()))
+                .thenThrow(new WorkoutPlanFailure(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED, "Successor required"));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "accept-fail-successor", "Note", 1);
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(WorkoutPlanFailure.class)
+                .extracting(ex -> ((WorkoutPlanFailure) ex).error())
+                .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED);
+
+        verify(recommendationRepository, never()).updateDecision(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Active plan appeared after preview throws conflict")
+    void acceptRecommendation_whenActivePlanAppearedAfterPreview_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID activePlanId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        PlanSummary activeSummary = new PlanSummary(
+                activePlanId, studentId, null, periodId, "Newly Created Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        // Expected no active plan because user previewed when there was none
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-appeared-plan", "Note", 1, null, null, true
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Active workout plan appeared after proposal was previewed");
+
+        verify(workoutPlanCommandUseCase, never()).publishVersion(any());
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Active plan aggregate version changed throws conflict")
+    void acceptRecommendation_whenPlanAggregateVersionChanged_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID activePlanId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Plan in DB has aggregateVersion = 2L
+        PlanSummary activeSummary = new PlanSummary(
+                activePlanId, studentId, null, periodId, "Active Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 2L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 2, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        // User saw aggregateVersion = 1L at preview
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-stale-plan-ver", "Note", 1, activePlanId, 1L, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Workout plan version conflict: expected plan aggregate version 1 but current is 2");
+
+        verify(workoutPlanCommandUseCase, never()).publishVersion(any());
+    }
+
+    @Test
+    @DisplayName("Accept recommendation: Active plan ID changed throws conflict")
+    void acceptRecommendation_whenActivePlanIdChanged_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID currentActivePlanId = UUID.randomUUID();
+        UUID expectedPlanId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .expiresAt(now.plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Plan currently in DB is currentActivePlanId
+        PlanSummary activeSummary = new PlanSummary(
+                currentActivePlanId, studentId, null, periodId, "Current Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        // User saw expectedPlanId
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-mismatched-plan-id", "Note", 1, expectedPlanId, 1L, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Active workout plan has changed since preview");
+
+        verify(workoutPlanCommandUseCase, never()).publishVersion(any());
     }
 }
