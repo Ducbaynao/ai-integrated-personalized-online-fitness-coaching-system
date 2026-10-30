@@ -91,6 +91,7 @@ class AiWorkoutProposalPersistenceIntegrationTest {
                 .status(AiRecommendationStatus.PENDING)
                 .decisionAuthority(AiDecisionAuthority.STUDENT)
                 .targetEntityType("WORKOUT_PLAN")
+                .sourceSnapshot("{\"goalId\":\"11111111-1111-4111-8111-111111111111\",\"goalVersionNumber\":1}")
                 .expiresAt(expiresAt)
                 .build();
 
@@ -103,6 +104,7 @@ class AiWorkoutProposalPersistenceIntegrationTest {
         assertThat(found.get().title()).isEqualTo("1-Week Full Body Starter");
         assertThat(found.get().decisionAuthority()).isEqualTo(AiDecisionAuthority.STUDENT);
         assertThat(found.get().status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(found.get().sourceSnapshot()).contains("11111111-1111-4111-8111-111111111111");
     }
 
     @Test

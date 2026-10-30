@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -50,8 +50,22 @@ class F02WorkoutProposalRequest(BaseModel):
     fitnessLevel: str | None = None
     goalType: str | None = None
     equipmentAvailable: list[str] = Field(default_factory=list)
-    preferences: dict[str, str | int] | None = None
+    preferences: dict[str, Any] | None = None
     candidateVariationIds: list[UUID] = Field(default_factory=list)
+    continuityState: (
+        Literal[
+            "CONFIRMED_NEW",
+            "RECENT_CONSISTENT",
+            "PROLONGED_INACTIVITY",
+            "UNKNOWN_HISTORY",
+            "RESTRICTED_HISTORY",
+        ]
+        | None
+    ) = None
+    daysSinceLastWorkout: int | None = None
+    goalId: UUID | None = None
+    goalVersionNumber: int | None = None
+    hasActivePlan: bool = False
 
 
 class F02WorkoutProposalResponse(BaseModel):

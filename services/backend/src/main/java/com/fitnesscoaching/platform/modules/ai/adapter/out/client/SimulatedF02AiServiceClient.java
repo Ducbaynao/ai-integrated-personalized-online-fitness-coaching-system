@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.ai.adapter.out.client;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F02AiServiceClient;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +34,7 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
 
         String goal = request.goalType() != null ? request.goalType() : "GENERAL_FITNESS";
         String level = request.fitnessLevel() != null ? request.fitnessLevel() : "BEGINNER";
+        String continuity = request.continuityState();
 
         int days = 3;
         if (request.preferences() != null) {
@@ -46,17 +48,54 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                 } catch (Exception ignored) {}
             }
         }
-        if (days != 4) days = 3;
+        if ("PROLONGED_INACTIVITY".equals(continuity)) {
+            days = 3;
+        } else if (days != 4) {
+            days = 3;
+        }
 
         List<Map<String, Object>> sessions;
-        List<String> reasoning;
+        List<String> reasoning = new ArrayList<>();
+        List<String> limitations = new ArrayList<>();
+        limitations.add("Proposal covers exactly 1 week (Phase 2 release scope baseline).");
+        limitations.add("Loads and intensities must be self-regulated using RPE 7-8 guidelines.");
+
+        List<String> usedData = new ArrayList<>(List.of(
+                "student_id: " + request.studentId(),
+                "coaching_mode: " + request.mode(),
+                "fitness_level: " + level,
+                "goal_type: " + goal,
+                "requested_days_per_week: " + days
+        ));
+
+        if (continuity != null) {
+            usedData.add("continuity_state: " + continuity);
+            if (request.daysSinceLastWorkout() != null) {
+                usedData.add("days_since_last_workout: " + request.daysSinceLastWorkout());
+            }
+        }
+
+        String planNameSuffix = "Starter Plan";
+
+        if ("PROLONGED_INACTIVITY".equals(continuity)) {
+            planNameSuffix = "Return-to-Training Plan";
+            reasoning.add("Trainee is returning after prolonged inactivity; starting with conservative re-adaptation volume and loads without assuming prior capacity.");
+            limitations.add("Return-to-training protocol applied due to prolonged inactivity (>=100 days). Historical performance is not representative of current capacity; loads must be conservative.");
+        } else if ("CONFIRMED_NEW".equals(continuity)) {
+            reasoning.add("Trainee is confirmed new with zero training history; foundation movement patterns prioritized.");
+            limitations.add("First-time introductory foundation; movement mechanics prioritized over loading.");
+        } else if ("UNKNOWN_HISTORY".equals(continuity)) {
+            reasoning.add("Trainee has unverified prior platform history; baseline calibration required.");
+            limitations.add("Unverified prior platform history; baseline calibration required.");
+        } else if ("RESTRICTED_HISTORY".equals(continuity)) {
+            reasoning.add("Coach does not have access to trainee workout history; proposal requires student confirmation.");
+            limitations.add("Workout history access restricted; baseline calibration required.");
+        }
 
         if (days == 4) {
-            reasoning = List.of(
-                    "Program tailored for " + level + " level targeting " + goal + ".",
-                    "Distributed across a 4-day upper/lower split (Day 1 Upper Push, Day 2 Lower, Day 4 Upper Pull, Day 5 Lower/Conditioning).",
-                    "Volume calibrated at 3-4 sets per primary movement pattern."
-            );
+            reasoning.add("Program tailored for " + level + " level targeting " + goal + ".");
+            reasoning.add("Distributed across a 4-day upper/lower split (Day 1 Upper Push, Day 2 Lower, Day 4 Upper Pull, Day 5 Lower/Conditioning).");
+            reasoning.add("Volume calibrated at 3-4 sets per primary movement pattern.");
             sessions = List.of(
                     Map.of(
                             "weekNumber", 1,
@@ -119,7 +158,7 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                                             "targetRepsMin", 10,
                                             "targetRepsMax", 12,
                                             "restSeconds", 60,
-                                            "instructions", "Keep core engaged."
+                                            "instructions", "Keep core engaged and avoid hyperextending lumbar spine."
                                     )
                             )
                     ),
@@ -146,11 +185,9 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                     )
             );
         } else {
-            reasoning = List.of(
-                    "Program tailored for " + level + " level targeting " + goal + ".",
-                    "Distributed across a 3-day split (Day 1 Upper, Day 3 Lower, Day 5 Conditioning) ensuring 48h recovery.",
-                    "Volume calibrated at 3-4 sets per primary movement pattern."
-            );
+            reasoning.add("Program tailored for " + level + " level targeting " + goal + ".");
+            reasoning.add("Distributed across a 3-day split (Day 1 Upper, Day 3 Lower, Day 5 Conditioning) ensuring 48h recovery between sessions.");
+            reasoning.add("Volume calibrated at 3-4 sets per primary movement pattern.");
             sessions = List.of(
                     Map.of(
                             "weekNumber", 1,
@@ -160,7 +197,7 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                             "focus", "Upper horizontal push and horizontal pull",
                             "estimatedDurationMinutes", 50,
                             "supervision", "SELF_PERFORMABLE",
-                            "notes", "Focus on full range of motion.",
+                            "notes", "Focus on full range of motion and scapular control.",
                             "prescriptions", List.of(
                                     Map.of(
                                             "exerciseVariationId", v1.toString(),
@@ -179,7 +216,7 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                                             "targetRepsMin", 10,
                                             "targetRepsMax", 12,
                                             "restSeconds", 60,
-                                            "instructions", "Keep core engaged."
+                                            "instructions", "Keep core engaged and avoid hyperextending lumbar spine."
                                     )
                             )
                     ),
@@ -201,7 +238,7 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                                             "targetRepsMax", 10,
                                             "targetLoad", 30.0,
                                             "restSeconds", 120,
-                                            "instructions", "Break at hips and knees simultaneously."
+                                            "instructions", "Break at hips and knees simultaneously; maintain neutral spine."
                                     )
                             )
                     ),
@@ -233,24 +270,15 @@ public class SimulatedF02AiServiceClient implements F02AiServiceClient {
                 "recommendationType", "WORKOUT_PLAN_PROPOSAL",
                 "summary", "1-week personalized workout proposal targeting " + goal + " with " + days + " balanced training sessions.",
                 "reasoning", reasoning,
-                "usedData", List.of(
-                        "student_id: " + request.studentId(),
-                        "coaching_mode: " + request.mode(),
-                        "fitness_level: " + level,
-                        "goal_type: " + goal,
-                        "requested_days_per_week: " + days
-                ),
+                "usedData", usedData,
                 "missingData", List.of(
                         "recent_1rm_test_results",
                         "detailed_orthopedic_evaluations"
                 ),
-                "limitations", List.of(
-                        "Proposal covers exactly 1 week (Phase 2 release scope baseline).",
-                        "Loads and intensities must be self-regulated using RPE 7-8 guidelines."
-                ),
+                "limitations", limitations,
                 "confidence", 0.92,
                 "plan", Map.of(
-                        "name", "1-Week " + goal.replace('_', ' ') + " Starter Plan",
+                        "name", "1-Week " + goal.replace('_', ' ') + " " + planNameSuffix,
                         "description", "Structured " + days + "-day foundation program created for " + level.toLowerCase() + " trainees.",
                         "durationWeeks", 1,
                         "sessions", sessions

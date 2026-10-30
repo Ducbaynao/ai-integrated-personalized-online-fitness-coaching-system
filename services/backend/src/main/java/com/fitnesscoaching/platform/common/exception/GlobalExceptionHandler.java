@@ -872,11 +872,25 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), Collections.emptyList()));
     }
 
+    @ExceptionHandler(AiProviderException.class)
+    public ResponseEntity<ErrorResponse> handleAiProvider(AiProviderException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse.of(
+                "SERVICE_UNAVAILABLE", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(AiTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handleAiTimeout(AiTimeoutException ex) {
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(ErrorResponse.of(
+                "GATEWAY_TIMEOUT", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(AiRunValidationException.class)
     public ResponseEntity<ErrorResponse> handleAiRunValidation(AiRunValidationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(
                 "VALIDATION_FAILED", ex.getMessage(), Instant.now(clock),
-                RequestIdHolder.get(), Collections.emptyList()));
+                RequestIdHolder.get(), ex.getFieldErrors() != null ? ex.getFieldErrors() : Collections.emptyList()));
     }
 
     @ExceptionHandler(Exception.class)

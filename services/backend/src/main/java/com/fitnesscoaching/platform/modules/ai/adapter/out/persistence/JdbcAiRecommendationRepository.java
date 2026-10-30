@@ -45,6 +45,7 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
             rs.getString("original_payload"),
             rs.getBoolean("is_customized"),
             (UUID) rs.getObject("last_modified_by"),
+            rs.getString("source_snapshot"),
             toInstant(rs.getTimestamp("created_at")),
             toInstant(rs.getTimestamp("updated_at"))
     );
@@ -76,13 +77,13 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 title, explanation, structured_payload, status, decision_authority,
                 target_entity_type, target_entity_id, decided_by, decided_at, decision_note,
                 expires_at, revision, original_payload, is_customized, last_modified_by,
-                created_at, updated_at
+                source_snapshot, created_at, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?::jsonb, ?::fitness.recommendation_status, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?::jsonb, ?, ?,
-                ?, ?
+                ?::jsonb, ?, ?
             )
             """;
 
@@ -108,6 +109,7 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 origPayload,
                 recommendation.isCustomized(),
                 recommendation.lastModifiedBy(),
+                recommendation.sourceSnapshot(),
                 now,
                 now
         );

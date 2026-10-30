@@ -13,6 +13,17 @@ jest.mock('@/services/workoutPlanApi', () => ({
   },
 }));
 
+jest.mock('@/services/studentProfileApi', () => ({
+  studentProfileApi: {
+    getMyStudentProfile: jest.fn().mockResolvedValue({
+      userId: 'student-1',
+      availableDaysPerWeek: 3,
+      preferredSessionMinutes: 60,
+      trainingExperienceLevel: 'BEGINNER',
+    }),
+  },
+}));
+
 jest.mock('@/services/aiWorkoutProposalApi', () => {
   const actual = jest.requireActual('@/services/aiWorkoutProposalApi');
   return {
@@ -107,6 +118,18 @@ describe('AiWorkoutProposalModal', () => {
       dayBtn.props.onPress();
     });
 
+    // Select 45 minutes
+    const minBtn = tree!.root.findByProps({ testID: 'session-minutes-45' });
+    renderer.act(() => {
+      minBtn.props.onPress();
+    });
+
+    // Confirm no physical limitations
+    const noLimBtn = tree!.root.findByProps({ testID: 'limitations-none-button' });
+    renderer.act(() => {
+      noLimBtn.props.onPress();
+    });
+
     // Enter notes
     const notesInput = tree!.root.findByProps({ testID: 'ai-proposal-notes-input' });
     renderer.act(() => {
@@ -120,13 +143,20 @@ describe('AiWorkoutProposalModal', () => {
     });
     await flushPromises();
 
-    expect(aiWorkoutProposalApi.generate).toHaveBeenCalledWith({
-      studentId: 'student-1',
-      preferences: {
-        daysPerWeek: 4,
-        note: 'No overhead presses',
-      },
-    });
+    expect(aiWorkoutProposalApi.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        studentId: 'student-1',
+        preferences: expect.objectContaining({
+          daysPerWeek: 4,
+          preferredDaysPerWeek: 4,
+          preferredSessionMinutes: 45,
+          allowBodyweight: true,
+          hasPhysicalLimitations: false,
+          limitationsConfirmed: true,
+          note: 'No overhead presses',
+        }),
+      })
+    );
 
     const detailView = tree!.root.findByProps({ testID: 'ai-proposal-detail-view' });
     expect(detailView).toBeDefined();
@@ -513,5 +543,229 @@ describe('AiWorkoutProposalModal', () => {
       2,
       false
     );
+  });
+  it('displays backend field errors and readiness guidance banner on validation failure', async () => {
+    const errorResponse: ErrorResponse = {
+      errorCode: 'VALIDATION_FAILED',
+      message: 'Validation failed',
+      timestamp: '2026-10-30T10:00:00Z',
+      requestId: 'req-val-1',
+      fieldErrors: [
+        { field: 'fitnessGoal', code: 'REQUIRED', message: 'Active fitness goal is required.' },
+        { field: 'startDate', code: 'PAST_DATE', message: 'Workout plan start date cannot be in the past.' },
+        { field: 'limitations', code: 'REQUIRED', message: 'Physical limitations or health status confirmation is required.' },
+      ],
+    };
+    (aiWorkoutProposalApi.generate as jest.Mock).mockRejectedValueOnce(
+      new ApiError(400, 'Validation failed', errorResponse)
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-1"
+          isTrainer={false}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Click Generate without selecting limitations
+    const generateBtn = tree!.root.findByProps({ testID: 'generate-ai-proposal-button' });
+    renderer.act(() => {
+      generateBtn.props.onPress();
+    });
+    await flushPromises();
+
+    // Verify readiness guidance card is displayed
+    const guidanceCard = tree!.root.findByProps({ testID: 'readiness-guidance-card' });
+    expect(guidanceCard).toBeDefined();
+
+    // Verify error banner
+    const errorBanner = tree!.root.findByProps({ testID: 'ai-proposal-error-banner' });
+    expect(errorBanner).toBeDefined();
+  });
+
+  it('handles physical limitations toggle and requires description when limitations exist', async () => {
+    (aiWorkoutProposalApi.generate as jest.Mock).mockResolvedValueOnce(mockProposal);
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-1"
+          isTrainer={false}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Select "Có hạn chế"
+    const yesLimBtn = tree!.root.findByProps({ testID: 'limitations-yes-button' });
+    renderer.act(() => {
+      yesLimBtn.props.onPress();
+    });
+
+    // Enter limitations description
+    const limInput = tree!.root.findByProps({ testID: 'ai-proposal-limitations-input' });
+    renderer.act(() => {
+      limInput.props.onChangeText('Recovering from mild knee strain');
+    });
+
+    // Generate
+    const generateBtn = tree!.root.findByProps({ testID: 'generate-ai-proposal-button' });
+    renderer.act(() => {
+      generateBtn.props.onPress();
+    });
+    await flushPromises();
+
+    expect(aiWorkoutProposalApi.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        studentId: 'student-1',
+        preferences: expect.objectContaining({
+          hasPhysicalLimitations: true,
+          limitationsConfirmed: true,
+          limitationsDescription: 'Recovering from mild knee strain',
+        }),
+      })
+    );
+  });
+
+  it('does not prefill preferences from getMyStudentProfile when isTrainer is true', async () => {
+    const { studentProfileApi } = require('@/services/studentProfileApi');
+    studentProfileApi.getMyStudentProfile.mockClear();
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-99"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Trainer must not load their own student profile as the target student's profile
+    expect(studentProfileApi.getMyStudentProfile).not.toHaveBeenCalled();
+  });
+
+  it('resets proposal and user inputs when studentId changes to prevent data leakage', async () => {
+    (aiWorkoutProposalApi.generate as jest.Mock).mockResolvedValueOnce(mockProposal);
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-A"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Fill notes for Student A
+    const notesInput = tree!.root.findByProps({ testID: 'ai-proposal-notes-input' });
+    renderer.act(() => {
+      notesInput.props.onChangeText('Notes for Student A');
+    });
+
+    // Confirm no limitations for Student A
+    const noLimBtn = tree!.root.findByProps({ testID: 'limitations-none-button' });
+    renderer.act(() => {
+      noLimBtn.props.onPress();
+    });
+
+    // Generate proposal for Student A
+    const generateBtn = tree!.root.findByProps({ testID: 'generate-ai-proposal-button' });
+    renderer.act(() => {
+      generateBtn.props.onPress();
+    });
+    await flushPromises();
+
+    // Verify proposal detail is rendered for Student A
+    expect(tree!.root.findByProps({ testID: 'ai-proposal-detail-view' })).toBeDefined();
+
+    // Now switch modal to Student B (studentId prop changes)
+    renderer.act(() => {
+      tree!.update(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-B"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Verify proposal detail from Student A is WIPED and request form is reset for Student B
+    expect(() => tree!.root.findByProps({ testID: 'ai-proposal-detail-view' })).toThrow();
+    const newForm = tree!.root.findByProps({ testID: 'ai-proposal-request-form' });
+    expect(newForm).toBeDefined();
+
+    // Verify notes input for Student B is empty (not leaked from Student A)
+    const newNotesInput = tree!.root.findByProps({ testID: 'ai-proposal-notes-input' });
+    expect(newNotesInput.props.value).toBe('');
+  });
+
+  it('ignores stale in-flight response when studentId changes during request', async () => {
+    let resolveGenerate!: (val: any) => void;
+    (aiWorkoutProposalApi.generate as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGenerate = resolve;
+        })
+    );
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-A"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Trigger generate for student-A (request is now in-flight)
+    const generateBtn = tree!.root.findByProps({ testID: 'generate-ai-proposal-button' });
+    renderer.act(() => {
+      generateBtn.props.onPress();
+    });
+
+    // While request for student-A is in-flight, switch to student-B
+    renderer.act(() => {
+      tree.update(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-B"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+
+    // Now resolve the old request for student-A
+    renderer.act(() => {
+      resolveGenerate(mockProposal);
+    });
+    await flushPromises();
+
+    // The proposal detail should NOT be rendered for student-B
+    expect(() => tree!.root.findByProps({ testID: 'ai-proposal-detail-view' })).toThrow();
+    expect(tree!.root.findByProps({ testID: 'ai-proposal-request-form' })).toBeDefined();
   });
 });

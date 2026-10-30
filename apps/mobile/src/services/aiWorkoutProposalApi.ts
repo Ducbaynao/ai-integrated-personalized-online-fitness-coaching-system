@@ -7,8 +7,22 @@ import {
   RejectRecommendationResponse,
   UpdateRecommendationDraftRequest,
   UpdateRecommendationDraftResponse,
+  WorkoutProposalPreferences,
 } from '@/types/aiWorkoutProposal';
 import { ApiError } from '@/types/auth';
+
+export function getWorkoutProposalFieldErrors(error: unknown): Record<string, string> {
+  if (error instanceof ApiError && error.errorResponse?.fieldErrors) {
+    const map: Record<string, string> = {};
+    for (const fe of error.errorResponse.fieldErrors) {
+      if (fe.field && fe.message) {
+        map[fe.field] = fe.message;
+      }
+    }
+    return map;
+  }
+  return {};
+}
 
 export function getWorkoutProposalErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -27,7 +41,7 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
     }
     if (code === 'AI_RUN_LIFECYCLE_CONFLICT') {
       if (error.message.includes('expired')) {
-        return 'Đề xuất giáo án đã hết hạn (quá 7 ngày). Vui lòng tạo đề xuất mới.';
+        return 'Đề xuất giáo án đã hết hạn (quá 24 giờ). Vui lòng tạo đề xuất mới.';
       }
       if (error.message.includes('already been applied')) {
         return 'Đề xuất giáo án này đã được áp dụng trước đó.';
@@ -39,6 +53,11 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
         return 'Bản thảo đã bị chỉnh sửa ở một phiên khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.';
       }
       return 'Xung đột trạng thái đề xuất giáo án. Vui lòng tải lại trang và thử lại.';
+    }
+    if (code === 'VALIDATION_FAILED' || code === 'BAD_REQUEST') {
+      if (error.errorResponse?.fieldErrors && error.errorResponse.fieldErrors.length > 0) {
+        return 'Vui lòng kiểm tra và hoàn thiện các trường thông tin bắt buộc còn thiếu bên dưới.';
+      }
     }
     if (code === 'AI_OUTPUT_VALIDATION_FAILED' || error.status === 422) {
       return 'Đề xuất từ AI không vượt qua kiểm định an toàn bài tập hoặc cấu trúc 1 tuần.';
@@ -63,7 +82,10 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
 }
 
 export const aiWorkoutProposalApi = {
-  generate(input: { studentId?: string; preferences?: Record<string, unknown> }, commandKey = createCommandKey()) {
+  generate(
+    input: { studentId?: string; preferences?: WorkoutProposalPreferences | Record<string, unknown> },
+    commandKey = createCommandKey()
+  ) {
     return request<WorkoutProposalResponse>('/ai/workout-proposals', {
       method: 'POST',
       body: { ...input, commandKey },

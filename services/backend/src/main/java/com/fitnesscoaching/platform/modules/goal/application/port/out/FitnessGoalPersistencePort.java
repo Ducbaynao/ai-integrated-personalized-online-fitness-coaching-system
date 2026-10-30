@@ -61,4 +61,6 @@ public interface FitnessGoalPersistencePort {
     List<FitnessGoal> findByStudentId(UUID studentId, com.fitnesscoaching.platform.modules.goal.domain.GoalStatus status, int limit, long offset);
 
     long countByStudentId(UUID studentId, com.fitnesscoaching.platform.modules.goal.domain.GoalStatus status);
+
+    Optional<FitnessGoal> lockAndVerifyActiveGoal(UUID studentId, UUID goalId, int expectedVersionNumber);
 }

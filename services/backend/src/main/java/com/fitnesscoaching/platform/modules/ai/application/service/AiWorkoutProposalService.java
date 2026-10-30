@@ -3,6 +3,8 @@ package com.fitnesscoaching.platform.modules.ai.application.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.AiOutputValidationException;
+import com.fitnesscoaching.platform.common.exception.AiProviderException;
+import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.AiRunNotFoundException;
@@ -17,9 +19,15 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRecommendationApplicatio
 import com.fitnesscoaching.platform.modules.ai.domain.AiRecommendationStatus;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
+import com.fitnesscoaching.platform.modules.ai.domain.F02SourceSnapshot;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanSummary;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
@@ -32,6 +40,7 @@ import com.fitnesscoaching.platform.modules.workout.domain.ExercisePrescription;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +68,8 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final CurrentCoachingContextQuery coachingContextQuery;
+    private final UserAccountStatusQuery accountStatusQuery;
+    private final ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider;
 
     public AiWorkoutProposalService(
             AiRunRepository aiRunRepository,
@@ -70,7 +81,9 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
             WorkoutPlanQueryUseCase workoutPlanQueryUseCase,
             AuditService auditService,
             ObjectMapper objectMapper,
-            CurrentCoachingContextQuery coachingContextQuery
+            CurrentCoachingContextQuery coachingContextQuery,
+            UserAccountStatusQuery accountStatusQuery,
+            ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider
     ) {
         this.aiRunRepository = aiRunRepository;
         this.recommendationRepository = recommendationRepository;
@@ -82,12 +95,20 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.coachingContextQuery = coachingContextQuery;
+        this.accountStatusQuery = accountStatusQuery;
+        this.goalProvider = goalProvider;
     }
 
     @Override
     public WorkoutProposalResult generateProposal(GenerateProposalCommand command) {
         if (command == null || command.actorId() == null) {
             throw new IllegalArgumentException("Invalid proposal command: actorId is required.");
+        }
+
+        // 0. Verify Actor Account Status (B08: inactive/suspended accounts cannot request AI assistance)
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(command.actorId()).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
         }
 
         UUID studentId = command.studentId() != null ? command.studentId() : command.actorId();
@@ -107,13 +128,28 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         Instant now = Instant.now();
         UUID runId = UUID.randomUUID();
 
-        // 1. Record Initial AI Run
+        // 1. Build Context Envelope & Capture Source Snapshot BEFORE calling provider
+        F02ContextBuilder.ContextEnvelopeResult envelopeResult =
+                contextBuilder.buildContextEnvelope(studentId, command.actorId(), command.preferences(), List.of());
+        F02ServiceRequest request = envelopeResult.request();
+        F02SourceSnapshot sourceSnapshot = envelopeResult.sourceSnapshot();
+
+        String sourceSnapshotJson;
+        try {
+            sourceSnapshotJson = objectMapper.writeValueAsString(sourceSnapshot);
+        } catch (Exception e) {
+            log.error("Failed to serialize F02 source snapshot for student {}: {}", studentId, e.getMessage());
+            throw new IllegalStateException("Failed to serialize source snapshot: " + e.getMessage(), e);
+        }
+
+        // Record Initial AI Run with source snapshot in input payload
         AiRun run = AiRun.builder()
                 .id(runId)
                 .requestedBy(command.actorId())
                 .studentId(studentId)
                 .coachingPeriodId(coaching.periodId())
                 .requestType("F02_WORKOUT_PLAN_PROPOSAL")
+                .inputPayload(sourceSnapshotJson)
                 .status(AiRunStatus.QUEUED)
                 .purpose("BUSINESS_ASSISTANCE")
                 .evaluationOnly(false)
@@ -125,8 +161,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         // Transition to RUNNING
         aiRunRepository.transitionStatus(runId, AiRunStatus.QUEUED, AiRunStatus.RUNNING, now, null);
 
-        // 2. Build Context Envelope & Invoke AI Service
-        F02ServiceRequest request = contextBuilder.buildRequest(studentId, command.preferences(), List.of());
+        // 2. Invoke AI Service
         String rawJson;
         Instant startCall = Instant.now();
         try {
@@ -134,7 +169,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         } catch (Exception e) {
             Instant failedAt = Instant.now();
             int latency = (int) ChronoUnit.MILLIS.between(startCall, failedAt);
-            aiRunRepository.completeRun(runId, AiRunStatus.FAILED, null, "PROVIDER_ERROR", e.getMessage(), 0, 0, latency, failedAt);
+            aiRunRepository.completeRun(runId, AiRunStatus.FAILED, null, "PROVIDER_ERROR", e.getMessage(), null, null, latency, failedAt);
             throw e;
         }
 
@@ -144,15 +179,51 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
             Instant rejectedAt = Instant.now();
             int latency = (int) ChronoUnit.MILLIS.between(startCall, rejectedAt);
             aiRunRepository.completeRun(runId, AiRunStatus.REJECTED_BY_VALIDATOR, null, "VALIDATION_FAILED",
-                    validation.failureReason(), 0, 0, latency, rejectedAt);
+                    validation.failureReason(), null, null, latency, rejectedAt);
             throw new AiOutputValidationException("F02 proposal output validation failed: " + validation.failureReason());
+        }
+
+        // 4. Revalidate Actor Authorization Post-Provider Call (T04: Cutoff check before delivery)
+        AccountStatus postAccountStatus = accountStatusQuery.getAccountStatus(command.actorId()).orElse(null);
+        if (postAccountStatus != AccountStatus.ACTIVE) {
+            Instant revokedAt = Instant.now();
+            int latency = (int) ChronoUnit.MILLIS.between(startCall, revokedAt);
+            aiRunRepository.completeRun(runId, AiRunStatus.FAILED, null, "AUTHORITY_REVOKED",
+                    "Actor account is no longer active", null, null, latency, revokedAt);
+            throw new AiRunAccessDeniedException("Actor account is no longer active; output cannot be delivered.");
+        }
+
+        var postCoachingOpt = coachingContextQuery.findEffectiveContext(studentId, false);
+        if ("HUMAN_COACH".equals(coaching.mode())) {
+            if (postCoachingOpt.isEmpty()
+                    || !"HUMAN_COACH".equals(postCoachingOpt.get().mode() != null ? postCoachingOpt.get().mode().name() : null)
+                    || !command.actorId().equals(postCoachingOpt.get().trainerId())
+                    || (coaching.periodId() != null && !coaching.periodId().equals(postCoachingOpt.get().periodId()))) {
+                Instant revokedAt = Instant.now();
+                int latency = (int) ChronoUnit.MILLIS.between(startCall, revokedAt);
+                aiRunRepository.completeRun(runId, AiRunStatus.FAILED, null, "AUTHORITY_REVOKED",
+                        "Trainer coaching authority revoked or coaching period changed during generation",
+                        null, null, latency, revokedAt);
+                throw new AiRunAccessDeniedException("Trainer coaching authority revoked or coaching period changed during generation.");
+            }
+        } else if ("SELF_DIRECTED".equals(coaching.mode())) {
+            if (postCoachingOpt.isPresent()
+                    && "HUMAN_COACH".equals(postCoachingOpt.get().mode() != null ? postCoachingOpt.get().mode().name() : null)) {
+                Instant revokedAt = Instant.now();
+                int latency = (int) ChronoUnit.MILLIS.between(startCall, revokedAt);
+                aiRunRepository.completeRun(runId, AiRunStatus.FAILED, null, "AUTHORITY_REVOKED",
+                        "Coaching mode transitioned to HUMAN_COACH during generation",
+                        null, null, latency, revokedAt);
+                throw new AiRunAccessDeniedException("Coaching mode transitioned to HUMAN_COACH during generation.");
+            }
         }
 
         Instant completedAt = Instant.now();
         int latency = (int) ChronoUnit.MILLIS.between(startCall, completedAt);
-        aiRunRepository.completeRun(runId, AiRunStatus.SUCCEEDED, rawJson, null, null, 150, 450, latency, completedAt);
+        // Telemetry tokens are recorded as null/unknown when provider does not measure exact token count (no fake numbers)
+        aiRunRepository.completeRun(runId, AiRunStatus.SUCCEEDED, rawJson, null, null, null, null, latency, completedAt);
 
-        // 4. Create and Persist Recommendation in PENDING state
+        // 5. Create and Persist Recommendation in PENDING state
         String title = "1-Week Workout Plan Proposal";
         String explanation = "Personalized resistance training plan tailored to current goals and training schedule.";
         try {
@@ -169,7 +240,8 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 ? AiDecisionAuthority.TRAINER
                 : AiDecisionAuthority.STUDENT;
 
-        Instant expiresAt = completedAt.plus(7, ChronoUnit.DAYS);
+        // Approved contract: F02 recommendation expires in 24 hours
+        Instant expiresAt = completedAt.plus(24, ChronoUnit.HOURS);
 
         AiRecommendation recommendation = AiRecommendation.builder()
                 .id(UUID.randomUUID())
@@ -183,6 +255,7 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 .originalPayload(rawJson)
                 .revision(1)
                 .isCustomized(false)
+                .sourceSnapshot(sourceSnapshotJson)
                 .status(AiRecommendationStatus.PENDING)
                 .decisionAuthority(authority)
                 .targetEntityType("WORKOUT_PLAN")
@@ -220,6 +293,14 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
 
     @Override
     public AiRecommendation getRecommendation(UUID actorId, UUID recommendationId) {
+        if (actorId == null) {
+            throw new AiRunAccessDeniedException("Authenticated actor ID is required.");
+        }
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(actorId).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
+        }
+
         AiRecommendation rec = recommendationRepository.findById(recommendationId)
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + recommendationId));
 
@@ -241,6 +322,11 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         }
         if (command.structuredPayload() == null || command.structuredPayload().isBlank()) {
             throw new IllegalArgumentException("Structured payload is required for draft update.");
+        }
+
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(command.actorId()).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
         }
 
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
@@ -354,6 +440,11 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
             throw new IllegalArgumentException("Invalid accept command parameters.");
         }
 
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(command.actorId()).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
+        }
+
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + command.recommendationId()));
 
@@ -462,8 +553,96 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                     + rec.revision() + "; expectedRevision is required when accepting.");
         }
 
-        // Re-validate payload with output validator inside transactional boundary before applying
-        F02RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(rec.structuredPayload());
+        // Check if student already has an ACTIVE workout plan
+        Optional<PlanDetail> activePlanOpt = workoutPlanQueryUseCase.findActive(command.actorId(), rec.studentId());
+
+        TrainingContinuityState snapshotContinuity = null;
+
+        // Source Snapshot Guards (T05: Goal and active plan state verification with fail-closed semantics)
+        if (rec.sourceSnapshot() != null && !rec.sourceSnapshot().isBlank()) {
+            JsonNode snapshotNode;
+            try {
+                snapshotNode = objectMapper.readTree(rec.sourceSnapshot());
+            } catch (Exception e) {
+                log.error("Failed to parse source snapshot for recommendation {}: {}", command.recommendationId(), e.getMessage());
+                throw new AiRunLifecycleConflictException("Source snapshot is malformed and cannot be verified: " + e.getMessage());
+            }
+
+            if (snapshotNode.hasNonNull("continuityState")) {
+                try {
+                    snapshotContinuity = TrainingContinuityState.valueOf(snapshotNode.get("continuityState").asText());
+                } catch (Exception ignored) {}
+            }
+
+            if (snapshotNode.hasNonNull("goalId")) {
+                UUID snapshotGoalId = UUID.fromString(snapshotNode.get("goalId").asText());
+                int snapshotGoalVer = snapshotNode.has("goalVersionNumber") ? snapshotNode.get("goalVersionNumber").asInt() : -1;
+
+                GetCurrentFitnessGoalUseCase goalService = goalProvider.getIfAvailable();
+                if (goalService == null) {
+                    throw new AiProviderException("Fitness goal service is unavailable for source revalidation");
+                }
+                Optional<FitnessGoal> currentGoalOpt = goalService.lockAndVerifyActiveGoal(rec.studentId(), snapshotGoalId, snapshotGoalVer);
+                if (currentGoalOpt.isEmpty() || currentGoalOpt.get().status() != GoalStatus.ACTIVE) {
+                    throw new AiRunLifecycleConflictException("Active fitness goal is no longer active; cannot accept recommendation.");
+                }
+                FitnessGoal currentGoal = currentGoalOpt.get();
+                if (!snapshotGoalId.equals(currentGoal.id())) {
+                    throw new AiRunLifecycleConflictException("Fitness goal has changed since proposal was generated; cannot accept recommendation.");
+                }
+                if (currentGoal.currentVersion() == null || currentGoal.currentVersion().versionNumber() != snapshotGoalVer) {
+                    throw new AiRunLifecycleConflictException("Fitness goal version has changed since proposal was generated (was v"
+                            + snapshotGoalVer + ", now v" + (currentGoal.currentVersion() != null ? currentGoal.currentVersion().versionNumber() : "null")
+                            + "); please reload proposal.");
+                }
+            }
+
+            // Plan guards from snapshot
+            if (snapshotNode.has("activePlanId")) {
+                if (snapshotNode.get("activePlanId").isNull()) {
+                    if (activePlanOpt.isPresent()) {
+                        throw new AiRunLifecycleConflictException("Active workout plan appeared since proposal was generated; "
+                                + "please reload the proposal to review changes before accepting.");
+                    }
+                } else {
+                    UUID snapshotPlanId = UUID.fromString(snapshotNode.get("activePlanId").asText());
+                    long snapshotPlanAggVer = snapshotNode.has("activePlanAggregateVersion")
+                            ? snapshotNode.get("activePlanAggregateVersion").asLong() : -1L;
+
+                    if (activePlanOpt.isEmpty()) {
+                        throw new AiRunLifecycleConflictException("Expected active workout plan " + snapshotPlanId
+                                + " is no longer active; please reload the proposal before accepting.");
+                    }
+                    if (!activePlanOpt.get().plan().id().equals(snapshotPlanId)) {
+                        throw new AiRunLifecycleConflictException("Active workout plan has changed since proposal was generated (was "
+                                + snapshotPlanId + ", now " + activePlanOpt.get().plan().id() + "); please reload proposal.");
+                    }
+                    if (snapshotPlanAggVer >= 0 && activePlanOpt.get().plan().aggregateVersion() != snapshotPlanAggVer) {
+                        long currentAggVer = activePlanOpt.get().plan().aggregateVersion();
+                        if (command.expectedPlanAggregateVersion() == null || command.expectedPlanAggregateVersion() != currentAggVer) {
+                            throw new AiRunLifecycleConflictException("Workout plan version conflict: plan aggregate version has changed (was "
+                                    + snapshotPlanAggVer + ", now " + currentAggVer
+                                    + "); please reload to review changes before accepting.");
+                        }
+                        log.info("Accepting proposal {} after client reloaded preview: original snapshot aggregate version {}, current aggregate version {}",
+                                command.recommendationId(), snapshotPlanAggVer, currentAggVer);
+                    }
+                }
+            }
+        } else {
+            // Legacy proposal without snapshot: verify live active goal
+            log.info("Proposal {} has no source snapshot (legacy record). Performing basic live goal verification.", command.recommendationId());
+            GetCurrentFitnessGoalUseCase goalService = goalProvider.getIfAvailable();
+            if (goalService != null) {
+                Optional<FitnessGoal> currentGoalOpt = goalService.getCurrentFitnessGoal(rec.studentId(), false);
+                if (currentGoalOpt.isEmpty() || currentGoalOpt.get().status() != GoalStatus.ACTIVE) {
+                    throw new AiRunLifecycleConflictException("Active fitness goal is no longer active; cannot accept recommendation.");
+                }
+            }
+        }
+
+        // Re-validate payload with output validator and continuity rule gate inside transactional boundary before applying
+        F02RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(rec.structuredPayload(), snapshotContinuity);
         if (!validation.isValid()) {
             throw new AiOutputValidationException("Recommendation cannot be applied because payload is no longer valid: " + validation.failureReason());
         }
@@ -472,9 +651,6 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         List<WorkoutSessionTemplate> sessionTemplates = parseTemplates(rec.structuredPayload());
         String planName = rec.title();
         String planDescription = rec.explanation();
-
-        // Check if student already has an ACTIVE workout plan
-        Optional<PlanDetail> activePlanOpt = workoutPlanQueryUseCase.findActive(command.actorId(), rec.studentId());
 
         // Plan version and preview guards:
         if (Boolean.TRUE.equals(command.expectedNoActivePlan()) && activePlanOpt.isPresent()) {
@@ -549,10 +725,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
             workoutPlanCommandUseCase.activate(activateCmd);
             resultingPlanId = draftResult.planId();
             resultingPlanVersionId = draftResult.planVersionId();
-            action = "CREATED_NEW_PLAN";
+            action = "CREATED_AND_ACTIVATED_NEW_PLAN";
         }
 
-        // Update Recommendation Status to APPLIED
+        // 3. Mark Recommendation APPLIED atomically
         recommendationRepository.updateDecision(
                 rec.id(),
                 AiRecommendationStatus.APPLIED,
@@ -563,31 +739,22 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 resultingPlanId
         );
 
-        // Save Application Record with full payload tracking including revision, action and provenance
-        String appPayloadJson;
+        // 4. Save Application Audit Record (Receipt)
+        String appPayload = "{}";
         try {
-            java.util.Map<String, Object> payloadMap = new java.util.HashMap<>();
-            payloadMap.put("commandKey", command.commandKey() != null ? command.commandKey() : "");
-            payloadMap.put("actorId", command.actorId().toString());
-            payloadMap.put("decisionNote", command.decisionNote() != null ? command.decisionNote() : "");
-            payloadMap.put("createdPlanId", resultingPlanId.toString());
-            payloadMap.put("planVersionId", resultingPlanVersionId != null ? resultingPlanVersionId.toString() : "");
-            payloadMap.put("appliedRevision", rec.revision());
-            payloadMap.put("isCustomized", rec.isCustomized());
-            payloadMap.put("action", action);
-            if (command.expectedPlanId() != null) {
-                payloadMap.put("expectedPlanId", command.expectedPlanId().toString());
-            }
-            if (command.expectedPlanAggregateVersion() != null) {
-                payloadMap.put("expectedPlanAggregateVersion", command.expectedPlanAggregateVersion());
-            }
-            if (command.expectedNoActivePlan() != null) {
-                payloadMap.put("expectedNoActivePlan", command.expectedNoActivePlan());
-            }
-            appPayloadJson = objectMapper.writeValueAsString(payloadMap);
-        } catch (Exception e) {
-            appPayloadJson = "{}";
-        }
+            appPayload = objectMapper.writeValueAsString(Map.of(
+                    "commandKey", command.commandKey() != null ? command.commandKey() : "",
+                    "actorId", command.actorId().toString(),
+                    "decisionNote", command.decisionNote() != null ? command.decisionNote() : "",
+                    "resultingPlanId", resultingPlanId.toString(),
+                    "resultingPlanVersionId", resultingPlanVersionId != null ? resultingPlanVersionId.toString() : "",
+                    "appliedRevision", rec.revision(),
+                    "isCustomized", rec.isCustomized(),
+                    "action", action,
+                    "expectedPlanId", command.expectedPlanId() != null ? command.expectedPlanId().toString() : "",
+                    "expectedPlanAggregateVersion", command.expectedPlanAggregateVersion() != null ? command.expectedPlanAggregateVersion() : -1L
+            ));
+        } catch (Exception ignored) {}
 
         AiRecommendationApplication application = new AiRecommendationApplication(
                 UUID.randomUUID(),
@@ -595,20 +762,32 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 command.actorId(),
                 "WORKOUT_PLAN",
                 resultingPlanId,
-                appPayloadJson,
+                appPayload,
                 now
         );
         recommendationRepository.saveApplication(application);
 
-        // Record Immutable Audit
+        // 5. Audit Logging
+        String auditAfterJson = "{}";
+        try {
+            auditAfterJson = objectMapper.writeValueAsString(Map.of(
+                    "status", "APPLIED",
+                    "resultingPlanId", resultingPlanId.toString(),
+                    "resultingPlanVersionId", resultingPlanVersionId != null ? resultingPlanVersionId.toString() : "",
+                    "appliedRevision", rec.revision(),
+                    "isCustomized", rec.isCustomized(),
+                    "action", action
+            ));
+        } catch (Exception ignored) {}
+
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(command.actorId())
                 .actorRole(rec.decisionAuthority().name())
                 .action("AI_RECOMMENDATION_APPLIED")
                 .targetType("AI_RECOMMENDATION")
                 .targetId(rec.id())
-                .beforeDataJson("{}")
-                .afterDataJson(appPayloadJson)
+                .beforeDataJson(rec.structuredPayload())
+                .afterDataJson(auditAfterJson)
                 .occurredAt(now)
                 .build());
 
@@ -628,6 +807,11 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
     public RejectRecommendationResult rejectRecommendation(RejectRecommendationCommand command) {
         if (command == null || command.actorId() == null || command.recommendationId() == null) {
             throw new IllegalArgumentException("Invalid reject command parameters.");
+        }
+
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(command.actorId()).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
         }
 
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
@@ -713,9 +897,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                 int dayNumber = sNode.path("dayNumber").asInt(1);
                 int seqNumber = sNode.path("sequenceNumber").asInt(i + 1);
                 String name = sNode.path("name").asText("Session " + (i + 1));
-                String focus = sNode.has("focus") ? sNode.path("focus").asText() : null;
-                Integer estimatedMinutes = sNode.has("estimatedDurationMinutes") ? sNode.path("estimatedDurationMinutes").asInt() : null;
-                String notes = sNode.has("notes") ? sNode.path("notes").asText() : null;
+                String focus = sNode.has("focus") && !sNode.path("focus").isNull() ? sNode.path("focus").asText() : null;
+                Integer estimatedMinutes = sNode.has("estimatedDurationMinutes") && !sNode.path("estimatedDurationMinutes").isNull()
+                        ? sNode.path("estimatedDurationMinutes").asInt() : null;
+                String notes = sNode.has("notes") && !sNode.path("notes").isNull() ? sNode.path("notes").asText() : null;
 
                 JsonNode pNode = sNode.path("prescriptions");
                 List<ExercisePrescription> prescriptions = new ArrayList<>();
@@ -723,26 +908,44 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
                     JsonNode exNode = pNode.get(j);
                     UUID varId = UUID.fromString(exNode.path("exerciseVariationId").asText());
                     int exSeq = exNode.path("sequenceNumber").asInt(j + 1);
-                    Integer targetSets = exNode.has("targetSets") ? exNode.path("targetSets").asInt() : 3;
-                    Integer targetRepsMin = exNode.has("targetRepsMin") ? exNode.path("targetRepsMin").asInt() : null;
-                    Integer targetRepsMax = exNode.has("targetRepsMax") ? exNode.path("targetRepsMax").asInt() : null;
-                    BigDecimal targetLoad = exNode.has("targetLoad") ? BigDecimal.valueOf(exNode.path("targetLoad").asDouble()) : null;
-                    Integer restSeconds = exNode.has("restSeconds") ? exNode.path("restSeconds").asInt() : null;
-                    Integer durationSeconds = exNode.has("durationSeconds") ? exNode.path("durationSeconds").asInt() : null;
-                    String instructions = exNode.has("instructions") ? exNode.path("instructions").asText() : null;
+                    Integer targetSets = exNode.has("targetSets") && !exNode.path("targetSets").isNull() ? exNode.path("targetSets").asInt() : 3;
+                    Integer targetRepsMin = exNode.has("targetRepsMin") && !exNode.path("targetRepsMin").isNull() ? exNode.path("targetRepsMin").asInt() : null;
+                    Integer targetRepsMax = exNode.has("targetRepsMax") && !exNode.path("targetRepsMax").isNull() ? exNode.path("targetRepsMax").asInt() : null;
+                    BigDecimal targetLoad = exNode.has("targetLoad") && !exNode.path("targetLoad").isNull()
+                            ? BigDecimal.valueOf(exNode.path("targetLoad").asDouble()) : null;
+                    Integer restSeconds = exNode.has("restSeconds") && !exNode.path("restSeconds").isNull() ? exNode.path("restSeconds").asInt() : null;
+                    Integer durationSeconds = exNode.has("durationSeconds") && !exNode.path("durationSeconds").isNull() ? exNode.path("durationSeconds").asInt() : null;
+                    String instructions = exNode.has("instructions") && !exNode.path("instructions").isNull() ? exNode.path("instructions").asText() : null;
 
                     prescriptions.add(new ExercisePrescription(
-                            UUID.randomUUID(), varId, exSeq, targetSets, targetRepsMin, targetRepsMax, targetLoad, restSeconds, durationSeconds, instructions
+                            null,
+                            varId,
+                            exSeq,
+                            targetSets,
+                            targetRepsMin,
+                            targetRepsMax,
+                            targetLoad,
+                            restSeconds,
+                            durationSeconds,
+                            instructions
                     ));
                 }
 
                 sessionTemplates.add(new WorkoutSessionTemplate(
-                        UUID.randomUUID(), weekNumber, dayNumber, seqNumber, name, focus, estimatedMinutes, notes, prescriptions
+                        null,
+                        weekNumber,
+                        dayNumber,
+                        seqNumber,
+                        name,
+                        focus,
+                        estimatedMinutes,
+                        notes,
+                        prescriptions
                 ));
             }
+            return sessionTemplates;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse workout plan templates from structured proposal", e);
         }
-        return sessionTemplates;
     }
 }

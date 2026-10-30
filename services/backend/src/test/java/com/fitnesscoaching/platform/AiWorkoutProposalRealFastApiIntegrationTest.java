@@ -241,7 +241,11 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
         jdbc.update("INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at) SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code=?",
                 id, id, role);
         if (role.equals("STUDENT")) {
-            jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", id);
+            jdbc.update("""
+                    INSERT INTO fitness.student_profiles(user_id, training_experience_level, available_days_per_week, preferred_session_minutes)
+                    VALUES (?, 'BEGINNER', 3, 60)
+                    """, id);
+            createActiveGoal(id);
         }
         if (role.equals("TRAINER")) {
             jdbc.update("""
@@ -253,11 +257,51 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
         return id;
     }
 
+    private UUID createActiveGoal(UUID studentId) {
+        UUID goalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.fitness_goals (
+                    id, student_id, title, status, created_by, created_at, updated_at
+                ) VALUES (
+                    ?, ?, 'Real Goal', 'DRAFT'::fitness.lifecycle_status, ?, now(), now()
+                )
+                """, goalId, studentId, studentId);
+        jdbc.update("""
+                INSERT INTO fitness.fitness_goal_versions (
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
+                    duration_days, effective_from, effective_until, change_reason, created_by,
+                    created_at, locked_at, locked_by, lock_reason
+                ) VALUES (
+                    ?, ?, 1, 'Real Goal', current_date, current_date + 30,
+                    30, now(), NULL, 'INITIAL_CREATION', ?,
+                    now(), now(), ?, 'ACTIVATED'::fitness.version_lock_reason
+                )
+                """, versionId, goalId, studentId, studentId);
+        jdbc.update("""
+                UPDATE fitness.fitness_goals
+                SET status = 'ACTIVE'::fitness.lifecycle_status, activated_at = now()
+                WHERE id = ?
+                """, goalId);
+        return goalId;
+    }
+
     private UUID createSelfDirectedCoachingPeriod(UUID studentId) {
         UUID periodId = UUID.randomUUID();
         jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',clock_timestamp()-interval '1 day',?)",
                 periodId, studentId, studentId);
         return periodId;
+    }
+
+    private Map<String, Object> validFastApiPreferences(int days) {
+        return Map.of(
+                "daysPerWeek", days,
+                "preferredDaysPerWeek", days,
+                "preferredSessionMinutes", 60,
+                "equipment", List.of("BODYWEIGHT"),
+                "limitationsConfirmed", true,
+                "startDate", java.time.LocalDate.now().plusDays(1).toString()
+        );
     }
 
     private record HumanCoachSetup(UUID studentId, UUID trainerId, UUID relationshipId, UUID periodId) {}
@@ -285,6 +329,13 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
                 VALUES (?,?,?,?, 'WORKOUT_PLAN','ALLOW','MANAGE'::fitness.data_access_level,
                         clock_timestamp()-interval '1 day',?)
                 """, permission, relationship, student, trainer, student);
+        UUID historyPermission = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id,relationship_id,student_id,trainer_id,data_scope,decision,access_level,valid_from,granted_by)
+                VALUES (?,?,?,?, 'WORKOUT_HISTORY','ALLOW','VIEW'::fitness.data_access_level,
+                        clock_timestamp()-interval '1 day',?)
+                """, historyPermission, relationship, student, trainer, student);
         return new HumanCoachSetup(student, trainer, relationship, period);
     }
 
@@ -297,7 +348,7 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
 
         // 1. Generate Proposal via REST API -> calls FastAPI over HTTP
         WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
-                studentId, "http-gen-key-1", Map.of("daysPerWeek", 3)
+                studentId, "http-gen-key-1", validFastApiPreferences(3)
         );
 
         String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")
@@ -355,7 +406,7 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
         String token = generateToken(studentId, "STUDENT");
 
         WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
-                studentId, "http-gen-4days", Map.of("daysPerWeek", 4)
+                studentId, "http-gen-4days", validFastApiPreferences(4)
         );
 
         String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")
@@ -395,7 +446,7 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
 
         // 1. Trainer generates proposal for Student
         WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
-                setup.studentId(), "trainer-http-gen-1", Map.of("daysPerWeek", 3)
+                setup.studentId(), "trainer-http-gen-1", validFastApiPreferences(3)
         );
 
         String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")
@@ -433,7 +484,7 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
         String token = generateToken(studentId, "STUDENT");
 
         WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
-                studentId, "http-gen-reject", Map.of()
+                studentId, "http-gen-reject", validFastApiPreferences(3)
         );
 
         String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")
@@ -471,7 +522,7 @@ class AiWorkoutProposalRealFastApiIntegrationTest {
 
         // 1. Generate Proposal via REST API -> calls Real FastAPI
         WorkoutProposalApiRequest req = new WorkoutProposalApiRequest(
-                studentId, "real-fastapi-edit-gen-1", Map.of("daysPerWeek", 3)
+                studentId, "real-fastapi-edit-gen-1", validFastApiPreferences(3)
         );
 
         String genResponseStr = mockMvc.perform(post("/api/v1/ai/workout-proposals")

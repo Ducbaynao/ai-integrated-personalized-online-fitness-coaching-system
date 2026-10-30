@@ -9542,8 +9542,21 @@ components:
       type: object
       properties:
         studentId: { type: string, format: uuid }
+        commandKey: { type: string }
         preferences:
           type: object
+          properties:
+            preferredDaysPerWeek: { type: integer, minimum: 1, maximum: 7 }
+            daysPerWeek: { type: integer, minimum: 1, maximum: 7 }
+            preferredSessionMinutes: { type: integer, minimum: 15, maximum: 180 }
+            startDate: { type: string, format: date }
+            equipment: { type: array, items: { type: string } }
+            allowBodyweight: { type: boolean }
+            hasPhysicalLimitations: { type: boolean }
+            limitationsConfirmed: { type: boolean }
+            limitationsDescription: { type: string }
+            note: { type: string }
+            timezone: { type: string }
           additionalProperties: true
 
     WorkoutProposalResponse:

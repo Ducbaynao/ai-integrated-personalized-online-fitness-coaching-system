@@ -377,3 +377,96 @@ Theo đúng tài liệu phê duyệt (`phase-2-release-scope.md` và `phase-2-im
   6. Diễn tập Live Mobile GUI Runtime Local trên Android Emulator Pixel 8 thành công 100% với 9 ảnh chụp màn hình artifacts.
   7. Chi phí AI: $0.00 spend.
 - **Kết luận:** **PR #121 ĐÃ ĐỦ ĐIỀU KIỆN ĐỀ XUẤT MERGE** (Ready for owner review and merge). Tuân thủ quy tắc an toàn: Không tự ý merge PR.
+
+
+---
+
+## 11. Gói Mở rộng Hoàn thiện F02: Context, Source Guards, Revalidation & Training Continuity (P2-M3 Extended)
+
+### 11.1. Bối cảnh & Baseline
+- **Branch:** `feat/p2-m3-f02-context-source-guards-20261030`
+- **Baseline commit:** `d8105eefb9156c68194d761f939c455d5ec8dfef` (Merge commit PR #121).
+- **Mục tiêu:** Đóng toàn bộ các khoảng trống nghiệp vụ còn lại của F02 sau PR #121:
+  1. Kiểm soát dữ liệu đầu vào bắt buộc, fail-fast không silent fallback (T07).
+  2. Phân định Training Continuity (T08): người mới (`CONFIRMED_NEW`), lịch sử không rõ (`UNKNOWN_HISTORY`), nghỉ gián đoạn $\ge 100$ ngày (`PROLONGED_INACTIVITY`), và duy trì gần đây (`RECENT_CONSISTENT`). Đối với ca nghỉ $\ge 100$ ngày, sinh giáo án làm quen "Return-to-Training Plan" với volume/load bảo thủ và limitations cảnh báo tải cũ không đại diện cho năng lực hiện tại.
+  3. Bổ sung Flyway Migration V52 lưu `source_snapshot` (jsonb) trong bảng `fitness.ai_recommendations`. Khi Accept, đối soát nguồn bắt buộc: Goal còn ACTIVE không, version Goal có bị đổi không (nếu đổi -> 409 Conflict); Active plan có xuất hiện/thay đổi không (T05).
+  4. Post-Provider Authority Revalidation (T04): Sau khi model xử lý xong và trước khi trả output / lưu recommendation, tái kiểm định quyền hạn của actor và trạng thái tài khoản `ACTIVE` (B08 cutoff). Nếu mất quyền, `AiRun` chuyển ngay sang terminal `FAILED` (`AUTHORITY_REVOKED`), không lưu `AiRecommendation` và ném 403 `AiRunAccessDeniedException`. Kiểm tra cả khi đọc qua `getRecommendation`.
+  5. Sửa thời hạn hết hạn đề xuất chuẩn 24 giờ (`completedAt.plus(24, ChronoUnit.HOURS)`) theo đúng release scope phê duyệt D02/D03.
+  6. Loại bỏ token count hardcoded giả tạo (150, 450), ghi nhận `null/unknown` khi provider không cung cấp dữ liệu token.
+  7. Đồng bộ toàn diện hợp đồng Mobile Client & Backend Preferences: đầy đủ các trường bắt buộc, prefill từ profile học viên, không tự động confirm thay người dùng, và mapping field errors trực tiếp lên từng trường nhập liệu.
+  8. Bổ sung ca kiểm thử hồi quy Reload Preview khi exercise variation trong catalog bị vô hiệu hóa: chứng minh fail-closed và rollback toàn vẹn kể cả khi caller gửi `expectedPlanAggregateVersion` mới nhất khớp cơ sở dữ liệu.
+
+### 11.2. Phân định Nguồn Policy Canonical vs Operational Candidates (D06)
+- **Nguồn Policy Canonical Đã Phê duyệt Chính thức:**
+  - Ngưỡng gián đoạn tập luyện $\ge 100$ ngày (`PROLONGED_INACTIVITY`): Căn cứ chính thức tại `acceptance-criteria.md:18`, `business-rules.md:41`, `phase-2-implementation-plan.md:244`, và `phase-2-feature-data-authority-matrix.md:179`.
+  - Quy tắc nghiệp vụ bắt buộc: Không áp dụng progressive overload thông thường; chuyển sang giai đoạn làm quen/tái thích ứng (`Return-to-Training`), áp dụng volume/frequency bảo thủ ($\le 3$ buổi/tuần, $\le 3$ sets/bài), bổ sung cảnh báo limitations rõ ràng.
+- **Tham số Vận hành (Operational Candidates) Chờ Thẩm định Chuyên môn (D06):**
+  - Các ngưỡng định lượng của `RECENT_CONSISTENT` (tối thiểu 2 buổi hoàn thành trong vòng 28 ngày, lần tập gần nhất $\le 14$ ngày): Là các tham số vận hành tạm thời (operational candidate thresholds) theo mục 11.1 của implementation plan, đang chờ hội đồng chuyên môn huấn luyện phê duyệt chính thức trong catalog bài tập/nguyên tắc (D06).
+  - Hệ thống áp dụng nguyên tắc thiết kế an toàn tối đa (fail-closed): Khi dữ liệu lịch sử không đáp ứng trọn vẹn tiêu chí hoặc thiếu quyền truy vấn lịch sử (`WORKOUT_HISTORY:VIEW`), hệ thống luôn phân loại an toàn về `UNKNOWN_HISTORY` hoặc `RESTRICTED_HISTORY`, không bao giờ suy đoán khống để tăng tải nặng mù quáng.
+- **Ràng buộc Ngữ nghĩa Đa ngữ & Limitations:**
+  - Không dựa duy nhất vào từ khóa tiếng Anh trong tên/mô tả. Hệ thống hỗ trợ đầy đủ các thuật ngữ tiếng Việt phổ biến (`quay lại`, `tái thích nghi`, `gián đoạn`, `thích ứng`, `nghỉ dài`, `bảo thủ`, `khởi động lại`, `làm quen`), tiếng Anh (`return`, `ramp`, `inactivity`, `re-entry`), và cấu trúc mảng `limitations` chính quy trong root payload.
+
+### 11.3. Đồng bộ Hợp đồng Mobile Client & Backend Preferences
+- **Cập nhật Schema & DTO:**
+  - `contracts/openapi/openapi.yaml`: Khai báo đầy đủ các trường thuộc `WorkoutProposalRequest.preferences`: `preferredDaysPerWeek`, `preferredSessionMinutes`, `startDate`, `equipment`, `allowBodyweight`, `hasPhysicalLimitations`, `limitationsConfirmed`, `limitationsDescription`, `note`, `timezone`.
+  - `apps/mobile/src/types/aiWorkoutProposal.ts`: Khai báo interface `WorkoutProposalPreferences`.
+  - `apps/mobile/src/services/aiWorkoutProposalApi.ts`: Bổ sung helper `getWorkoutProposalFieldErrors(error)` bóc tách danh sách `fieldErrors` từ backend response.
+- **Giao diện Modal `AiWorkoutProposalModal.tsx`:**
+  - Form nhập liệu hoàn chỉnh cho cả Student và Trainer:
+    + Số ngày/tuần: Chip selector (3 buổi vs 4 buổi).
+    + Thời lượng buổi tập: Chip selector (30, 45, 60, 90 phút).
+    + Ngày bắt đầu (`startDate`): Input định dạng `YYYY-MM-DD` (mặc định ngày mai, kiểm tra không chọn ngày quá khứ).
+    + Thiết bị (`equipment`): Chip selector (Dumbbells, Barbells, Kettlebells, Bands, Machines) kèm switch "Cho phép bài tập dùng trọng lượng cơ thể (Bodyweight)".
+    + Hạn chế thể chất (`hasPhysicalLimitations` & `limitationsConfirmed`): Thao tác bấm chọn giữa "Không có hạn chế thể chất" hoặc "Có hạn chế / chấn thương cần tránh" là hành vi xác nhận cam kết trung thực của người dùng về tình trạng thể chất (`limitationsConfirmed: true`). UI khẳng định rõ ràng cam kết này, **tuyệt đối không tự động xác nhận khi mở modal hoặc khi đổi học viên**, loại bỏ checkbox thừa gây hiểu nhầm. Khi chọn có hạn chế, ô nhập `limitationsDescription` là bắt buộc.
+    + Cô lập hồ sơ học viên: Huấn luyện viên không dùng profile của chính mình cho học viên; chuyển đổi `studentId` hoặc đóng/mở modal reset sạch toàn bộ trạng thái form/đề xuất, chống stale async response ghi đè dữ liệu.
+    + Xử lý múi giờ địa phương: Ngày bắt đầu mặc định (ngày mai) được tính toán theo lịch địa phương của thiết bị (`getTomorrowLocalDate()`), tránh lệch múi giờ UTC.
+  - **Mapping Field Errors:** Khi Backend trả về lỗi validation 400 kèm `fieldErrors`, từng thông báo lỗi chi tiết được ánh xạ và hiển thị màu đỏ ngay dưới trường nhập liệu tương ứng.
+  - **Prefill Thông minh:** Tự động nạp sẵn số ngày tập và thời lượng từ hồ sơ học viên (`studentProfileApi.getMyStudentProfile()`), giảm thiểu thao tác nhập liệu thủ công.
+
+### 11.4. Ca Kiểm thử Hồi quy: Reload Preview & Exercise Catalog Guard
+- **Test case:** `reloadPreviewWithUpdatedPlanVersion_failsClosedIfExerciseInPayloadBecomesInactive` trong `AiWorkoutProposalFullSliceIntegrationTest.java`.
+- **Kịch bản kiểm chứng:**
+  1. Học viên có kế hoạch ACTIVE (v1, aggregateVersion = 1).
+  2. Học viên sinh đề xuất F02 chứa các bài tập hợp lệ.
+  3. Một tác vụ nền xuất bản version mới, nâng aggregateVersion lên 2.
+  4. Client nạp lại bản preview, nhận thấy aggregateVersion mới là 2.
+  5. Đồng thời trong catalog, một biến thể bài tập trong payload đề xuất bị vô hiệu hóa (`is_active = false`).
+  6. Client gửi request Accept với `expectedPlanAggregateVersion = 2L` (khớp version mới nhất trong DB).
+  7. **Kết quả:** Kiểm tra aggregateVersion vượt qua, nhưng bước re-validation danh mục bài tập phát hiện bài tập không khả dụng (`WORKOUT_PLAN_EXERCISE_UNAVAILABLE`), ném `AiOutputValidationException`. Toàn bộ transaction rollback sạch sẽ, recommendation giữ nguyên `PENDING`, không làm hỏng kế hoạch active.
+
+### 11.5. Tổng hợp Bằng chứng Kiểm thử (100% PASS)
+- **Backend Tests (Maven Surefire):** **89/89 tests PASS**
+  - `AiWorkoutProposalFullSliceIntegrationTest`: **25/25 PASS** (bao gồm regression test reload preview & catalog guard, T04 revoked authority, T05 goal/plan concurrency locks, T07 missing inputs, T08 prolonged inactivity).
+  - `AiWorkoutProposalServiceUnitTest`: **31/31 PASS** (post-provider authority revalidation, snapshot verification, 24h expiry, null telemetry, fail-closed parse).
+  - `F02ContextBuilderUnitTest`: **19/19 PASS** (xử lý validation input, limitations confirmation semantics, allowBodyweight false, past date rejection, continuity states).
+  - `AiWorkoutProposalPersistenceIntegrationTest`: **5/5 PASS** (Flyway V52 migration, source_snapshot JSONB persistence & mapping).
+  - `AiWorkoutProposalRealFastApiIntegrationTest`: **5/5 PASS** (multi-tier HTTP communication với tiến trình FastAPI Uvicorn thật).
+  - `AiWorkoutProposalControllerUnitTest`: **4/4 PASS**.
+- **Mobile Client Tests (Jest):**
+  - `AiWorkoutProposalModal.test.tsx`: **13/13 PASS** (bổ sung test bỏ qua response bất đồng bộ cũ khi đổi học viên - activeRequestIdRef) (bổ sung test hiển thị backend field errors, guidance banner, toggle physical limitations, trainer profile isolation, student switch state reset).
+  - Toàn bộ suite Mobile: **82 test suites PASS, 630/630 tests PASS**.
+- **Mobile Client Typecheck:** `npm --prefix apps/mobile run typecheck` **0 lỗi** (`tsc --noEmit` exit code 0).
+- **AI Service Tests (Pytest):** **53/53 tests PASS** (bao gồm `PROLONGED_INACTIVITY`, `CONFIRMED_NEW`, `RESTRICTED_HISTORY` trong `test_f02_provider.py`).
+- **Contract & Schemas Validation:** `npm run validate:contracts` **PASS** (Redocly 0 lỗi OpenAPI 3.0, Ajv 6 schemas Draft 2020-12 + 22 fixtures valid).
+### 11.6. Chuẩn hóa Bằng chứng Thực nghiệm & Kết quả Kiểm chứng
+- **Phân loại bằng chứng:**
+  - **Ca A, B, C, E:** Live HTTP API & Database PostgreSQL (Spring Boot 8080 dev profile, FastAPI 8000, PostgreSQL 5433).
+  - **Ca D:** Database Inspection trực tiếp trên cột `source_snapshot` JSONB.
+  - **Ca F:** Mobile Jest Component Tests (13/13 PASS) kiểm chứng cô lập học viên và triệt tiêu stale async response.
+  - **Mobile Interactive GUI (Form mới):** **NOT RUN** (môi trường CLI headless không có màn hình tương tác; không dùng ảnh chụp từ PR cũ làm bằng chứng cho form mới).
+- **Kết quả các ca kiểm chứng:**
+  - **Ca C (Validation & Fail-Fast): PASS (Live API).** 400 Bad Request cho C1 (`limitationsConfirmed`), C2 (`limitationsDescription`), C3 (`equipment`), C4 (`startDate`). Không gọi provider.
+  - **Ca A (Student SELF_DIRECTED): PASS (Live API & DB).** Tạo đề xuất PENDING -> Chỉnh sửa revision 2 -> Accept với aggregate version guard -> Kích hoạt giáo án thành công (HTTP 200 APPLIED) và tạo receipt.
+  - **Ca B (Trainer HUMAN_COACH - T02): PASS (Live API & DB).** Học viên gửi Accept nhận HTTP 403 Forbidden (`AiRunAccessDeniedException`) -> Huấn luyện viên gửi Accept nhận HTTP 200 APPLIED.
+  - **Ca D (Continuity & Snapshot): PASS (DB Inspection).** `source_snapshot` JSONB đông kết đầy đủ `goalId`, `goalVersionNumber`, `continuityState: UNKNOWN_HISTORY`, `activePlanId`, `activePlanAggregateVersion`.
+  - **Ca E (Source Conflict): PASS (Live API).** Accept với aggregate version cũ (7 thay vì 8) -> HTTP 409 Conflict. Rollback toàn vẹn, recommendation giữ `PENDING`.
+  - **Ca F (Student Isolation): PASS (Jest Tests).** 13/13 PASS: không nhầm profile huấn luyện viên; đổi học viên reset sạch form; stale response bị loại bỏ hoàn toàn (`activeRequestIdRef`).
+- **Phân loại bộ kiểm thử tự động:**
+  - Backend targeted F02 suites: **89/89 PASS** (không gọi là full backend suite).
+  - Mobile targeted modal tests: **13/13 PASS**; Full mobile suite: **82 suites, 630/630 tests PASS**.
+  - Mobile typecheck: **0 lỗi** (`tsc --noEmit`).
+  - Pytest targeted F02 provider: **53/53 tests PASS** (file `test_f02_provider.py`).
+  - Contract & Schemas: **PASS** (Redocly OpenAPI 3.0: 0 lỗi; Ajv: 6 AI schemas và 22 contract fixtures hợp lệ).
+- **Candidate Policies & Giới hạn:**
+  - Ngưỡng 100 ngày không tập là policy chính thống đã duyệt (`PROLONGED_INACTIVITY`).
+  - Các ngưỡng định lượng của `RECENT_CONSISTENT` (14 ngày, 28 ngày, $\le 3$ buổi/tuần, $\le 3$ sets/bài) là các tham số vận hành đề xuất (operational candidates), đang chờ thẩm định chuyên môn (D06), không được coi là quy tắc lâm sàng đã duyệt.

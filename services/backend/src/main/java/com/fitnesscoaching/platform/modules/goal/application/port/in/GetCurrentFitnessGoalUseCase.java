@@ -12,4 +12,8 @@ public interface GetCurrentFitnessGoalUseCase {
     }
 
     Optional<FitnessGoal> getCurrentFitnessGoal(UUID studentId, boolean includePaused);
+
+    default Optional<FitnessGoal> lockAndVerifyActiveGoal(UUID studentId, UUID goalId, int expectedVersionNumber) {
+        return Optional.empty();
+    }
 }
