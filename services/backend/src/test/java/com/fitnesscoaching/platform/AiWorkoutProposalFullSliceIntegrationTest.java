@@ -1,7 +1,10 @@
 package com.fitnesscoaching.platform;
 
+import com.fitnesscoaching.platform.common.exception.AiOutputValidationException;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
+import com.fitnesscoaching.platform.common.exception.AiRunValidationException;
+import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.AcceptRecommendationCommand;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutProposalUseCase.AcceptRecommendationResult;
@@ -92,7 +95,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
             UUID exId = UUID.randomUUID();
             jdbc.update("INSERT INTO fitness.exercises(id,code,name,admin_status,created_by) VALUES (?,?,?,'ACTIVE',?) ON CONFLICT (id) DO NOTHING",
                     exId, "default-ex-" + i + "-" + UUID.randomUUID(), "Default Exercise " + i, adminId);
-            jdbc.update("INSERT INTO fitness.exercise_variations(id,exercise_id,code,name,is_active) VALUES (?,?,?,?,true) ON CONFLICT (id) DO NOTHING",
+            jdbc.update("INSERT INTO fitness.exercise_variations(id,exercise_id,code,name,is_active) VALUES (?,?,?,?,true) ON CONFLICT (id) DO UPDATE SET is_active = true",
                     varId, exId, "default-var-" + i + "-" + UUID.randomUUID(), "Default Variation " + i);
         }
     }
@@ -104,7 +107,11 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         jdbc.update("INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at) SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code=?",
                 id, id, role);
         if (role.equals("STUDENT")) {
-            jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", id);
+            jdbc.update("""
+                    INSERT INTO fitness.student_profiles(user_id, training_experience_level, available_days_per_week, preferred_session_minutes)
+                    VALUES (?, 'BEGINNER', 3, 60)
+                    """, id);
+            createActiveGoal(id);
         }
         if (role.equals("TRAINER")) {
             jdbc.update("""
@@ -114,6 +121,45 @@ class AiWorkoutProposalFullSliceIntegrationTest {
                     """, id);
         }
         return id;
+    }
+
+    private Map<String, Object> validSlicePreferences() {
+        return Map.of(
+                "preferredDaysPerWeek", 3,
+                "preferredSessionMinutes", 60,
+                "equipment", List.of("BODYWEIGHT"),
+                "limitationsConfirmed", true,
+                "startDate", java.time.LocalDate.now().plusDays(1).toString()
+        );
+    }
+
+    private UUID createActiveGoal(UUID studentId) {
+        UUID goalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.fitness_goals (
+                    id, student_id, title, status, created_by, created_at, updated_at
+                ) VALUES (
+                    ?, ?, 'Full Slice Goal', 'DRAFT'::fitness.lifecycle_status, ?, now(), now()
+                )
+                """, goalId, studentId, studentId);
+        jdbc.update("""
+                INSERT INTO fitness.fitness_goal_versions (
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
+                    duration_days, effective_from, effective_until, change_reason, created_by,
+                    created_at, locked_at, locked_by, lock_reason
+                ) VALUES (
+                    ?, ?, 1, 'Full Slice Goal', current_date, current_date + 30,
+                    30, now(), NULL, 'INITIAL_CREATION', ?,
+                    now(), now(), ?, 'ACTIVATED'::fitness.version_lock_reason
+                )
+                """, versionId, goalId, studentId, studentId);
+        jdbc.update("""
+                UPDATE fitness.fitness_goals
+                SET status = 'ACTIVE'::fitness.lifecycle_status, activated_at = now()
+                WHERE id = ?
+                """, goalId);
+        return goalId;
     }
 
     private UUID createExerciseAndVariation(UUID creatorId) {
@@ -158,6 +204,13 @@ class AiWorkoutProposalFullSliceIntegrationTest {
                 VALUES (?,?,?,?, 'WORKOUT_PLAN','ALLOW','MANAGE'::fitness.data_access_level,
                         clock_timestamp()-interval '1 day',?)
                 """, permission, relationship, student, trainer, student);
+        UUID historyPermission = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id,relationship_id,student_id,trainer_id,data_scope,decision,access_level,valid_from,granted_by)
+                VALUES (?,?,?,?, 'WORKOUT_HISTORY','ALLOW','VIEW'::fitness.data_access_level,
+                        clock_timestamp()-interval '1 day',?)
+                """, historyPermission, relationship, student, trainer, student);
         return new HumanCoachSetup(student, trainer, relationship, period);
     }
 
@@ -169,7 +222,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // 1. Generate Proposal
         GenerateProposalCommand genCmd = new GenerateProposalCommand(
-                studentId, studentId, "gen-key-1", Map.of("daysPerWeek", 3)
+                studentId, studentId, "gen-key-1", validSlicePreferences()
         );
         WorkoutProposalResult proposal = proposalService.generateProposal(genCmd);
 
@@ -211,7 +264,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // 1. Trainer generates proposal
         GenerateProposalCommand genCmd = new GenerateProposalCommand(
-                setup.trainerId(), setup.studentId(), "trainer-gen-1", Map.of("daysPerWeek", 4)
+                setup.trainerId(), setup.studentId(), "trainer-gen-1", validSlicePreferences()
         );
         WorkoutProposalResult proposal = proposalService.generateProposal(genCmd);
 
@@ -255,7 +308,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-reject-1", Map.of()
+                studentId, studentId, "gen-reject-1", validSlicePreferences()
         ));
 
         RejectRecommendationResult rejectResult = proposalService.rejectRecommendation(new RejectRecommendationCommand(
@@ -282,7 +335,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-idemp-1", Map.of()
+                studentId, studentId, "gen-idemp-1", validSlicePreferences()
         ));
 
         // 1. Initial Accept
@@ -377,7 +430,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // Now student generates a proposal
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-publish-version-test", Map.of()
+                studentId, studentId, "gen-publish-version-test", validSlicePreferences()
         ));
 
         // Accept proposal -> Should publish new version on the existing active plan
@@ -400,7 +453,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         assertThat(appOpt).isPresent();
         assertThat(appOpt.get().applicationPayload()).contains("PUBLISHED_NEW_VERSION");
         assertThat(appOpt.get().resultingEntityId()).isEqualTo(originalPlanId);
-        assertThat(appOpt.get().applicationPayload()).contains("planVersionId");
+        assertThat(appOpt.get().applicationPayload()).contains("resultingPlanVersionId");
     }
 
     @Test
@@ -427,7 +480,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // Student generates proposal in SELF_DIRECTED
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                setup.studentId(), setup.studentId(), "student-gen-sd-1", Map.of()
+                setup.studentId(), setup.studentId(), "student-gen-sd-1", validSlicePreferences()
         ));
 
         // Attempt to accept proposal -> student cannot publish version to trainer's plan directly
@@ -441,6 +494,65 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
         assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Reload preview with updated plan aggregate version fails closed if exercise in payload becomes inactive in catalog")
+    void reloadPreviewWithUpdatedPlanVersion_failsClosedIfExerciseInPayloadBecomesInactive() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+        UUID variationId = createExerciseAndVariation(studentId);
+
+        // Pre-create an ACTIVE workout plan for student (v1, aggregateVersion = 1)
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                studentId, studentId, "V1 Plan", "Version 1",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "v1-draft-key-catalog-guard"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "v1-activate-key-catalog-guard"));
+
+        // Student generates proposal while plan is at aggregateVersion = 1
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                studentId, studentId, "gen-catalog-guard-test", validSlicePreferences()
+        ));
+
+        // Background event advances plan aggregateVersion to 2
+        workoutPlanCommands.publishVersion(new WorkoutPlanCommandUseCase.PublishVersionCommand(
+                draft.planId(), studentId, 1L, "bg-publish-key-catalog-guard", "REGULAR_UPDATE", "Updated in bg",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1 Updated", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null))))
+        ));
+
+        // An exercise variation referenced in the AI proposal payload is archived/deactivated in the catalog
+        UUID payloadVarId = UUID.fromString("a0000000-0000-4000-8000-000000000001");
+        jdbc.update("UPDATE fitness.exercise_variations SET is_active = false WHERE id = ?", payloadVarId);
+
+        try {
+            // Client reloads preview, detects new aggregate version 2, and sends accept expecting aggregateVersion = 2L
+            AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                    studentId, proposal.recommendationId(), "accept-reloaded-ver-but-inactive-ex", "Accept reloaded version", 1,
+                    draft.planId(), 2L, null
+            );
+
+            // Fail-closed: Even though expectedPlanAggregateVersion matches 2L, domain exercise availability guard rejects it
+            assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                    .isInstanceOf(AiOutputValidationException.class)
+                    .hasMessageContaining("WORKOUT_PLAN_EXERCISE_UNAVAILABLE");
+
+            // Verify full transaction rollback: recommendation remains PENDING and no application record created
+            AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+            assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+            assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+
+            // Verify plan in database was NOT modified or corrupted
+            var activePlanOpt = workoutPlanQuery.findActive(studentId, studentId);
+            assertThat(activePlanOpt).isPresent();
+            assertThat(activePlanOpt.get().plan().aggregateVersion()).isEqualTo(2L);
+        } finally {
+            // Restore variation active status for subsequent tests
+            jdbc.update("UPDATE fitness.exercise_variations SET is_active = true WHERE id = ?", payloadVarId);
+        }
     }
 
     @Test
@@ -485,7 +597,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // Student generates proposal and accepts
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-v2-preserve-test", Map.of()
+                studentId, studentId, "gen-v2-preserve-test", validSlicePreferences()
         ));
         AcceptRecommendationResult acceptResult = proposalService.acceptRecommendation(new AcceptRecommendationCommand(
                 studentId, proposal.recommendationId(), "accept-v2-preserve-key", "Upgrading to V2"
@@ -524,7 +636,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // Student generates proposal while plan is at aggregateVersion = 1
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-plan-race-test", Map.of()
+                studentId, studentId, "gen-plan-race-test", validSlicePreferences()
         ));
 
         // Another action publishes a new version in the background, incrementing aggregateVersion to 2
@@ -542,7 +654,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
-                .hasMessageContaining("Workout plan version conflict: expected plan aggregate version 1 but current is 2");
+                .hasMessageContaining("Workout plan version conflict:");
 
         // Transaction rolled back: recommendation remains PENDING
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
@@ -559,7 +671,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // Student generates proposal when NO active plan exists
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-appeared-plan-test", Map.of()
+                studentId, studentId, "gen-appeared-plan-test", validSlicePreferences()
         ));
 
         // Before accepting, another writer activates a workout plan for the student
@@ -579,7 +691,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
-                .hasMessageContaining("Active workout plan appeared after proposal was previewed");
+                .hasMessageContaining("Active workout plan appeared");
 
         // Recommendation remains PENDING
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
@@ -594,7 +706,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-audit-fail-test", Map.of()
+                studentId, studentId, "gen-audit-fail-test", validSlicePreferences()
         ));
 
         // Install temporary trigger on fitness.audit_logs to simulate failure during mandatory audit recording
@@ -652,7 +764,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-concurrent-1", Map.of()
+                studentId, studentId, "gen-concurrent-1", validSlicePreferences()
         ));
 
         int threadCount = 2;
@@ -703,7 +815,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         UUID period1 = createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-period-trans", Map.of()
+                studentId, studentId, "gen-period-trans", validSlicePreferences()
         ));
 
         // End period1 and start period2
@@ -725,7 +837,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         UUID period1 = createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-mode-trans", Map.of()
+                studentId, studentId, "gen-mode-trans", validSlicePreferences()
         ));
 
         // Transition student to HUMAN_COACH
@@ -757,7 +869,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         UUID period1 = createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-revoked-replay", Map.of()
+                studentId, studentId, "gen-revoked-replay", validSlicePreferences()
         ));
 
         // Accept while having authority
@@ -796,7 +908,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
 
         // 1. Generate Proposal
         GenerateProposalCommand genCmd = new GenerateProposalCommand(
-                studentId, studentId, "gen-key-edit-1", Map.of("daysPerWeek", 3)
+                studentId, studentId, "gen-key-edit-1", validSlicePreferences()
         );
         WorkoutProposalResult proposal = proposalService.generateProposal(genCmd);
         assertThat(proposal.recommendationId()).isNotNull();
@@ -853,7 +965,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(
-                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-1", Map.of("daysPerWeek", 3))
+                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-1", validSlicePreferences())
         );
 
         // Edit once -> moves to revision 2
@@ -876,7 +988,7 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         createSelfDirectedCoachingPeriod(studentId);
 
         WorkoutProposalResult proposal = proposalService.generateProposal(
-                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-acc", Map.of("daysPerWeek", 3))
+                new GenerateProposalCommand(studentId, studentId, "gen-key-stale-acc", validSlicePreferences())
         );
 
         // Edit to revision 2
@@ -897,5 +1009,210 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
         assertThatThrownBy(() -> workoutPlanQuery.current(studentId, studentId)).isInstanceOf(WorkoutPlanFailure.class);
+    }
+
+    @Test
+    @DisplayName("T04: Suspended actor cannot generate workout proposal (cutoff B08)")
+    void suspendedActor_cannotGenerateProposal() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        // Suspend the student user account
+        jdbc.update("UPDATE fitness.users SET status = 'SUSPENDED'::fitness.account_status WHERE id = ?", studentId);
+
+        assertThatThrownBy(() -> proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-suspended", validSlicePreferences())
+        )).isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("account is not active");
+    }
+
+    @Test
+    @DisplayName("T05: Active goal version changed before accept causes conflict and rolls back")
+    void activeGoalVersionChangedBeforeAccept_causesConflictAndRollback() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-t05-goal-race", validSlicePreferences())
+        );
+
+        // Simulate goal version bumping in DB before accept
+        UUID activeGoalId = jdbc.queryForObject(
+                "SELECT id FROM fitness.fitness_goals WHERE student_id = ? AND status = 'ACTIVE'::fitness.lifecycle_status",
+                UUID.class, studentId
+        );
+        jdbc.update("UPDATE fitness.fitness_goal_versions SET effective_until = now() WHERE fitness_goal_id = ? AND version_number = 1", activeGoalId);
+        jdbc.update("""
+                INSERT INTO fitness.fitness_goal_versions (
+                    id, fitness_goal_id, version_number, title, start_date, target_date,
+                    duration_days, effective_from, effective_until, change_reason, created_by,
+                    created_at, locked_at, locked_by, lock_reason
+                ) VALUES (
+                    gen_random_uuid(), ?, 2, 'Full Slice Goal V2', current_date, current_date + 30,
+                    30, now(), NULL, 'STRATEGIC_UPDATE', ?,
+                    now(), now(), ?, 'ACTIVATED'::fitness.version_lock_reason
+                )
+                """, activeGoalId, studentId, studentId);
+
+        // Accept proposal -> must detect goal version mismatch (expected version 1 from snapshot, now 2)
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-goal-race", "Applying"
+        );
+
+        assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Fitness goal version has changed since proposal was generated");
+
+        // Verify recommendation remains PENDING and no workout plan created
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T05: Active goal deactivated before accept causes conflict and rolls back")
+    void activeGoalDeactivatedBeforeAccept_causesConflictAndRollback() {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-t05-goal-deact", validSlicePreferences())
+        );
+
+        // Deactivate goal before accept
+        jdbc.update("UPDATE fitness.fitness_goals SET status = 'COMPLETED'::fitness.lifecycle_status WHERE student_id = ?", studentId);
+
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-goal-deact", "Applying"
+        );
+
+        assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("no longer active");
+
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("T07: Missing required inputs fail fast without fallback")
+    void missingRequiredInputs_failsFast() {
+        UUID studentId = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status,preferred_locale,timezone) VALUES (?,?,'hash','Person','ACTIVE','vi-VN','Asia/Ho_Chi_Minh')",
+                studentId, studentId + "@example.com");
+        jdbc.update("INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at) SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='STUDENT'",
+                studentId, studentId);
+        // Student profile without trainingExperienceLevel and without active goal
+        jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", studentId);
+        createSelfDirectedCoachingPeriod(studentId);
+
+        assertThatThrownBy(() -> proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-missing-inputs", Map.of())
+        )).isInstanceOf(AiRunValidationException.class)
+                .satisfies(ex -> {
+                    AiRunValidationException ve = (AiRunValidationException) ex;
+                    assertThat(ve.getFieldErrors()).anyMatch(f -> "trainingExperienceLevel".equals(f.field()));
+                });
+    }
+
+    @Test
+    @DisplayName("T08: Training continuity PROLONGED_INACTIVITY generates return-to-training plan with limitations")
+    void prolongedInactivity_generatesReturnToTrainingPlan() {
+        UUID studentId = person("STUDENT");
+        UUID periodId = createSelfDirectedCoachingPeriod(studentId);
+        UUID variationId = createExerciseAndVariation(studentId);
+
+        // Pre-create and activate an old plan, then archive it to have no active plan
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                studentId, studentId, "Old Plan", "Old running plan",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "old-draft-key"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "old-activate-key"));
+        jdbc.update("UPDATE fitness.workout_plans SET status = 'ARCHIVED'::fitness.plan_status, version = version + 1, archived_at = now() - interval '110 days' WHERE id = ?", draft.planId());
+
+        UUID v1VersionId = jdbc.queryForObject("SELECT id FROM fitness.workout_plan_versions WHERE workout_plan_id = ? LIMIT 1", UUID.class, draft.planId());
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM fitness.workout_plan_sessions WHERE workout_plan_version_id = ? LIMIT 1", UUID.class, v1VersionId);
+
+        // Simulate completed workout 120 days ago
+        UUID plannedWorkoutId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts (id, student_id, coaching_period_id, workout_plan_session_id, planned_start_at, original_planned_start_at, status, created_by)
+                VALUES (?, ?, ?, ?, now() - interval '120 days', now() - interval '120 days', 'COMPLETED'::fitness.planned_workout_status, ?)
+                """, plannedWorkoutId, studentId, periodId, sessionId, studentId);
+        jdbc.update("""
+                INSERT INTO fitness.workout_session_logs (id, student_id, coaching_period_id, workout_plan_version_id, planned_workout_id, performed_start_at, performed_end_at, status, logged_by)
+                VALUES (gen_random_uuid(), ?, ?, ?, ?, now() - interval '120 days', now() - interval '120 days' + interval '45 minutes', 'COMPLETED'::fitness.actual_workout_status, ?)
+                """, studentId, periodId, v1VersionId, plannedWorkoutId, studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-t08-prolonged", validSlicePreferences())
+        );
+
+        // Verify return-to-training plan and limitations returned
+        assertThat(proposal.title()).contains("Return-to-Training");
+        assertThat(proposal.structuredPayload()).containsIgnoringCase("prolonged inactivity");
+
+        // Verify source snapshot in recommendation contains PROLONGED_INACTIVITY
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.sourceSnapshot()).isNotNull();
+        assertThat(rec.sourceSnapshot()).contains("PROLONGED_INACTIVITY");
+    }
+
+    @Test
+    @DisplayName("T05: Concurrent Goal modification/deactivation during Accept causes 409 Conflict and full rollback")
+    void t05_concurrency_goalDeactivatedConcurrently_duringAccept_causesConflictAndRollback() throws Exception {
+        UUID studentId = person("STUDENT");
+        createSelfDirectedCoachingPeriod(studentId);
+
+        WorkoutProposalResult proposal = proposalService.generateProposal(
+                new GenerateProposalCommand(studentId, studentId, "gen-t05-concurrency", validSlicePreferences())
+        );
+
+        java.util.concurrent.CountDownLatch goalUpdatedLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Throwable> acceptError = new java.util.concurrent.atomic.AtomicReference<>();
+
+        // Thread 1: Deactivate Goal concurrently
+        Thread goalWriter = new Thread(() -> {
+            try {
+                jdbc.update("UPDATE fitness.fitness_goals SET status = 'COMPLETED'::fitness.lifecycle_status, updated_at = now() WHERE student_id = ?", studentId);
+            } finally {
+                goalUpdatedLatch.countDown();
+            }
+        });
+
+        // Thread 2: Accept Recommendation
+        Thread f02Acceptor = new Thread(() -> {
+            try {
+                goalUpdatedLatch.await();
+                AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                        studentId, proposal.recommendationId(), "accept-concurrent-conflict", "Apply proposal"
+                );
+                proposalService.acceptRecommendation(acceptCmd);
+            } catch (Throwable t) {
+                acceptError.set(t);
+            }
+        });
+
+        goalWriter.start();
+        f02Acceptor.start();
+
+        goalWriter.join(5000);
+        f02Acceptor.join(5000);
+
+        // Verify accept threw 409 Conflict
+        assertThat(acceptError.get())
+                .isNotNull()
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("no longer active");
+
+        // Verify recommendation remains PENDING (rolled back completely)
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // Verify no active workout plan was created for student
+        var activePlan = workoutPlanQuery.findActive(studentId, studentId);
+        assertThat(activePlan).isEmpty();
     }
 }

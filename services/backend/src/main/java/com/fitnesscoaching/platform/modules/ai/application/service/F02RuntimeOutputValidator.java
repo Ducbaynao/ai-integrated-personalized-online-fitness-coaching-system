@@ -1,5 +1,7 @@
 package com.fitnesscoaching.platform.modules.ai.application.service;
 
+import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
@@ -33,6 +35,10 @@ public class F02RuntimeOutputValidator {
     }
 
     public ValidationResult validate(String rawPayload) {
+        return validate(rawPayload, null);
+    }
+
+    public ValidationResult validate(String rawPayload, TrainingContinuityState continuityState) {
         if (rawPayload == null || rawPayload.isBlank()) {
             return ValidationResult.invalid("Payload is empty or null.");
         }
@@ -66,6 +72,9 @@ public class F02RuntimeOutputValidator {
         JsonNode sessionsNode = plan.path("sessions");
         if (!sessionsNode.isArray() || sessionsNode.isEmpty() || sessionsNode.size() > 7) {
             return ValidationResult.invalid("Plan must contain between 1 and 7 sessions.");
+        }
+        if (continuityState == TrainingContinuityState.PROLONGED_INACTIVITY && sessionsNode.size() > 3) {
+            return ValidationResult.invalid("PROLONGED_INACTIVITY requires gentle ramp-up: plan must not exceed 3 sessions per week (found " + sessionsNode.size() + ").");
         }
 
         Set<String> sessionKeys = new HashSet<>();
@@ -124,6 +133,9 @@ public class F02RuntimeOutputValidator {
                 if (targetSets < 1 || targetSets > 20) {
                     return ValidationResult.invalid("targetSets must be between 1 and 20.");
                 }
+                if (continuityState == TrainingContinuityState.PROLONGED_INACTIVITY && targetSets > 3) {
+                    return ValidationResult.invalid("PROLONGED_INACTIVITY requires lower training volume: targetSets must not exceed 3 sets per exercise (found " + targetSets + ").");
+                }
 
                 if (prescription.has("targetRepsMin") && prescription.get("targetRepsMin").asInt() < 0) {
                     return ValidationResult.invalid("targetRepsMin cannot be negative.");
@@ -145,6 +157,39 @@ public class F02RuntimeOutputValidator {
                 if (prescription.has("targetLoad") && prescription.get("targetLoad").asDouble() < 0) {
                     return ValidationResult.invalid("targetLoad cannot be negative.");
                 }
+            }
+        }
+
+        if (continuityState == TrainingContinuityState.PROLONGED_INACTIVITY) {
+            // Structural constraint: volume and frequency must be conservative
+            if (sessionsNode.size() > 3) {
+                return ValidationResult.invalid("PROLONGED_INACTIVITY requires conservative training frequency: sessions must not exceed 3 days per week (found " + sessionsNode.size() + ").");
+            }
+
+            // Semantic and domain constraint:
+            // Must have return-to-training guidance or caution:
+            // 1. Structured returnToTrainingNotes or plan/session notes, OR
+            // 2. Structured limitations list in proposal root warning against prior loads / inactivity, OR
+            // 3. Descriptive guidance in Vietnamese or English (not solely reliant on English keywords).
+            String desc = plan.path("description").asText("").toLowerCase();
+            String name = plan.path("name").asText("").toLowerCase();
+            String returnNotes = plan.path("returnToTrainingNotes").asText("");
+
+            boolean hasLimitationsArray = root.has("limitations")
+                    && root.path("limitations").isArray()
+                    && !root.path("limitations").isEmpty();
+
+            boolean hasMultilingualGuidance = !returnNotes.isBlank()
+                    || hasLimitationsArray
+                    || desc.contains("return") || desc.contains("ramp") || desc.contains("inactivity") || desc.contains("re-entry")
+                    || desc.contains("quay lại") || desc.contains("tái thích nghi") || desc.contains("gián đoạn")
+                    || desc.contains("thích ứng") || desc.contains("nghỉ dài") || desc.contains("bảo thủ")
+                    || desc.contains("khởi động lại") || desc.contains("làm quen")
+                    || name.contains("return") || name.contains("ramp")
+                    || name.contains("quay lại") || name.contains("khởi động") || name.contains("làm quen");
+
+            if (!hasMultilingualGuidance) {
+                return ValidationResult.invalid("PROLONGED_INACTIVITY requires return-to-training guidance and explicit limitations cautioning against prior load assumptions.");
             }
         }
 

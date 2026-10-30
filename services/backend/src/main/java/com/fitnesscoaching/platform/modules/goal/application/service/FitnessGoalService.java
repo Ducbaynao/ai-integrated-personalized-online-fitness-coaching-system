@@ -1011,4 +1011,14 @@ public class FitnessGoalService implements
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
     }
+
+    @Override
+    @Transactional
+    public Optional<FitnessGoal> lockAndVerifyActiveGoal(UUID studentId, UUID goalId, int expectedVersionNumber) {
+        if (studentId == null || goalId == null) {
+            throw new ApplicationValidationException("studentId and goalId cannot be null");
+        }
+        goalStudentAuthorityPort.verifyStudentCanManageGoals(studentId);
+        return fitnessGoalPersistencePort.lockAndVerifyActiveGoal(studentId, goalId, expectedVersionNumber);
+    }
 }

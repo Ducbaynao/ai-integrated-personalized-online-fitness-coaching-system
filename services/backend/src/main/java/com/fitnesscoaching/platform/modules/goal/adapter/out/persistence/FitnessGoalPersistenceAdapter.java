@@ -1350,4 +1350,22 @@ public class FitnessGoalPersistenceAdapter implements FitnessGoalPersistencePort
 
         return findById(goalId).orElseThrow(() -> new IllegalStateException("Failed to load resumed fitness goal: " + goalId));
     }
+
+    @Override
+    public Optional<FitnessGoal> lockAndVerifyActiveGoal(UUID studentId, UUID goalId, int expectedVersionNumber) {
+        String sql = """
+                SELECT id
+                FROM fitness.fitness_goals
+                WHERE id = ?
+                  AND student_id = ?
+                  AND status = 'ACTIVE'::fitness.lifecycle_status
+                  AND deleted_at IS NULL
+                FOR SHARE
+                """;
+        List<UUID> ids = jdbcTemplate.query(sql, (rs, rowNum) -> (UUID) rs.getObject("id"), goalId, studentId);
+        if (ids.isEmpty()) {
+            return Optional.empty();
+        }
+        return findById(ids.get(0));
+    }
 }

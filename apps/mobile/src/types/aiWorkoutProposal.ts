@@ -40,10 +40,26 @@ export interface WorkoutProposalPayload {
   };
 }
 
+export interface WorkoutProposalPreferences {
+  preferredDaysPerWeek?: number;
+  daysPerWeek?: number;
+  preferredSessionMinutes?: number;
+  startDate?: string;
+  equipment?: string[];
+  allowBodyweight?: boolean;
+  hasPhysicalLimitations?: boolean;
+  limitationsConfirmed?: boolean;
+  limitationsDescription?: string;
+  limitations?: string;
+  injuries?: string;
+  note?: string;
+  timezone?: string;
+}
+
 export interface WorkoutProposalRequest {
   studentId?: string;
   commandKey: string;
-  preferences?: Record<string, unknown>;
+  preferences?: WorkoutProposalPreferences | Record<string, unknown>;
 }
 
 export interface WorkoutProposalResponse {

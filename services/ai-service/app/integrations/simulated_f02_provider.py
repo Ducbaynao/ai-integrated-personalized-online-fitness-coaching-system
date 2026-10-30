@@ -29,6 +29,7 @@ class SimulatedF02WorkoutProvider:
         goal = request.goalType or "GENERAL_FITNESS"
         level = request.fitnessLevel or "BEGINNER"
         mode = request.mode
+        continuity = request.continuityState
 
         days = 3
         if request.preferences:
@@ -42,7 +43,7 @@ class SimulatedF02WorkoutProvider:
                     days = int(request.preferences["preferredDaysPerWeek"])
                 except (ValueError, TypeError):
                     pass
-        if days not in (3, 4):
+        if continuity == "PROLONGED_INACTIVITY" or days not in (3, 4):
             days = 3
 
         used_data = [
@@ -54,29 +55,66 @@ class SimulatedF02WorkoutProvider:
         ]
         if request.equipmentAvailable:
             used_data.append(f"equipment: {', '.join(request.equipmentAvailable)}")
+        if continuity:
+            used_data.append(f"continuity_state: {continuity}")
+            if request.daysSinceLastWorkout is not None:
+                used_data.append(f"days_since_last_workout: {request.daysSinceLastWorkout}")
 
         missing_data = [
             "recent_1rm_test_results",
             "detailed_orthopedic_evaluations",
         ]
 
-        if days == 4:
-            reasoning = [
-                f"Program tailored for {level} level targeting {goal.replace('_', ' ').lower()}.",
-                "Distributed across a 4-day upper/lower split (Day 1 Upper Push, Day 2 Lower, Day 4 Upper Pull, Day 5 Lower/Conditioning) with rest days scheduled after each 2-day training block.",
-                "Volume calibrated at 3-4 sets per primary movement pattern with conservative starting loads.",
-            ]
-        else:
-            reasoning = [
-                f"Program tailored for {level} level targeting {goal.replace('_', ' ').lower()}.",
-                "Distributed across a 3-day split (Day 1 Upper, Day 3 Lower, Day 5 Conditioning) ensuring 48h recovery between sessions.",
-                "Volume calibrated at 3-4 sets per primary movement pattern with conservative starting loads.",
-            ]
-
+        reasoning = []
         limitations = [
             "Proposal covers exactly 1 week (Phase 2 release scope baseline).",
             "Loads and intensities must be self-regulated using RPE 7-8 guidelines.",
         ]
+
+        plan_name_suffix = "Starter Plan"
+
+        if continuity == "PROLONGED_INACTIVITY":
+            plan_name_suffix = "Return-to-Training Plan"
+            reasoning.append(
+                "Trainee is returning after prolonged inactivity; starting with conservative re-adaptation volume and loads without assuming prior capacity."
+            )
+            limitations.append(
+                "Return-to-training protocol applied due to prolonged inactivity (>=100 days). Historical performance is not representative of current capacity; loads must be conservative."
+            )
+        elif continuity == "CONFIRMED_NEW":
+            reasoning.append(
+                "Trainee is confirmed new with zero training history; foundation movement patterns prioritized."
+            )
+            limitations.append(
+                "First-time introductory foundation; movement mechanics prioritized over loading."
+            )
+        elif continuity == "UNKNOWN_HISTORY":
+            reasoning.append(
+                "Trainee has unverified prior platform history; baseline calibration required."
+            )
+            limitations.append(
+                "Unverified prior platform history; baseline calibration required."
+            )
+        elif continuity == "RESTRICTED_HISTORY":
+            reasoning.append(
+                "Coach does not have access to trainee workout history; proposal requires student confirmation."
+            )
+            limitations.append(
+                "Workout history access restricted; baseline calibration required."
+            )
+
+        if days == 4:
+            reasoning.extend([
+                f"Program tailored for {level} level targeting {goal.replace('_', ' ').lower()}.",
+                "Distributed across a 4-day upper/lower split (Day 1 Upper Push, Day 2 Lower, Day 4 Upper Pull, Day 5 Lower/Conditioning) with rest days scheduled after each 2-day training block.",
+                "Volume calibrated at 3-4 sets per primary movement pattern with conservative starting loads.",
+            ])
+        else:
+            reasoning.extend([
+                f"Program tailored for {level} level targeting {goal.replace('_', ' ').lower()}.",
+                "Distributed across a 3-day split (Day 1 Upper, Day 3 Lower, Day 5 Conditioning) ensuring 48h recovery between sessions.",
+                "Volume calibrated at 3-4 sets per primary movement pattern with conservative starting loads.",
+            ])
 
         if days == 4:
             sessions = [
@@ -245,9 +283,18 @@ class SimulatedF02WorkoutProvider:
                 ),
             ]
 
+        if continuity == "PROLONGED_INACTIVITY":
+            # Cap targetSets at 3 for gentle return-to-training volume
+            for s in sessions:
+                for p in s.prescriptions:
+                    p.targetSets = min(p.targetSets, 3)
+            plan_description = f"Structured {days}-day return-to-training foundation program created for {level.lower()} trainees returning after prolonged inactivity."
+        else:
+            plan_description = f"Structured {days}-day foundation program created for {level.lower()} trainees."
+
         plan = WorkoutPlanPayloadSchema(
-            name=f"1-Week {goal.replace('_', ' ').title()} Starter Plan",
-            description=f"Structured {days}-day foundation program created for {level.lower()} trainees.",
+            name=f"1-Week {goal.replace('_', ' ').title()} {plan_name_suffix}",
+            description=plan_description,
             durationWeeks=1,
             sessions=sessions,
         )

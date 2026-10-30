@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   ScrollView,
@@ -10,13 +10,19 @@ import {
   useColorScheme,
 } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
-import { aiWorkoutProposalApi, getWorkoutProposalErrorMessage } from '@/services/aiWorkoutProposalApi';
+import {
+  aiWorkoutProposalApi,
+  getWorkoutProposalErrorMessage,
+  getWorkoutProposalFieldErrors,
+} from '@/services/aiWorkoutProposalApi';
 import { workoutPlanApi } from '@/services/workoutPlanApi';
+import { studentProfileApi } from '@/services/studentProfileApi';
 import { WorkoutPlanDetail } from '@/types/workoutPlan';
 import {
   WorkoutProposalPayload,
   WorkoutProposalResponse,
   WorkoutProposalSession,
+  WorkoutProposalPreferences,
 } from '@/types/aiWorkoutProposal';
 import { WorkoutButton, WorkoutCard } from './WorkoutUi';
 
@@ -34,6 +40,15 @@ interface Props {
   onPlanApplied?: (planId: string) => void;
 }
 
+function getTomorrowLocalDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function AiWorkoutProposalModal({
   visible,
   studentId,
@@ -45,9 +60,18 @@ export function AiWorkoutProposalModal({
   const theme = getSemanticColors(isDark);
 
   const [daysPerWeek, setDaysPerWeek] = useState<number>(3);
+  const [sessionMinutes, setSessionMinutes] = useState<number>(60);
+  const [startDate, setStartDate] = useState<string>(() => getTomorrowLocalDate());
+  const currentStudentRef = React.useRef(studentId);
+  const activeRequestIdRef = React.useRef<number>(0);
+  const [allowBodyweight, setAllowBodyweight] = useState<boolean>(true);
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>(['BODYWEIGHT']);
+  const [hasPhysicalLimitations, setHasPhysicalLimitations] = useState<boolean | null>(null);
+  const [limitationsDescription, setLimitationsDescription] = useState<string>('');
   const [preferencesNote, setPreferencesNote] = useState<string>('');
   const [decisionNote, setDecisionNote] = useState<string>('');
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isDeciding, setIsDeciding] = useState<boolean>(false);
   const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
@@ -60,22 +84,135 @@ export function AiWorkoutProposalModal({
   const [appliedPlanId, setAppliedPlanId] = useState<string | null>(null);
   const [currentActivePlan, setCurrentActivePlan] = useState<WorkoutPlanDetail | null>(null);
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
+  // Adjust state during render when modal visibility or studentId changes (React recommended pattern)
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevStudentId, setPrevStudentId] = useState(studentId);
+
+  if (visible !== prevVisible || studentId !== prevStudentId) {
+    setPrevVisible(visible);
+    setPrevStudentId(studentId);
+
+    // Reset proposals, active plan, editing, and error state
+    setProposal(null);
+    setEditablePayload(null);
+    setCurrentActivePlan(null);
+    setAppliedPlanId(null);
     setErrorMessage(null);
+    setFieldErrors({});
     setIsEditing(false);
     setShowOriginalComparison(false);
+    setIsGenerating(false);
+    setIsDeciding(false);
+    setIsSavingDraft(false);
+
+    // Reset user-specific inputs so they never leak to another student
+    setDaysPerWeek(3);
+    setSessionMinutes(60);
+    setStartDate(getTomorrowLocalDate());
+    setSelectedEquipment(['BODYWEIGHT']);
+    setAllowBodyweight(true);
+    setHasPhysicalLimitations(null);
+    setLimitationsDescription('');
+    setPreferencesNote('');
+    setDecisionNote('');
+  }
+
+  // Update currentStudentRef and invalidate in-flight requests safely in effect
+  useEffect(() => {
+    currentStudentRef.current = studentId;
+    activeRequestIdRef.current += 1;
+  }, [visible, studentId]);
+
+  // Pre-fill preferences ONLY for Student viewing their own profile (Trainer does not use trainer profile)
+  useEffect(() => {
+    if (!visible || isTrainer) return;
+
+    activeRequestIdRef.current += 1;
+    const effectRequestId = activeRequestIdRef.current;
+
+    studentProfileApi.getMyStudentProfile()
+      .then((profile) => {
+        if (activeRequestIdRef.current !== effectRequestId) return;
+        if (profile.availableDaysPerWeek && (profile.availableDaysPerWeek === 3 || profile.availableDaysPerWeek === 4)) {
+          setDaysPerWeek(profile.availableDaysPerWeek);
+        }
+        if (profile.preferredSessionMinutes && profile.preferredSessionMinutes >= 15 && profile.preferredSessionMinutes <= 180) {
+          setSessionMinutes(profile.preferredSessionMinutes);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      activeRequestIdRef.current += 1;
+    };
+  }, [visible, studentId, isTrainer]);
+
+  const toggleEquipment = (eq: string) => {
+    if (eq === 'BODYWEIGHT') {
+      const willEnable = !selectedEquipment.includes('BODYWEIGHT');
+      setAllowBodyweight(willEnable);
+      if (willEnable) {
+        setSelectedEquipment([...selectedEquipment, 'BODYWEIGHT']);
+      } else {
+        setSelectedEquipment(selectedEquipment.filter((x) => x !== 'BODYWEIGHT'));
+      }
+      return;
+    }
+    if (selectedEquipment.includes(eq)) {
+      setSelectedEquipment(selectedEquipment.filter((x) => x !== eq));
+    } else {
+      setSelectedEquipment([...selectedEquipment, eq]);
+    }
+  };
+
+  const handleGenerate = async () => {
+    const thisRequestId = ++activeRequestIdRef.current;
+    setIsGenerating(true);
+    setErrorMessage(null);
+    setFieldErrors({});
+    setIsEditing(false);
+    setShowOriginalComparison(false);
+
+    const equipList = [...selectedEquipment];
+    if (allowBodyweight && !equipList.includes('BODYWEIGHT')) {
+      equipList.push('BODYWEIGHT');
+    }
+
+    const localTimezone = (() => {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        return undefined;
+      }
+    })();
+
+    const prefs: WorkoutProposalPreferences = {
+      preferredDaysPerWeek: daysPerWeek,
+      daysPerWeek: daysPerWeek,
+      preferredSessionMinutes: sessionMinutes,
+      startDate: startDate.trim(),
+      equipment: equipList,
+      allowBodyweight: allowBodyweight,
+      hasPhysicalLimitations: hasPhysicalLimitations !== null ? hasPhysicalLimitations : undefined,
+      limitationsConfirmed: hasPhysicalLimitations !== null,
+      limitationsDescription: hasPhysicalLimitations ? limitationsDescription.trim() : undefined,
+      note: preferencesNote.trim(),
+      timezone: localTimezone,
+    };
+
+    const targetStudentId = studentId;
+
     try {
       const [res, activePlan] = await Promise.all([
         aiWorkoutProposalApi.generate({
-          studentId,
-          preferences: {
-            daysPerWeek,
-            note: preferencesNote.trim(),
-          },
+          studentId: targetStudentId,
+          preferences: prefs,
         }),
-        workoutPlanApi.current(studentId).catch(() => null),
+        workoutPlanApi.current(targetStudentId).catch(() => null),
       ]);
+      if (activeRequestIdRef.current !== thisRequestId || currentStudentRef.current !== targetStudentId) {
+        return; // Guard against stale response if studentId or request changed
+      }
       setProposal({
         ...res,
         revision: 1,
@@ -84,9 +221,15 @@ export function AiWorkoutProposalModal({
       });
       setCurrentActivePlan(activePlan);
     } catch (err) {
+      if (activeRequestIdRef.current !== thisRequestId || currentStudentRef.current !== targetStudentId) {
+        return;
+      }
       setErrorMessage(getWorkoutProposalErrorMessage(err));
+      setFieldErrors(getWorkoutProposalFieldErrors(err));
     } finally {
-      setIsGenerating(false);
+      if (activeRequestIdRef.current === thisRequestId && currentStudentRef.current === targetStudentId) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -105,6 +248,7 @@ export function AiWorkoutProposalModal({
 
   const handleSaveDraft = async () => {
     if (!proposal || !editablePayload) return;
+    const thisRequestId = ++activeRequestIdRef.current;
     setIsSavingDraft(true);
     setErrorMessage(null);
     try {
@@ -116,6 +260,7 @@ export function AiWorkoutProposalModal({
         structuredPayload: editablePayload,
       });
 
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setProposal({
         ...proposal,
         revision: res.revision,
@@ -128,9 +273,12 @@ export function AiWorkoutProposalModal({
       setIsEditing(false);
       setEditablePayload(null);
     } catch (err) {
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setErrorMessage(getWorkoutProposalErrorMessage(err));
     } finally {
-      setIsSavingDraft(false);
+      if (activeRequestIdRef.current === thisRequestId) {
+        setIsSavingDraft(false);
+      }
     }
   };
 
@@ -189,6 +337,7 @@ export function AiWorkoutProposalModal({
 
   const handleAccept = async () => {
     if (!proposal) return;
+    const thisRequestId = ++activeRequestIdRef.current;
     setIsDeciding(true);
     setErrorMessage(null);
     try {
@@ -201,6 +350,7 @@ export function AiWorkoutProposalModal({
         currentActivePlan ? currentActivePlan.plan.aggregateVersion : undefined,
         currentActivePlan ? false : true
       );
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setProposal({
         ...proposal,
         status: 'APPLIED',
@@ -210,14 +360,18 @@ export function AiWorkoutProposalModal({
         onPlanApplied(res.resultingEntityId);
       }
     } catch (err) {
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setErrorMessage(getWorkoutProposalErrorMessage(err));
     } finally {
-      setIsDeciding(false);
+      if (activeRequestIdRef.current === thisRequestId) {
+        setIsDeciding(false);
+      }
     }
   };
 
   const handleReject = async () => {
     if (!proposal) return;
+    const thisRequestId = ++activeRequestIdRef.current;
     setIsDeciding(true);
     setErrorMessage(null);
     try {
@@ -225,14 +379,18 @@ export function AiWorkoutProposalModal({
         proposal.recommendationId,
         decisionNote.trim() || 'Người dùng từ chối đề xuất'
       );
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setProposal({
         ...proposal,
         status: 'REJECTED',
       });
     } catch (err) {
+      if (activeRequestIdRef.current !== thisRequestId) return;
       setErrorMessage(getWorkoutProposalErrorMessage(err));
     } finally {
-      setIsDeciding(false);
+      if (activeRequestIdRef.current === thisRequestId) {
+        setIsDeciding(false);
+      }
     }
   };
 
@@ -314,8 +472,26 @@ export function AiWorkoutProposalModal({
                 Hệ thống AI sẽ đối chiếu mục tiêu và dữ liệu tập luyện hiện tại để thiết kế giáo án mẫu chuẩn xác trong phạm vi đúng 1 tuần.
               </Text>
 
+              {/* Goal or Profile readiness warning banner */}
+              {fieldErrors['fitnessGoal'] || fieldErrors['trainingExperienceLevel'] ? (
+                <View style={[styles.alertBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.dangerText }]} testID="readiness-guidance-card">
+                  <Text style={[styles.alertTitle, { color: theme.dangerText }]}>Cần bổ sung thông tin hồ sơ</Text>
+                  {fieldErrors['fitnessGoal'] ? (
+                    <Text style={[styles.alertBody, { color: theme.textPrimary }]}>
+                      • Mục tiêu tập luyện: Chưa có Mục tiêu thể hình (Goal) ACTIVE. Vui lòng vào màn hình Mục tiêu để tạo và kích hoạt mục tiêu trước khi thiết kế giáo án.
+                    </Text>
+                  ) : null}
+                  {fieldErrors['trainingExperienceLevel'] ? (
+                    <Text style={[styles.alertBody, { color: theme.textPrimary }]}>
+                      • Trình độ tập luyện: Hồ sơ học viên chưa cập nhật trình độ tập luyện. Vui lòng vào phần Hồ sơ cá nhân để thiết lập trình độ (Beginner / Intermediate / Advanced).
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* 1. Days per week */}
               <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
-                Số ngày tập mỗi tuần:
+                Số ngày tập mỗi tuần (*):
               </Text>
               <View style={styles.daysSelector}>
                 {[3, 4].map((days) => (
@@ -328,7 +504,15 @@ export function AiWorkoutProposalModal({
                         backgroundColor: daysPerWeek === days ? theme.primary : theme.surfaceSubtle,
                       },
                     ]}
-                    onPress={() => setDaysPerWeek(days)}
+                    onPress={() => {
+                      setDaysPerWeek(days);
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.preferredDaysPerWeek;
+                        delete copy.daysPerWeek;
+                        return copy;
+                      });
+                    }}
                   >
                     <Text
                       style={[
@@ -341,9 +525,249 @@ export function AiWorkoutProposalModal({
                   </TouchableOpacity>
                 ))}
               </View>
+              {fieldErrors['preferredDaysPerWeek'] || fieldErrors['daysPerWeek'] ? (
+                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                  {fieldErrors['preferredDaysPerWeek'] || fieldErrors['daysPerWeek']}
+                </Text>
+              ) : null}
 
+              {/* 2. Session Duration */}
               <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
-                Ghi chú hoặc ưu tiên đặc biệt:
+                Thời lượng mỗi buổi tập (*):
+              </Text>
+              <View style={styles.daysSelector}>
+                {[30, 45, 60, 90].map((mins) => (
+                  <TouchableOpacity
+                    key={mins}
+                    testID={`session-minutes-${mins}`}
+                    style={[
+                      styles.dayOption,
+                      {
+                        backgroundColor: sessionMinutes === mins ? theme.primary : theme.surfaceSubtle,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSessionMinutes(mins);
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.preferredSessionMinutes;
+                        return copy;
+                      });
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dayOptionText,
+                        { color: sessionMinutes === mins ? theme.textOnPrimary : theme.textPrimary },
+                      ]}
+                    >
+                      {mins} phút
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {fieldErrors['preferredSessionMinutes'] ? (
+                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                  {fieldErrors['preferredSessionMinutes']}
+                </Text>
+              ) : null}
+
+              {/* 3. Start Date */}
+              <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
+                Ngày bắt đầu giáo án (YYYY-MM-DD) (*):
+              </Text>
+              <TextInput
+                testID="ai-proposal-start-date-input"
+                style={[
+                  styles.textInput,
+                  {
+                    color: theme.textPrimary,
+                    borderColor: fieldErrors['startDate'] ? theme.dangerText : theme.border,
+                    backgroundColor: theme.surfaceSubtle,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.textSecondary}
+                value={startDate}
+                onChangeText={(val) => {
+                  setStartDate(val);
+                  setFieldErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.startDate;
+                    return copy;
+                  });
+                }}
+              />
+              {fieldErrors['startDate'] ? (
+                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                  {fieldErrors['startDate']}
+                </Text>
+              ) : null}
+
+              {/* 4. Equipment Selection */}
+              <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
+                Thiết bị tập luyện sẵn có (*):
+              </Text>
+              <View style={styles.chipsRow}>
+                {[
+                  { id: 'BODYWEIGHT', label: 'Bodyweight' },
+                  { id: 'DUMBBELL', label: 'Tạ đơn (Dumbbell)' },
+                  { id: 'BARBELL', label: 'Thanh đòn (Barbell)' },
+                  { id: 'RESISTANCE_BAND', label: 'Dây kháng lực' },
+                  { id: 'CABLE', label: 'Máy cáp (Cable)' },
+                  { id: 'MACHINE', label: 'Máy tạ (Machine)' },
+                ].map((item) => {
+                  const isSelected = selectedEquipment.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      testID={`equipment-chip-${item.id}`}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: isSelected ? theme.primary : theme.surfaceSubtle,
+                          borderColor: isSelected ? theme.primary : theme.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        toggleEquipment(item.id);
+                        setFieldErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.equipment;
+                          return copy;
+                        });
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: isSelected ? theme.textOnPrimary : theme.textPrimary },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {fieldErrors['equipment'] ? (
+                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                  {fieldErrors['equipment']}
+                </Text>
+              ) : null}
+
+              {/* 5. Health & Physical Limitations Confirmation */}
+              <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
+                Tình trạng chấn thương / hạn chế thể chất (*):
+              </Text>
+              <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
+                Bắt buộc xác nhận trung thực để đảm bảo an toàn tập luyện. Không tự động điền câu trả lời.
+              </Text>
+              <View style={styles.limitationChoiceRow}>
+                <TouchableOpacity
+                  testID="limitations-none-button"
+                  style={[
+                    styles.limitationChoiceBtn,
+                    {
+                      backgroundColor: hasPhysicalLimitations === false ? theme.primary : theme.surfaceSubtle,
+                      borderColor: hasPhysicalLimitations === false ? theme.primary : theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setHasPhysicalLimitations(false);
+                    setLimitationsDescription('');
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.limitations;
+                      delete copy.limitationsConfirmed;
+                      delete copy.limitationsDescription;
+                      return copy;
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.choiceBtnText,
+                      { color: hasPhysicalLimitations === false ? theme.textOnPrimary : theme.textPrimary },
+                    ]}
+                  >
+                    ✓ Không có hạn chế
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  testID="limitations-yes-button"
+                  style={[
+                    styles.limitationChoiceBtn,
+                    {
+                      backgroundColor: hasPhysicalLimitations === true ? theme.primary : theme.surfaceSubtle,
+                      borderColor: hasPhysicalLimitations === true ? theme.primary : theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setHasPhysicalLimitations(true);
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.limitations;
+                      delete copy.limitationsConfirmed;
+                      return copy;
+                    });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.choiceBtnText,
+                      { color: hasPhysicalLimitations === true ? theme.textOnPrimary : theme.textPrimary },
+                    ]}
+                  >
+                    ⚠ Có hạn chế / chấn thương
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {fieldErrors['limitations'] || fieldErrors['limitationsConfirmed'] ? (
+                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                  {fieldErrors['limitations'] || fieldErrors['limitationsConfirmed']}
+                </Text>
+              ) : null}
+
+              {hasPhysicalLimitations === true ? (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={[styles.subLabel, { color: theme.textPrimary }]}>
+                    Mô tả chấn thương hoặc các bài tập cần tránh (*):
+                  </Text>
+                  <TextInput
+                    testID="ai-proposal-limitations-input"
+                    style={[
+                      styles.textInput,
+                      {
+                        color: theme.textPrimary,
+                        borderColor: fieldErrors['limitationsDescription'] ? theme.dangerText : theme.border,
+                        backgroundColor: theme.surfaceSubtle,
+                      },
+                    ]}
+                    placeholder="Ví dụ: Đau khớp gối nhẹ khi gập sâu, tránh tạ nặng bài squat..."
+                    placeholderTextColor={theme.textSecondary}
+                    value={limitationsDescription}
+                    onChangeText={(val) => {
+                      setLimitationsDescription(val);
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.limitationsDescription;
+                        return copy;
+                      });
+                    }}
+                  />
+                  {fieldErrors['limitationsDescription'] ? (
+                    <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
+                      {fieldErrors['limitationsDescription']}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* 6. Notes */}
+              <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
+                Ghi chú hoặc ưu tiên sở thích cá nhân (Tùy chọn):
               </Text>
               <Text style={[styles.subLabel, { color: theme.textSecondary }]}>
                 Văn bản tự do chỉ mang tính tham khảo sở thích cá nhân, không thay thế dữ liệu y tế hoặc chẩn đoán chấn thương đã xác thực.
@@ -358,7 +782,7 @@ export function AiWorkoutProposalModal({
                     backgroundColor: theme.surfaceSubtle,
                   },
                 ]}
-                placeholder="Ví dụ: Ưu tiên thân trên, hạn chế tạ nặng bài squat..."
+                placeholder="Ví dụ: Ưu tiên thân trên, thích các bài tập tạ đơn..."
                 placeholderTextColor={theme.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -1043,5 +1467,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 12,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  limitationChoiceRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  limitationChoiceBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  alertBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  alertTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  alertBody: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
 });

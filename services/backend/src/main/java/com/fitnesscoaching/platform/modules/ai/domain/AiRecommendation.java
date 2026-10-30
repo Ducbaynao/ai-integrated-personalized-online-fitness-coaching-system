@@ -24,6 +24,7 @@ public record AiRecommendation(
         String originalPayload,
         boolean isCustomized,
         UUID lastModifiedBy,
+        String sourceSnapshot,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -56,6 +57,7 @@ public record AiRecommendation(
         private String originalPayload;
         private boolean isCustomized = false;
         private UUID lastModifiedBy;
+        private String sourceSnapshot;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -79,6 +81,7 @@ public record AiRecommendation(
         public Builder originalPayload(String originalPayload) { this.originalPayload = originalPayload; return this; }
         public Builder isCustomized(boolean isCustomized) { this.isCustomized = isCustomized; return this; }
         public Builder lastModifiedBy(UUID lastModifiedBy) { this.lastModifiedBy = lastModifiedBy; return this; }
+        public Builder sourceSnapshot(String sourceSnapshot) { this.sourceSnapshot = sourceSnapshot; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(Instant updatedAt) { this.updatedAt = updatedAt; return this; }
 
@@ -105,6 +108,7 @@ public record AiRecommendation(
                     orig,
                     isCustomized,
                     lastModifiedBy,
+                    sourceSnapshot,
                     createdAt != null ? createdAt : Instant.now(),
                     updatedAt != null ? updatedAt : Instant.now()
             );

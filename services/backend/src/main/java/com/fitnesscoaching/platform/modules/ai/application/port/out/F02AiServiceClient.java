@@ -15,6 +15,25 @@ public interface F02AiServiceClient {
             String goalType,
             List<String> equipmentAvailable,
             Map<String, Object> preferences,
-            List<UUID> candidateVariationIds
-    ) {}
+            List<UUID> candidateVariationIds,
+            String continuityState,
+            Integer daysSinceLastWorkout,
+            UUID goalId,
+            Integer goalVersionNumber,
+            boolean hasActivePlan
+    ) {
+        public F02ServiceRequest(
+                UUID studentId,
+                UUID coachingPeriodId,
+                String mode,
+                String fitnessLevel,
+                String goalType,
+                List<String> equipmentAvailable,
+                Map<String, Object> preferences,
+                List<UUID> candidateVariationIds
+        ) {
+            this(studentId, coachingPeriodId, mode, fitnessLevel, goalType, equipmentAvailable, preferences, candidateVariationIds,
+                    null, null, null, null, false);
+        }
+    }
 }

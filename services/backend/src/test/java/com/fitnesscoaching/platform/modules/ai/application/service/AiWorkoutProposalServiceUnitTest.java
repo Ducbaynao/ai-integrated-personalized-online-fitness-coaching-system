@@ -54,13 +54,32 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import com.fitnesscoaching.platform.modules.ai.application.port.out.F02AiServiceClient.F02ServiceRequest;
+import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
+import java.time.LocalDate;
+import com.fitnesscoaching.platform.modules.ai.domain.F02SourceSnapshot;
+import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
+import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import org.springframework.beans.factory.ObjectProvider;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class AiWorkoutProposalServiceUnitTest {
 
     @Mock
@@ -79,6 +98,12 @@ class AiWorkoutProposalServiceUnitTest {
     private AuditService auditService;
     @Mock
     private CurrentCoachingContextQuery coachingContextQuery;
+    @Mock
+    private UserAccountStatusQuery accountStatusQuery;
+    @Mock
+    private ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider;
+    @Mock
+    private GetCurrentFitnessGoalUseCase goalService;
 
     private ObjectMapper objectMapper;
     private F02AiServiceClient aiServiceClient;
@@ -92,6 +117,44 @@ class AiWorkoutProposalServiceUnitTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         aiServiceClient = new SimulatedF02AiServiceClient(objectMapper);
+        lenient().when(accountStatusQuery.getAccountStatus(any())).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        lenient().when(goalProvider.getIfAvailable()).thenReturn(goalService);
+        lenient().when(goalService.getCurrentFitnessGoal(any())).thenAnswer(inv -> {
+            UUID s = inv.getArgument(0);
+            UUID g = UUID.randomUUID();
+            FitnessGoalVersion v = new FitnessGoalVersion(
+                    UUID.randomUUID(), g, 1, LocalDate.now(), LocalDate.now().plusMonths(3), 90,
+                    Instant.now(), null, null, "Initial", "v1", s, null, Instant.now(), null, null, null, List.of(), List.of()
+            );
+            return Optional.of(new FitnessGoal(
+                    g, s, "Goal", GoalStatus.ACTIVE, s, Instant.now(), null, null, null, null, Instant.now(), Instant.now(), v
+            ));
+        });
+        lenient().when(goalService.getCurrentFitnessGoal(any(), anyBoolean())).thenAnswer(inv -> {
+            UUID s = inv.getArgument(0);
+            UUID g = UUID.randomUUID();
+            FitnessGoalVersion v = new FitnessGoalVersion(
+                    UUID.randomUUID(), g, 1, LocalDate.now(), LocalDate.now().plusMonths(3), 90,
+                    Instant.now(), null, null, "Initial", "v1", s, null, Instant.now(), null, null, null, List.of(), List.of()
+            );
+            return Optional.of(new FitnessGoal(
+                    g, s, "Goal", GoalStatus.ACTIVE, s, Instant.now(), null, null, null, null, Instant.now(), Instant.now(), v
+            ));
+        });
+        lenient().when(goalService.lockAndVerifyActiveGoal(any(), any(), anyInt())).thenAnswer(inv -> {
+            UUID s = inv.getArgument(0);
+            UUID g = inv.getArgument(1);
+            int v = inv.getArgument(2);
+            FitnessGoalVersion fv = new FitnessGoalVersion(
+                    UUID.randomUUID(), g, v, LocalDate.now(), LocalDate.now().plusMonths(3), 90,
+                    Instant.now(), null, null, "Initial", "v" + v, s, null, Instant.now(), null, null, null, List.of(), List.of()
+            );
+            return Optional.of(new FitnessGoal(
+                    g, s, "Goal", GoalStatus.ACTIVE, s, Instant.now(), null, null, null, null, Instant.now(), Instant.now(), fv
+            ));
+        });
+        lenient().when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        lenient().when(outputValidator.validate(any(), any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
         service = new AiWorkoutProposalService(
                 aiRunRepository,
                 recommendationRepository,
@@ -102,7 +165,9 @@ class AiWorkoutProposalServiceUnitTest {
                 workoutPlanQueryUseCase,
                 auditService,
                 objectMapper,
-                coachingContextQuery
+                coachingContextQuery,
+                accountStatusQuery,
+                goalProvider
         );
     }
 
@@ -111,8 +176,13 @@ class AiWorkoutProposalServiceUnitTest {
     void selfDirected_studentGeneratesProposal_succeeds() {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "SELF_DIRECTED", null));
-        when(contextBuilder.buildRequest(eq(studentId), any(), any()))
-                .thenReturn(new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "INTERMEDIATE", "GENERAL_FITNESS", List.of(), Map.of(), List.of()));
+        F02SourceSnapshot snapshot = new F02SourceSnapshot(
+                UUID.randomUUID(), 1, null, null, periodId, "SELF_DIRECTED", null,
+                TrainingContinuityState.CONFIRMED_NEW, null, Instant.now()
+        );
+        F02ServiceRequest req = new F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "INTERMEDIATE", "GENERAL_FITNESS", List.of(), Map.of(), List.of());
+        when(contextBuilder.buildContextEnvelope(eq(studentId), any(), any(), any()))
+                .thenReturn(new F02ContextBuilder.ContextEnvelopeResult(req, snapshot));
         when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
         when(recommendationRepository.save(any(AiRecommendation.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -127,8 +197,10 @@ class AiWorkoutProposalServiceUnitTest {
         assertThat(result.title()).isNotBlank();
         assertThat(result.explanation()).isNotBlank();
         assertThat(result.expiresAt()).isNotNull();
+        assertThat(result.expiresAt()).isEqualTo(result.createdAt().plus(24, ChronoUnit.HOURS));
 
         verify(aiRunRepository).create(any(AiRun.class));
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.SUCCEEDED), any(), isNull(), isNull(), isNull(), isNull(), anyInt(), any());
         verify(recommendationRepository).save(any(AiRecommendation.class));
         verify(auditService).recordAudit(any());
     }
@@ -152,8 +224,15 @@ class AiWorkoutProposalServiceUnitTest {
     void humanCoach_assignedTrainerGeneratesProposal_succeeds() {
         when(contextBuilder.resolveCoachingContext(studentId))
                 .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "HUMAN_COACH", trainerId));
-        when(contextBuilder.buildRequest(eq(studentId), any(), any()))
-                .thenReturn(new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "HUMAN_COACH", "ADVANCED", "MUSCLE_GAIN", List.of(), Map.of(), List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, null, trainerId, Instant.now(), null)));
+        F02SourceSnapshot snapshot = new F02SourceSnapshot(
+                UUID.randomUUID(), 1, null, null, periodId, "HUMAN_COACH", trainerId,
+                TrainingContinuityState.RECENT_CONSISTENT, 3, Instant.now()
+        );
+        F02ServiceRequest req = new F02ServiceRequest(studentId, periodId, "HUMAN_COACH", "ADVANCED", "MUSCLE_GAIN", List.of(), Map.of(), List.of());
+        when(contextBuilder.buildContextEnvelope(eq(studentId), any(), any(), any()))
+                .thenReturn(new F02ContextBuilder.ContextEnvelopeResult(req, snapshot));
         when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
         when(recommendationRepository.save(any(AiRecommendation.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -229,7 +308,7 @@ class AiWorkoutProposalServiceUnitTest {
         assertThat(result.resultingEntityId()).isEqualTo(createdPlanId);
         assertThat(result.replayed()).isFalse();
 
-        verify(outputValidator).validate(proposalPayload);
+        verify(outputValidator).validate(eq(proposalPayload), any());
         verify(workoutPlanCommandUseCase).createDraft(any());
         verify(workoutPlanCommandUseCase).activate(any());
         verify(recommendationRepository).updateDecision(eq(recId), eq(AiRecommendationStatus.APPLIED), eq(studentId), any(), eq("Looks great!"), eq("WORKOUT_PLAN"), eq(createdPlanId));
@@ -395,7 +474,7 @@ class AiWorkoutProposalServiceUnitTest {
         when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
         when(coachingContextQuery.findEffectiveContext(studentId, false))
                 .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, now, null)));
-        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.invalid("Exercise variation retired"));
+        when(outputValidator.validate(any(), any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.invalid("Exercise variation retired"));
 
         AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "cmd-1", "Note", 1);
 
@@ -979,5 +1058,346 @@ class AiWorkoutProposalServiceUnitTest {
                 .hasMessageContaining("Active workout plan has changed since preview");
 
         verify(workoutPlanCommandUseCase, never()).publishVersion(any());
+    }
+
+    @Test
+    @DisplayName("T04: Actor account inactive prior to generation -> Throws 403 Access Denied")
+    void t04_actorAccountInactiveBeforeRequest_throwsAccessDenied() {
+        when(accountStatusQuery.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.SUSPENDED));
+
+        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-key-inactive", Map.of());
+        assertThatThrownBy(() -> service.generateProposal(cmd))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Actor account is not active");
+
+        verify(aiRunRepository, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("T04: Actor account revoked during provider call -> transitions run to FAILED and throws 403")
+    void t04_actorAccountRevokedDuringProviderCall_failsRunAndThrowsAccessDenied() {
+        when(contextBuilder.resolveCoachingContext(studentId))
+                .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "SELF_DIRECTED", null));
+        F02SourceSnapshot snapshot = new F02SourceSnapshot(
+                UUID.randomUUID(), 1, null, null, periodId, "SELF_DIRECTED", null,
+                TrainingContinuityState.CONFIRMED_NEW, null, Instant.now()
+        );
+        F02ServiceRequest req = new F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of());
+        when(contextBuilder.buildContextEnvelope(eq(studentId), any(), any(), any()))
+                .thenReturn(new F02ContextBuilder.ContextEnvelopeResult(req, snapshot));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+
+        // Active initially, but revoked at post-provider revalidation
+        when(accountStatusQuery.getAccountStatus(studentId))
+                .thenReturn(Optional.of(AccountStatus.ACTIVE))
+                .thenReturn(Optional.of(AccountStatus.DISABLED));
+
+        GenerateProposalCommand cmd = new GenerateProposalCommand(studentId, studentId, "cmd-key-revoked", Map.of());
+        assertThatThrownBy(() -> service.generateProposal(cmd))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Actor account is no longer active");
+
+        verify(aiRunRepository).create(any(AiRun.class));
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.FAILED), isNull(), eq("AUTHORITY_REVOKED"),
+                contains("no longer active"), isNull(), isNull(), anyInt(), any());
+        verify(recommendationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T04: Assigned coach revoked during provider call -> transitions run to FAILED and throws 403")
+    void t04_trainerRevokedDuringProviderCall_failsRunAndThrowsAccessDenied() {
+        when(contextBuilder.resolveCoachingContext(studentId))
+                .thenReturn(new F02ContextBuilder.CoachingContextDetails(periodId, "HUMAN_COACH", trainerId));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, null, trainerId, Instant.now(), null)));
+        F02SourceSnapshot snapshot = new F02SourceSnapshot(
+                UUID.randomUUID(), 1, null, null, periodId, "HUMAN_COACH", trainerId,
+                TrainingContinuityState.RECENT_CONSISTENT, 2, Instant.now()
+        );
+        F02ServiceRequest req = new F02ServiceRequest(studentId, periodId, "HUMAN_COACH", "ADVANCED", "MUSCLE_GAIN", List.of(), Map.of(), List.of());
+        when(contextBuilder.buildContextEnvelope(eq(studentId), any(), any(), any()))
+                .thenReturn(new F02ContextBuilder.ContextEnvelopeResult(req, snapshot));
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+
+        // At post-provider revalidation, coach is unassigned
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.empty());
+
+        GenerateProposalCommand cmd = new GenerateProposalCommand(trainerId, studentId, "cmd-key-coach-revoked", Map.of());
+        assertThatThrownBy(() -> service.generateProposal(cmd))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer coaching authority revoked");
+
+        verify(aiRunRepository).create(any(AiRun.class));
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.FAILED), isNull(), eq("AUTHORITY_REVOKED"),
+                contains("authority revoked"), isNull(), isNull(), anyInt(), any());
+        verify(recommendationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T04: Actor account inactive when retrieving recommendation -> Throws 403 Access Denied")
+    void t04_actorAccountInactiveWhenReadingRecommendation_throwsAccessDenied() {
+        when(accountStatusQuery.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.SUSPENDED));
+
+        UUID recId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.getRecommendation(studentId, recId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Actor account is not active");
+
+        verify(recommendationRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("T05: Accept recommendation fails with 409 Conflict when Goal version changed since snapshot")
+    void t05_acceptRecommendation_whenGoalVersionChangedSinceSnapshot_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String snapshotJson = "{\"goalId\":\"" + goalId + "\",\"goalVersionNumber\":1,\"activePlanId\":null}";
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .sourceSnapshot(snapshotJson)
+                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Goal in DB has version 2 now
+        FitnessGoalVersion v2 = new FitnessGoalVersion(
+                UUID.randomUUID(), goalId, 2, LocalDate.now(), LocalDate.now().plusMonths(3), 90,
+                now, null, null, "Update", "v2", studentId, null, now, null, null, null, List.of(), List.of()
+        );
+        FitnessGoal goalV2 = new FitnessGoal(
+                goalId, studentId, "Goal", GoalStatus.ACTIVE, studentId, now, null, null, null, null, now, now, v2
+        );
+        lenient().when(goalService.lockAndVerifyActiveGoal(eq(studentId), eq(goalId), eq(1))).thenReturn(Optional.of(goalV2));
+        lenient().when(goalService.lockAndVerifyActiveGoal(any(), any(), anyInt())).thenReturn(Optional.of(goalV2));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-stale-goal-ver", "Note", 1, null, null, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Fitness goal version has changed since proposal was generated (was v1, now v2)");
+
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+        verify(workoutPlanCommandUseCase, never()).publishVersion(any());
+    }
+
+    @Test
+    @DisplayName("T05: Accept recommendation fails with 409 Conflict when Goal is no longer ACTIVE")
+    void t05_acceptRecommendation_whenGoalNoLongerActiveSinceSnapshot_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String snapshotJson = "{\"goalId\":\"" + goalId + "\",\"goalVersionNumber\":1,\"activePlanId\":null}";
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .sourceSnapshot(snapshotJson)
+                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Goal in DB is ended / paused / absent
+        lenient().when(goalService.lockAndVerifyActiveGoal(any(), any(), anyInt())).thenReturn(Optional.empty());
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-inactive-goal", "Note", 1, null, null, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Active fitness goal is no longer active");
+
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("T05: Accept recommendation fails with 409 Conflict when active plan appeared since proposal snapshot")
+    void t05_acceptRecommendation_whenActivePlanAppearedSinceSnapshot_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        // Snapshot had NO active plan
+        String snapshotJson = "{\"goalId\":\"" + goalId + "\",\"goalVersionNumber\":1,\"activePlanId\":null}";
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .sourceSnapshot(snapshotJson)
+                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any())).thenReturn(F02RuntimeOutputValidator.ValidationResult.valid(List.of()));
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+
+        // Goal is unchanged
+        FitnessGoalVersion v1 = new FitnessGoalVersion(
+                UUID.randomUUID(), goalId, 1, LocalDate.now(), LocalDate.now().plusMonths(3), 90,
+                now, null, null, "Initial", "v1", studentId, null, now, null, null, null, List.of(), List.of()
+        );
+        FitnessGoal goalV1 = new FitnessGoal(
+                goalId, studentId, "Goal", GoalStatus.ACTIVE, studentId, now, null, null, null, null, now, now, v1
+        );
+        when(goalService.getCurrentFitnessGoal(studentId, false)).thenReturn(Optional.of(goalV1));
+
+        // But now an active plan appeared!
+        UUID newActivePlanId = UUID.randomUUID();
+        PlanSummary activeSummary = new PlanSummary(
+                newActivePlanId, studentId, goalId, periodId, "Surprise Active Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 1L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(1, ChronoUnit.HOURS), now.minus(1, ChronoUnit.HOURS), null,
+                UUID.randomUUID(), 1, now.minus(1, ChronoUnit.HOURS), now.minus(1, ChronoUnit.HOURS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(activeSummary, null)));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-appeared-plan", "Note", 1, null, null, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Active workout plan appeared since proposal was generated");
+
+        verify(workoutPlanCommandUseCase, never()).createDraft(any());
+    }
+
+    @Test
+    @DisplayName("Fail-Closed: Malformed source snapshot throws 409 Conflict with malformed reason")
+    void t05_acceptRecommendation_whenSnapshotMalformed_throwsConflict() {
+        UUID recId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload("{\"plan\":{\"name\":\"Test Plan\",\"sessions\":[]}}")
+                .sourceSnapshot("{this is completely broken json")
+                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+        lenient().when(accountStatusQuery.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-malformed-snap", "Note", 1, null, null, null
+        );
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Source snapshot is malformed and cannot be verified");
+    }
+
+    @Test
+    @DisplayName("Preview Reload: Active plan aggregate version bumped but client previewed and reloaded new version -> accepts successfully")
+    void t05_acceptRecommendation_whenPlanAggregateVersionBumped_butClientReloadedPreview_succeeds() {
+        UUID recId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        String validPayload = aiServiceClient.generateProposalJson(
+                new F02AiServiceClient.F02ServiceRequest(studentId, periodId, "SELF_DIRECTED", "BEGINNER", "GENERAL_FITNESS", List.of(), Map.of(), List.of())
+        );
+
+        // Snapshot had activePlanId and activePlanAggregateVersion = 1
+        String snapshotJson = "{\"goalId\":\"" + goalId + "\",\"goalVersionNumber\":1,\"activePlanId\":\"" + planId + "\",\"activePlanAggregateVersion\":1}";
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .title("1-Week Plan")
+                .explanation("Details")
+                .structuredPayload(validPayload)
+                .sourceSnapshot(snapshotJson)
+                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(coachingContextQuery.findEffectiveContext(studentId, false))
+                .thenReturn(Optional.of(new CurrentCoachingContextQuery.CurrentCoachingContext(
+                        periodId, CurrentCoachingContextQuery.Mode.SELF_DIRECTED, null, null, now, null
+                )));
+        lenient().when(accountStatusQuery.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+
+        // Current active plan has been bumped to aggregate version 2!
+        PlanSummary bumpedSummary = new PlanSummary(
+                planId, studentId, goalId, periodId, "Current Plan", "Running", "STUDENT",
+                WorkoutPlanStatus.ACTIVE, 2L, DecisionOwnerType.STUDENT, studentId, null, null,
+                now.minus(2, ChronoUnit.HOURS), now.minus(2, ChronoUnit.HOURS), null,
+                UUID.randomUUID(), 2, now.minus(2, ChronoUnit.HOURS), now.minus(2, ChronoUnit.HOURS), ReadContext.CURRENT
+        );
+        when(workoutPlanQueryUseCase.findActive(studentId, studentId))
+                .thenReturn(Optional.of(new PlanDetail(bumpedSummary, null)));
+
+        when(workoutPlanCommandUseCase.publishVersion(any()))
+                .thenReturn(new CommandResult(planId, UUID.randomUUID(), 3, WorkoutPlanStatus.ACTIVE, 3L, now, false));
+
+        // Client sent expectedPlanAggregateVersion = 2 (proving client reloaded preview)
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(
+                studentId, recId, "accept-reloaded-preview", "Note", 1, planId, 2L, null
+        );
+
+        AcceptRecommendationResult result = service.acceptRecommendation(cmd);
+
+        assertThat(result).isNotNull();
+        assertThat(result.recommendationId()).isEqualTo(recId);
+        verify(workoutPlanCommandUseCase).publishVersion(any());
+        assertThat(rec.sourceSnapshot()).isEqualTo(snapshotJson);
     }
 }
