@@ -6,6 +6,7 @@ import { WorkoutProposalResponse } from '@/types/aiWorkoutProposal';
 import { ApiError, ErrorResponse } from '@/types/auth';
 
 import { workoutPlanApi } from '@/services/workoutPlanApi';
+import { studentProfileApi } from '@/services/studentProfileApi';
 
 jest.mock('@/services/workoutPlanApi', () => ({
   workoutPlanApi: {
@@ -637,12 +638,10 @@ describe('AiWorkoutProposalModal', () => {
   });
 
   it('does not prefill preferences from getMyStudentProfile when isTrainer is true', async () => {
-    const { studentProfileApi } = require('@/services/studentProfileApi');
-    studentProfileApi.getMyStudentProfile.mockClear();
+    (studentProfileApi.getMyStudentProfile as jest.Mock).mockClear();
 
-    let tree: renderer.ReactTestRenderer;
     renderer.act(() => {
-      tree = renderer.create(
+      renderer.create(
         <AiWorkoutProposalModal
           visible={true}
           studentId="student-99"

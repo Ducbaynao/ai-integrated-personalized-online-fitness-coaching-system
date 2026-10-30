@@ -43,9 +43,7 @@ class SimulatedF02WorkoutProvider:
                     days = int(request.preferences["preferredDaysPerWeek"])
                 except (ValueError, TypeError):
                     pass
-        if continuity == "PROLONGED_INACTIVITY":
-            days = 3
-        elif days not in (3, 4):
+        if continuity == "PROLONGED_INACTIVITY" or days not in (3, 4):
             days = 3
 
         used_data = [
@@ -289,8 +287,7 @@ class SimulatedF02WorkoutProvider:
             # Cap targetSets at 3 for gentle return-to-training volume
             for s in sessions:
                 for p in s.prescriptions:
-                    if p.targetSets > 3:
-                        p.targetSets = 3
+                    p.targetSets = min(p.targetSets, 3)
             plan_description = f"Structured {days}-day return-to-training foundation program created for {level.lower()} trainees returning after prolonged inactivity."
         else:
             plan_description = f"Structured {days}-day foundation program created for {level.lower()} trainees."

@@ -63,7 +63,6 @@ export function AiWorkoutProposalModal({
   const [sessionMinutes, setSessionMinutes] = useState<number>(60);
   const [startDate, setStartDate] = useState<string>(() => getTomorrowLocalDate());
   const currentStudentRef = React.useRef(studentId);
-  currentStudentRef.current = studentId;
   const activeRequestIdRef = React.useRef<number>(0);
   const [allowBodyweight, setAllowBodyweight] = useState<boolean>(true);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>(['BODYWEIGHT']);
@@ -85,12 +84,13 @@ export function AiWorkoutProposalModal({
   const [appliedPlanId, setAppliedPlanId] = useState<string | null>(null);
   const [currentActivePlan, setCurrentActivePlan] = useState<WorkoutPlanDetail | null>(null);
 
-  // Reset all modal state when visibility changes or when studentId changes to prevent data leakage
-  useEffect(() => {
-    if (!visible) return;
+  // Adjust state during render when modal visibility or studentId changes (React recommended pattern)
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevStudentId, setPrevStudentId] = useState(studentId);
 
-    activeRequestIdRef.current += 1;
-    const effectRequestId = activeRequestIdRef.current;
+  if (visible !== prevVisible || studentId !== prevStudentId) {
+    setPrevVisible(visible);
+    setPrevStudentId(studentId);
 
     // Reset proposals, active plan, editing, and error state
     setProposal(null);
@@ -115,21 +115,32 @@ export function AiWorkoutProposalModal({
     setLimitationsDescription('');
     setPreferencesNote('');
     setDecisionNote('');
+  }
 
-    // Pre-fill preferences ONLY for Student viewing their own profile (Trainer does not use trainer profile)
-    if (!isTrainer) {
-      studentProfileApi.getMyStudentProfile()
-        .then((profile) => {
-          if (activeRequestIdRef.current !== effectRequestId) return;
-          if (profile.availableDaysPerWeek && (profile.availableDaysPerWeek === 3 || profile.availableDaysPerWeek === 4)) {
-            setDaysPerWeek(profile.availableDaysPerWeek);
-          }
-          if (profile.preferredSessionMinutes && profile.preferredSessionMinutes >= 15 && profile.preferredSessionMinutes <= 180) {
-            setSessionMinutes(profile.preferredSessionMinutes);
-          }
-        })
-        .catch(() => {});
-    }
+  // Update currentStudentRef and invalidate in-flight requests safely in effect
+  useEffect(() => {
+    currentStudentRef.current = studentId;
+    activeRequestIdRef.current += 1;
+  }, [visible, studentId]);
+
+  // Pre-fill preferences ONLY for Student viewing their own profile (Trainer does not use trainer profile)
+  useEffect(() => {
+    if (!visible || isTrainer) return;
+
+    activeRequestIdRef.current += 1;
+    const effectRequestId = activeRequestIdRef.current;
+
+    studentProfileApi.getMyStudentProfile()
+      .then((profile) => {
+        if (activeRequestIdRef.current !== effectRequestId) return;
+        if (profile.availableDaysPerWeek && (profile.availableDaysPerWeek === 3 || profile.availableDaysPerWeek === 4)) {
+          setDaysPerWeek(profile.availableDaysPerWeek);
+        }
+        if (profile.preferredSessionMinutes && profile.preferredSessionMinutes >= 15 && profile.preferredSessionMinutes <= 180) {
+          setSessionMinutes(profile.preferredSessionMinutes);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       activeRequestIdRef.current += 1;
