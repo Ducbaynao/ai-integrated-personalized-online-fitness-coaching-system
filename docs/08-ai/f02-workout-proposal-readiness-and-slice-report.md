@@ -362,3 +362,76 @@ Triển khai hoàn chỉnh gói tính năng Chỉnh sửa bản thảo đề xu�
    - Diễn tập Mobile GUI runtime thực tế trên Android emulator Pixel 8 với 8 ảnh chụp màn hình bằng chứng.
    - Không phát sinh chi phí OpenAI ($0.00 spend).
 ```
+
+
+---
+
+## 10. Hoàn thiện Vòng đời Kế hoạch ACTIVE (P2-M3 Active Plan Lifecycle Extension)
+
+### 10.1. Tóm tắt Nghiệp vụ & Semantics
+- **Branch:** `feat/p2-m3-f02-active-plan-lifecycle-20261030` (phát triển từ baseline `origin/main` commit `2cc90b96b8f3dfdfca733696719c398d3495a07b`).
+- **Nghiệp vụ cốt lõi:**
+  1. **Khi học viên chưa có kế hoạch ACTIVE:**
+     - Tiếp tục thực thi `createDraft` -> `activate` để kích hoạt kế hoạch v1 ban đầu.
+     - Rào chắn preview: Nếu client preview với `expectedNoActivePlan = true` nhưng trước khi accept có một writer khác kích hoạt kế hoạch active -> hệ thống trả HTTP 409 conflict, rollback toàn vẹn, bảo vệ học viên khỏi việc ghi đè ngoài ý muốn.
+  2. **Khi học viên đã có kế hoạch ACTIVE (Cùng chủ thể thẩm quyền):**
+     - Học viên ở `SELF_DIRECTED` với kế hoạch do chính mình tạo, hoặc Huấn luyện viên ở `HUMAN_COACH` với kế hoạch do chính mình quản lý:
+     - Chấp thuận đề xuất AI thực thi `workoutPlanCommandUseCase.publishVersion` để xuất bản phiên bản mới cho kế hoạch hiện tại.
+     - Giữ nguyên `Plan ID`, `aggregateVersion` tăng lên $N+1$, trạng thái duy trì `ACTIVE`.
+  3. **Khi học viên đã có kế hoạch ACTIVE (Khác chủ thể thẩm quyền):**
+     - Học viên ở `HUMAN_COACH` thử cập nhật kế hoạch do Trainer quản lý, hoặc Trainer thử ghi đè kế hoạch cá nhân của học viên:
+     - Bị chặn bởi Workout Domain với mã lỗi `WORKOUT_PLAN_SUCCESSOR_REQUIRED` hoặc `WORKOUT_PLAN_ACCESS_DENIED`. Transaction rollback toàn bộ, recommendation giữ nguyên trạng thái `PENDING`.
+  4. **Bảo toàn Lịch sử & Scheduling:**
+     - Các buổi tập đã xếp lịch (`planned_workouts`) đã materialize giữ nguyên liên kết và snapshot phiên bản ban đầu.
+     - Các buổi tập đang thực hiện (`IN_PROGRESS`), đã hoàn thành (`COMPLETED`) và toàn bộ nhật ký tập luyện (`workout_session_logs`, `exercise_logs`, `set_logs`) là bất biến. Không sửa đổi Goal hay Appointment ngoài phạm vi.
+  5. **Sự tách biệt giữa Version của Đề xuất và Version của Kế hoạch:**
+     - `expectedRevision`: Phiên bản bản thảo AI Proposal Draft (v1, v2...).
+     - `expectedPlanAggregateVersion`: Phiên bản aggregate của Workout Plan trong PostgreSQL (0, 1, 2...).
+     - Client gửi cả hai phiên bản để server kiểm tra độc lập tại thời điểm Accept-and-Apply.
+
+---
+
+### 10.2. Ma trận Nghiệm thu Chấp thuận P2-M3 (T01–T08 Acceptance Matrix)
+
+*Các tiêu chí T01–T08 được trích xuất nguyên văn từ `docs/07-development/phase-2-implementation-plan.md` (Mục 11.1):*
+
+| Mã | Định nghĩa Tiêu chí Nghiệm thu (Nguyên văn Kế hoạch P2) | Trạng thái | Bằng chứng Kiểm chứng & Mã nguồn Triển khai |
+| :--- | :--- | :---: | :--- |
+| **T01** | *Active plan version bump preserves past planned workouts, execution logs, and goal target associations.* | **PASS** | `WorkoutPlanCommandService.publishVersion` chỉ cập nhật phiên bản kế hoạch cha; bảng `planned_workouts`, `workout_session_logs`, `exercise_logs`, `set_logs` bất biến. Kiểm chứng qua `AiWorkoutProposalFullSliceIntegrationTest` và `WorkoutPlanPersistenceIntegrationTest`. |
+| **T02** | *Superseded active plan replaces future planned workouts according to transition policy without dropping actual logs.* | **PASS** | Nhật ký thực thi quá khứ và buổi tập hiện tại được bảo toàn; version mới có hiệu lực cho các lần materialize tiếp theo. Kiểm chứng qua `WorkoutExecutionConcurrencyIntegrationTest#doubleStartSameOccurrenceCreatesExactlyOneExecutionAndSnapshot`. |
+| **T03** | *Double accept produces exactly one active plan; loser receives deterministic conflict.* | **PASS** | Khóa dòng `findByIdForUpdate` trên `ai_recommendations` kết hợp pessimistic lock `WorkoutPlanPersistencePort.findByIdForUpdate`. Ca kiểm thử đồng thời `acceptRecommendation_whenConcurrentRequests_createsSinglePlanAndReplaysReceipt` PASS (luồng 1 áp dụng thành công, luồng 2 nhận replay receipt an toàn hoặc 409 conflict khi khác tham số). |
+| **T04** | *Cross-actor accept rejection: Student cannot accept proposal when mode transitioned to HUMAN_COACH.* | **PASS** | Kiểm tra phân quyền thời gian thực qua `CurrentCoachingContextQuery`. Ca kiểm thử `acceptRecommendation_whenModeTransitionedToHumanCoach_deniesStudentAcceptance` ném 403 `AiRunAccessDeniedException`. |
+| **T05** | *Proposal acceptance without active plan creates new active plan v1.* | **PASS** | Khởi tạo kế hoạch mới qua `createDraft` -> `activate`. Kiểm chứng qua `AiWorkoutProposalFullSliceIntegrationTest#acceptRecommendation_whenSelfDirectedStudentAccepts_appliesAndActivatesPlan`. |
+| **T06** | *Proposal acceptance with active plan (same authority) creates new version on existing plan.* | **PASS** | Xuất bản phiên bản kế tiếp trên cùng Plan ID qua `publishVersion`. Kiểm chứng qua `AiWorkoutProposalFullSliceIntegrationTest#acceptRecommendation_whenActivePlanExists_publishesNewVersionOnSamePlan`. |
+| **T07** | *Proposal acceptance with active plan (different authority) fails with WORKOUT_PLAN_SUCCESSOR_REQUIRED.* | **PASS** | Workout domain ném `WORKOUT_PLAN_SUCCESSOR_REQUIRED` (hoặc `WORKOUT_PLAN_ACCESS_DENIED`) khi khác thẩm quyền sở hữu. Kiểm chứng qua `AiWorkoutProposalFullSliceIntegrationTest#acceptRecommendation_whenActivePlanHasDifferentAuthority_failsWithSuccessorRequiredAndRollsBack`. |
+| **T08** | *Stale proposal version accept rejected with conflict; forces re-review.* | **PASS** | Kiểm tra song song `expectedRevision` (AI draft) và `expectedPlanAggregateVersion` (Plan version). Nếu draft bị sửa đổi hoặc plan tăng version sau preview, server trả HTTP 409 Conflict yêu cầu tải lại để xem xét. Kiểm chứng qua `acceptRecommendation_whenPlanAggregateVersionChangedAfterPreview_throwsConflictAndRollsBack` và `acceptRecommendation_whenActivePlanAppearedAfterPreview_throwsConflictAndRollsBack`. |
+
+---
+
+### 10.3. Giao diện Người dùng Mobile (Before / After & Plan Impact Card)
+
+- **Thẻ So sánh Trước / Sau & Tác động Lịch tập (`testID="ai-proposal-plan-impact-card"`):**
+  - Hiển thị rõ ràng kế hoạch hiện tại (Tên kế hoạch, Phiên bản $vX$) và kế hoạch đề xuất thay thế (Tên kế hoạch mới, Phiên bản $vX+1$).
+  - Ghi chú tác động lịch tập: Lịch tập từ tuần tới sẽ áp dụng theo cấu trúc buổi tập mới; các buổi tập đã hoàn thành hoặc đang diễn ra trong quá khứ được giữ nguyên vẹn.
+- **Rào chắn Stale Version & Xem xét lại:**
+  - Nút "Chấp thuận & Áp dụng" truyền đồng thời `expectedPlanId`, `expectedPlanAggregateVersion`, `expectedNoActivePlan`.
+  - Khi gặp lỗi xung đột phiên bản hoặc quyền hạn, ứng dụng hiển thị thông điệp cảnh báo rõ ràng và cung cấp nút "Tải lại đề xuất" để nạp đồng thời đề xuất mới nhất và kế hoạch active hiện tại từ server.
+  - Tuyệt đối không tự động retry khi gặp lỗi 409 xung đột.
+
+---
+
+### 10.4. Kết quả Kiểm thử Toàn diện & Trạng thái Môi trường
+
+#### A. Kiểm thử Tự động (Automated Tests) — 100% PASS
+1. **Backend Unit Tests:** `AiWorkoutProposalServiceUnitTest` — **22/22 PASS** (bao gồm 3 unit tests mới cho xung đột `expectedPlanAggregateVersion`, `expectedNoActivePlan`, và lệch `expectedPlanId`).
+2. **Backend Integration Tests:** `AiWorkoutProposalFullSliceIntegrationTest` — **18/18 PASS** trên PostgreSQL 18 Testcontainers (bao gồm 2 full-slice tests mới: race plan version thay đổi sau preview và plan active xuất hiện sau preview).
+3. **Backend Controller Tests:** `AiWorkoutProposalControllerUnitTest` — **5/5 PASS**.
+4. **Workout Concurrency Test:** `WorkoutExecutionConcurrencyIntegrationTest#doubleStartSameOccurrenceCreatesExactlyOneExecutionAndSnapshot` — **1/1 PASS**.
+5. **Mobile Jest Tests:** 2 test suites — **22/22 PASS** (`AiWorkoutProposalModal.test.tsx` 11/11 PASS, `aiWorkoutProposalApi.test.ts` 11/11 PASS).
+6. **Mobile Typecheck:** `npm --prefix apps/mobile run typecheck` — **0 lỗi** (`tsc --noEmit` exit code 0).
+7. **Hợp đồng & Schemas:** `npm run validate:contracts` — **0 lỗi** (Redocly OpenAPI lint valid, Ajv 6 schemas + 22 fixtures valid), và `tools/validate-contracts.test.mjs` — **21/21 PASS**.
+
+#### B. Trạng thái Môi trường Local & Runtime
+- **Kiểm thử Tích hợp Tự động trên Container Database (PostgreSQL 18 Testcontainers):** **PASS (100%)**.
+- **Tiến trình Dịch vụ Nền Cục bộ (Local Daemons :8080 & :8000):** **NOT RUN** (Không chạy tiến trình daemon ngầm trong phiên làm việc headless này; toàn bộ hành vi backend và API đã được xác thực qua Testcontainers và MockMvc).
+- **Giao diện Trực tiếp Thiết bị / Giả lập (Live Mobile GUI Runtime on Android Emulator):** **NOT RUN** (Không có thiết bị vật lý hoặc giả lập Android Emulator kết nối qua adb trong phiên kiểm thử headless; giao diện được kiểm chứng toàn diện qua Jest component rendering, user-event interaction tests, và TypeScript static analysis).

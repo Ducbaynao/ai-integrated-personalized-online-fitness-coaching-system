@@ -16,6 +16,15 @@ export function getWorkoutProposalErrorMessage(error: unknown): string {
     if (code === 'ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS') {
       return 'Học viên đã có một kế hoạch tập luyện đang áp dụng. Hệ thống không cho phép áp dụng đồng thời nhiều kế hoạch tập luyện.';
     }
+    if (code === 'WORKOUT_PLAN_SUCCESSOR_REQUIRED') {
+      return 'Kế hoạch hiện tại do huấn luyện viên quản lý. Bạn cần tạo bản kế thừa của riêng mình trước khi cập nhật.';
+    }
+    if (code === 'WORKOUT_PLAN_VERSION_CONFLICT') {
+      return 'Phiên bản kế hoạch đã bị thay đổi trên hệ thống. Vui lòng tải lại và thử lại.';
+    }
+    if (code === 'WORKOUT_PLAN_ACCESS_DENIED') {
+      return 'Bạn không có quyền chỉnh sửa kế hoạch tập luyện này trong chế độ hiện tại.';
+    }
     if (code === 'AI_RUN_LIFECYCLE_CONFLICT') {
       if (error.message.includes('expired')) {
         return 'Đề xuất giáo án đã hết hạn (quá 7 ngày). Vui lòng tạo đề xuất mới.';
@@ -74,10 +83,25 @@ export const aiWorkoutProposalApi = {
     });
   },
 
-  accept(recommendationId: string, decisionNote?: string, commandKey = createCommandKey(), expectedRevision?: number) {
+  accept(
+    recommendationId: string,
+    decisionNote?: string,
+    commandKey = createCommandKey(),
+    expectedRevision?: number,
+    expectedPlanId?: string,
+    expectedPlanAggregateVersion?: number,
+    expectedNoActivePlan?: boolean
+  ) {
+    const body: Record<string, unknown> = { commandKey };
+    if (decisionNote !== undefined) body.decisionNote = decisionNote;
+    if (expectedRevision !== undefined) body.expectedRevision = expectedRevision;
+    if (expectedPlanId !== undefined) body.expectedPlanId = expectedPlanId;
+    if (expectedPlanAggregateVersion !== undefined) body.expectedPlanAggregateVersion = expectedPlanAggregateVersion;
+    if (expectedNoActivePlan !== undefined) body.expectedNoActivePlan = expectedNoActivePlan;
+
     return request<AcceptRecommendationResponse>(`/ai/recommendations/${recommendationId}/accept`, {
       method: 'POST',
-      body: { commandKey, decisionNote, expectedRevision },
+      body,
     });
   },
 

@@ -354,13 +354,13 @@ class AiWorkoutProposalFullSliceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Active workout plan already exists: accept fails with ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS and rolls back transaction")
-    void existingActivePlan_causesConflictAndRollback() {
+    @DisplayName("Active workout plan exists (same owner): accept publishes new version on existing plan")
+    void existingActivePlan_whenOwnerAccepts_publishesNewVersionSuccessfully() {
         UUID studentId = person("STUDENT");
         UUID periodId = createSelfDirectedCoachingPeriod(studentId);
         UUID variationId = createExerciseAndVariation(studentId);
 
-        // Pre-create an ACTIVE workout plan for student
+        // Pre-create an ACTIVE workout plan for student (version 1)
         var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
                 studentId, studentId, "Existing Active Plan", "Already running",
                 List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
@@ -369,29 +369,222 @@ class AiWorkoutProposalFullSliceIntegrationTest {
         ));
         workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "existing-activate-key"));
 
+        // Verify plan is active at version 1
+        var planV1 = workoutPlanQuery.current(studentId, studentId);
+        assertThat(planV1.plan().status()).isEqualTo(WorkoutPlanStatus.ACTIVE);
+        assertThat(planV1.plan().aggregateVersion()).isEqualTo(1);
+        UUID originalPlanId = draft.planId();
+
         // Now student generates a proposal
         WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
-                studentId, studentId, "gen-conflict-test", Map.of()
+                studentId, studentId, "gen-publish-version-test", Map.of()
         ));
 
-        // Attempting to accept proposal should fail with WorkoutPlanFailure (ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS)
+        // Accept proposal -> Should publish new version on the existing active plan
+        AcceptRecommendationResult acceptResult = proposalService.acceptRecommendation(new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-publish-ver-key", "Applying updated AI version"
+        ));
+
+        assertThat(acceptResult.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(acceptResult.resultingEntityType()).isEqualTo("WORKOUT_PLAN");
+        assertThat(acceptResult.resultingEntityId()).isEqualTo(originalPlanId);
+
+        // Verify existing plan is still active and aggregate version incremented
+        var planV2 = workoutPlanQuery.current(studentId, studentId);
+        assertThat(planV2.plan().id()).isEqualTo(originalPlanId);
+        assertThat(planV2.plan().status()).isEqualTo(WorkoutPlanStatus.ACTIVE);
+        assertThat(planV2.plan().aggregateVersion()).isEqualTo(2);
+
+        // Verify application record contains PUBLISHED_NEW_VERSION and planVersionId
+        var appOpt = recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId());
+        assertThat(appOpt).isPresent();
+        assertThat(appOpt.get().applicationPayload()).contains("PUBLISHED_NEW_VERSION");
+        assertThat(appOpt.get().resultingEntityId()).isEqualTo(originalPlanId);
+        assertThat(appOpt.get().applicationPayload()).contains("planVersionId");
+    }
+
+    @Test
+    @DisplayName("Active workout plan exists (trainer owner): student in SELF_DIRECTED cannot publish version directly, requires successor")
+    void existingActivePlan_whenStudentAttemptsToModifyTrainerPlan_throwsSuccessorRequiredConflict() {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID variationId = createExerciseAndVariation(setup.trainerId());
+
+        // Trainer creates and activates plan for student
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                setup.studentId(), setup.trainerId(), "Trainer Plan", "Created by trainer",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "trainer-draft-key"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), setup.trainerId(), 0L, "trainer-activate-key"));
+
+        // Close previous HUMAN_COACH coaching period at statement_timestamp()
+        jdbc.update("UPDATE fitness.coaching_periods SET ended_at = statement_timestamp() WHERE student_id = ?", setup.studentId());
+        // Transition to SELF_DIRECTED coaching period starting at statement_timestamp()
+        UUID newPeriodId = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.coaching_periods(id,student_id,mode,started_at,created_by) VALUES (?,?,'SELF_DIRECTED',statement_timestamp(),?)",
+                newPeriodId, setup.studentId(), setup.studentId());
+
+        // Student generates proposal in SELF_DIRECTED
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                setup.studentId(), setup.studentId(), "student-gen-sd-1", Map.of()
+        ));
+
+        // Attempt to accept proposal -> student cannot publish version to trainer's plan directly
         assertThatThrownBy(() -> proposalService.acceptRecommendation(new AcceptRecommendationCommand(
-                studentId, proposal.recommendationId(), "attempt-apply-key", "Should fail"
+                setup.studentId(), proposal.recommendationId(), "student-accept-trainer-plan", "Note"
         ))).isInstanceOf(WorkoutPlanFailure.class)
                 .extracting(ex -> ((WorkoutPlanFailure) ex).error())
-                .isEqualTo(WorkoutPlanError.ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS);
+                .isEqualTo(WorkoutPlanError.WORKOUT_PLAN_SUCCESSOR_REQUIRED);
 
-        // Verify transaction rolled back cleanly:
-        // Recommendation is still PENDING
+        // Verify transaction rolled back cleanly
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
-
-        // No application record saved
         assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+    }
 
-        // The existing plan is still the only active plan
-        var current = workoutPlanQuery.current(studentId, studentId);
-        assertThat(current.plan().id()).isEqualTo(draft.planId());
+    @Test
+    @DisplayName("Active workout plan: publishing new version preserves existing planned workouts and executions history")
+    void existingActivePlan_publishesNewVersion_preservesExistingMaterializedPlannedWorkoutsAndExecutions() {
+        UUID studentId = person("STUDENT");
+        UUID periodId = createSelfDirectedCoachingPeriod(studentId);
+        UUID variationId = createExerciseAndVariation(studentId);
+
+        // Pre-create an ACTIVE workout plan for student
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                studentId, studentId, "V1 Plan", "Version 1",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "v1-draft-key"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "v1-activate-key"));
+
+        var planV1 = workoutPlanQuery.current(studentId, studentId);
+        UUID v1VersionId = planV1.currentVersion().id();
+
+        UUID sessionId = jdbc.queryForObject(
+                "SELECT id FROM fitness.workout_plan_sessions WHERE workout_plan_version_id = ? LIMIT 1",
+                UUID.class, v1VersionId
+        );
+
+        // Simulate an existing materialized planned workout occurrence and execution record in DB
+        UUID plannedWorkoutId = UUID.randomUUID();
+        jdbc.update("""
+            INSERT INTO fitness.planned_workouts
+            (id, student_id, coaching_period_id, workout_plan_session_id, planned_start_at, original_planned_start_at, status, created_by)
+            VALUES (?, ?, ?, ?, clock_timestamp() - interval '1 day', clock_timestamp() - interval '1 day', 'COMPLETED'::fitness.planned_workout_status, ?)
+        """, plannedWorkoutId, studentId, periodId, sessionId, studentId);
+
+        UUID executionLogId = UUID.randomUUID();
+        jdbc.update("""
+            INSERT INTO fitness.workout_session_logs
+            (id, student_id, coaching_period_id, workout_plan_version_id, planned_workout_id,
+             performed_start_at, performed_end_at, status, logged_by)
+            VALUES (?, ?, ?, ?, ?, clock_timestamp() - interval '1 day', clock_timestamp() - interval '23 hours', 'COMPLETED'::fitness.actual_workout_status, ?)
+        """, executionLogId, studentId, periodId, v1VersionId, plannedWorkoutId, studentId);
+
+        // Student generates proposal and accepts
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                studentId, studentId, "gen-v2-preserve-test", Map.of()
+        ));
+        AcceptRecommendationResult acceptResult = proposalService.acceptRecommendation(new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-v2-preserve-key", "Upgrading to V2"
+        ));
+        assertThat(acceptResult.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // Verify planned workout and execution log are completely intact and unchanged
+        Integer plannedCount = jdbc.queryForObject(
+                "SELECT count(*) FROM fitness.planned_workouts WHERE id = ? AND workout_plan_session_id = ? AND status = 'COMPLETED'::fitness.planned_workout_status",
+                Integer.class, plannedWorkoutId, sessionId
+        );
+        assertThat(plannedCount).isEqualTo(1);
+
+        Integer executionCount = jdbc.queryForObject(
+                "SELECT count(*) FROM fitness.workout_session_logs WHERE id = ? AND workout_plan_version_id = ? AND status = 'COMPLETED'::fitness.actual_workout_status",
+                Integer.class, executionLogId, v1VersionId
+        );
+        assertThat(executionCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Active workout plan: plan aggregate version changed after preview throws conflict and rolls back")
+    void existingActivePlan_whenPlanVersionChangedAfterPreview_causesConflictAndRollback() {
+        UUID studentId = person("STUDENT");
+        UUID periodId = createSelfDirectedCoachingPeriod(studentId);
+        UUID variationId = createExerciseAndVariation(studentId);
+
+        // Pre-create an ACTIVE workout plan for student (v1)
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                studentId, studentId, "V1 Plan", "Version 1",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "v1-draft-key-race"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "v1-activate-key-race"));
+
+        // Student generates proposal while plan is at aggregateVersion = 1
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                studentId, studentId, "gen-plan-race-test", Map.of()
+        ));
+
+        // Another action publishes a new version in the background, incrementing aggregateVersion to 2
+        workoutPlanCommands.publishVersion(new WorkoutPlanCommandUseCase.PublishVersionCommand(
+                draft.planId(), studentId, 1L, "background-publish-key", "REGULAR_UPDATE", "Updated in bg",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1 Updated", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null))))
+        ));
+
+        // Now student sends accept expecting aggregateVersion = 1 (what was seen at preview)
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-stale-plan-ver-key", "Note", 1,
+                draft.planId(), 1L, null
+        );
+
+        assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Workout plan version conflict: expected plan aggregate version 1 but current is 2");
+
+        // Transaction rolled back: recommendation remains PENDING
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("No active plan at preview: active plan appeared before accept throws conflict and rolls back")
+    void noActivePlan_whenActivePlanAppearedAfterPreview_causesConflictAndRollback() {
+        UUID studentId = person("STUDENT");
+        UUID periodId = createSelfDirectedCoachingPeriod(studentId);
+        UUID variationId = createExerciseAndVariation(studentId);
+
+        // Student generates proposal when NO active plan exists
+        WorkoutProposalResult proposal = proposalService.generateProposal(new GenerateProposalCommand(
+                studentId, studentId, "gen-appeared-plan-test", Map.of()
+        ));
+
+        // Before accepting, another writer activates a workout plan for the student
+        var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(
+                studentId, studentId, "Competitor Plan", "Created concurrently",
+                List.of(new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Session 1", "Strength", 45, null,
+                        List.of(new ExercisePrescription(UUID.randomUUID(), variationId, 1, 3, 8, 12, null, 60, null, null)))),
+                "competitor-draft-key"
+        ));
+        workoutPlanCommands.activate(new ActivateCommand(draft.planId(), studentId, 0L, "competitor-activate-key"));
+
+        // Student sends accept with expectedNoActivePlan = true (as previewed)
+        AcceptRecommendationCommand acceptCmd = new AcceptRecommendationCommand(
+                studentId, proposal.recommendationId(), "accept-appeared-plan-key", "Note", 1,
+                null, null, true
+        );
+
+        assertThatThrownBy(() -> proposalService.acceptRecommendation(acceptCmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Active workout plan appeared after proposal was previewed");
+
+        // Recommendation remains PENDING
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(recommendationRepository.findApplicationByRecommendationId(proposal.recommendationId())).isEmpty();
     }
 
     @Test

@@ -68,6 +68,24 @@ public class WorkoutPlanQueryService implements WorkoutPlanQueryUseCase {
         return detail(withContext(raw, readContext), readContext);
     }
 
+    @Override public Optional<PlanDetail> findActive(UUID actorId, UUID requestedStudentId) {
+        if (actorId == null) throw validation();
+        UUID studentId = requestedStudentId == null ? actorId : requestedStudentId;
+        boolean student = actorId.equals(studentId);
+        CurrentCoachingContextQuery.CurrentCoachingContext current = null;
+        if (!student) {
+            if (!currentAllowed(actorId, studentId)) return Optional.empty();
+            current = contexts.findEffectiveContext(studentId, false).orElse(null);
+        }
+        Optional<PlanSummary> rawOpt = store.findActiveByStudent(studentId);
+        if (rawOpt.isEmpty()) return Optional.empty();
+        PlanSummary raw = rawOpt.get();
+        ReadContext readContext = context(raw, actorId, student, current);
+        if (!student && readContext == ReadContext.HISTORICAL
+                && !historicalAllowed(actorId, studentId, occurredAt(raw))) return Optional.empty();
+        return Optional.of(detail(withContext(raw, readContext), readContext));
+    }
+
     @Override public PlanDetail detail(UUID actorId, UUID planId) {
         if (actorId == null || planId == null) throw validation();
         PlanSummary raw = store.findPlan(planId).orElseThrow(WorkoutPlanQueryService::concealed);

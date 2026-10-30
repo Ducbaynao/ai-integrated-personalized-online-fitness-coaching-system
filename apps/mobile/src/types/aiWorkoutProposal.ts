@@ -106,6 +106,9 @@ export interface AcceptRecommendationRequest {
   commandKey: string;
   decisionNote?: string;
   expectedRevision?: number;
+  expectedPlanId?: string;
+  expectedPlanAggregateVersion?: number;
+  expectedNoActivePlan?: boolean;
 }
 
 export interface AcceptRecommendationResponse {

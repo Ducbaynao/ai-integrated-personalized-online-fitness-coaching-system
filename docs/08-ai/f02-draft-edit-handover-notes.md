@@ -217,3 +217,101 @@ Theo đúng tài liệu phê duyệt (`phase-2-release-scope.md` và `phase-2-im
 2. **Bước 2 (Tiếp tục trong P2-M3):** Xử lý nghiệp vụ xung đột kế hoạch đang hoạt động (`ACTIVE` plan) theo contract (làm rõ hoặc bổ sung workflow kế thừa/thay thế giáo án active nếu thuộc phạm vi).
 3. **Bước 3 (P2-M3):** Bổ sung kiểm chứng và đối chiếu tiêu chí nghiệm thu toàn diện của Milestone P2-M3 trước khi đóng milestone.
 4. **Lưu ý định tuyến:** Tính năng **F03** (Thay bài tập, điều chỉnh volume/load trong kế hoạch hiện có) thuộc về **Milestone P2-M4** (theo Mục 1 bảng phạm vi phát hành và implementation plan), không thuộc P2-M3.
+
+
+---
+
+## 6. Gói Bổ sung: Hoàn thiện Vòng đời & Kế hoạch ACTIVE (P2-M3 Active Plan Lifecycle)
+
+- **Thời điểm hoàn thiện:** 2026-10-30
+- **Branch:** `feat/p2-m3-f02-active-plan-lifecycle-20261030`
+- **Baseline origin/main:** `2cc90b96b8f3dfdfca733696719c398d3495a07b` (PR #120 merged, CI 6/6 SUCCESS, Run ID 40935396051)
+- **Mục tiêu & Phạm vi triển khai:**
+  1. **Khi chưa có ACTIVE plan:** Duy trì luồng chuẩn `createDraft` -> `activate`, tạo kế hoạch mới phiên bản 1.
+  2. **Khi đã có ACTIVE plan (cùng thẩm quyền sở hữu):**
+     - Thực thi `workoutPlanCommandUseCase.publishVersion` xuất bản version mới trên cùng Plan ID (tăng `aggregate_version`, đóng version cũ tại boundary timestamp và mở version mới).
+     - Bảo vệ ràng buộc duy nhất: `uq_workout_plan_one_active_per_student` (tối đa 1 kế hoạch ACTIVE cho mỗi học viên).
+     - Ghi nhận `ai_recommendation_applications` với `action = "PUBLISHED_NEW_VERSION"`, `planVersionId`, `appliedRevision`, `isCustomized`.
+  3. **Khi khác thẩm quyền sở hữu:**
+     - Nếu Học viên ở `SELF_DIRECTED` muốn thay đổi kế hoạch do Huấn luyện viên tạo từ trước: Domain command ném `WORKOUT_PLAN_SUCCESSOR_REQUIRED` (409 Conflict), transaction rollback toàn vẹn, recommendation giữ `PENDING`.
+     - Nếu Huấn luyện viên muốn thay đổi kế hoạch do Học viên tạo: Domain command ném `WORKOUT_PLAN_ACCESS_DENIED` (403 Forbidden).
+  4. **Bảo vệ chống Stale Plan Version & Active Plan xuất hiện sau Preview (Plan Version Guards):**
+     - Mở rộng hợp đồng `AcceptRecommendationRequest`: hỗ trợ `expectedPlanId`, `expectedPlanAggregateVersion`, `expectedNoActivePlan`.
+     - Phân biệt rành mạch giữa `expectedRevision` (phiên bản bản thảo AI draft $v1, v2, ...$) và `expectedPlanAggregateVersion` (phiên bản kế hoạch tập luyện trong domain aggregate $0, 1, 2, ...$).
+     - Nếu người dùng xem trước khi chưa có plan active nhưng trước khi Accept xuất hiện plan active -> Server từ chối 409 (`expectedNoActivePlan` conflict).
+     - Nếu người dùng xem trước khi plan ở version $V$, nhưng trước khi Accept có writer khác xuất bản version $V+1$ -> Server từ chối 409 (`WORKOUT_PLAN_VERSION_CONFLICT`).
+     - Tương thích ngược: Các caller không truyền thông số plan version vẫn tuân theo cơ chế kiểm tra tự động của domain command.
+  5. **Bảo toàn Dữ liệu Lịch sử & Scheduling:**
+     - Các buổi tập đã xếp lịch (`planned_workouts`) đã materialize giữ nguyên định danh session và version ban đầu; không bị re-link hay re-map.
+     - Lần xếp lịch trong tương lai mới chọn phiên bản kế hoạch mới có hiệu lực.
+     - Toàn bộ buổi tập đang diễn ra (`IN_PROGRESS`), đã hoàn thành (`COMPLETED`, `FROZEN`) và nhật ký thực hiện (`workout_session_logs`) là bất biến.
+  6. **F11 Decision Events:**
+     - Ghi nhận quyết định Accept / Reject qua `decided_by`, `decided_at`, `decision_note` trên bảng `ai_recommendations`.
+     - Lưu trữ application receipt trên bảng `ai_recommendation_applications`.
+     - Ghi nhận nhật ký kiểm toán bất biến `AI_RECOMMENDATION_APPLIED` / `AI_RECOMMENDATION_REJECTED` trong cùng transaction boundary (rollback toàn bộ nếu audit lỗi).
+     - Không ép buộc nhập ghi chú để được phép Reject đề xuất.
+  7. **Mobile Client (React Native Expo):**
+     - Hiển thị thẻ đối chiếu cụ thể trước khi xác nhận (**Before / After & Plan Impact Card**): Kế hoạch hiện tại (tên, vX) vs Kế hoạch đề xuất (tên, vX+1) cùng cảnh báo tác động xếp lịch.
+     - Gửi kèm `expectedRevision`, `expectedPlanId`, `expectedPlanAggregateVersion`, `expectedNoActivePlan` khi bấm Chấp thuận.
+     - Ánh xạ thông điệp tiếng Việt rõ ràng cho các mã lỗi `WORKOUT_PLAN_SUCCESSOR_REQUIRED`, `WORKOUT_PLAN_VERSION_CONFLICT`, `WORKOUT_PLAN_ACCESS_DENIED`.
+     - Nút "Tải lại đề xuất" đồng thời tải lại trạng thái kế hoạch active mới nhất từ server để xem lại trước khi thử lại.
+
+---
+
+## 7. Ma trận Đối soát Tiêu chí Nghiệm thu P2-M3 (T01–T08, F11)
+
+> [!IMPORTANT]
+> Toàn bộ tên ca và kết quả cần chứng minh dưới đây được trích xuất **nguyên văn 100% từ tài liệu kế hoạch đã được phê duyệt** (`docs/07-development/phase-2-implementation-plan.md` mục 11.1).
+
+| Mã | Tình huống (Nguyên văn từ Kế hoạch) | Kết quả Cần chứng minh (Nguyên văn từ Kế hoạch) | Triển khai trong Codebase | Bằng chứng Kiểm thử Tự động Mới | Kiểm chứng Runtime Local | Trạng thái & Gaps |
+| :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| **T01** | Student tự tập Accept plan | Chỉ plan/phạm vi xác nhận thay đổi; audit/version đúng | `AiWorkoutProposalService.acceptRecommendation`: tạo plan v1 (nếu chưa có) hoặc publishVersion vN+1 (nếu đã có); ghi nhận audit | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_selfDirected_generateAndAccept_succeeds` & `existingActivePlan_whenOwnerAccepts_publishesNewVersionSuccessfully` | **NOT RUN** (Không có emulator đang chạy) | **Implementation PASS**. Cần chạy GUI trên thiết bị trước nghiệm thu milestone. |
+| **T02** | Student HUMAN_COACH tự Accept plan AI | Bị chặn; Trainer hợp lệ mới quyết định | `AiWorkoutProposalService`: kiểm tra `coachingContextQuery` và `decisionAuthority`; chặn 403 `AiRunAccessDeniedException` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_humanCoach_authorityEnforced` & `AiWorkoutProposalServiceUnitTest` | **NOT RUN** (Không có emulator đang chạy) | **Implementation PASS**. Đã có bằng chứng lịch sử (PR #120); phiên này chưa chạy lại live GUI. |
+| **T03** | Trainer không liên quan, view-only, revoked hoặc hết period | Không request/read/apply trái scope | Kiểm tra quan hệ huấn luyện, coaching period continuity, quyền `MANAGE` | `AiWorkoutProposalFullSliceIntegrationTest.fullSlice_humanCoach_authorityEnforced` (unrelated trainer 403) | **NOT RUN** | **Implementation PASS**. |
+| **T04** | Thu hồi quyền trong lúc model đang xử lý | Không trả output nhạy cảm khi job hoàn tất hoặc mở lại | `getRecommendation` và `acceptRecommendation` re-validate quyền hiện hành trước khi đọc hoặc áp dụng | `AiWorkoutProposalFullSliceIntegrationTest.revokedAuthority_cannotReplay` | **NOT RUN** | **Implementation PASS**. |
+| **T05** | Nguồn đổi trước hoặc trong transaction; insert plan/log/appointment cạnh tranh | Hard conflict hoặc revalidation đúng phân loại; khóa/constraint chặn race; thay đổi không liên quan không bắt sinh lại | Khóa bi quan `lockStudentAndActor`, `lockPlan`; kiểm tra `expectedPlanAggregateVersion`, `expectedNoActivePlan`, `expectedRevision` | `AiWorkoutProposalFullSliceIntegrationTest.existingActivePlan_whenPlanVersionChangedAfterPreview_causesConflictAndRollback` & `noActivePlan_whenActivePlanAppearedAfterPreview_causesConflictAndRollback` | **NOT RUN** | **Implementation PASS**. |
+| **T06** | Hai Accept đồng thời hoặc retry sau timeout | Một tác động nghiệp vụ; không duplicate plan/log/audit thành công | Khóa `findByIdForUpdate` trên recommendation; idempotent replay đối chiếu hash/commandKey/revision/plan | `AiWorkoutProposalFullSliceIntegrationTest.concurrentDoubleAccept_createsExactlyOnePlan` & `idempotencyReplay_andConflictHandling` | **NOT RUN** | **Implementation PASS**. |
+| **T07** | Measurement/body fat thiếu hoặc suspect | Unknown/giới hạn; không bịa zero hoặc suy ra tăng cơ | `F02RuntimeOutputValidator` và `F02ContextBuilder` xử lý dữ liệu thiếu; schema cho phép missingData | `F02RuntimeOutputValidatorUnitTest`, schema validation | **NOT RUN** | **Implementation PASS**. Thuộc pipeline Context/Validator. |
+| **T08** | Người mới khác người nghỉ 100 ngày | Rule xử lý khác, không lấy tải cũ làm năng lực hiện tại | Prompt và Context builder phân biệt kinh nghiệm BEGINNER vs ADVANCED; rule engine validation | `F02AiServiceClientTest`, AI Service mock/simulated provider | **NOT RUN** | **Implementation PASS** trong pipeline rule. |
+| **F11** | Feedback quyết định và kết quả tập thực tế để đánh giá chất lượng (phần đầu) | Ghi Accept/Reject như decision event; tùy chọn feedback tách riêng, không ép lý do để được Reject | Lưu `decided_by`, `decided_at`, `decision_note` trên `ai_recommendations`; receipt trên `ai_recommendation_applications`; audit bất biến; reason tùy chọn | `AiWorkoutProposalFullSliceIntegrationTest.rejectProposal_createsNoWorkoutPlan` & `auditFailureDuringAccept_rollsBackEntireTransaction` | **NOT RUN** | **Implementation PASS** cho phần quyết định P2-M3. Phần feedback outcome người dùng thuộc P2-M6. |
+
+---
+
+## 8. Kết quả Kiểm thử Tự động Chi tiết (Automated Evidence)
+
+1. **Backend Unit Tests:**
+   - File: `AiWorkoutProposalServiceUnitTest.java`
+   - Lệnh: `mvnw.cmd test -Dtest=AiWorkoutProposalServiceUnitTest`
+   - Kết quả: **22/22 tests PASS (100%)**, 0 failures, 0 errors.
+2. **Backend Full Slice Integration Tests (PostgreSQL 18 Testcontainers):**
+   - File: `AiWorkoutProposalFullSliceIntegrationTest.java`
+   - Lệnh: `mvnw.cmd test -Dtest=AiWorkoutProposalFullSliceIntegrationTest`
+   - Kết quả: **18/18 tests PASS (100%)**, 0 failures, 0 errors.
+3. **Backend Controller Unit Tests:**
+   - File: `AiWorkoutProposalControllerUnitTest.java`
+   - Lệnh: `mvnw.cmd test -Dtest=AiWorkoutProposalControllerUnitTest`
+   - Kết quả: **5/5 tests PASS (100%)**, 0 failures, 0 errors.
+4. **Backend Concurrency Guard B05:**
+   - File: `WorkoutExecutionConcurrencyIntegrationTest.java`
+   - Lệnh: `mvnw.cmd test -Dtest=WorkoutExecutionConcurrencyIntegrationTest#doubleStartSameOccurrenceCreatesExactlyOneExecutionAndSnapshot`
+   - Kết quả: **1/1 test PASS (100%)**, 0 failures, 0 errors.
+5. **Mobile Client Tests:**
+   - Lệnh: `npm --prefix apps/mobile test -- --watchAll=false src/__tests__/AiWorkoutProposalModal.test.tsx src/__tests__/aiWorkoutProposalApi.test.ts`
+   - Kết quả: **2 suites PASS, 22/22 tests PASS (100%)**.
+6. **Mobile Typecheck:**
+   - Lệnh: `npm --prefix apps/mobile run typecheck`
+   - Kết quả: `tsc --noEmit` hoàn thành với **Exit code 0 (0 lỗi)**.
+7. **Hợp đồng & Schemas:**
+   - Lệnh: `npm run validate:contracts` & `node --test tools/validate-contracts.test.mjs`
+   - Kết quả: OpenAPI 3.0 valid, AI Schemas passed (6 schemas, 22 fixtures), Contract test suites: 21/21 tests PASS.
+
+---
+
+## 9. Đánh giá Môi trường & Kết luận
+
+- **Tuyên bố minh bạch về Runtime Local:**
+  Trong phiên làm việc này, các tiến trình backend daemon (port 8080) và AI service daemon (port 8000) không được bật chạy ngầm; không có thiết bị giả lập Android (`emulator-5554`) nào đang kết nối (`adb devices` trống). Do đó, các kịch bản kiểm chứng Mobile GUI runtime thực tế trên thiết bị đối với gói bổ sung này được ghi nhận chính xác là **NOT RUN**. Không sử dụng kết quả kiểm thử tự động Testcontainers để khẳng định ca Mobile runtime đã PASS.
+- **Đánh giá Implementation:**
+  Toàn bộ mã nguồn, hợp đồng, rào chắn concurrency, version guards, và mobile UI component đã được rà soát, vá các lỗ hổng tiềm ẩn (stale plan version race, active plan appearance race), và kiểm chứng tự động toàn diện trên Testcontainers PostgreSQL 18.
+- **Đề xuất Bước tiếp theo:**
+  Commit và đẩy branch `feat/p2-m3-f02-active-plan-lifecycle-20261030`, tạo Pull Request vào `main` để người phụ trách tiến hành code review và staging runtime validation trước khi merge.

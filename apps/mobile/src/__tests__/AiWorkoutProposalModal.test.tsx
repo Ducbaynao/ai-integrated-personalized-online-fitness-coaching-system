@@ -5,6 +5,14 @@ import { aiWorkoutProposalApi } from '@/services/aiWorkoutProposalApi';
 import { WorkoutProposalResponse } from '@/types/aiWorkoutProposal';
 import { ApiError, ErrorResponse } from '@/types/auth';
 
+import { workoutPlanApi } from '@/services/workoutPlanApi';
+
+jest.mock('@/services/workoutPlanApi', () => ({
+  workoutPlanApi: {
+    current: jest.fn().mockResolvedValue(null),
+  },
+}));
+
 jest.mock('@/services/aiWorkoutProposalApi', () => {
   const actual = jest.requireActual('@/services/aiWorkoutProposalApi');
   return {
@@ -172,7 +180,7 @@ describe('AiWorkoutProposalModal', () => {
     });
     await flushPromises();
 
-    expect(aiWorkoutProposalApi.accept).toHaveBeenCalledWith('rec-uuid-1', 'Approved and excited', undefined, 1);
+    expect(aiWorkoutProposalApi.accept).toHaveBeenCalledWith('rec-uuid-1', 'Approved and excited', undefined, 1, undefined, undefined, true);
     expect(onPlanApplied).toHaveBeenCalledWith('new-plan-uuid-1');
     expect(tree!.root.findByProps({ testID: 'ai-proposal-applied-success' })).toBeDefined();
   });
@@ -441,5 +449,69 @@ describe('AiWorkoutProposalModal', () => {
 
     const rejectBtn = tree!.root.findByProps({ testID: 'reject-ai-proposal-button' });
     expect(rejectBtn.props.disabled).toBe(true);
+  });
+
+  it('accepts proposal when active plan exists: renders Before/After card and passes active plan details', async () => {
+    const mockActivePlan = {
+      plan: {
+        id: 'plan-active-1',
+        name: 'Existing Active Plan',
+        aggregateVersion: 2,
+        status: 'ACTIVE',
+      },
+      currentVersion: {
+        id: 'ver-active-1',
+        versionNumber: 2,
+      },
+    };
+    (workoutPlanApi.current as jest.Mock).mockResolvedValueOnce(mockActivePlan);
+    (aiWorkoutProposalApi.generate as jest.Mock).mockResolvedValueOnce(mockProposal);
+    (aiWorkoutProposalApi.accept as jest.Mock).mockResolvedValueOnce({
+      recommendationId: 'rec-uuid-1',
+      status: 'APPLIED',
+      appliedBy: 'student-1',
+      resultingEntityType: 'WORKOUT_PLAN',
+      resultingEntityId: 'plan-active-1',
+      appliedAt: '2026-10-27T10:05:00Z',
+      replayed: false,
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-1"
+          isTrainer={false}
+          onClose={jest.fn()}
+        />
+      );
+    });
+
+    const generateBtn = tree!.root.findByProps({ testID: 'generate-ai-proposal-button' });
+    renderer.act(() => {
+      generateBtn.props.onPress();
+    });
+    await flushPromises();
+
+    // Verify Before / After Card is rendered
+    const impactCard = tree!.root.findByProps({ testID: 'ai-proposal-plan-impact-card' });
+    expect(impactCard).toBeDefined();
+
+    const acceptBtn = tree!.root.findByProps({ testID: 'accept-ai-proposal-button' });
+    renderer.act(() => {
+      acceptBtn.props.onPress();
+    });
+    await flushPromises();
+
+    expect(aiWorkoutProposalApi.accept).toHaveBeenCalledWith(
+      'rec-uuid-1',
+      undefined,
+      undefined,
+      1,
+      'plan-active-1',
+      2,
+      false
+    );
   });
 });

@@ -65,10 +65,17 @@ public interface AiWorkoutProposalUseCase {
             UUID recommendationId,
             String commandKey,
             String decisionNote,
-            Integer expectedRevision
+            Integer expectedRevision,
+            UUID expectedPlanId,
+            Long expectedPlanAggregateVersion,
+            Boolean expectedNoActivePlan
     ) {
         public AcceptRecommendationCommand(UUID actorId, UUID recommendationId, String commandKey, String decisionNote) {
-            this(actorId, recommendationId, commandKey, decisionNote, null);
+            this(actorId, recommendationId, commandKey, decisionNote, null, null, null, null);
+        }
+
+        public AcceptRecommendationCommand(UUID actorId, UUID recommendationId, String commandKey, String decisionNote, Integer expectedRevision) {
+            this(actorId, recommendationId, commandKey, decisionNote, expectedRevision, null, null, null);
         }
     }
 
