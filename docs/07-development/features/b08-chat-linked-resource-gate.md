@@ -11,6 +11,19 @@ documentation update. The integration base is `origin/main@d8105eefb9156c68194d7
 which already contains AI migration V51; the Chat candidate therefore uses V52.
 This document is not evidence of a merged feature.
 
+**Post-merge V52 collision (2026-10-31):** PR #122 merged the linked-resource
+feature at `70a500134d195b630bc87eec08ac2a356fbfe035`, after PR #123
+introduced a separate AI V52. The merge-SHA CI failed Database Migrations and
+Backend because Flyway found two V52 scripts. The isolated hotfix candidate
+keeps AI V52 intact and moves the byte-identical Chat migration to V53.
+The earlier V52 statements in this inventory describe the pre-merge candidate,
+not a working migration order on current main. The project owner reports
+Person A approved both the Chat schema and AI V52 → Chat V53 order through
+direct conversations; shared dev/staging/production Flyway histories and
+production rollout values are still unknown. See the
+[collision packet](v52-flyway-collision-hotfix-plan.md) and updated
+[A01 packet](b08-chat-linked-resource-a01-schema-review.md).
+
 ## Executable baseline
 
 - B08 permits direct messaging only within the active human Coaching Period.

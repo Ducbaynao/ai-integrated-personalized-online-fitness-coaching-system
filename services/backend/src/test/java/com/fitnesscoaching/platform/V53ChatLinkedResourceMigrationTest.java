@@ -14,22 +14,30 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class V52ChatLinkedResourceMigrationTest {
-    @Test void cleanInstallHasShapeGuard() { migrate(false); }
-    @Test void upgradeFromV51PreservesExistingMessages() { migrate(true); }
+class V53ChatLinkedResourceMigrationTest {
+    @Test void cleanInstallHasShapeGuard() { migrate(null); }
+    @Test void upgradeFromV51PreservesExistingMessages() { migrate("51"); }
+    @Test void upgradeAfterAiV52PreservesExistingMessages() { migrate("52"); }
 
-    private void migrate(boolean upgrade) {
+    private void migrate(String priorVersion) {
         try (var pg = new PostgreSQLContainer<>(
                 DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"))
-                .withDatabaseName("b08_v51_disposable").withUsername("fitness_app").withPassword("testpass123")) {
+                .withDatabaseName("b08_v53_disposable").withUsername("fitness_app").withPassword("testpass123")) {
             pg.start();
             var dataSource = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
             var jdbc = new JdbcTemplate(dataSource);
             UUID legacyMessage = null;
-            if (upgrade) {
+            if (priorVersion != null) {
                 Flyway.configure().dataSource(dataSource).schemas("fitness").defaultSchema("fitness")
-                        .locations("classpath:db/migration").target(MigrationVersion.fromVersion("51"))
+                        .locations("classpath:db/migration").target(MigrationVersion.fromVersion(priorVersion))
                         .load().migrate();
+                if ("52".equals(priorVersion)) {
+                    assertThat(jdbc.queryForObject("SELECT script FROM fitness.flyway_schema_history "
+                            + "WHERE version='52' AND success", String.class))
+                            .isEqualTo("V52__ai_recommendation_source_snapshot.sql");
+                    assertThat(jdbc.queryForObject("SELECT checksum FROM fitness.flyway_schema_history "
+                            + "WHERE version='52' AND success", Integer.class)).isEqualTo(-990909199);
+                }
                 UUID legacyConversation = jdbc.queryForObject("INSERT INTO fitness.conversations(conversation_type) "
                         + "VALUES ('SUPPORT') RETURNING id", UUID.class);
                 legacyMessage = jdbc.queryForObject("INSERT INTO fitness.messages(conversation_id,message_type,body,"
@@ -38,8 +46,17 @@ class V52ChatLinkedResourceMigrationTest {
             }
             Flyway.configure().dataSource(dataSource).schemas("fitness").defaultSchema("fitness")
                     .locations("classpath:db/migration").load().migrate();
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.flyway_schema_history "
-                    + "WHERE version='52' AND success", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT script FROM fitness.flyway_schema_history "
+                    + "WHERE version='52' AND success", String.class))
+                    .isEqualTo("V52__ai_recommendation_source_snapshot.sql");
+            assertThat(jdbc.queryForObject("SELECT checksum FROM fitness.flyway_schema_history "
+                    + "WHERE version='52' AND success", Integer.class)).isEqualTo(-990909199);
+            assertThat(jdbc.queryForObject("SELECT script FROM fitness.flyway_schema_history "
+                    + "WHERE version='53' AND success", String.class))
+                    .isEqualTo("V53__chat_linked_resource_parent.sql");
+            assertThat(jdbc.queryForObject("SELECT column_name FROM information_schema.columns "
+                    + "WHERE table_schema='fitness' AND table_name='ai_recommendations' "
+                    + "AND column_name='source_snapshot'", String.class)).isEqualTo("source_snapshot");
             assertThat(jdbc.queryForObject("SELECT column_name FROM information_schema.columns "
                     + "WHERE table_schema='fitness' AND table_name='messages' AND column_name='shared_parent_id'",
                     String.class)).isEqualTo("shared_parent_id");
