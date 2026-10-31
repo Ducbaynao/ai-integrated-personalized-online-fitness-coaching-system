@@ -12,6 +12,7 @@ import com.fitnesscoaching.platform.modules.notification.PushDeliveryWorker;
 import com.fitnesscoaching.platform.modules.user.application.service.AccountDataExportService;
 import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureService;
 import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureWorker;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutChatResourceQuery;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -89,6 +90,56 @@ class ChatNotificationIntegrationTest {
     @MockitoBean ChatObjectStorage storage;
     @MockitoBean ClamdAttachmentScanner scanner;
     @MockitoBean ExpoPushGateway expo;
+    @MockitoBean WorkoutChatResourceQuery workoutLinks;
+
+    @Test void linkedResourceRequiresBothSourceReadersAndConcealsAfterRevocation() throws Exception {
+        UUID student = student(), trainer = trainer();
+        UUID relationship = activate(student, trainer);
+        UUID period = chat.send(student, student, "Initial", UUID.randomUUID()).conversationId();
+        UUID coachingPeriod = chat.detail(student, period).coachingPeriodId();
+        UUID plan = UUID.randomUUID(), version = UUID.randomUUID(), key = UUID.randomUUID();
+        when(workoutLinks.canReadPublishedVersion(student, student, coachingPeriod, plan, version)).thenReturn(true);
+        when(workoutLinks.canReadPublishedVersion(trainer, student, coachingPeriod, plan, version)).thenReturn(true);
+        String payload = "{\"type\":\"WORKOUT_PLAN_VERSION\",\"resourceId\":\"" + version
+                + "\",\"parentId\":\"" + plan + "\",\"commandKey\":\"" + key + "\"}";
+        String sent = mvc.perform(post("/api/v1/chat/students/{id}/linked-resources", student)
+                .with(jwt().jwt(j -> j.subject(student.toString()))).contentType("application/json")
+                .content(payload)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.linkedResourceAvailable").value(true))
+                .andReturn().getResponse().getContentAsString();
+        UUID messageId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(sent, "$.id"));
+        assertThat(jdbc.queryForObject("SELECT shared_entity_type FROM fitness.messages WHERE id=?",
+                String.class, messageId)).isEqualTo("WORKOUT_PLAN_VERSION");
+        assertThat(jdbc.queryForObject("SELECT shared_parent_id FROM fitness.messages WHERE id=?",
+                UUID.class, messageId)).isEqualTo(plan);
+        mvc.perform(post("/api/v1/chat/students/{id}/linked-resources", student)
+                .with(jwt().jwt(j -> j.subject(student.toString()))).contentType("application/json")
+                .content(payload)).andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(messageId.toString()));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.messages WHERE shared_entity_id=?",
+                Integer.class, version)).isEqualTo(1);
+        mvc.perform(get("/api/v1/chat/messages/{id}/linked-resource", messageId)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.resourceId").value(version.toString()));
+
+        when(workoutLinks.canReadPublishedVersion(trainer, student, coachingPeriod, plan, version)).thenReturn(false);
+        mvc.perform(get("/api/v1/chat/messages/{id}/linked-resource", messageId)
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.errorCode").value("CHAT_LINK_NOT_FOUND"));
+        mvc.perform(get("/api/v1/chat/conversations/{id}/messages", period)
+                .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].linkedResourceAvailable").value(false))
+                .andExpect(jsonPath("$.items[0].linkedResourceId").isEmpty());
+        mvc.perform(get("/api/v1/chat/conversations/{id}/messages", period)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].linkedResourceAvailable").value(false))
+                .andExpect(jsonPath("$.items[0].linkedResourceId").isEmpty());
+        mvc.perform(get("/api/v1/chat/messages/{id}/linked-resource", messageId)
+                .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.errorCode").value("CHAT_LINK_NOT_FOUND"));
+        lifecycle.relationshipAction(student, relationship, "PAUSE", 1, null, UUID.randomUUID());
+        mvc.perform(get("/api/v1/chat/messages/{id}/linked-resource", messageId)
+                .with(jwt().jwt(j -> j.subject(trainer.toString())))).andExpect(status().isNotFound());
+    }
 
     @Test void pushStartsOffThenQueuesOnlyAfterOptInAndTracksProviderSeparatelyFromDevice() throws Exception {
         UUID student = student(), trainer = trainer(), device = UUID.randomUUID();

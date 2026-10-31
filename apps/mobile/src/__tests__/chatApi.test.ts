@@ -25,6 +25,17 @@ describe('B08 chat and in-app notification API', () => {
     expect(request).toHaveBeenNthCalledWith(2, '/chat/students/student-1/messages', { method: 'POST', body });
   });
 
+  it('uses a stable linked-resource command and a separately authorized open', async () => {
+    const body = { type: 'WORKOUT_PLAN_VERSION' as const, resourceId: 'version-1',
+      parentId: 'plan-1', commandKey: 'same-link-key' };
+    await chatApi.sendLinked('student-1', body);
+    await chatApi.sendLinked('student-1', body);
+    await chatApi.openLinked('message-1');
+    expect(request).toHaveBeenNthCalledWith(1, '/chat/students/student-1/linked-resources', { method: 'POST', body });
+    expect(request).toHaveBeenNthCalledWith(2, '/chat/students/student-1/linked-resources', { method: 'POST', body });
+    expect(request).toHaveBeenNthCalledWith(3, '/chat/messages/message-1/linked-resource');
+  });
+
   it('uses explicit recipient receipt and notification read commands only', async () => {
     await chatApi.receipt('message-1', 'DELIVERED');
     await chatApi.receipt('message-1', 'READ');

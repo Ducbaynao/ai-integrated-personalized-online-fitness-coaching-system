@@ -318,6 +318,38 @@ paths:
         '404': { $ref: '#/components/responses/ChatConcealed' }
         '409': { $ref: '#/components/responses/ChatConflict' }
         '503': { description: Private storage or malware scanner unavailable; no attachment is released, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /chat/students/{studentId}/linked-resources:
+    post:
+      tags: [Chat]
+      operationId: sendChatLinkedResource
+      description: >-
+        Only a published Workout Plan version, Planned Workout occurrence or Coaching Appointment
+        in the current human Coaching Period may be linked. Student and Trainer must both currently
+        read the source. Exact actor-scoped command replay rechecks authority and returns one message;
+        a changed payload returns 409. The stored body is a non-sensitive type label, never source detail.
+      parameters: [{ name: studentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ChatLinkedResourceRequest' } } }
+      responses:
+        '201': { description: Committed linked-resource message or exact replay, content: { application/json: { schema: { $ref: '#/components/schemas/ChatMessage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
+        '409': { $ref: '#/components/responses/ChatConflict' }
+  /chat/messages/{messageId}/linked-resource:
+    get:
+      tags: [Chat]
+      operationId: openChatLinkedResource
+      description: >-
+        Rechecks the current period and source-owner read authority for both participants.
+        Never returns source content or a direct storage URL; the client must use the owner API
+        for detail. Lost access is concealed as 404. Successful responses are not cacheable.
+      parameters: [{ name: messageId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Currently authorized source identity, content: { application/json: { schema: { $ref: '#/components/schemas/ChatLinkedResource' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ChatConcealed' }
   /chat/attachments/{attachmentId}/content:
     get:
       tags: [Chat]
@@ -5393,7 +5425,7 @@ components:
     ChatMessage:
       type: object
       additionalProperties: false
-      required: [id, conversationId, senderId, body, status, sentAt, deliveredAt, readAt, attachmentId, attachmentName, attachmentContentType, attachmentSize]
+      required: [id, conversationId, senderId, body, status, sentAt, deliveredAt, readAt, attachmentId, attachmentName, attachmentContentType, attachmentSize, linkedResourceType, linkedResourceId, linkedResourceParentId, linkedResourceAvailable]
       properties:
         id: { type: string, format: uuid }
         conversationId: { type: string, format: uuid }
@@ -5407,6 +5439,27 @@ components:
         attachmentName: { type: [string, 'null'], description: Original filename, never included in notification preview. }
         attachmentContentType: { type: [string, 'null'], enum: [image/jpeg, image/png, application/pdf, null] }
         attachmentSize: { type: [integer, 'null'], format: int64, maximum: 10485760 }
+        linkedResourceType: { type: [string, 'null'], enum: [WORKOUT_PLAN_VERSION, PLANNED_WORKOUT, APPOINTMENT, null] }
+        linkedResourceId: { type: [string, 'null'], format: uuid, description: Concealed when source authority is lost. }
+        linkedResourceParentId: { type: [string, 'null'], format: uuid, description: Plan ID for a readable plan version only. }
+        linkedResourceAvailable: { type: boolean, description: Current source-owner read authority at response time; tap rechecks again. }
+    ChatLinkedResourceRequest:
+      type: object
+      additionalProperties: false
+      required: [type, resourceId, commandKey]
+      properties:
+        type: { type: string, enum: [WORKOUT_PLAN_VERSION, PLANNED_WORKOUT, APPOINTMENT] }
+        resourceId: { type: string, format: uuid }
+        parentId: { type: [string, 'null'], format: uuid, description: Required for WORKOUT_PLAN_VERSION; absent for other types. }
+        commandKey: { type: string, format: uuid }
+    ChatLinkedResource:
+      type: object
+      additionalProperties: false
+      required: [type, resourceId, parentId]
+      properties:
+        type: { type: string, enum: [WORKOUT_PLAN_VERSION, PLANNED_WORKOUT, APPOINTMENT] }
+        resourceId: { type: string, format: uuid }
+        parentId: { type: [string, 'null'], format: uuid }
     ChatSendRequest:
       type: object
       additionalProperties: false

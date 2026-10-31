@@ -30,7 +30,7 @@ import java.util.UUID;
 
 /** Schedule-owned Appointment commands; no Workout or Coaching repository is accessed directly. */
 @Service
-public class AppointmentService {
+public class AppointmentService implements com.fitnesscoaching.platform.modules.schedule.application.port.in.AppointmentChatResourceQuery {
     private final JdbcTemplate jdbc;
     private final CurrentCoachingContextQuery contexts;
     private final StudentCapabilityQuery students;
@@ -72,6 +72,16 @@ public class AppointmentService {
                                   UUID coachingPeriodId, UUID plannedWorkoutId, String status,
                                   Instant startAt, Instant endAt, String timezone, LocalDateTime localStart,
                                   LocalDateTime localEnd, String startUtcOffset, String endUtcOffset) {}
+
+    @Override public boolean canRead(UUID actor, UUID student, UUID period, UUID appointmentId) {
+        if (appointmentId == null) return false;
+        try {
+            var row = appointmentDetail(actor, appointmentId);
+            return student.equals(row.studentId()) && period.equals(row.coachingPeriodId());
+        } catch (AppointmentFailure denied) {
+            return false;
+        }
+    }
     public record CommandResult(RequestView request, AppointmentView appointment, boolean replayed) {
         CommandResult asReplay() { return new CommandResult(request, appointment, true); }
     }

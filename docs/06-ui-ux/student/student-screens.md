@@ -107,5 +107,7 @@ Current appointment, proposed slot, timezone, conflict result, recurrence scope 
 
 ## ST-19 Chat
 
+Linked resources (B08 local candidate): Student/Trainer chọn phiên bản Workout Plan đã publish, Planned Workout hoặc Appointment từ API đang có quyền đọc. Tin nhắn chỉ lưu loại/nhãn tối thiểu; màn mở link gọi backend Chat để kiểm cả hai người và period hiện hành, sau đó đọc lại API của owner. Khi không còn quyền, chỉ hiện “Tài nguyên không còn khả dụng”, xóa cache Chat liên quan; không dùng URL trực tiếp. Danh sách chọn đang phân trang phạm vi đầu tiên (20 mục, lịch gần hiện tại), không tuyên bố bao phủ mọi lịch sử. Lỗi mạng giữ nguyên commandKey cho lần gửi lại; lỗi 403/404/409 yêu cầu tải lại và chọn lại.
+
 Conversation theo Coaching Period: Student giữ lịch sử của mình, Trainer chỉ xem period hiện hành có quyền. Local candidate cho chọn JPEG/PNG/PDF tối đa 10 MiB, xem tên/kích thước, gửi lại đúng command key sau lỗi mạng chưa rõ; tải tệp qua backend sau khi kiểm quyền và quét, không mở URL storage. Notification preview không chứa tên tệp/nội dung. Khi quan hệ kết thúc, quyền gửi/đọc tuân policy; retention/account erasure chưa được chốt.
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ChatInboxScreen, ConversationScreen, NotificationsScreen } from '@/features/chat/ChatScreens';
+import { ChatInboxScreen, ChatLinkedResourceScreen, ConversationScreen, NotificationsScreen } from '@/features/chat/ChatScreens';
 import { useAuth } from '@/features/auth/AuthContext';
 import { chatApi } from '@/services/chatApi';
 import { ApiError } from '@/types/auth';
@@ -17,9 +17,13 @@ jest.mock('expo-file-system', () => ({ Paths: { cache: {} }, File: jest.fn().moc
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
 jest.mock('@/services/chatApi', () => ({ chatApi: {
   conversations: jest.fn(), conversation: jest.fn(), messages: jest.fn(), send: jest.fn(),
+  sendLinked: jest.fn(), openLinked: jest.fn(),
   sendAttachment: jest.fn(), attachmentContent: jest.fn(),
   receipt: jest.fn(), notifications: jest.fn(), readNotification: jest.fn(),
 } }));
+jest.mock('@/services/workoutPlanApi', () => ({ workoutPlanApi: { list: jest.fn(), detail: jest.fn(), version: jest.fn() } }));
+jest.mock('@/services/workoutScheduleApi', () => ({ workoutScheduleApi: { list: jest.fn(), listForTrainer: jest.fn(), detail: jest.fn() } }));
+jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { appointments: jest.fn(), detail: jest.fn() } }));
 
 const clients: QueryClient[] = [];
 const trees: renderer.ReactTestRenderer[] = [];
@@ -75,6 +79,25 @@ describe('B08 chat screens', () => {
     expect(tree.root.findByProps({ accessibilityLabel: 'Đánh dấu đã đọc' })).toBeTruthy();
     expect(chatApi.receipt).toHaveBeenCalledWith('message-1', 'DELIVERED');
     expect(chatApi.receipt).not.toHaveBeenCalledWith('message-1', 'READ');
+  });
+
+  it('shows an unavailable linked resource without a navigation action', async () => {
+    (chatApi.messages as jest.Mock).mockResolvedValue({ items: [{ id: 'linked-1', conversationId: 'conversation-1',
+      senderId: 'trainer-1', body: 'Lịch tập', status: 'SENT', sentAt: '2026-10-17T08:00:00Z',
+      deliveredAt: '2026-10-17T08:01:00Z', readAt: null, linkedResourceType: 'PLANNED_WORKOUT',
+      linkedResourceId: null, linkedResourceAvailable: false }], page: 0, size: 30, hasMore: false });
+    const tree = render(<ConversationScreen conversationId="conversation-1" />);
+    await settle();
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Mở tài nguyên được chia sẻ' })).toHaveLength(0);
+    expect(JSON.stringify(tree.toJSON())).toContain('Tài nguyên không còn khả dụng');
+  });
+
+  it('does not render a stale linked source when the open command is denied', async () => {
+    (chatApi.openLinked as jest.Mock).mockRejectedValue(new ApiError(404, 'hidden'));
+    const tree = render(<ChatLinkedResourceScreen messageId="linked-1" />);
+    await settle();
+    expect(JSON.stringify(tree.toJSON())).toContain('Không còn quyền xem');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Phiên bản 1');
   });
 
   it('keeps an old period readable without offering a send action', async () => {

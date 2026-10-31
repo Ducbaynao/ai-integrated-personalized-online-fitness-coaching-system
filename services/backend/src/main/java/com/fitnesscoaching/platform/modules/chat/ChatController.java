@@ -56,6 +56,20 @@ public class ChatController {
                 file.getOriginalFilename(), file.getContentType(), file.getBytes(), commandKey));
     }
 
+    @PostMapping("/students/{studentId}/linked-resources")
+    public ResponseEntity<ChatService.Message> sendLinked(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID studentId, @Valid @RequestBody LinkedRequest input) {
+        return ResponseEntity.status(201).body(chat.sendLinked(actor(jwt), studentId,
+                input.type(), input.resourceId(), input.parentId(), input.commandKey()));
+    }
+
+    @GetMapping("/messages/{messageId}/linked-resource")
+    public ResponseEntity<ChatService.LinkedResource> openLinked(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID messageId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(chat.openLinked(actor(jwt), messageId));
+    }
+
     @GetMapping("/attachments/{attachmentId}/content")
     public ResponseEntity<byte[]> download(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID attachmentId) {
         ChatService.AttachmentContent file = chat.download(actor(jwt), attachmentId);
@@ -73,5 +87,7 @@ public class ChatController {
 
     private static UUID actor(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
     public record SendRequest(@NotBlank @Size(max = 4000) String body, @NotNull UUID commandKey) {}
+    public record LinkedRequest(@NotBlank String type, @NotNull UUID resourceId,
+                                UUID parentId, @NotNull UUID commandKey) {}
     public record ReceiptRequest(@NotBlank String kind) {}
 }

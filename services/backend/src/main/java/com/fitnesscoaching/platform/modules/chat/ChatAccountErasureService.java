@@ -38,7 +38,7 @@ public class ChatAccountErasureService implements ChatAccountErasure {
         // for owner review before final identity minimization may proceed.
         jdbc.update("""
                 UPDATE fitness.messages SET body=NULL,message_type='SYSTEM',
-                    shared_entity_type=NULL,shared_entity_id=NULL,
+                    shared_entity_type=NULL,shared_entity_id=NULL,shared_parent_id=NULL,
                     deleted_at=COALESCE(deleted_at,clock_timestamp())
                 WHERE sender_id=?
                 """, userId);
@@ -56,7 +56,8 @@ public class ChatAccountErasureService implements ChatAccountErasure {
                 """, userId, userId);
         jdbc.update("""
                 UPDATE fitness.messages SET sender_id=NULL,body=NULL,message_type='SYSTEM',
-                    shared_entity_type=NULL,shared_entity_id=NULL,deleted_at=COALESCE(deleted_at,clock_timestamp())
+                    shared_entity_type=NULL,shared_entity_id=NULL,shared_parent_id=NULL,
+                    deleted_at=COALESCE(deleted_at,clock_timestamp())
                 WHERE sender_id=?
                 """, userId);
         jdbc.update("UPDATE fitness.conversations SET created_by=NULL WHERE created_by=?", userId);
