@@ -1,5 +1,15 @@
 # B08 Chat and In-App Notification — approved first slice
 
+## 2026-10-31 — Timed reminders and independent preferences (APPROVED policy; local candidate)
+
+Person B approved one reminder 60 minutes before the start of a **CONFIRMED Appointment** for its Student and Trainer, only while the Coaching Period and each recipient's current authority remain valid. A **SCHEDULED Planned Workout** may remind only its Student once 60 minutes before start; no Trainer receives this reminder. An invalid source or `COACH_REQUIRED` workout is skipped. Student ownership of an eligible workout does not depend on a current Trainer. Appointment and workout remain independent lifecycles.
+
+In-app and push reminders have separate per-type opt-ins, both **OFF by default**. Push additionally requires the existing device and push consent checks; push consent does not imply in-app consent. A changed schedule version or cancelled source invalidates pending reminders for the old schedule and the new version is evaluated independently. The dedupe identity is source kind/ID, schedule version, recipient, channel and reminder instant. Before dispatch, recheck source state, Account status, current authority and preference. Push quiet hours use the recipient's confirmed IANA timezone; delivery may be deferred only while still before the source start. At or after start, an unsent reminder is skipped. An uncertain Expo submission must not be blindly retried; ticket/receipt is not device delivery or READ. Source instants and existing IANA timezone information govern DST; this approval creates no new retention period.
+
+These are approved **product rules**. The V54 scheduler, API, schema and Mobile settings in this checkpoint are a local candidate pending independent review and gates; they are not merged or deployed. Existing lifecycle notices and the always-on in-app inbox do not opt the user into timed reminders. Account erasure request/worker remain default OFF, and M7 is not Done.
+
+Runtime delivery boundary: source invalidation and opt-out stop `QUEUED` push attempts, while a claimed `SENDING` attempt keeps its provider outcome. An Expo call already in progress cannot be recalled; a subsequent accepted ticket remains available for receipt reconciliation even if the source or permission changes. The client must recheck authority on every deep link. `SKIPPED` is not used as evidence that an already-started provider call was never accepted. An unknown Expo outcome is terminal and never blindly retried.
+
 **Account auth cutoff checkpoint (IMPLEMENTED_LOCAL, 2026-10-27):** The shared JWT
 decoder rechecks current Account status from PostgreSQL for each new bearer-authenticated
 HTTP request and Chat WebSocket handshake. This denies previously issued tokens after

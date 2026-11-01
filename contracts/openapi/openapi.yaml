@@ -400,7 +400,8 @@ paths:
         Mixed Chat, proposal, Appointment, Attention, Review and coaching-request facts.
         Source-object authority is checked before pagination and again on read/deep link;
         former Trainers cannot infer old-period notifications. Push opt-in is independent
-        of this in-app inbox, which cannot be disabled.
+        of this in-app inbox, which cannot be disabled. Timed reminders have separate
+        default-OFF consent per type and channel; push-only reminders are not listed here.
       parameters:
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
@@ -429,6 +430,27 @@ paths:
       responses:
         '200': { description: Explicit per-event-category preferences, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PushPreference' } } } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/reminder-preferences:
+    get:
+      tags: [In-App Notification]
+      operationId: listMyInAppReminderPreferences
+      description: Missing row means OFF; the ordinary in-app inbox remains available.
+      responses:
+        '200': { description: Explicit in-app timed-reminder opt-ins, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ReminderPreference' } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /notifications/me/reminder-preferences/{type}:
+    put:
+      tags: [In-App Notification]
+      operationId: putMyInAppReminderPreference
+      description: >-
+        Idempotent actor-owned in-app consent, independent of push consent. Only
+        APPOINTMENT_REMINDER and WORKOUT_REMINDER are allowed; both default OFF.
+      parameters: [{ name: type, in: path, required: true, schema: { type: string, enum: [APPOINTMENT_REMINDER, WORKOUT_REMINDER] } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReminderPreferenceInput' } } } }
+      responses:
+        '200': { description: Current preference, content: { application/json: { schema: { $ref: '#/components/schemas/ReminderPreference' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /notifications/me/push/deliveries/{notificationId}:
     get:
       tags: [In-App Notification]
@@ -437,6 +459,11 @@ paths:
         Authority-checked per-device states without exposing device tokens. TICKET_ACCEPTED
         is Expo acceptance, PROVIDER_ACCEPTED is FCM/APNs acceptance, and
         DEVICE_ACKNOWLEDGED requires an explicit callback; none marks the in-app notice READ.
+        A source change, opt-out or authority loss after provider I/O begins cannot retract
+        the payload. An in-flight attempt retains its Expo ticket or error for reconciliation;
+        For source invalidation and preference opt-out, SKIPPED applies only before
+        the provider call starts. Opening the source always rechecks
+        current authority, and a ticket or receipt does not prove device display.
       parameters: [{ name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200': { description: Empty if no opted-in device was queued, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PushDeliveryState' } } } } }
@@ -448,11 +475,13 @@ paths:
       operationId: putMyPushPreference
       description: >-
         Idempotent actor-owned setting. eventType is one of CHAT, COACHING, WORKOUT,
-        GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT; unknown producers never push.
+        GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT, APPOINTMENT_REMINDER,
+        WORKOUT_REMINDER; unknown producers never push. Reminder consent is independent
+        of the corresponding ordinary-event category and in-app reminder consent.
         User explicitly chooses IANA timezone and optional quiet hours [start,end), including
-        cross-midnight. No device/profile timezone fallback. Quiet notices remain queued until
-        the next allowed dispatch; no new reminder is generated.
-      parameters: [{ name: eventType, in: path, required: true, schema: { type: string, enum: [CHAT, COACHING, WORKOUT, GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT] } }]
+        cross-midnight. No device/profile timezone fallback. A timed reminder deferred
+        past its source start is skipped, not sent late. Expo ticket/receipt is not device delivery.
+      parameters: [{ name: eventType, in: path, required: true, schema: { type: string, enum: [CHAT, COACHING, WORKOUT, GOAL, NUTRITION, ATTENTION_REVIEW, APPOINTMENT, APPOINTMENT_REMINDER, WORKOUT_REMINDER] } }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PushPreferenceInput' } } } }
       responses:
         '200': { description: Current preference, content: { application/json: { schema: { $ref: '#/components/schemas/PushPreference' } } } }
@@ -5482,6 +5511,19 @@ components:
         timezone: { type: string, description: Explicit IANA timezone chosen by the account owner. }
         quietHoursStart: { type: [string, 'null'], description: Local HH:mm; both endpoints present or both absent. }
         quietHoursEnd: { type: [string, 'null'], description: Local HH:mm; exclusive end. }
+    ReminderPreferenceInput:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    ReminderPreference:
+      type: object
+      additionalProperties: false
+      required: [type, enabled]
+      properties:
+        type: { type: string, enum: [APPOINTMENT_REMINDER, WORKOUT_REMINDER] }
+        enabled: { type: boolean }
     PushPreference:
       allOf:
         - { $ref: '#/components/schemas/PushPreferenceInput' }

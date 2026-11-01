@@ -92,7 +92,8 @@ public class AppointmentService implements com.fitnesscoaching.platform.modules.
     public record EventView(UUID eventId, UUID appointmentId, String eventType, UUID actorId,
                             String reason, JsonNode oldState, JsonNode newState, Instant occurredAt) {}
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    // Trainer authority locks the current Coaching Period row with FOR SHARE.
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Page<RequestView> listRequests(UUID actor, String status, int page, int size) {
         validatePage(page, size);
         if (status != null && !List.of("PENDING", "ACCEPTED", "REJECTED").contains(status)) throw invalid();
@@ -111,7 +112,7 @@ public class AppointmentService implements com.fitnesscoaching.platform.modules.
         return slice(visible, page, size);
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Page<AppointmentView> listAppointments(UUID actor, Instant from, Instant until, int page, int size) {
         validatePage(page, size);
         if (from == null || until == null || !from.isBefore(until)) throw invalid();
@@ -131,7 +132,7 @@ public class AppointmentService implements com.fitnesscoaching.platform.modules.
         return slice(visible, page, size);
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public AppointmentView appointmentDetail(UUID actor, UUID id) {
         AppointmentView item = loadAppointmentOrConceal(id);
         if (actor.equals(item.studentId())) requireStudent(actor);
@@ -140,7 +141,7 @@ public class AppointmentService implements com.fitnesscoaching.platform.modules.
         return item;
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Page<EventView> history(UUID actor, UUID appointmentId, int page, int size) {
         validatePage(page, size);
         appointmentDetail(actor, appointmentId);
@@ -440,7 +441,7 @@ public class AppointmentService implements com.fitnesscoaching.platform.modules.
         return result;
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public RequestView detail(UUID actor, UUID requestId) {
         if (actor == null || requestId == null) throw notFound();
         RequestView request = loadRequest(requestId, false);

@@ -48,6 +48,13 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                        UUID coachingPeriodId, Instant createdAt, Instant readAt) {}
     public record Page(List<Item> items, int page, int size, boolean hasMore) {}
 
+    /** Reminder authority is checked before enqueue and again on each read/send. */
+    @Transactional
+    public boolean canReadReminder(UUID actor, UUID student, UUID trainer, UUID period, String entityType, UUID entityId) {
+        return actor != null && accounts.getAccountStatus(actor).orElse(null) == AccountStatus.ACTIVE
+                && visible(actor, student, trainer, period, entityType, entityId);
+    }
+
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void committed(UUID sourceEventId, String type, String entityType, UUID entityId,
@@ -136,7 +143,7 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                        COALESCE(chat_student_id,source_student_id) AS source_student_id,
                        COALESCE(chat_trainer_id,source_trainer_id) AS source_trainer_id,
                        created_at,read_at
-                FROM fitness.notifications WHERE recipient_user_id=?
+                FROM fitness.notifications WHERE recipient_user_id=? AND inbox_visible=true
                   AND (event_type='CHAT_MESSAGE' OR related_entity_type IN ('APPOINTMENT','APPOINTMENT_REQUEST',
                       'WORKOUT_SCHEDULE_PROPOSAL','WORKOUT_CHANGE_PROPOSAL','NUTRITION_STRATEGY_PROPOSAL',
                        'FITNESS_GOAL_PROPOSAL','COACHING_REQUEST','COACHING_RESUME_REQUEST',
@@ -166,7 +173,7 @@ public class InAppNotificationService implements ChatNotificationWriter, Lifecyc
                        COALESCE(chat_trainer_id,source_trainer_id),coaching_period_id,related_entity_type,
                        related_entity_id
                 FROM fitness.notifications
-                WHERE id=? AND recipient_user_id=? FOR UPDATE
+                WHERE id=? AND recipient_user_id=? AND inbox_visible=true FOR UPDATE
                 """, (rs, row) -> new NotificationRow(rs.getObject(1, UUID.class),
                 rs.getObject(2, UUID.class), rs.getObject(3, UUID.class), rs.getString(4),
                 rs.getObject(5, UUID.class)), id, actor);

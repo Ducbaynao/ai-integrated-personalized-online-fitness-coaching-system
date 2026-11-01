@@ -18,9 +18,9 @@ public class PushQueueWriter {
     public PushQueueWriter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void queue(UUID notificationId, UUID recipient, String eventType) {
+    public int queue(UUID notificationId, UUID recipient, String eventType) {
         String category = category(eventType);
-        if (category == null) return; // No push for unapproved/unknown producers.
+        if (category == null) return 0; // No push for unapproved/unknown producers.
         Instant databaseNow = jdbc.queryForObject("SELECT clock_timestamp()",
                 (rs, row) -> rs.getTimestamp(1).toInstant());
         List<DevicePreference> devices = jdbc.query("""
@@ -45,12 +45,14 @@ public class PushQueueWriter {
                 INSERT INTO fitness.notification_deliveries(notification_id,channel,status)
                 VALUES (?,'PUSH','PENDING') ON CONFLICT DO NOTHING
                 """, notificationId);
+        return inserted;
     }
 
     private record DevicePreference(UUID id, String timezone, LocalTime quietStart, LocalTime quietEnd) {}
 
     static String category(String eventType) {
         if (eventType == null) return null;
+        if (eventType.equals("APPOINTMENT_REMINDER") || eventType.equals("WORKOUT_REMINDER")) return eventType;
         if (eventType.equals("CHAT_MESSAGE")) return "CHAT";
         if (eventType.startsWith("ATTENTION_") || eventType.startsWith("REVIEW_TASK_")) return "ATTENTION_REVIEW";
         if (eventType.startsWith("APPOINTMENT_")) return "APPOINTMENT";
