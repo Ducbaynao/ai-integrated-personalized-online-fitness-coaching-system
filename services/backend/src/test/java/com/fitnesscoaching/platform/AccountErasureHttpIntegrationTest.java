@@ -173,6 +173,90 @@ class AccountErasureHttpIntegrationTest {
                 Integer.class, request)).isGreaterThanOrEqualTo(2);
     }
 
+    @Test void erasurePreservesAnInFlightPushOutcomeUntilItCanBeMinimized() throws Exception {
+        UUID user = UUID.randomUUID(), notification = UUID.randomUUID();
+        UUID claim = UUID.randomUUID(), command = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?,?,'hash','Student','ACTIVE')
+                """, user, user + "@example.com");
+        jdbc.update("""
+                INSERT INTO fitness.notifications(id,recipient_user_id,event_type,title,body)
+                VALUES (?,?,'CHAT_MESSAGE','Bạn có tin nhắn mới','Bạn có tin nhắn mới')
+                """, notification, user);
+        UUID device = jdbc.queryForObject("""
+                INSERT INTO fitness.push_devices(user_id,device_key,expo_token)
+                VALUES (?,?,'ExpoPushToken[erasure-inflight]') RETURNING id
+                """, UUID.class, user, UUID.randomUUID());
+        UUID attempt = jdbc.queryForObject("""
+                INSERT INTO fitness.push_delivery_attempts
+                    (notification_id,device_id,category,status,claim_token,lease_expires_at,
+                     send_attempt_count,attempted_at)
+                VALUES (?,?,'CHAT','SENDING',?,clock_timestamp()+interval '5 minutes',1,clock_timestamp())
+                RETURNING id
+                """, UUID.class, notification, device, claim);
+
+        String response = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + command + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper().readTree(response).get("id").asText());
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.push_delivery_attempts WHERE id=?",
+                String.class, attempt)).isEqualTo("SENDING");
+        assertThat(jdbc.queryForObject("SELECT expo_token FROM fitness.push_devices WHERE id=?",
+                String.class, device)).startsWith("revoked:");
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("RETRYABLE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.account_erasure_push_diagnostics WHERE request_id=?",
+                Integer.class, request)).isZero();
+
+        // The already-started provider call can still record its ticket. It is
+        // not evidence of device delivery, and the worker may then minimize it.
+        jdbc.update("""
+                UPDATE fitness.push_delivery_attempts
+                SET status='TICKET_ACCEPTED',expo_ticket_id='ticket-before-erasure',
+                    claim_token=NULL,lease_expires_at=NULL
+                WHERE id=? AND claim_token=?
+                """, attempt, claim);
+        UUID receiptClaim = UUID.randomUUID();
+        jdbc.update("""
+                UPDATE fitness.push_delivery_attempts
+                SET status='CHECKING_RECEIPT',claim_token=?,
+                    lease_expires_at=clock_timestamp()+interval '5 minutes'
+                WHERE id=? AND status='TICKET_ACCEPTED'
+                """, receiptClaim, attempt);
+        jdbc.update("""
+                UPDATE fitness.account_erasure_requests
+                SET next_attempt_at=clock_timestamp()-interval '1 second'
+                WHERE id=?
+                """, request);
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("RETRYABLE");
+        jdbc.update("""
+                UPDATE fitness.push_delivery_attempts
+                SET status='PROVIDER_ACCEPTED',provider_accepted_at=clock_timestamp(),
+                    claim_token=NULL,lease_expires_at=NULL
+                WHERE id=? AND claim_token=?
+                """, attempt, receiptClaim);
+        jdbc.update("""
+                UPDATE fitness.account_erasure_requests
+                SET next_attempt_at=clock_timestamp()-interval '1 second'
+                WHERE id=?
+                """, request);
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("""
+                SELECT final_status FROM fitness.account_erasure_push_diagnostics
+                WHERE source_attempt_id=?
+                """, String.class, attempt)).isEqualTo("PROVIDER_ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.push_delivery_attempts WHERE id=?",
+                Integer.class, attempt)).isZero();
+    }
+
     @Test void legacyChatProvidersAreConcealedAndRetainedForObjectReview() throws Exception {
         UUID user = UUID.randomUUID(), conversation = UUID.randomUUID(), message = UUID.randomUUID();
         UUID unsupported = UUID.randomUUID(), unknownBucket = UUID.randomUUID();
