@@ -9,6 +9,7 @@ export const pushCategories = [
   ['CHAT', 'Tin nhắn'], ['COACHING', 'Huấn luyện'], ['WORKOUT', 'Lịch tập'],
   ['GOAL', 'Mục tiêu'], ['NUTRITION', 'Dinh dưỡng'],
   ['ATTENTION_REVIEW', 'Tín hiệu và đánh giá'], ['APPOINTMENT', 'Lịch hẹn'],
+  ['APPOINTMENT_REMINDER', 'Nhắc lịch hẹn'], ['WORKOUT_REMINDER', 'Nhắc buổi tập'],
 ] as const;
 export type PushCategory = (typeof pushCategories)[number][0];
 export type PushPreference = { eventType: PushCategory; enabled: boolean; timezone: string;
@@ -17,6 +18,17 @@ export type PushPreferenceInput = Omit<PushPreference, 'eventType'>;
 export type PushDeliveryState = { status: 'QUEUED' | 'TICKET_ACCEPTED' | 'PROVIDER_ACCEPTED'
   | 'DEVICE_ACKNOWLEDGED' | 'FAILED' | 'SKIPPED'; attemptedAt: string | null;
   providerAcceptedAt: string | null; deviceAcknowledgedAt: string | null };
+
+export type ReminderCategory = 'APPOINTMENT_REMINDER' | 'WORKOUT_REMINDER';
+export type ReminderPreference = { type: ReminderCategory; enabled: boolean };
+
+export const reminderApi = {
+  list() { return request<ReminderPreference[]>('/notifications/me/reminder-preferences'); },
+  set(type: ReminderCategory, enabled: boolean) {
+    return request<ReminderPreference>(`/notifications/me/reminder-preferences/${type}`,
+      { method: 'PUT', body: { enabled } });
+  },
+};
 
 const DEVICE_KEY = 'push_device_key_v1';
 async function deviceKey(): Promise<string> {

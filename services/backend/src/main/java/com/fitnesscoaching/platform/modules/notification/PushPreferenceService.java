@@ -68,7 +68,7 @@ public class PushPreferenceService implements PushPreferenceQuery {
                           String quietStart, String quietEnd) {
         requireAccount(actor);
         if (eventType == null || !List.of("CHAT", "COACHING", "WORKOUT", "GOAL", "NUTRITION",
-                "ATTENTION_REVIEW", "APPOINTMENT").contains(eventType))
+                "ATTENTION_REVIEW", "APPOINTMENT", "APPOINTMENT_REMINDER", "WORKOUT_REMINDER").contains(eventType))
             throw new ChatFailure("PUSH_PREFERENCE_INVALID", 400);
         // A user must explicitly confirm the IANA timezone; no device/profile fallback.
         try {
@@ -96,7 +96,7 @@ public class PushPreferenceService implements PushPreferenceQuery {
                 UPDATE fitness.push_delivery_attempts a SET status='SKIPPED',
                   claim_token=NULL,lease_expires_at=NULL
                 FROM fitness.notifications n WHERE a.notification_id=n.id AND n.recipient_user_id=?
-                  AND a.category=? AND a.status IN ('QUEUED','SENDING')
+                  AND a.category=? AND a.status='QUEUED'
                 """, actor, eventType);
         else {
             Instant now = jdbc.queryForObject("SELECT clock_timestamp()",
@@ -138,7 +138,7 @@ public class PushPreferenceService implements PushPreferenceQuery {
         jdbc.update("""
                 UPDATE fitness.push_delivery_attempts a SET status='SKIPPED',claim_token=NULL,lease_expires_at=NULL
                 FROM fitness.push_devices d WHERE a.device_id=d.id AND d.user_id=? AND d.device_key=?
-                  AND a.status IN ('QUEUED','SENDING')
+                  AND a.status='QUEUED'
                 """, actor, deviceKey);
         jdbc.update("UPDATE fitness.push_devices SET active=false WHERE user_id=? AND device_key=?", actor, deviceKey);
     }

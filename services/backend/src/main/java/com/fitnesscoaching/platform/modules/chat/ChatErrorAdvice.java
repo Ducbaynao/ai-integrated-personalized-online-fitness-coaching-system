@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.common.exception.ErrorResponse;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.notification.InAppNotificationController;
 import com.fitnesscoaching.platform.modules.notification.PushPreferenceController;
+import com.fitnesscoaching.platform.modules.notification.ReminderPreferenceController;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,7 @@ import java.time.Instant;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {ChatController.class, InAppNotificationController.class,
-        PushPreferenceController.class})
+        PushPreferenceController.class, ReminderPreferenceController.class})
 public class ChatErrorAdvice {
     private final Clock clock;
     public ChatErrorAdvice(Clock clock) { this.clock = clock; }

@@ -8,7 +8,7 @@ import { ApiError } from '@/types/auth';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
-import { pushApi, pushCategories, PushCategory, PushPreferenceInput } from '@/services/pushApi';
+import { pushApi, pushCategories, PushCategory, PushPreferenceInput, reminderApi, ReminderCategory } from '@/services/pushApi';
 
 export default function PushSettingsScreen() {
   const { user, activeCapability } = useAuth();
@@ -19,6 +19,16 @@ export default function PushSettingsScreen() {
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const queryKey = ['push-preferences', actor, role];
   const query = useQuery({ queryKey, enabled: !!actor, gcTime: 0, queryFn: pushApi.list });
+  const reminderKey = ['reminder-preferences', actor, role];
+  const reminderQuery = useQuery({ queryKey: reminderKey, enabled: !!actor, gcTime: 0, queryFn: reminderApi.list });
+  const reminderMutation = useMutation({
+    mutationFn: ({ type, enabled }: { type: ReminderCategory; enabled: boolean }) => reminderApi.set(type, enabled),
+    onSuccess: () => { void cache.invalidateQueries({ queryKey: reminderKey }); },
+    onError: error => {
+      if (error instanceof ApiError && [403, 404].includes(error.status)) cache.removeQueries({ queryKey: reminderKey });
+      setFormError(error instanceof Error ? error.message : 'Không thể lưu tùy chọn nhắc lịch.');
+    },
+  });
   const [search, setSearch] = useState('');
   const [timezone, setTimezone] = useState('');
   const [quietStart, setQuietStart] = useState('');
@@ -43,11 +53,32 @@ export default function PushSettingsScreen() {
   };
   const concealed = query.isError && query.error instanceof ApiError && [403, 404].includes(query.error.status);
   useEffect(() => { if (concealed) cache.removeQueries({ queryKey: ['push-preferences', actor, role] }); }, [concealed, cache, actor, role]);
+  const reminderConcealed = reminderQuery.isError && reminderQuery.error instanceof ApiError
+    && [403, 404].includes(reminderQuery.error.status);
+  useEffect(() => {
+    if (reminderConcealed) cache.removeQueries({ queryKey: ['reminder-preferences', actor, role] });
+  }, [reminderConcealed, cache, actor, role]);
   return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
     <ScrollView testID="push-settings" contentContainerStyle={styles.content}>
       <Text style={[styles.title, { color: theme.textPrimary }]}>Thông báo đẩy</Text>
       <CoachingButton label="Quay lại thông báo" secondary onPress={() => router.back()} />
       <Text style={[styles.body, { color: theme.textSecondary }]}>Mặc định tắt. Hộp thư trong ứng dụng vẫn hoạt động. Expo xác nhận ticket và nhà cung cấp; chúng không chứng minh thiết bị đã nhận hoặc bạn đã đọc.</Text>
+      <CoachingCard>
+        <Text style={[styles.h2, { color: theme.textPrimary }]}>Nhắc lịch trong ứng dụng</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Mặc định tắt. Bật riêng từng loại; bật thông báo đẩy không tự bật nhắc trong ứng dụng.</Text>
+        {reminderQuery.isPending ? <CoachingState busy title="Đang tải nhắc lịch" message="Vui lòng chờ." /> : null}
+        {reminderQuery.isError ? <CoachingState title="Không thể tải nhắc lịch" message="Vui lòng thử lại." onRetry={() => reminderQuery.refetch()} /> : null}
+        {!reminderQuery.isPending && !reminderQuery.isError ? (['APPOINTMENT_REMINDER', 'WORKOUT_REMINDER'] as const).map(type => {
+          const enabled = reminderQuery.data?.find(item => item.type === type)?.enabled ?? false;
+          const title = type === 'APPOINTMENT_REMINDER' ? 'Lịch hẹn' : 'Buổi tập';
+          return <View key={type}>
+            <Text style={[styles.body, { color: theme.textSecondary }]}>{title}: {enabled ? 'Đang bật' : 'Đang tắt'}</Text>
+            <CoachingButton label={`${enabled ? 'Tắt' : 'Bật'} nhắc ${title.toLowerCase()} trong ứng dụng`}
+              busy={reminderMutation.isPending} disabled={reminderMutation.isPending}
+              onPress={() => reminderMutation.mutate({ type, enabled: !enabled })} />
+          </View>;
+        }) : null}
+      </CoachingCard>
       {query.isPending ? <CoachingState busy title="Đang tải tùy chọn" message="Vui lòng chờ." /> : null}
       {query.isError ? <CoachingState title="Không thể tải tùy chọn" message="Vui lòng thử lại." onRetry={() => query.refetch()} /> : null}
       {!query.isError ? <View>
@@ -60,7 +91,7 @@ export default function PushSettingsScreen() {
           value={quietStart} onChangeText={setQuietStart} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
         <TextInput accessibilityLabel="Giờ kết thúc yên tĩnh HH:mm" placeholder="Kết thúc HH:mm (có thể bỏ trống)"
           value={quietEnd} onChangeText={setQuietEnd} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Trong khoảng giờ yên tĩnh, thông báo đẩy chờ tới thời điểm được phép. Không có nhắc hẹn theo giờ trong luồng này.</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Nhắc lịch qua push chỉ gửi sau giờ yên tĩnh nếu lịch chưa bắt đầu. Bật riêng push cho “Nhắc lịch hẹn” hoặc “Nhắc buổi tập”.</Text>
       </View> : null}
       {formError ? <CoachingState title="Chưa lưu được" message={formError} /> : null}
       {!query.isPending && !query.isError ? pushCategories.map(([category, title]) => {

@@ -1,4 +1,4 @@
-import { pushApi } from '@/services/pushApi';
+import { pushApi, reminderApi } from '@/services/pushApi';
 import { request } from '@/services/apiClient';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -33,6 +33,15 @@ describe('B08 push opt-in API', () => {
       method: 'PUT', body: { enabled: true, timezone: 'Asia/Ho_Chi_Minh',
         quietHoursStart: '22:00', quietHoursEnd: '07:00' },
     });
+  });
+  it('sets in-app reminder consent without device registration or push consent', async () => {
+    await reminderApi.list();
+    expect(request).toHaveBeenCalledWith('/notifications/me/reminder-preferences');
+    await reminderApi.set('WORKOUT_REMINDER', true);
+    expect(request).toHaveBeenLastCalledWith('/notifications/me/reminder-preferences/WORKOUT_REMINDER', {
+      method: 'PUT', body: { enabled: true },
+    });
+    expect(Notifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
   });
   it('does not register a device or enable push when Android permission is denied', async () => {
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ granted: false });

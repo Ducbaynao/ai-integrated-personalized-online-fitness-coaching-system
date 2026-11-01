@@ -21,13 +21,15 @@ public class PushDeliveryWorker {
     private final JdbcTemplate jdbc;
     private final InAppNotificationService notices;
     private final ExpoPushGateway expo;
+    private final TimedReminderService reminders;
     private final TransactionTemplate transactions;
     private final boolean enabled;
 
     public PushDeliveryWorker(JdbcTemplate jdbc, InAppNotificationService notices, ExpoPushGateway expo,
+                              TimedReminderService reminders,
                               PlatformTransactionManager transactionManager,
                               @Value("${push.expo.enabled:false}") boolean enabled) {
-        this.jdbc = jdbc; this.notices = notices; this.expo = expo;
+        this.jdbc = jdbc; this.notices = notices; this.expo = expo; this.reminders = reminders;
         this.transactions = new TransactionTemplate(transactionManager);
         this.enabled = enabled;
     }
@@ -94,16 +96,20 @@ public class PushDeliveryWorker {
                 claim.id(), claim.claimToken());
         if (current.isEmpty()) return false;
         Eligibility value = current.getFirst();
+        Instant now = databaseNow();
         if (!value.active() || !value.optedIn() || value.timezone() == null
                 || !claim.token().equals(value.currentToken())
-                || !notices.canReadNotice(claim.recipient(), claim.notificationId())) {
+                || !notices.canReadNotice(claim.recipient(), claim.notificationId())
+                || !reminders.currentForPush(claim.notificationId(), claim.recipient(), now)) {
             clearClaim(claim, "SKIPPED", null, null);
             return false;
         }
-        Instant now = databaseNow();
         if (PushQuietHours.isQuiet(now, value.timezone(), value.quietStart(), value.quietEnd())) {
-            clearClaim(claim, "QUEUED", null, PushQuietHours.nextAllowed(now, value.timezone(),
-                    value.quietStart(), value.quietEnd()));
+            Instant next = PushQuietHours.nextAllowed(now, value.timezone(),
+                    value.quietStart(), value.quietEnd());
+            if (reminders.canWaitForQuietHours(claim.notificationId(), claim.recipient(), next))
+                clearClaim(claim, "QUEUED", null, next);
+            else clearClaim(claim, "SKIPPED", null, null);
             return false;
         }
         jdbc.update("""
