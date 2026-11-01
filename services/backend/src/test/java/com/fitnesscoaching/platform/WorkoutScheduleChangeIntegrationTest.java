@@ -9,12 +9,14 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutS
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.*;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutScheduleFailure;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionFailure;
+import com.fitnesscoaching.platform.modules.workout.adapter.out.persistence.JdbcWorkoutScheduleChangeAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +35,8 @@ import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.reset;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,6 +70,7 @@ class WorkoutScheduleChangeIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired tools.jackson.databind.ObjectMapper mapper;
     @Autowired PlatformTransactionManager transactionManager;
+    @MockitoSpyBean JdbcWorkoutScheduleChangeAdapter changeAdapter;
 
     @Test void startWinningSealsOccurrenceAndRejectsRescheduleWithoutEffects() throws Exception {
         Fixture f = startableFixture();
@@ -223,6 +228,40 @@ class WorkoutScheduleChangeIntegrationTest {
                     "America/New_York", offset, "-05:00");
             assertCode(() -> changes.reschedule(new Reschedule(source, f.student(), 0,
                     destination, null, "ambiguous-" + offset)), "WORKOUT_SCHEDULE_WINDOW_INVALID");
+        }
+    }
+
+    @Test void ambiguousDstOffsetsRescheduleToDistinctInstantsWithinFrozenWindow() {
+        Fixture early = fixture(), late = fixture();
+        UUID earlySource = confirmed(early, "ambiguous-future-early");
+        UUID lateSource = confirmed(late, "ambiguous-future-late");
+        LocalDateTime localStart = LocalDateTime.of(2025, 11, 2, 1, 30);
+        LocalDateTime localEnd = LocalDateTime.of(2025, 11, 2, 2, 30);
+
+        // Freeze only the schedule-change clock. The two valid offsets must both
+        // pass the 90-day window even when the wall-clock test date moves on.
+        doReturn(Instant.parse("2025-10-01T00:00:00Z")).when(changeAdapter).databaseNow();
+        try {
+            ChangeResult first = changes.reschedule(new Reschedule(earlySource, early.student(), 0,
+                    new Destination(localStart, localEnd, "America/New_York", "-04:00", "-05:00"),
+                    null, "ambiguous-future-early"));
+            ChangeResult second = changes.reschedule(new Reschedule(lateSource, late.student(), 0,
+                    new Destination(localStart, localEnd, "America/New_York", "-05:00", "-05:00"),
+                    null, "ambiguous-future-late"));
+
+            assertThat(first.newPlannedStartAt()).isEqualTo(Instant.parse("2025-11-02T05:30:00Z"));
+            assertThat(second.newPlannedStartAt()).isEqualTo(Instant.parse("2025-11-02T06:30:00Z"));
+            assertThat(second.newPlannedStartAt()).isEqualTo(first.newPlannedStartAt().plusSeconds(3600));
+            assertThat(jdbc.queryForObject("SELECT planned_start_at FROM fitness.planned_workouts WHERE id=?",
+                    Timestamp.class, first.replacementOccurrenceId()).toInstant()).isEqualTo(first.newPlannedStartAt());
+            assertThat(jdbc.queryForObject("SELECT planned_start_at FROM fitness.planned_workouts WHERE id=?",
+                    Timestamp.class, second.replacementOccurrenceId()).toInstant()).isEqualTo(second.newPlannedStartAt());
+            assertThat(jdbc.queryForObject("SELECT schedule_start_utc_offset FROM fitness.planned_workouts WHERE id=?",
+                    String.class, first.replacementOccurrenceId())).isEqualTo("-04:00");
+            assertThat(jdbc.queryForObject("SELECT schedule_start_utc_offset FROM fitness.planned_workouts WHERE id=?",
+                    String.class, second.replacementOccurrenceId())).isEqualTo("-05:00");
+        } finally {
+            reset(changeAdapter);
         }
     }
 
