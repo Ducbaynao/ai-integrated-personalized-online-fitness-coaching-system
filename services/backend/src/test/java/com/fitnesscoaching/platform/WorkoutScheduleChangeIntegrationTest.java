@@ -212,16 +212,17 @@ class WorkoutScheduleChangeIntegrationTest {
         }
     }
 
-    @Test void ambiguousDstOffsetsAreExplicitAndProduceDistinctInstants() {
-        LocalDateTime ambiguous = LocalDateTime.of(2026, 11, 1, 1, 30);
+    @Test void historicalAmbiguousDstOffsetsCannotBypassRescheduleWindow() {
+        // Offset resolution is covered by WorkoutScheduleTimeResolutionTest. A fixed
+        // integration destination must not become a valid future schedule by accident.
+        LocalDateTime ambiguous = LocalDateTime.of(2025, 11, 2, 1, 30);
         for (String offset : List.of("-04:00", "-05:00")) {
             Fixture f = fixture();
             UUID source = confirmed(f, "ambiguous-" + offset);
-            Destination destination = new Destination(ambiguous, LocalDateTime.of(2026, 11, 1, 2, 30),
+            Destination destination = new Destination(ambiguous, LocalDateTime.of(2025, 11, 2, 2, 30),
                     "America/New_York", offset, "-05:00");
-            ChangeResult result = changes.reschedule(new Reschedule(source, f.student(), 0,
-                    destination, null, "ambiguous-" + offset));
-            assertThat(result.newPlannedStartAt()).isEqualTo(ambiguous.toInstant(ZoneOffset.of(offset)));
+            assertCode(() -> changes.reschedule(new Reschedule(source, f.student(), 0,
+                    destination, null, "ambiguous-" + offset)), "WORKOUT_SCHEDULE_WINDOW_INVALID");
         }
     }
 
