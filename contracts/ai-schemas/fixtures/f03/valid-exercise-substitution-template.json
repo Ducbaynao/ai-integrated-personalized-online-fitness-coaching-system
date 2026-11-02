@@ -1,0 +1,51 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Thay thế bài Dumbbell Bench Press thay cho Barbell Bench Press trong toàn bộ giáo án",
+  "reasoning": [
+    "Học viên cảm thấy đau vai khi tập tạ đòn ngang.",
+    "Tạ đơn cho phép khớp vai xoay tự nhiên và giảm áp lực lên bao khớp."
+  ],
+  "usedData": ["workout_plan_templates", "student_physical_limitations"],
+  "missingData": [],
+  "limitations": [],
+  "confidence": 0.92,
+  "changes": [
+    {
+      "changeId": "22222222-2222-4222-8222-222222222222",
+      "changeType": "EXERCISE_SUBSTITUTION",
+      "scope": "TEMPLATE_OR_FUTURE_OCCURRENCES",
+      "targetRef": {
+        "scope": "TEMPLATE_OR_FUTURE_OCCURRENCES",
+        "planId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "planVersionNumber": 1,
+        "dayNumber": 1,
+        "exercisePrescriptionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      },
+      "before": {
+        "exerciseVariationId": "44444444-4444-4444-8444-444444444444",
+        "exerciseName": "Barbell Bench Press",
+        "movementPattern": "HORIZONTAL_PUSH",
+        "equipmentType": "BARBELL"
+      },
+      "after": {
+        "replacementVariationId": "55555555-5555-4555-8555-555555555555",
+        "replacementExerciseName": "Dumbbell Bench Press",
+        "movementPattern": "HORIZONTAL_PUSH",
+        "equipmentType": "DUMBBELL",
+        "substitutionCategory": "LIMITATION_OR_PAIN"
+      },
+      "reason": "Điều chỉnh chiến lược sang tạ đơn để bảo vệ khớp vai trong các tuần tập tới.",
+      "evidence": {
+        "movementPatternMatch": true,
+        "equipmentAvailable": true,
+        "rpeWindowCoverage": null,
+        "continuityState": "RECENT_CONSISTENT",
+        "knowledgeCitations": []
+      },
+      "versionGuards": {
+        "expectedOccurrenceVersion": null,
+        "expectedPlanAggregateVersion": 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Tải trọng mang giá trị âm là không hợp lệ",
+  "reasoning": ["Mức tạ không được âm"],
+  "usedData": [],
+  "missingData": [],
+  "confidence": 0.5,
+  "changes": [
+    {
+      "changeId": "88888888-8888-4888-8888-888888888888",
+      "changeType": "LOAD_ADJUSTMENT",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "targetLoad": 50.0,
+        "loadUnit": "KG",
+        "loadUnitId": 1
+      },
+      "after": {
+        "targetLoad": -10.0,
+        "loadUnit": "KG",
+        "loadUnitId": 1,
+        "direction": "DECREASE",
+        "deltaLoad": -60.0,
+        "deltaPercent": -120.0
+      },
+      "reason": "Mức tạ âm vi phạm schema"
+    }
+  ]
+}

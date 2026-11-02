@@ -1,0 +1,51 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Tăng thêm 1 hiệp cho bài Dumbbell Shoulder Press",
+  "reasoning": [
+    "Học viên thích nghi tốt với khối lượng tập hiện tại, tăng số hiệp để kích thích phát triển cơ bắp."
+  ],
+  "usedData": ["workout_history", "training_volume_signals"],
+  "missingData": [],
+  "limitations": [],
+  "confidence": 0.85,
+  "changes": [
+    {
+      "changeId": "55555555-5555-4555-8555-555555555555",
+      "changeType": "VOLUME_ADJUSTMENT",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "targetSets": 3,
+        "targetRepsMin": 8,
+        "targetRepsMax": 10,
+        "durationSeconds": null
+      },
+      "after": {
+        "targetSets": 4,
+        "targetRepsMin": 8,
+        "targetRepsMax": 10,
+        "durationSeconds": null,
+        "deltaSets": 1,
+        "deltaRepsMin": 0,
+        "deltaRepsMax": 0,
+        "deltaDurationSeconds": null
+      },
+      "reason": "Tăng 1 hiệp làm việc từ 3 lên 4 hiệp nhằm tăng tổng khối lượng tập luyện cơ vai.",
+      "evidence": {
+        "movementPatternMatch": null,
+        "equipmentAvailable": true,
+        "rpeWindowCoverage": "3_OF_3_SESSIONS_COVERED",
+        "continuityState": "RECENT_CONSISTENT",
+        "knowledgeCitations": []
+      },
+      "versionGuards": {
+        "expectedOccurrenceVersion": 2,
+        "expectedPlanAggregateVersion": null
+      }
+    }
+  ]
+}

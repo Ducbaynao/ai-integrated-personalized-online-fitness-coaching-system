@@ -304,6 +304,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
         AiRecommendation rec = recommendationRepository.findById(recommendationId)
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + recommendationId));
 
+        if (!"WORKOUT_PLAN_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunNotFoundException("Recommendation is not a workout plan proposal: " + recommendationId);
+        }
+
         if (!actorId.equals(rec.studentId())) {
             var ctx = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
             if (ctx == null || !actorId.equals(ctx.trainerId())) {
@@ -331,6 +335,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
 
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + command.recommendationId()));
+
+        if (!"WORKOUT_PLAN_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunLifecycleConflictException("Recommendation is not a workout plan proposal: " + rec.recommendationType());
+        }
 
         // 1. Verify current coaching context and decision authority
         var currentContext = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
@@ -447,6 +455,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
 
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + command.recommendationId()));
+
+        if (!"WORKOUT_PLAN_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunLifecycleConflictException("Recommendation is not a workout plan proposal: " + rec.recommendationType());
+        }
 
         // 1. Verify current coaching context and decision authority FIRST before looking at replay
         var currentContext = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
@@ -816,6 +828,10 @@ public class AiWorkoutProposalService implements AiWorkoutProposalUseCase {
 
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(command.recommendationId())
                 .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + command.recommendationId()));
+
+        if (!"WORKOUT_PLAN_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunLifecycleConflictException("Recommendation is not a workout plan proposal: " + rec.recommendationType());
+        }
 
         if (rec.status() != AiRecommendationStatus.PENDING) {
             throw new AiRunLifecycleConflictException("Recommendation is in status " + rec.status() + " and cannot be rejected.");

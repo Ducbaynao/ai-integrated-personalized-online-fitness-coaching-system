@@ -1400,4 +1400,50 @@ class AiWorkoutProposalServiceUnitTest {
         verify(workoutPlanCommandUseCase).publishVersion(any());
         assertThat(rec.sourceSnapshot()).isEqualTo(snapshotJson);
     }
+
+    @Test
+    @DisplayName("F03 Boundary Guard: acceptRecommendation rejects WORKOUT_ADJUSTMENT_PROPOSAL")
+    void acceptRecommendation_rejectsWorkoutAdjustmentProposal() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .recommendationType("WORKOUT_ADJUSTMENT_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+
+        AcceptRecommendationCommand cmd = new AcceptRecommendationCommand(studentId, recId, "cmd-key-1", "note", 1);
+
+        assertThatThrownBy(() -> service.acceptRecommendation(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Recommendation is not a workout plan proposal: WORKOUT_ADJUSTMENT_PROPOSAL");
+    }
+
+    @Test
+    @DisplayName("F03 Boundary Guard: updateDraft rejects WORKOUT_ADJUSTMENT_PROPOSAL")
+    void updateDraft_rejectsWorkoutAdjustmentProposal() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .recommendationType("WORKOUT_ADJUSTMENT_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+
+        UpdateDraftCommand cmd = new UpdateDraftCommand(studentId, recId, 1, "Title", "Expl", "{}");
+
+        assertThatThrownBy(() -> service.updateDraft(cmd))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Recommendation is not a workout plan proposal: WORKOUT_ADJUSTMENT_PROPOSAL");
+    }
 }
