@@ -109,6 +109,33 @@ class CoachingSharingIntegrationTest {
     }
 
     @Test
+    void disabledStudentConcealsEveryGrantedScopeWithoutDeletingHistory() {
+        UUID student = person("STUDENT"), trainer = person("TRAINER");
+        Outcome active = accepted(student, trainer);
+        Instant from = Instant.now().minus(1, ChronoUnit.DAYS);
+        for (DataScope scope : new DataScope[]{DataScope.WORKOUT_PLAN, DataScope.WORKOUT_HISTORY,
+                DataScope.NUTRITION_LOGS, DataScope.BODY_METRICS}) {
+            sharing.grantOrReplace(student, active.relationship().id(), scope,
+                    SharingDecision.ALLOW, DataAccessLevel.VIEW, from, null, null,
+                    null, UUID.randomUUID());
+            assertThat(authority.evaluateCurrent(new AuthorityRequest(trainer, student, scope,
+                    DataAccessLevel.VIEW)).allowed()).isTrue();
+        }
+        jdbc.update("UPDATE fitness.users SET status='DISABLED' WHERE id=?", student);
+        for (DataScope scope : new DataScope[]{DataScope.WORKOUT_PLAN, DataScope.WORKOUT_HISTORY,
+                DataScope.NUTRITION_LOGS, DataScope.BODY_METRICS}) {
+            assertThat(authority.evaluateCurrent(new AuthorityRequest(trainer, student, scope,
+                    DataAccessLevel.VIEW)).reason()).isEqualTo(AuthorityReason.ACCOUNT_UNAVAILABLE);
+            assertThat(authority.evaluateHistorical(new HistoricalAuthorityRequest(trainer, student, scope,
+                    DataAccessLevel.VIEW, Instant.now())).reason()).isEqualTo(AuthorityReason.ACCOUNT_UNAVAILABLE);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_periods WHERE id=?",
+                Integer.class, active.currentPeriod().id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.data_sharing_permissions WHERE relationship_id=?",
+                Integer.class, active.relationship().id())).isEqualTo(4);
+    }
+
+    @Test
     void replaceRevokeAndReplayPreserveHistoryAuditAndMonotonicVersion() {
         UUID student = person("STUDENT"), trainer = person("TRAINER");
         Outcome active = accepted(student, trainer);
