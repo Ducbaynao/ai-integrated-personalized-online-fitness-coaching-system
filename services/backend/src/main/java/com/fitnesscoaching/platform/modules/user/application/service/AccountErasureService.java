@@ -159,6 +159,7 @@ public class AccountErasureService {
             nutrition.minimizeAuthoredMealText(userId);
             progress.minimizeOwnedConnectionIdentifiers(userId);
             progress.tombstoneStudentMeasurements(userId, id);
+            progress.minimizeSubjectScopedPhotoAndBatchValues(userId);
             // Preserve the stable UUID and FK-linked history; remove direct account identifiers.
             jdbc.update("""
                     UPDATE fitness.users SET email=('erased-'||id::text||'@invalid.local'),

@@ -43,4 +43,20 @@ public class ProgressAccountErasureService implements ProgressAccountErasure {
                 WHERE student_id=? AND erased_at IS NULL
                 """, requestId, userId);
     }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void minimizeSubjectScopedPhotoAndBatchValues(UUID userId) {
+        // The Student FK proves whose health value/device reference this is.
+        // Notes may have been written by someone else; media can have multiple
+        // consumers. Neither is erased or attested by this narrow port.
+        jdbc.update("""
+                UPDATE fitness.progress_photos SET weight_at_time=NULL,weight_unit_id=NULL
+                WHERE student_id=? AND (weight_at_time IS NOT NULL OR weight_unit_id IS NOT NULL)
+                """, userId);
+        jdbc.update("""
+                UPDATE fitness.measurement_batches SET device_identifier=NULL
+                WHERE student_id=? AND device_identifier IS NOT NULL
+                """, userId);
+    }
 }

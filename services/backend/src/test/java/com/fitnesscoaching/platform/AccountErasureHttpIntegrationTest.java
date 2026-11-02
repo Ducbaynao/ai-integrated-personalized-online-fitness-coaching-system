@@ -175,6 +175,32 @@ class AccountErasureHttpIntegrationTest {
                        'sensitive note','source-person')
                     """, values[0], values[1], metricCode, unitCode, sourceCode);
         }
+        UUID ownBatch = UUID.randomUUID(), otherBatch = UUID.randomUUID();
+        UUID ownPhoto = UUID.randomUUID(), otherPhoto = UUID.randomUUID();
+        UUID ownMedia = UUID.randomUUID(), otherMedia = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownBatch, requester, ownPhoto, ownMedia},
+                {otherBatch, other, otherPhoto, otherMedia}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.measurement_batches
+                      (id,student_id,measured_at,source_id,device_identifier,notes)
+                    VALUES (?,?,clock_timestamp(),
+                      (SELECT id FROM fitness.measurement_sources WHERE code=?),
+                      'private-device','unattributed batch note')
+                    """, values[0], values[1], sourceCode);
+            jdbc.update("""
+                    INSERT INTO fitness.media_files
+                      (id,owner_user_id,storage_provider,bucket_name,object_key,
+                       content_type,size_bytes,media_purpose)
+                    VALUES (?,?,'S3','disposable',?,'image/png',1,'PROGRESS_PHOTO')
+                    """, values[3], values[1], "progress/" + values[3]);
+            jdbc.update("""
+                    INSERT INTO fitness.progress_photos
+                      (id,student_id,media_id,taken_at,weight_at_time,weight_unit_id,notes)
+                    VALUES (?,?,?,clock_timestamp(),75,
+                      (SELECT id FROM fitness.measurement_units WHERE code=?),
+                      'unattributed photo note')
+                    """, values[2], values[1], values[3], unitCode);
+        }
         jdbc.update("""
                 INSERT INTO fitness.integration_providers(code,name,provider_type)
                 VALUES (?,'Owner port fixture','WEARABLE')
@@ -212,6 +238,10 @@ class AccountErasureHttpIntegrationTest {
                 String.class, request)).isEqualTo("HELD");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, ownerMeal)).isEqualTo("my food");
+        assertThat(jdbc.queryForObject("SELECT weight_at_time FROM fitness.progress_photos WHERE id=?",
+                java.math.BigDecimal.class, ownPhoto)).isEqualByComparingTo("75");
+        assertThat(jdbc.queryForObject("SELECT device_identifier FROM fitness.measurement_batches WHERE id=?",
+                String.class, ownBatch)).isEqualTo("private-device");
         jdbc.update("""
                 UPDATE fitness.account_erasure_holds SET released_at=clock_timestamp(),released_by=?
                 WHERE request_id=? AND case_id='owner-port-hold'
@@ -243,6 +273,20 @@ class AccountErasureHttpIntegrationTest {
                 String.class, ownMeasurement)).isNull();
         assertThat(jdbc.queryForObject("SELECT numeric_value FROM fitness.measurements WHERE id=?",
                 java.math.BigDecimal.class, otherMeasurement)).isEqualByComparingTo("75");
+        assertThat(jdbc.queryForObject("SELECT weight_at_time FROM fitness.progress_photos WHERE id=?",
+                java.math.BigDecimal.class, ownPhoto)).isNull();
+        assertThat(jdbc.queryForObject("SELECT weight_unit_id FROM fitness.progress_photos WHERE id=?",
+                Short.class, ownPhoto)).isNull();
+        assertThat(jdbc.queryForObject("SELECT device_identifier FROM fitness.measurement_batches WHERE id=?",
+                String.class, ownBatch)).isNull();
+        assertThat(jdbc.queryForObject("SELECT weight_at_time FROM fitness.progress_photos WHERE id=?",
+                java.math.BigDecimal.class, otherPhoto)).isEqualByComparingTo("75");
+        assertThat(jdbc.queryForObject("SELECT device_identifier FROM fitness.measurement_batches WHERE id=?",
+                String.class, otherBatch)).isEqualTo("private-device");
+        assertThat(jdbc.queryForObject("SELECT notes FROM fitness.progress_photos WHERE id=?",
+                String.class, ownPhoto)).isEqualTo("unattributed photo note");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?",
+                Integer.class, request, ownMedia)).isZero();
         assertThat(jdbc.queryForObject("SELECT encrypted_credentials_ref FROM fitness.integration_connections WHERE id=?",
                 String.class, ownerConnection)).isNull();
         assertThat(jdbc.queryForObject("SELECT status FROM fitness.integration_connections WHERE id=?",

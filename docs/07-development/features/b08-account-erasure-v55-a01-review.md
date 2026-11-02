@@ -1,6 +1,6 @@
-# B08 Account Erasure — V55 A01 schema review packet (CANDIDATE)
+# B08 Account Erasure — V55 A01 schema review packet (MERGED; REVIEW_PENDING)
 
-Base: PR #132 merge `ac956d77cded957e17f27b2bb6c25b087d531557`; main's last migration is V54. Person A's user-reported direct approval of V50/V54 does **not** approve this V55 candidate.
+V55 was merged via PR #133 at `8c8aa0cf35c3ef8e2ead8cfec094b32dc386a619`. Person A's user-reported direct approval of V50/V54 does **not** approve V55; no specific V55 sign-off was supplied. Merge/CI are implementation evidence, not A01 approval.
 
 ## DDL and data behavior
 
