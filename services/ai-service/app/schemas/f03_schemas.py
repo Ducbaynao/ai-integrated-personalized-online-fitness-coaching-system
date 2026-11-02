@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -18,16 +18,20 @@ class TargetRefSchema(BaseModel):
 
     @model_validator(mode="after")
     def validate_target_scope(self) -> "TargetRefSchema":
-        if self.scope == "ONE_MATERIALIZED_OCCURRENCE":
-            if self.plannedWorkoutId is None or self.plannedSessionExerciseId is None:
-                raise ValueError(
-                    "Scope ONE_MATERIALIZED_OCCURRENCE requires plannedWorkoutId and plannedSessionExerciseId"
-                )
-        elif self.scope == "TEMPLATE_OR_FUTURE_OCCURRENCES":
-            if self.planId is None or self.planVersionNumber is None or self.exercisePrescriptionId is None:
-                raise ValueError(
-                    "Scope TEMPLATE_OR_FUTURE_OCCURRENCES requires planId, planVersionNumber, and exercisePrescriptionId"
-                )
+        if (
+            self.scope == "ONE_MATERIALIZED_OCCURRENCE"
+            and (self.plannedWorkoutId is None or self.plannedSessionExerciseId is None)
+        ):
+            raise ValueError(
+                "Scope ONE_MATERIALIZED_OCCURRENCE requires plannedWorkoutId and plannedSessionExerciseId"
+            )
+        elif (
+            self.scope == "TEMPLATE_OR_FUTURE_OCCURRENCES"
+            and (self.planId is None or self.planVersionNumber is None or self.exercisePrescriptionId is None)
+        ):
+            raise ValueError(
+                "Scope TEMPLATE_OR_FUTURE_OCCURRENCES requires planId, planVersionNumber, and exercisePrescriptionId"
+            )
         return self
 
 
@@ -107,9 +111,8 @@ class VolumeAdjustmentAfter(BaseModel):
 
     @model_validator(mode="after")
     def validate_reps_min_max(self) -> "VolumeAdjustmentAfter":
-        if self.targetRepsMin is not None and self.targetRepsMax is not None:
-            if self.targetRepsMin > self.targetRepsMax:
-                raise ValueError("targetRepsMin must be <= targetRepsMax")
+        if self.targetRepsMin is not None and self.targetRepsMax is not None and self.targetRepsMin > self.targetRepsMax:
+            raise ValueError("targetRepsMin must be <= targetRepsMax")
         return self
 
 
@@ -211,11 +214,7 @@ class VolumeAdjustmentChange(BaseModel):
 
 
 TypedWorkoutChange = Annotated[
-    Union[
-        ExerciseSubstitutionChange,
-        LoadAdjustmentChange,
-        VolumeAdjustmentChange,
-    ],
+    ExerciseSubstitutionChange | LoadAdjustmentChange | VolumeAdjustmentChange,
     Field(discriminator="changeType"),
 ]
 

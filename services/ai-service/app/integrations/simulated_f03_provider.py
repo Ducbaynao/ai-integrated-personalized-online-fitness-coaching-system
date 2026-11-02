@@ -11,7 +11,6 @@ from app.schemas.f03_schemas import (
     LoadAdjustmentAfter,
     LoadAdjustmentBefore,
     LoadAdjustmentChange,
-    TargetRefSchema,
     VersionGuardsSchema,
     VolumeAdjustmentAfter,
     VolumeAdjustmentBefore,
@@ -99,7 +98,7 @@ class SimulatedF03WorkoutProvider:
                 direction = "DECREASE"
                 target_load = max(Decimal("0.0"), before_load - Decimal("2.5"))
 
-            delta_pct = (delta / before_load * Decimal("100")).quantize(Decimal("0.1")) if before_load > 0 else Decimal("10.0")
+            delta_pct = (delta / before_load * Decimal(100)).quantize(Decimal("0.1")) if before_load > 0 else Decimal("10.0")
 
             change = LoadAdjustmentChange(
                 changeId=change_id,

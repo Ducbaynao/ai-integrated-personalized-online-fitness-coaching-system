@@ -6,8 +6,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.f03_schemas import (
-    F03WorkoutAdjustmentRequest,
     F03WorkoutAdjustmentResponse,
+    LoadAdjustmentAfter,
+    LoadAdjustmentBefore,
+    LoadAdjustmentChange,
     TargetRefSchema,
 )
 
@@ -108,7 +110,6 @@ def test_contradictory_delta_load_fails():
         plannedSessionExerciseId=UUID("7c9e6679-7425-40de-944b-e07fc1f90ae7"),
     )
     with pytest.raises(ValidationError, match="Contradictory deltaLoad"):
-        from app.schemas.f03_schemas import LoadAdjustmentAfter, LoadAdjustmentBefore, LoadAdjustmentChange
         LoadAdjustmentChange(
             changeId=UUID("11111111-1111-4111-8111-111111111111"),
             scope="ONE_MATERIALIZED_OCCURRENCE",
