@@ -22,5 +22,12 @@ public class NutritionAccountErasureService implements NutritionAccountErasure {
                 UPDATE fitness.meals SET title=NULL,notes=NULL
                 WHERE created_by=? AND (title IS NOT NULL OR notes IS NOT NULL)
                 """, userId);
+        // V16 forbids changing locked versions. Their authored summaries need an
+        // evidenced redaction path and remain unresolved rather than blocking
+        // all other partial cleanup in this transaction.
+        jdbc.update("""
+                UPDATE fitness.nutrition_goal_versions SET change_summary=NULL
+                WHERE created_by=? AND locked_at IS NULL AND change_summary IS NOT NULL
+                """, userId);
     }
 }

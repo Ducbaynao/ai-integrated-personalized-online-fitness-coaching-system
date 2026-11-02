@@ -101,6 +101,18 @@ class AccountErasureHttpIntegrationTest {
                     VALUES (?,?,1,'USER_REASON','private summary',?)
                     """, values[2], values[0], values[1]);
         }
+        UUID lockedPlan = UUID.randomUUID(), lockedVersion = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.workout_plans
+                  (id,student_id,name,source,status,created_by,decision_owner_type,decision_owner_id)
+                VALUES (?,?,'Locked plan','STUDENT','DRAFT',?,'STUDENT',?)
+                """, lockedPlan, requester, requester, requester);
+        jdbc.update("""
+                INSERT INTO fitness.workout_plan_versions
+                  (id,workout_plan_id,version_number,change_reason,change_summary,created_by,
+                   locked_at,lock_reason)
+                VALUES (?,?,1,'USER_REASON','locked private summary',?,clock_timestamp(),'APPROVED')
+                """, lockedVersion, lockedPlan, requester);
         UUID ownerMeal = UUID.randomUUID(), otherMeal = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
@@ -110,6 +122,59 @@ class AccountErasureHttpIntegrationTest {
                 INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
                 VALUES (?,?,'BREAKFAST',clock_timestamp(),'other food','other note',?)
                 """, otherMeal, other, other);
+        UUID ownNutritionGoal = UUID.randomUUID(), otherNutritionGoal = UUID.randomUUID();
+        UUID ownNutritionVersion = UUID.randomUUID(), otherNutritionVersion = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownNutritionGoal, requester, ownNutritionVersion},
+                {otherNutritionGoal, other, otherNutritionVersion}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.nutrition_goals(id,student_id,title,created_by)
+                    VALUES (?,?,'Goal',?)
+                    """, values[0], values[1], values[1]);
+            jdbc.update("""
+                    INSERT INTO fitness.nutrition_goal_versions
+                      (id,nutrition_goal_id,version_number,effective_from,change_summary,created_by)
+                    VALUES (?,?,1,CURRENT_DATE,'private nutrition summary',?)
+                    """, values[2], values[0], values[1]);
+        }
+        UUID lockedNutritionGoal = UUID.randomUUID(), lockedNutritionVersion = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.nutrition_goals(id,student_id,title,created_by)
+                VALUES (?,?,'Locked goal',?)
+                """, lockedNutritionGoal, requester, requester);
+        jdbc.update("""
+                INSERT INTO fitness.nutrition_goal_versions
+                  (id,nutrition_goal_id,version_number,effective_from,change_summary,created_by,
+                   locked_at,lock_reason)
+                VALUES (?,?,1,CURRENT_DATE,'locked nutrition summary',?,clock_timestamp(),'APPROVED')
+                """, lockedNutritionVersion, lockedNutritionGoal, requester);
+        String metricCode = "ERASE_WEIGHT_" + requester.toString().substring(0, 8);
+        String unitCode = "ERASE_KG_" + requester.toString().substring(0, 8);
+        String sourceCode = "ERASE_MANUAL_" + requester.toString().substring(0, 8);
+        jdbc.update("""
+                INSERT INTO fitness.measurement_units(code,symbol,dimension)
+                VALUES (?,'kg','MASS')
+                """, unitCode);
+        jdbc.update("""
+                INSERT INTO fitness.metric_definitions(code,display_name,collection_type,default_unit_id)
+                VALUES (?,'Erasure weight','DIRECT',
+                    (SELECT id FROM fitness.measurement_units WHERE code=?))
+                """, metricCode, unitCode);
+        jdbc.update("""
+                INSERT INTO fitness.measurement_sources(code,name,source_kind)
+                VALUES (?,'Erasure manual','MANUAL')
+                """, sourceCode);
+        UUID ownMeasurement = UUID.randomUUID(), otherMeasurement = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownMeasurement, requester}, {otherMeasurement, other}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.measurements
+                      (id,student_id,metric_definition_id,numeric_value,unit_id,measured_at,
+                       source_id,notes,external_record_id)
+                    VALUES (?, ?, (SELECT id FROM fitness.metric_definitions WHERE code=?),
+                       75, (SELECT id FROM fitness.measurement_units WHERE code=?),
+                       clock_timestamp(),(SELECT id FROM fitness.measurement_sources WHERE code=?),
+                       'sensitive note','source-person')
+                    """, values[0], values[1], metricCode, unitCode, sourceCode);
+        }
         jdbc.update("""
                 INSERT INTO fitness.integration_providers(code,name,provider_type)
                 VALUES (?,'Owner port fixture','WEARABLE')
@@ -158,10 +223,26 @@ class AccountErasureHttpIntegrationTest {
                 String.class, ownerVersion)).isNull();
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
                 String.class, otherVersion)).isEqualTo("private summary");
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
+                String.class, lockedVersion)).isEqualTo("locked private summary");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, ownerMeal)).isNull();
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, otherMeal)).isEqualTo("other food");
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.nutrition_goal_versions WHERE id=?",
+                String.class, ownNutritionVersion)).isNull();
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.nutrition_goal_versions WHERE id=?",
+                String.class, otherNutritionVersion)).isEqualTo("private nutrition summary");
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.nutrition_goal_versions WHERE id=?",
+                String.class, lockedNutritionVersion)).isEqualTo("locked nutrition summary");
+        assertThat(jdbc.queryForObject("SELECT numeric_value FROM fitness.measurements WHERE id=?",
+                java.math.BigDecimal.class, ownMeasurement)).isNull();
+        assertThat(jdbc.queryForObject("SELECT erasure_request_id FROM fitness.measurements WHERE id=?",
+                UUID.class, ownMeasurement)).isEqualTo(request);
+        assertThat(jdbc.queryForObject("SELECT notes FROM fitness.measurements WHERE id=?",
+                String.class, ownMeasurement)).isNull();
+        assertThat(jdbc.queryForObject("SELECT numeric_value FROM fitness.measurements WHERE id=?",
+                java.math.BigDecimal.class, otherMeasurement)).isEqualByComparingTo("75");
         assertThat(jdbc.queryForObject("SELECT encrypted_credentials_ref FROM fitness.integration_connections WHERE id=?",
                 String.class, ownerConnection)).isNull();
         assertThat(jdbc.queryForObject("SELECT status FROM fitness.integration_connections WHERE id=?",
