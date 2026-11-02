@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f03-workout-adjustment.schema.json",
+  "title": "F03 Workout Adjustment Proposal",
+  "description": "Structured payload for F03 AI workout adjustment recommendations (exercise substitution, load and volume adjustments)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recommendationType",
+    "summary",
+    "reasoning",
+    "usedData",
+    "missingData",
+    "confidence",
+    "changes"
+  ],
+  "properties": {
+    "recommendationType": {
+      "type": "string",
+      "const": "WORKOUT_ADJUSTMENT_PROPOSAL"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reasoning": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "usedData": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "missingData": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "description": "Exercise substitution adjustment",
+            "additionalProperties": false,
+            "required": [
+              "changeId",
+              "changeType",
+              "scope",
+              "targetRef",
+              "before",
+              "after",
+              "reason"
+            ],
+            "properties": {
+              "changeId": { "type": "string", "format": "uuid" },
+              "changeType": { "type": "string", "const": "EXERCISE_SUBSTITUTION" },
+              "scope": {
+                "type": "string",
+                "enum": ["ONE_MATERIALIZED_OCCURRENCE", "TEMPLATE_OR_FUTURE_OCCURRENCES"]
+              },
+              "targetRef": { "$ref": "#/$defs/targetRef" },
+              "before": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["exerciseVariationId"],
+                "properties": {
+                  "exerciseVariationId": { "type": "string", "format": "uuid" },
+                  "exerciseName": { "type": ["string", "null"] },
+                  "movementPattern": { "type": ["string", "null"] },
+                  "equipmentType": { "type": ["string", "null"] }
+                }
+              },
+              "after": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["replacementVariationId"],
+                "properties": {
+                  "replacementVariationId": { "type": "string", "format": "uuid" },
+                  "replacementExerciseName": { "type": ["string", "null"] },
+                  "movementPattern": { "type": ["string", "null"] },
+                  "equipmentType": { "type": ["string", "null"] },
+                  "substitutionCategory": {
+                    "type": ["string", "null"],
+                    "enum": [
+                      "EQUIPMENT_UNAVAILABLE",
+                      "LIMITATION_OR_PAIN",
+                      "PREFERENCE",
+                      "FATIGUE_MANAGEMENT",
+                      "OTHER",
+                      null
+                    ]
+                  }
+                }
+              },
+              "reason": { "type": "string", "minLength": 1 },
+              "evidence": { "$ref": "#/$defs/evidence" },
+              "versionGuards": { "$ref": "#/$defs/versionGuards" }
+            }
+          },
+          {
+            "description": "Load/intensity adjustment",
+            "additionalProperties": false,
+            "required": [
+              "changeId",
+              "changeType",
+              "scope",
+              "targetRef",
+              "before",
+              "after",
+              "reason"
+            ],
+            "properties": {
+              "changeId": { "type": "string", "format": "uuid" },
+              "changeType": { "type": "string", "const": "LOAD_ADJUSTMENT" },
+              "scope": {
+                "type": "string",
+                "enum": ["ONE_MATERIALIZED_OCCURRENCE", "TEMPLATE_OR_FUTURE_OCCURRENCES"]
+              },
+              "targetRef": { "$ref": "#/$defs/targetRef" },
+              "before": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetLoad": { "type": ["number", "null"], "minimum": 0 },
+                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LBS", null] },
+                  "loadUnitId": { "type": ["integer", "null"], "minimum": 1 }
+                }
+              },
+              "after": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["direction"],
+                "properties": {
+                  "targetLoad": { "type": ["number", "null"], "minimum": 0 },
+                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LBS", null] },
+                  "loadUnitId": { "type": ["integer", "null"], "minimum": 1 },
+                  "direction": {
+                    "type": "string",
+                    "enum": ["INCREASE", "DECREASE", "MAINTAIN"]
+                  },
+                  "deltaLoad": { "type": ["number", "null"] },
+                  "deltaPercent": { "type": ["number", "null"] }
+                }
+              },
+              "reason": { "type": "string", "minLength": 1 },
+              "evidence": { "$ref": "#/$defs/evidence" },
+              "versionGuards": { "$ref": "#/$defs/versionGuards" }
+            }
+          },
+          {
+            "description": "Volume adjustment (sets/reps/duration)",
+            "additionalProperties": false,
+            "required": [
+              "changeId",
+              "changeType",
+              "scope",
+              "targetRef",
+              "before",
+              "after",
+              "reason"
+            ],
+            "properties": {
+              "changeId": { "type": "string", "format": "uuid" },
+              "changeType": { "type": "string", "const": "VOLUME_ADJUSTMENT" },
+              "scope": {
+                "type": "string",
+                "enum": ["ONE_MATERIALIZED_OCCURRENCE", "TEMPLATE_OR_FUTURE_OCCURRENCES"]
+              },
+              "targetRef": { "$ref": "#/$defs/targetRef" },
+              "before": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetSets": { "type": ["integer", "null"], "minimum": 1 },
+                  "targetRepsMin": { "type": ["integer", "null"], "minimum": 0 },
+                  "targetRepsMax": { "type": ["integer", "null"], "minimum": 0 },
+                  "durationSeconds": { "type": ["integer", "null"], "minimum": 0 }
+                }
+              },
+              "after": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetSets": { "type": ["integer", "null"], "minimum": 1 },
+                  "targetRepsMin": { "type": ["integer", "null"], "minimum": 0 },
+                  "targetRepsMax": { "type": ["integer", "null"], "minimum": 0 },
+                  "durationSeconds": { "type": ["integer", "null"], "minimum": 0 },
+                  "deltaSets": { "type": ["integer", "null"] },
+                  "deltaRepsMin": { "type": ["integer", "null"] },
+                  "deltaRepsMax": { "type": ["integer", "null"] },
+                  "deltaDurationSeconds": { "type": ["integer", "null"] }
+                }
+              },
+              "reason": { "type": "string", "minLength": 1 },
+              "evidence": { "$ref": "#/$defs/evidence" },
+              "versionGuards": { "$ref": "#/$defs/versionGuards" }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "targetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["ONE_MATERIALIZED_OCCURRENCE", "TEMPLATE_OR_FUTURE_OCCURRENCES"]
+        },
+        "plannedWorkoutId": { "type": ["string", "null"], "format": "uuid" },
+        "plannedSessionExerciseId": { "type": ["string", "null"], "format": "uuid" },
+        "planId": { "type": ["string", "null"], "format": "uuid" },
+        "planVersionNumber": { "type": ["integer", "null"], "minimum": 1 },
+        "dayNumber": { "type": ["integer", "null"], "minimum": 1, "maximum": 7 },
+        "exercisePrescriptionId": { "type": ["string", "null"], "format": "uuid" }
+      },
+      "oneOf": [
+        {
+          "properties": { "scope": { "const": "ONE_MATERIALIZED_OCCURRENCE" } },
+          "required": ["plannedWorkoutId", "plannedSessionExerciseId"]
+        },
+        {
+          "properties": { "scope": { "const": "TEMPLATE_OR_FUTURE_OCCURRENCES" } },
+          "required": ["planId", "planVersionNumber", "exercisePrescriptionId"]
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "movementPatternMatch": { "type": ["boolean", "null"] },
+        "equipmentAvailable": { "type": ["boolean", "null"] },
+        "rpeWindowCoverage": { "type": ["string", "null"] },
+        "continuityState": {
+          "type": ["string", "null"],
+          "enum": [
+            "CONFIRMED_NEW",
+            "RECENT_CONSISTENT",
+            "PROLONGED_INACTIVITY",
+            "UNKNOWN_HISTORY",
+            "RESTRICTED_HISTORY",
+            null
+          ]
+        },
+        "knowledgeCitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "versionGuards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectedOccurrenceVersion": { "type": ["integer", "null"], "minimum": 0 },
+        "expectedPlanAggregateVersion": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

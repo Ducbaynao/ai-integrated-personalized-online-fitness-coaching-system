@@ -1,0 +1,28 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Exercise substitution chứa trường thừa không được phép",
+  "reasoning": ["Vi phạm additionalProperties: false"],
+  "usedData": [],
+  "missingData": [],
+  "confidence": 0.5,
+  "changes": [
+    {
+      "changeId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "changeType": "EXERCISE_SUBSTITUTION",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "exerciseVariationId": "22222222-2222-4222-8222-222222222222",
+        "targetLoad": 80.0
+      },
+      "after": {
+        "replacementVariationId": "33333333-3333-4333-8333-333333333333"
+      },
+      "reason": "Before chứa targetLoad không hợp lệ cho bài thay"
+    }
+  ]
+}

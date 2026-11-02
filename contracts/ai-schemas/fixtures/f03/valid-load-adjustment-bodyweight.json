@@ -1,0 +1,48 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Duy trì mức tạ Bodyweight cho Pull-up",
+  "reasoning": [
+    "Bài tập sử dụng trọng lượng cơ thể thuần túy, không có tạ gắn ngoài."
+  ],
+  "usedData": ["exercise_catalog", "workout_history"],
+  "missingData": [],
+  "limitations": [],
+  "confidence": 0.9,
+  "changes": [
+    {
+      "changeId": "44444444-4444-4444-8444-444444444444",
+      "changeType": "LOAD_ADJUSTMENT",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "targetLoad": null,
+        "loadUnit": null,
+        "loadUnitId": null
+      },
+      "after": {
+        "targetLoad": null,
+        "loadUnit": null,
+        "loadUnitId": null,
+        "direction": "MAINTAIN",
+        "deltaLoad": null,
+        "deltaPercent": null
+      },
+      "reason": "Bài tập tự trọng cơ thể, duy trì không thêm tạ ngoài.",
+      "evidence": {
+        "movementPatternMatch": null,
+        "equipmentAvailable": true,
+        "rpeWindowCoverage": "2_OF_2_SESSIONS_COVERED",
+        "continuityState": "RECENT_CONSISTENT",
+        "knowledgeCitations": []
+      },
+      "versionGuards": {
+        "expectedOccurrenceVersion": 1,
+        "expectedPlanAggregateVersion": null
+      }
+    }
+  ]
+}

@@ -160,6 +160,49 @@ if (fs.existsSync(f02FixturesDir)) {
   }
 }
 
+
+// 4. F03 fixtures verification
+const f03FixturesDir = path.join(schemasDir, 'fixtures', 'f03');
+if (fs.existsSync(f03FixturesDir)) {
+  const f03AdjustmentValidator = compiledSchemas.get('f03-workout-adjustment.schema.json');
+  const f03TestCases = [
+    { file: 'valid-exercise-substitution-occurrence.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 substitution on single occurrence' },
+    { file: 'valid-exercise-substitution-template.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 substitution on template/future' },
+    { file: 'valid-load-adjustment.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 load adjustment' },
+    { file: 'valid-load-adjustment-bodyweight.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 bodyweight load adjustment' },
+    { file: 'valid-volume-adjustment-reps.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 volume adjustment reps' },
+    { file: 'valid-volume-adjustment-duration.json', validator: f03AdjustmentValidator, expectValid: true, desc: 'Valid F03 volume adjustment duration' },
+    { file: 'invalid-missing-change-type.json', validator: f03AdjustmentValidator, expectValid: false, desc: 'Invalid F03 missing changeType' },
+    { file: 'invalid-load-negative.json', validator: f03AdjustmentValidator, expectValid: false, desc: 'Invalid F03 negative load' },
+    { file: 'invalid-target-scope-mismatch.json', validator: f03AdjustmentValidator, expectValid: false, desc: 'Invalid F03 targetRef scope mismatch' },
+    { file: 'invalid-extra-fields-substitution.json', validator: f03AdjustmentValidator, expectValid: false, desc: 'Invalid F03 extra fields in substitution' },
+  ];
+
+  for (const tc of f03TestCases) {
+    const fixturePath = path.join(f03FixturesDir, tc.file);
+    if (!fs.existsSync(fixturePath)) {
+      failures.push(`F03 Fixture missing: ${tc.file}`);
+      continue;
+    }
+    try {
+      const data = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+      if (!tc.validator) {
+        failures.push(`Validator not found for fixture: ${tc.file}`);
+        continue;
+      }
+      const isValid = tc.validator(data);
+      fixtureCount++;
+      if (tc.expectValid && !isValid) {
+        failures.push(`Fixture failed unexpectedly [${tc.desc}]: ${ajv.errorsText(tc.validator.errors)}`);
+      } else if (!tc.expectValid && isValid) {
+        failures.push(`Fixture passed but was expected to fail [${tc.desc}] (${tc.file})`);
+      }
+    } catch (err) {
+      failures.push(`Fixture parse error [${tc.file}]: ${err.message}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI schema and contract validation failed:');
   for (const failure of failures) {

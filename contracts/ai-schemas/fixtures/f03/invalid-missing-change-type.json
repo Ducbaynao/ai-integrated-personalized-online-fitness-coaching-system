@@ -1,0 +1,22 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Thiếu changeType trong đối tượng thay đổi",
+  "reasoning": ["Test validation failure"],
+  "usedData": [],
+  "missingData": [],
+  "confidence": 0.5,
+  "changes": [
+    {
+      "changeId": "77777777-7777-4777-8777-777777777777",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {},
+      "after": {},
+      "reason": "Thiếu changeType bắt buộc"
+    }
+  ]
+}

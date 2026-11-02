@@ -1,0 +1,49 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Tăng mức tạ Barbell Back Squat thêm 2.5kg",
+  "reasoning": [
+    "Học viên hoàn thành đầy đủ 3 hiệp x 10 lần ở mức 80kg trong 2 buổi liên tiếp với RPE 7.0.",
+    "Chỉ số phục hồi tốt, đủ điều kiện kích hoạt tăng tải lũy tiến an toàn."
+  ],
+  "usedData": ["actual_workout_logs", "rpe_ratings", "progress_engine_signals"],
+  "missingData": [],
+  "limitations": [],
+  "confidence": 0.88,
+  "changes": [
+    {
+      "changeId": "33333333-3333-4333-8333-333333333333",
+      "changeType": "LOAD_ADJUSTMENT",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "targetLoad": 80.0,
+        "loadUnit": "KG",
+        "loadUnitId": 1
+      },
+      "after": {
+        "targetLoad": 82.5,
+        "loadUnit": "KG",
+        "loadUnitId": 1,
+        "direction": "INCREASE",
+        "deltaLoad": 2.5,
+        "deltaPercent": 3.125
+      },
+      "reason": "Hoàn thành tốt các buổi trước với RPE $\\le 7$, tăng tải bảo thủ 2.5kg (3.1%).",
+      "evidence": {
+        "movementPatternMatch": null,
+        "equipmentAvailable": true,
+        "rpeWindowCoverage": "3_OF_3_SESSIONS_COVERED",
+        "continuityState": "RECENT_CONSISTENT",
+        "knowledgeCitations": []
+      },
+      "versionGuards": {
+        "expectedOccurrenceVersion": 2,
+        "expectedPlanAggregateVersion": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Scope ONE_MATERIALIZED_OCCURRENCE nhưng thiếu plannedWorkoutId",
+  "reasoning": ["Sai lệch định danh targetRef"],
+  "usedData": [],
+  "missingData": [],
+  "confidence": 0.5,
+  "changes": [
+    {
+      "changeId": "99999999-9999-4999-8999-999999999999",
+      "changeType": "EXERCISE_SUBSTITUTION",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "exerciseVariationId": "22222222-2222-4222-8222-222222222222"
+      },
+      "after": {
+        "replacementVariationId": "33333333-3333-4333-8333-333333333333"
+      },
+      "reason": "Thiếu plannedWorkoutId trong scope 1 buổi"
+    }
+  ]
+}

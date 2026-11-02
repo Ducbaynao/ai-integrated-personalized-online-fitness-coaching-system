@@ -1,0 +1,51 @@
+{
+  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+  "summary": "Tăng thời lượng bài Plank từ 45s lên 60s",
+  "reasoning": [
+    "Học viên giữ tư thế Plank 45 giây vững vàng, tiến triển thêm 15 giây sức bền cơ lõi."
+  ],
+  "usedData": ["workout_history"],
+  "missingData": [],
+  "limitations": [],
+  "confidence": 0.9,
+  "changes": [
+    {
+      "changeId": "66666666-6666-4666-8666-666666666666",
+      "changeType": "VOLUME_ADJUSTMENT",
+      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+      "targetRef": {
+        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+        "plannedWorkoutId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "plannedSessionExerciseId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+      },
+      "before": {
+        "targetSets": 3,
+        "targetRepsMin": null,
+        "targetRepsMax": null,
+        "durationSeconds": 45
+      },
+      "after": {
+        "targetSets": 3,
+        "targetRepsMin": null,
+        "targetRepsMax": null,
+        "durationSeconds": 60,
+        "deltaSets": 0,
+        "deltaRepsMin": null,
+        "deltaRepsMax": null,
+        "deltaDurationSeconds": 15
+      },
+      "reason": "Tăng thêm 15 giây cho bài tập isometric core theo đúng tiến độ rèn luyện sức bền.",
+      "evidence": {
+        "movementPatternMatch": null,
+        "equipmentAvailable": true,
+        "rpeWindowCoverage": null,
+        "continuityState": "RECENT_CONSISTENT",
+        "knowledgeCitations": []
+      },
+      "versionGuards": {
+        "expectedOccurrenceVersion": 1,
+        "expectedPlanAggregateVersion": null
+      }
+    }
+  ]
+}
