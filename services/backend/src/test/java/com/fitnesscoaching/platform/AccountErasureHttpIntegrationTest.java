@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureWorker;
+import com.fitnesscoaching.platform.modules.user.application.service.AccountErasureService;
 import com.fitnesscoaching.platform.modules.chat.ChatObjectStorage;
 import com.fitnesscoaching.platform.modules.chat.ChatFailure;
 import com.fitnesscoaching.platform.modules.auth.domain.TokenHasher;
@@ -62,6 +63,7 @@ class AccountErasureHttpIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired AccountErasureWorker worker;
+    @Autowired AccountErasureService erasure;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping requestMappings;
     @MockitoBean ChatObjectStorage storage;
 
@@ -73,6 +75,102 @@ class AccountErasureHttpIntegrationTest {
                 SET next_attempt_at=clock_timestamp()+interval '1 day'
                 WHERE status IN ('REQUESTED','PROCESSING','RETRYABLE','HELD')
                 """);
+    }
+
+    @Test void fencedOwnerPortsMinimizeOnlyProvenAuthorAndConnectionFields() throws Exception {
+        UUID requester = UUID.randomUUID(), other = UUID.randomUUID();
+        for (UUID user : new UUID[]{requester, other}) {
+            jdbc.update("""
+                    INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                    VALUES (?,?,'hash','Owner port test','ACTIVE')
+                    """, user, user + "@example.com");
+            jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", user);
+        }
+        UUID ownerPlan = UUID.randomUUID(), otherPlan = UUID.randomUUID();
+        UUID ownerVersion = UUID.randomUUID(), otherVersion = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownerPlan, requester, ownerVersion},
+                {otherPlan, other, otherVersion}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.workout_plans
+                      (id,student_id,name,source,status,created_by,decision_owner_type,decision_owner_id)
+                    VALUES (?,?,'Plan','STUDENT','DRAFT',?,'STUDENT',?)
+                    """, values[0], values[1], values[1], values[1]);
+            jdbc.update("""
+                    INSERT INTO fitness.workout_plan_versions
+                      (id,workout_plan_id,version_number,change_reason,change_summary,created_by)
+                    VALUES (?,?,1,'USER_REASON','private summary',?)
+                    """, values[2], values[0], values[1]);
+        }
+        UUID ownerMeal = UUID.randomUUID(), otherMeal = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
+                VALUES (?,?,'BREAKFAST',clock_timestamp(),'my food','my note',?)
+                """, ownerMeal, requester, requester);
+        jdbc.update("""
+                INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
+                VALUES (?,?,'BREAKFAST',clock_timestamp(),'other food','other note',?)
+                """, otherMeal, other, other);
+        jdbc.update("""
+                INSERT INTO fitness.integration_providers(code,name,provider_type)
+                VALUES (?,'Owner port fixture','WEARABLE')
+                """, "ERASURE_" + requester.toString().substring(0, 12));
+        Integer provider = jdbc.queryForObject("SELECT id FROM fitness.integration_providers WHERE code=?",
+                Integer.class, "ERASURE_" + requester.toString().substring(0, 12));
+        UUID ownerConnection = UUID.randomUUID(), otherConnection = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownerConnection, requester}, {otherConnection, other}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.integration_connections
+                      (id,user_id,provider_id,external_account_id,encrypted_credentials_ref,granted_scopes)
+                    VALUES (?,?,?,'external','secret-ref',ARRAY['read']::text[])
+                    """, values[0], values[1], provider);
+        }
+
+        String body = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(requester.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
+                .readTree(body).get("id").asText());
+        // A stale/non-owner lease cannot invoke any owner port.
+        assertThat(erasure.minimizeCurrentScope(request, requester, UUID.randomUUID())).isNull();
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
+                String.class, ownerVersion)).isEqualTo("private summary");
+        jdbc.update("""
+                INSERT INTO fitness.account_erasure_holds(request_id,case_id,legal_basis,scope,
+                    approved_by,next_review_at)
+                VALUES (?,'owner-port-hold','test evidence','ALL',?,clock_timestamp()+interval '29 days')
+                """, request, requester);
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("HELD");
+        assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
+                String.class, ownerMeal)).isEqualTo("my food");
+        jdbc.update("""
+                UPDATE fitness.account_erasure_holds SET released_at=clock_timestamp(),released_by=?
+                WHERE request_id=? AND case_id='owner-port-hold'
+                """, requester, request);
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
+                String.class, ownerVersion)).isNull();
+        assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
+                String.class, otherVersion)).isEqualTo("private summary");
+        assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
+                String.class, ownerMeal)).isNull();
+        assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
+                String.class, otherMeal)).isEqualTo("other food");
+        assertThat(jdbc.queryForObject("SELECT encrypted_credentials_ref FROM fitness.integration_connections WHERE id=?",
+                String.class, ownerConnection)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.integration_connections WHERE id=?",
+                String.class, ownerConnection)).isEqualTo("REVOKED");
+        assertThat(jdbc.queryForObject("SELECT encrypted_credentials_ref FROM fitness.integration_connections WHERE id=?",
+                String.class, otherConnection)).isEqualTo("secret-ref");
+        assertThat(jdbc.queryForObject("SELECT active_cleaned_at FROM fitness.account_erasure_requests WHERE id=?",
+                java.sql.Timestamp.class, request)).isNull();
+        assertThat(erasure.minimizeCurrentScope(request, requester, UUID.randomUUID())).isNull();
     }
 
     @Test void noExistingAdminHasHoldMutationRouteOrPermission() {
@@ -323,6 +421,90 @@ class AccountErasureHttpIntegrationTest {
                 String.class, user)).isEqualTo("Legacy Sender");
         org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
                 .deleteAndVerify(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test void chatMediaAlsoLinkedToProgressPhotoCannotBeVerifiedAsChatOwned() throws Exception {
+        UUID user = UUID.randomUUID(), conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID(), media = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?,?,'hash','Shared media Student','ACTIVE')
+                """, user, user + "@example.com");
+        jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", user);
+        jdbc.update("""
+                INSERT INTO fitness.conversations(id,conversation_type,created_by)
+                VALUES (?,'SUPPORT',?)
+                """, conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.messages(id,conversation_id,sender_id,message_type)
+                VALUES (?,?,?,'IMAGE')
+                """, message, conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                    content_type,size_bytes,media_purpose,visibility,scan_status)
+                VALUES (?,?,'S3','disposable','shared/progress','image/png',1,
+                    'CHAT_ATTACHMENT','PRIVATE','CLEAN')
+                """, media, user);
+        jdbc.update("INSERT INTO fitness.message_attachments(message_id,media_id) VALUES (?,?)", message, media);
+        jdbc.update("""
+                INSERT INTO fitness.progress_photos(student_id,media_id,taken_at)
+                VALUES (?,?,clock_timestamp())
+                """, user, media);
+        String body = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
+                .readTree(body).get("id").asText());
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?
+                """, String.class, request, media)).isEqualTo("OWNER_REVIEW_REQUIRED");
+        assertThat(jdbc.queryForObject("SELECT deleted_at FROM fitness.media_files WHERE id=?",
+                java.sql.Timestamp.class, media)).isNotNull();
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+        org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                .deleteAndVerify(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test void chatOnlyMediaWithKnownForeignKeysRemainsClaimable() throws Exception {
+        UUID user = UUID.randomUUID(), conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID(), media = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?,?,'hash','Chat only Student','ACTIVE')
+                """, user, user + "@example.com");
+        jdbc.update("INSERT INTO fitness.conversations(id,conversation_type,created_by) VALUES (?,'SUPPORT',?)",
+                conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.messages(id,conversation_id,sender_id,message_type)
+                VALUES (?,?,?,'IMAGE')
+                """, message, conversation, user);
+        jdbc.update("""
+                INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                    content_type,size_bytes,media_purpose,visibility,scan_status)
+                VALUES (?,?,'S3','disposable','chat/only','image/png',1,
+                    'CHAT_ATTACHMENT','PRIVATE','CLEAN')
+                """, media, user);
+        jdbc.update("INSERT INTO fitness.message_attachments(message_id,media_id) VALUES (?,?)", message, media);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_constraint
+                WHERE contype='f' AND confrelid='fitness.media_files'::regclass
+                """, Integer.class)).isEqualTo(11);
+        String body = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
+                .readTree(body).get("id").asText());
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM fitness.account_erasure_objects WHERE request_id=? AND media_id=?
+                """, String.class, request, media)).isEqualTo("PENDING");
     }
 
     @Test void objectFailureRemainsRetryableAndTwoWorkersCannotClaimSameRequest() throws Exception {
