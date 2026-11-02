@@ -1,6 +1,6 @@
-# B08 account erasure — V50 A01 schema review packet (MERGED; SIGN-OFF UNVERIFIED)
+# B08 account erasure — V50 A01 schema review packet (MERGED; DIRECT APPROVAL REPORTED)
 
-PR #117 merged V50 at `origin/main@d906eb731f8473e35f085b51e9771bfea334dca1` (2026-10-29). The original packet below documents the candidate's design and disposable test evidence. Merge/CI do not establish Person A's A01 schema sign-off; no sign-off is recorded in this repository or PR reviews. Runtime request/worker flags remain OFF. The owner-domain inventory below is expanded in [the post-merge worklist](b08-account-erasure-owner-worklist.md).
+PR #117 merged V50 at `origin/main@d906eb731f8473e35f085b51e9771bfea334dca1` (2026-10-29). The original packet below documents the candidate's design and disposable test evidence. The project owner reports Person A approved A01 V50/V54 directly (**user-reported direct approval**); no GitHub review/comment or unprovided rollout parameters are claimed. Merge/CI alone did not establish that approval. Runtime request/worker flags remain OFF. The owner-domain inventory is expanded in [the post-merge worklist](b08-account-erasure-owner-worklist.md) and [Person B domain gates](b08-account-erasure-person-b-domain-gates.md).
 
 ## Proposed forward DDL and upgrade
 

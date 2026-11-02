@@ -49,6 +49,11 @@ public class CoachingAuthorityService implements CoachingAuthorityQuery {
         if (status != AccountStatus.ACTIVE) {
             return AuthorityDecision.denied(AuthorityReason.ACCOUNT_UNAVAILABLE);
         }
+        // A disabled Student must not remain visible through a still-active grant.
+        // This shared boundary protects both current and historical Trainer reads.
+        if (accounts.getAccountStatus(request.studentId()).orElse(null) != AccountStatus.ACTIVE) {
+            return AuthorityDecision.denied(AuthorityReason.ACCOUNT_UNAVAILABLE);
+        }
         if (!roles.hasActiveRole(request.actorId(), "TRAINER")) {
             return AuthorityDecision.denied(AuthorityReason.TRAINER_CAPABILITY_UNAVAILABLE);
         }

@@ -1,5 +1,7 @@
 # B08 account erasure — post-PR #117 owner worklist (2026-10-29)
 
+The newer [Person B owner-domain gate inventory](b08-account-erasure-person-b-domain-gates.md) records a local read-path correction on base `origin/main@752f634` and the remaining field-level decisions. PR #129/#130 are merged with separate merge-commit CI PASS. This historical table is not an instruction to erase any domain row.
+
 Evidence cut updated to `origin/main@acebde0c439c6726c00092998acacd626e38fc51` (PR #128, V54). Its merge-commit CI passed 6/6 jobs. Person A's A01 approval of V50 and V54 is **user-reported direct approval**; no GitHub comment is claimed and neither approval is inferred from CI. Rollout details such as a concrete `lock_timeout` remain unconfirmed. The final Workout test-only change in PR #128 has no evidenced supplementary Antigravity review. This is a source/schema inventory, **not** an authorization to erase the rows listed below. `account.erasure.request-enabled` and `account.erasure.worker-enabled` remain OFF; `DOMAIN_REVIEW_PENDING` is mandatory until every required owner attests. The approved 24-hour target is not a demonstrated SLA. See the historical [V50 packet](b08-account-erasure-a01-schema-review.md) for lock, hold and storage gates; its earlier evidence status predates the user-reported direct approval.
 
 ## Data and read-path worklist

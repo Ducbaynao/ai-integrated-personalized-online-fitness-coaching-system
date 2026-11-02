@@ -128,8 +128,20 @@ class CoachingAuthorityServiceUnitTest {
         assertThat(decision.reason()).isEqualTo(AuthorityReason.HISTORY_WINDOW_NOT_GRANTED);
     }
 
+    @Test
+    void disabledStudentConcealsCurrentAndHistoricalAuthority() {
+        when(accounts.getAccountStatus(trainerId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(accounts.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.DISABLED));
+
+        assertThat(service.evaluateCurrent(request(DataAccessLevel.VIEW)).reason())
+                .isEqualTo(AuthorityReason.ACCOUNT_UNAVAILABLE);
+        assertThat(service.evaluateHistorical(historical("2026-03-01T00:00:00Z")).reason())
+                .isEqualTo(AuthorityReason.ACCOUNT_UNAVAILABLE);
+    }
+
     private void eligibleTrainer() {
         when(accounts.getAccountStatus(trainerId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(accounts.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(roles.hasActiveRole(trainerId, "TRAINER")).thenReturn(true);
         when(trainers.getCoachingEligibility(trainerId)).thenReturn(new CoachingEligibility(true, List.of()));
     }
