@@ -28,4 +28,19 @@ public class ProgressAccountErasureService implements ProgressAccountErasure {
                     OR status<>'REVOKED' OR revoked_at IS NULL)
                 """, userId);
     }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void tombstoneStudentMeasurements(UUID userId, UUID requestId) {
+        // student_id proves the health-data subject even if a Trainer entered
+        // the observation. Keep the row/FK skeleton, never a fabricated zero.
+        jdbc.update("""
+                UPDATE fitness.measurements SET
+                    numeric_value=NULL,text_value=NULL,boolean_value=NULL,unit_id=NULL,
+                    notes=NULL,external_record_id=NULL,raw_ingestion_record_id=NULL,
+                    confidence_score=NULL,quality_score=NULL,
+                    erased_at=clock_timestamp(),erasure_request_id=?
+                WHERE student_id=? AND erased_at IS NULL
+                """, requestId, userId);
+    }
 }
