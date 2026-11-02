@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.chat;
 
+import com.fitnesscoaching.platform.modules.media.MediaErasureOwnership;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -11,7 +12,11 @@ import java.util.UUID;
 @Service
 public class ChatAccountErasureService implements ChatAccountErasure {
     private final JdbcTemplate jdbc;
-    public ChatAccountErasureService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final MediaErasureOwnership mediaOwnership;
+    public ChatAccountErasureService(JdbcTemplate jdbc, MediaErasureOwnership mediaOwnership) {
+        this.jdbc = jdbc;
+        this.mediaOwnership = mediaOwnership;
+    }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -27,7 +32,11 @@ public class ChatAccountErasureService implements ChatAccountErasure {
                 WHERE m.sender_id=?
                 """, (rs, row) -> new ObjectReference(rs.getObject(1, UUID.class),
                 rs.getString(2), rs.getString(3), rs.getString(4),
-                userId.equals(rs.getObject(5, UUID.class)) && rs.getLong(6) == 1), userId);
+                userId.equals(rs.getObject(5, UUID.class)) && rs.getLong(6) == 1), userId).stream()
+                .map(ref -> new ObjectReference(ref.mediaId(), ref.bucket(), ref.key(),
+                        ref.storageProvider(), ref.ownerVerified()
+                                && mediaOwnership.hasNoNonChatReferences(ref.mediaId())))
+                .toList();
         jdbc.update("""
                 UPDATE fitness.media_files mf SET deleted_at=COALESCE(mf.deleted_at,clock_timestamp())
                 FROM fitness.message_attachments ma JOIN fitness.messages m ON m.id=ma.message_id

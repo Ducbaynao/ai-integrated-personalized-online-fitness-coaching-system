@@ -4,6 +4,9 @@ import com.fitnesscoaching.platform.modules.auth.application.port.in.AccountEras
 import com.fitnesscoaching.platform.modules.audit.AuditAccountErasure;
 import com.fitnesscoaching.platform.modules.chat.ChatAccountErasure;
 import com.fitnesscoaching.platform.modules.notification.AccountNotificationErasure;
+import com.fitnesscoaching.platform.modules.nutrition.NutritionAccountErasure;
+import com.fitnesscoaching.platform.modules.progress.ProgressAccountErasure;
+import com.fitnesscoaching.platform.modules.workout.WorkoutAccountErasure;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -29,12 +32,16 @@ public class AccountErasureService {
     private final AccountNotificationErasure notifications;
     private final ChatAccountErasure chat;
     private final AuditAccountErasure audit;
+    private final WorkoutAccountErasure workouts;
+    private final NutritionAccountErasure nutrition;
+    private final ProgressAccountErasure progress;
     private final boolean requestEnabled;
 
     public AccountErasureService(JdbcTemplate jdbc, PlatformTransactionManager manager,
                                  AccountErasureSessionCutoff sessions,
                                  AccountNotificationErasure notifications, ChatAccountErasure chat,
-                                 AuditAccountErasure audit,
+                                 AuditAccountErasure audit, WorkoutAccountErasure workouts,
+                                 NutritionAccountErasure nutrition, ProgressAccountErasure progress,
                                  @Value("${account.erasure.request-enabled:false}") boolean requestEnabled) {
         this.jdbc = jdbc;
         this.transactions = new TransactionTemplate(manager);
@@ -42,6 +49,9 @@ public class AccountErasureService {
         this.notifications = notifications;
         this.chat = chat;
         this.audit = audit;
+        this.workouts = workouts;
+        this.nutrition = nutrition;
+        this.progress = progress;
         this.requestEnabled = requestEnabled;
     }
 
@@ -143,6 +153,11 @@ public class AccountErasureService {
             chat.redactSentMessages(userId);
             notifications.minimizeAfterCleanup(userId, id);
             audit.redactForAccount(userId, id);
+            // The request lease and hold are fenced above; all owner ports run in
+            // this same short transaction. These partial effects do not attest a domain.
+            workouts.minimizeAuthoredVersionSummaries(userId);
+            nutrition.minimizeAuthoredMealText(userId);
+            progress.minimizeOwnedConnectionIdentifiers(userId);
             // Preserve the stable UUID and FK-linked history; remove direct account identifiers.
             jdbc.update("""
                     UPDATE fitness.users SET email=('erased-'||id::text||'@invalid.local'),
