@@ -11,6 +11,7 @@ import { workoutPlanApi } from '@/services/workoutPlanApi';
 import { WorkoutPlanStatus } from '@/types/workoutPlan';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from './components/WorkoutUi';
 import { WorkoutPlanVersionContent } from './components/WorkoutPlanVersionContent';
+import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from './components/AiWorkoutAdjustmentModal';
 import { removeStudentWorkoutPlanCache } from './workoutPlanCache';
 import { isWorkoutAuthorityLoss, isWorkoutStaleConflict, workoutOwnerLabels, workoutPlanErrorMessage, workoutStatusLabels } from './workoutPlanMessages';
 import { useWorkoutPlan, useWorkoutPlanVersion, useWorkoutPlanVersions, workoutPlanQueryKeys } from './workoutPlanQueries';
@@ -38,7 +39,33 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const selectedId = selectedVersionId || (canViewCurrent ? detailQuery.data?.currentVersion?.id : '') || versions[0]?.id || '';
   const versionQuery = useWorkoutPlanVersion(studentId, planId, selectedId, Boolean(selectedId && (canViewCurrent || canViewHistory)));
+  const currentVersionId = canViewCurrent ? detailQuery.data?.currentVersion?.id ?? '' : '';
+  const currentVersionQuery = useWorkoutPlanVersion(
+    studentId,
+    planId,
+    currentVersionId,
+    Boolean(currentVersionId && canViewCurrent && currentVersionId !== selectedId)
+  );
   const [pendingTarget, setPendingTarget] = useState<WorkoutPlanStatus | 'ACTIVATE' | null>(null);
+  const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(false);
+
+  const currentPrescriptions: ExercisePrescriptionOption[] = useMemo(() => {
+    const currentData = selectedId === currentVersionId ? versionQuery.data : currentVersionQuery.data;
+    if (!currentData?.sessions) return [];
+    return currentData.sessions.flatMap((s) =>
+      s.prescriptions.map((p) => ({
+        id: p.id,
+        exerciseName: `${p.exercise.exerciseName || 'Bài tập'} (Ngày ${s.dayNumber})`,
+        dayNumber: s.dayNumber,
+        targetLoad: p.targetLoad,
+        loadUnit: null,
+        targetSets: p.targetSets,
+        targetRepsMin: p.targetRepsMin,
+        targetRepsMax: p.targetRepsMax,
+        durationSeconds: p.durationSeconds,
+      }))
+    );
+  }, [selectedId, currentVersionId, versionQuery.data, currentVersionQuery.data]);
   const commandKey = useRef<string | null>(null);
   const plan = detailQuery.data?.plan;
   const canManage = relationshipCurrent && currentPermission?.state === 'ALLOWED' && currentPermission.accessLevel === 'MANAGE'
@@ -94,6 +121,7 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
     </WorkoutCard>
     {canManage && plan.status === 'DRAFT' ? <View style={styles.row}><WorkoutButton testID="edit-draft-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=draft` as never)} /><WorkoutButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} /></View> : null}
     {canManage && ['ACTIVE', 'PAUSED'].includes(plan.status) && detailQuery.data.currentVersion ? <WorkoutButton testID="publish-version-button" label="Tạo phiên bản chiến lược mới" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=publish&versionId=${detailQuery.data.currentVersion?.id}` as never)} /> : null}
+    {canManage && detailQuery.data.currentVersion ? <WorkoutButton testID="trainer-ai-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
     {canManage ? <View style={styles.row}>{transitions[plan.status].map((target) => <WorkoutButton key={target} label={actionLabels[target] ?? workoutStatusLabels[target]} danger={target === 'ARCHIVED'} secondary onPress={() => openCommand(target)} />)}</View> : null}
     {!canManage && plan.readContext === 'CURRENT' ? <WorkoutState testID="plan-read-only" title="Chỉ xem" message="CONTRIBUTE không phải quyền tác giả. Cần quyền Quản lý và quyền quyết định hiện tại để sửa kế hoạch." /> : null}
     {mutation.isError ? <WorkoutState testID="plan-command-error" title="Chưa thể cập nhật kế hoạch" message={workoutPlanErrorMessage(mutation.error)} /> : null}
@@ -108,6 +136,34 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
     </WorkoutCard> : null}
     {selectedId ? <WorkoutPlanVersionContent testID="selected-version-detail" title={canViewHistory ? 'Nội dung phiên bản đã chọn' : 'Nội dung phiên bản hiện tại'} detail={versionQuery.data} isPending={versionQuery.isPending} isError={versionQuery.isError} error={versionQuery.error} onRetry={() => versionQuery.refetch()} /> : null}
     <WorkoutButton label="Quay lại chương trình" secondary onPress={() => router.back()} />
+
+    <AiWorkoutAdjustmentModal
+      visible={isAdjustmentModalVisible}
+      studentId={studentId}
+      isTrainer={true}
+      initialScope="TEMPLATE_OR_FUTURE_OCCURRENCES"
+      planContext={
+        detailQuery.data.currentVersion
+          ? {
+              planId: plan.id,
+              planVersionNumber: detailQuery.data.currentVersion.versionNumber,
+              planAggregateVersion: plan.aggregateVersion,
+              planName: plan.name,
+              prescriptions: currentPrescriptions,
+            }
+          : undefined
+      }
+      onClose={() => setIsAdjustmentModalVisible(false)}
+      onAdjustmentApplied={async () => {
+        setIsAdjustmentModalVisible(false);
+        await client.invalidateQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
+        await detailQuery.refetch();
+        await versionQuery.refetch();
+        if (currentVersionId && currentVersionId !== selectedId) {
+          await currentVersionQuery.refetch();
+        }
+      }}
+    />
 
     <Modal visible={pendingTarget !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeCommand}>
       <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thay đổi</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingTarget === 'ACTIVATE' ? 'Kích hoạt sẽ khóa phiên bản đầu tiên. Kế hoạch đang áp dụng khác của Học viên có thể gây xung đột.' : 'Backend sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.'}</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={mutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={mutation.isPending} disabled={mutation.isPending} danger={pendingTarget === 'ARCHIVED'} onPress={() => pendingTarget && mutation.mutate(pendingTarget)} /></View></WorkoutCard></View>
