@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { workoutPlanApi } from '@/services/workoutPlanApi';
 import { WorkoutPlanStatus } from '@/types/workoutPlan';
 import { TrainerWorkoutPlanDetailScreen } from './TrainerWorkoutPlanDetailScreen';
 import { WorkoutPlanVersionContent } from './components/WorkoutPlanVersionContent';
+import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from './components/AiWorkoutAdjustmentModal';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from './components/WorkoutUi';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from './workoutPlanQueries';
 import { isWorkoutStaleConflict, workoutOwnerLabels, workoutPlanErrorMessage, workoutStatusLabels } from './workoutPlanMessages';
@@ -48,6 +49,24 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
   const plan = query.data?.plan;
   const currentVersion = query.data?.currentVersion;
   const versionQuery = useWorkoutPlanVersion(studentId, planId, currentVersion?.id ?? '');
+  const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(false);
+
+  const prescriptions: ExercisePrescriptionOption[] = useMemo(() => {
+    if (!versionQuery.data?.sessions) return [];
+    return versionQuery.data.sessions.flatMap((s) =>
+      s.prescriptions.map((p) => ({
+        id: p.id,
+        exerciseName: `${p.exercise.exerciseName || 'Bài tập'} (Ngày ${s.dayNumber})`,
+        dayNumber: s.dayNumber,
+        targetLoad: p.targetLoad,
+        loadUnit: null,
+        targetSets: p.targetSets,
+        targetRepsMin: p.targetRepsMin,
+        targetRepsMax: p.targetRepsMax,
+        durationSeconds: p.durationSeconds,
+      }))
+    );
+  }, [versionQuery.data]);
   const [pendingCommand, setPendingCommand] = useState<PendingCommand | null>(null);
   const [successorOpen, setSuccessorOpen] = useState(false);
   const [successorName, setSuccessorName] = useState('');
@@ -115,6 +134,7 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
     {plan.status === 'ACTIVE' && plan.readContext === 'CURRENT' && currentVersion?.lockedAt && currentVersion.effectiveUntil === null ? <WorkoutButton testID="open-direct-scheduling" label="Tự lên lịch từ kế hoạch này" onPress={() => router.push(`/workout-plans/${plan.id}/schedule` as never)} hint="Chọn buổi từ phiên bản đã xuất bản; lịch chỉ được tạo sau khi bạn xác nhận cả đợt" /> : null}
     {plan.status === 'ACTIVE' && plan.readContext === 'CURRENT' && currentVersion?.lockedAt && currentVersion.effectiveUntil === null ? <WorkoutButton testID="open-recurring-scheduling" label="Tạo lịch tập lặp" secondary onPress={() => router.push(`/workout-plans/${plan.id}/series` as never)} hint="Chọn buổi và xác nhận series lặp theo toàn bộ block tuần của phiên bản đã xuất bản" /> : null}
 
+    {currentVersion ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
     <WorkoutButton testID="open-plan-history-button" label="Xem lịch sử phiên bản" secondary onPress={() => router.push(`/workout-plans/${plan.id}/history` as never)} />
     {mutableContext && studentOwned && plan.status === 'DRAFT' ? <View style={styles.row}><WorkoutButton testID="edit-plan-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/workout-plans/${plan.id}/edit?mode=draft` as never)} /><WorkoutButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} /></View> : null}
     {mutableContext && studentOwned && ['ACTIVE', 'PAUSED'].includes(plan.status) && currentVersion ? <WorkoutButton testID="publish-plan-version-button" label="Tạo phiên bản chiến lược mới" onPress={() => router.push(`/workout-plans/${plan.id}/edit?mode=publish&versionId=${currentVersion.id}` as never)} /> : null}
@@ -129,5 +149,28 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
     <Modal visible={successorOpen} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeSuccessor}>
       <View style={{ flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#00000066' }}><WorkoutCard testID="successor-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Tạo kế hoạch kế nhiệm</Text><Text style={[styles.body, { color: theme.textSecondary }]}>Một bản nháp mới do bạn sở hữu sẽ được tạo từ phiên bản đã chọn. Kế hoạch Huấn luyện viên bàn giao và lịch sử gốc không thay đổi.</Text><Text style={[styles.label, { color: theme.textPrimary }]}>Tên kế hoạch mới</Text><TextInput testID="successor-name-input" accessibilityLabel="Tên kế hoạch kế nhiệm" value={successorName} onChangeText={(value) => { successorKey.current = null; setSuccessorName(value); }} maxLength={200} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />{successorMutation.isError ? <WorkoutState title="Chưa thể tạo kế hoạch kế nhiệm" message={workoutPlanErrorMessage(successorMutation.error)} /> : null}<View style={styles.row}><WorkoutButton label="Hủy" secondary disabled={successorMutation.isPending} onPress={closeSuccessor} /><WorkoutButton testID="confirm-successor-button" label={successorMutation.isPending ? 'Đang tạo' : 'Tạo kế hoạch mới'} busy={successorMutation.isPending} disabled={!successorName.trim() || successorMutation.isPending} onPress={() => successorMutation.mutate()} /></View></WorkoutCard></View>
     </Modal>
+    <AiWorkoutAdjustmentModal
+      visible={isAdjustmentModalVisible}
+      studentId={studentId}
+      initialScope="TEMPLATE_OR_FUTURE_OCCURRENCES"
+      planContext={
+        currentVersion
+          ? {
+              planId: plan.id,
+              planVersionNumber: currentVersion.versionNumber,
+              planAggregateVersion: plan.aggregateVersion,
+              planName: plan.name,
+              prescriptions,
+            }
+          : undefined
+      }
+      onClose={() => setIsAdjustmentModalVisible(false)}
+      onAdjustmentApplied={async () => {
+        setIsAdjustmentModalVisible(false);
+        await client.invalidateQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
+        await query.refetch();
+        await versionQuery.refetch();
+      }}
+    />
   </ScrollView>;
 }
