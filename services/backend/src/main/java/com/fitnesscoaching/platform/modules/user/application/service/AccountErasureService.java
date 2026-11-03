@@ -1,11 +1,14 @@
 package com.fitnesscoaching.platform.modules.user.application.service;
 
 import com.fitnesscoaching.platform.modules.auth.application.port.in.AccountErasureSessionCutoff;
+import com.fitnesscoaching.platform.modules.auth.application.port.in.AccountErasureCredentialMinimizer;
 import com.fitnesscoaching.platform.modules.audit.AuditAccountErasure;
 import com.fitnesscoaching.platform.modules.chat.ChatAccountErasure;
 import com.fitnesscoaching.platform.modules.notification.AccountNotificationErasure;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionAccountErasure;
 import com.fitnesscoaching.platform.modules.progress.ProgressAccountErasure;
+import com.fitnesscoaching.platform.modules.student.StudentProfileAccountErasure;
+import com.fitnesscoaching.platform.modules.user.application.port.out.TrainerProfileAccountErasure;
 import com.fitnesscoaching.platform.modules.workout.WorkoutAccountErasure;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +38,9 @@ public class AccountErasureService {
     private final WorkoutAccountErasure workouts;
     private final NutritionAccountErasure nutrition;
     private final ProgressAccountErasure progress;
+    private final AccountErasureCredentialMinimizer credentials;
+    private final StudentProfileAccountErasure studentProfile;
+    private final TrainerProfileAccountErasure trainerProfile;
     private final boolean requestEnabled;
 
     public AccountErasureService(JdbcTemplate jdbc, PlatformTransactionManager manager,
@@ -42,6 +48,9 @@ public class AccountErasureService {
                                  AccountNotificationErasure notifications, ChatAccountErasure chat,
                                  AuditAccountErasure audit, WorkoutAccountErasure workouts,
                                  NutritionAccountErasure nutrition, ProgressAccountErasure progress,
+                                 AccountErasureCredentialMinimizer credentials,
+                                 StudentProfileAccountErasure studentProfile,
+                                 TrainerProfileAccountErasure trainerProfile,
                                  @Value("${account.erasure.request-enabled:false}") boolean requestEnabled) {
         this.jdbc = jdbc;
         this.transactions = new TransactionTemplate(manager);
@@ -52,6 +61,9 @@ public class AccountErasureService {
         this.workouts = workouts;
         this.nutrition = nutrition;
         this.progress = progress;
+        this.credentials = credentials;
+        this.studentProfile = studentProfile;
+        this.trainerProfile = trainerProfile;
         this.requestEnabled = requestEnabled;
     }
 
@@ -160,6 +172,9 @@ public class AccountErasureService {
             progress.minimizeOwnedConnectionIdentifiers(userId);
             progress.tombstoneStudentMeasurements(userId, id);
             progress.minimizeSubjectScopedPhotoAndBatchValues(userId);
+            credentials.minimizeAfterCutoff(userId);
+            studentProfile.minimizeCurrentProfile(userId);
+            trainerProfile.minimizeCurrentProfile(userId);
             // Preserve the stable UUID and FK-linked history; remove direct account identifiers.
             jdbc.update("""
                     UPDATE fitness.users SET email=('erased-'||id::text||'@invalid.local'),

@@ -77,6 +77,48 @@ class AccountErasureHttpIntegrationTest {
                 """);
     }
 
+    @Test void disabledAccountRevokesMfaAndStepUpAndFencedCleanupMinimizesOnlyItsProfiles() throws Exception {
+        UUID requester = UUID.randomUUID(), counterpart = UUID.randomUUID();
+        UUID requesterFactor = UUID.randomUUID(), counterpartFactor = UUID.randomUUID();
+        for (UUID user : new UUID[]{requester, counterpart}) {
+            jdbc.update("INSERT INTO fitness.users(id,email,password_hash,display_name,status) VALUES (?,?,'hash','Profile','ACTIVE')",
+                    user, user + "@example.com");
+            jdbc.update("INSERT INTO fitness.student_profiles(user_id,date_of_birth,training_experience_level) VALUES (?,'1990-01-01','BEGINNER')", user);
+            jdbc.update("INSERT INTO fitness.trainer_profiles(user_id,public_slug,bio,years_experience,is_accepting_students) VALUES (?,?, 'Private bio',5,true)",
+                    user, "profile-" + user);
+        }
+        for (UUID[] pair : new UUID[][]{{requesterFactor, requester}, {counterpartFactor, counterpart}}) {
+            jdbc.update("INSERT INTO fitness.mfa_factors(id,user_id,factor_type,label,status) VALUES (?,?,'TOTP','Private label','ACTIVE')",
+                    pair[0], pair[1]);
+            jdbc.update("""
+                    INSERT INTO fitness.step_up_authentications(user_id,mfa_factor_id,action_code,status,expires_at,ip_address,user_agent)
+                    VALUES (?,?,'ACCOUNT_ACTION','VERIFIED',clock_timestamp()+interval '1 hour','127.0.0.1','Private agent')
+                    """, pair[1], pair[0]);
+        }
+        String response = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(requester.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper().readTree(response).get("id").asText());
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.mfa_factors WHERE id=?", String.class, requesterFactor))
+                .isEqualTo("REVOKED");
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.step_up_authentications WHERE user_id=?", String.class, requester))
+                .isEqualTo("EXPIRED");
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.mfa_factors WHERE id=?", String.class, counterpartFactor))
+                .isEqualTo("ACTIVE");
+        assertThat(worker.processOne()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?", String.class, request))
+                .isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("SELECT label FROM fitness.mfa_factors WHERE id=?", String.class, requesterFactor)).isNull();
+        assertThat(jdbc.queryForObject("SELECT ip_address::text FROM fitness.step_up_authentications WHERE user_id=?", String.class, requester)).isNull();
+        assertThat(jdbc.queryForObject("SELECT date_of_birth FROM fitness.student_profiles WHERE user_id=?", java.sql.Date.class, requester)).isNull();
+        assertThat(jdbc.queryForObject("SELECT public_slug FROM fitness.trainer_profiles WHERE user_id=?", String.class, requester)).isNull();
+        assertThat(jdbc.queryForObject("SELECT date_of_birth FROM fitness.student_profiles WHERE user_id=?", java.sql.Date.class, counterpart)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT public_slug FROM fitness.trainer_profiles WHERE user_id=?", String.class, counterpart)).isNotNull();
+    }
+
     @Test void fencedOwnerPortsMinimizeOnlyProvenAuthorAndConnectionFields() throws Exception {
         UUID requester = UUID.randomUUID(), other = UUID.randomUUID();
         for (UUID user : new UUID[]{requester, other}) {
@@ -86,6 +128,11 @@ class AccountErasureHttpIntegrationTest {
                     """, user, user + "@example.com");
             jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", user);
         }
+        jdbc.update("UPDATE fitness.student_profiles SET date_of_birth='1991-01-01' WHERE user_id IN (?,?)",
+                requester, other);
+        UUID heldFactor = UUID.randomUUID();
+        jdbc.update("INSERT INTO fitness.mfa_factors(id,user_id,factor_type,label) VALUES (?,?,'TOTP','Held label')",
+                heldFactor, requester);
         UUID ownerPlan = UUID.randomUUID(), otherPlan = UUID.randomUUID();
         UUID ownerVersion = UUID.randomUUID(), otherVersion = UUID.randomUUID();
         for (UUID[] values : new UUID[][]{{ownerPlan, requester, ownerVersion},
@@ -226,6 +273,8 @@ class AccountErasureHttpIntegrationTest {
                 .readTree(body).get("id").asText());
         // A stale/non-owner lease cannot invoke any owner port.
         assertThat(erasure.minimizeCurrentScope(request, requester, UUID.randomUUID())).isNull();
+        assertThat(jdbc.queryForObject("SELECT label FROM fitness.mfa_factors WHERE id=?", String.class, heldFactor))
+                .isEqualTo("Held label");
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
                 String.class, ownerVersion)).isEqualTo("private summary");
         jdbc.update("""
@@ -236,6 +285,10 @@ class AccountErasureHttpIntegrationTest {
         assertThat(worker.processOne()).isTrue();
         assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
                 String.class, request)).isEqualTo("HELD");
+        assertThat(jdbc.queryForObject("SELECT date_of_birth FROM fitness.student_profiles WHERE user_id=?",
+                java.sql.Date.class, requester)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT label FROM fitness.mfa_factors WHERE id=?", String.class, heldFactor))
+                .isEqualTo("Held label");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, ownerMeal)).isEqualTo("my food");
         assertThat(jdbc.queryForObject("SELECT weight_at_time FROM fitness.progress_photos WHERE id=?",
@@ -249,6 +302,12 @@ class AccountErasureHttpIntegrationTest {
         assertThat(worker.processOne()).isTrue();
         assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
                 String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+        assertThat(jdbc.queryForObject("SELECT date_of_birth FROM fitness.student_profiles WHERE user_id=?",
+                java.sql.Date.class, requester)).isNull();
+        assertThat(jdbc.queryForObject("SELECT date_of_birth FROM fitness.student_profiles WHERE user_id=?",
+                java.sql.Date.class, other)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT label FROM fitness.mfa_factors WHERE id=?", String.class, heldFactor))
+                .isNull();
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
                 String.class, ownerVersion)).isNull();
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
