@@ -169,6 +169,14 @@ class AccountErasureHttpIntegrationTest {
                 INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
                 VALUES (?,?,'BREAKFAST',clock_timestamp(),'other food','other note',?)
                 """, otherMeal, other, other);
+        UUID ownPrivateFood = UUID.randomUUID(), otherPrivateFood = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownPrivateFood, requester}, {otherPrivateFood, other}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.student_private_foods
+                      (id,student_id,name,serving_label,energy_kcal_per_serving,protein_g_per_serving)
+                    VALUES (?,?,'private recipe','my serving',350,20)
+                    """, values[0], values[1]);
+        }
         UUID ownNutritionGoal = UUID.randomUUID(), otherNutritionGoal = UUID.randomUUID();
         UUID ownNutritionVersion = UUID.randomUUID(), otherNutritionVersion = UUID.randomUUID();
         for (UUID[] values : new UUID[][]{{ownNutritionGoal, requester, ownNutritionVersion},
@@ -318,6 +326,20 @@ class AccountErasureHttpIntegrationTest {
                 String.class, ownerMeal)).isNull();
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, otherMeal)).isEqualTo("other food");
+        assertThat(jdbc.queryForObject("SELECT name FROM fitness.student_private_foods WHERE id=?",
+                String.class, ownPrivateFood)).isEqualTo("ERASED");
+        assertThat(jdbc.queryForObject("SELECT serving_label FROM fitness.student_private_foods WHERE id=?",
+                String.class, ownPrivateFood)).isEqualTo("ERASED");
+        assertThat(jdbc.queryForObject("SELECT energy_kcal_per_serving FROM fitness.student_private_foods WHERE id=?",
+                java.math.BigDecimal.class, ownPrivateFood)).isNull();
+        assertThat(jdbc.queryForObject("SELECT protein_g_per_serving FROM fitness.student_private_foods WHERE id=?",
+                java.math.BigDecimal.class, ownPrivateFood)).isNull();
+        assertThat(jdbc.queryForObject("SELECT archived_at FROM fitness.student_private_foods WHERE id=?",
+                java.sql.Timestamp.class, ownPrivateFood)).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT name FROM fitness.student_private_foods WHERE id=?",
+                String.class, otherPrivateFood)).isEqualTo("private recipe");
+        assertThat(jdbc.queryForObject("SELECT energy_kcal_per_serving FROM fitness.student_private_foods WHERE id=?",
+                java.math.BigDecimal.class, otherPrivateFood)).isEqualByComparingTo("350");
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.nutrition_goal_versions WHERE id=?",
                 String.class, ownNutritionVersion)).isNull();
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.nutrition_goal_versions WHERE id=?",
@@ -934,6 +956,74 @@ class AccountErasureHttpIntegrationTest {
         assertThat(jdbc.queryForObject("""
                 SELECT status FROM fitness.account_erasure_requests WHERE id=?
                 """, String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
+    }
+
+    @Test void workerLosingRequestLeaseDuringS3CannotClaimNextObject() throws Exception {
+        UUID user = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.users(id,email,password_hash,display_name,status)
+                VALUES (?,?,'hash','Lease Student','ACTIVE')
+                """, user, user + "@example.com");
+        String response = mvc.perform(post("/api/v1/account-erasure-requests")
+                        .with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType("application/json")
+                        .content("{\"commandKey\":\"" + UUID.randomUUID()
+                                + "\",\"statusKey\":\"" + newStatusKey() + "\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
+                .readTree(response).get("id").asText());
+        UUID first = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        for (UUID media : new UUID[]{first, second}) {
+            String key = "erasure/lease/" + media;
+            jdbc.update("""
+                    INSERT INTO fitness.media_files(id,owner_user_id,storage_provider,bucket_name,object_key,
+                        content_type,size_bytes,media_purpose,visibility,scan_status,deleted_at)
+                    VALUES (?,?,'S3','disposable',?,'image/png',1,
+                        'CHAT_ATTACHMENT','PRIVATE','CLEAN',clock_timestamp())
+                    """, media, user, key);
+            jdbc.update("""
+                    INSERT INTO fitness.account_erasure_objects(id,request_id,media_id,bucket_name,object_key)
+                    VALUES (?,?,?,'disposable',?)
+                    """, media, request, media, key);
+        }
+        CountDownLatch inS3 = new CountDownLatch(1), releaseS3 = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            inS3.countDown();
+            assertThat(releaseS3.await(10, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(storage).deleteAndVerify("disposable", "erasure/lease/" + first);
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var running = pool.submit(worker::processOne);
+            assertThat(inS3.await(10, TimeUnit.SECONDS)).isTrue();
+            jdbc.update("""
+                    UPDATE fitness.account_erasure_requests
+                    SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=?
+                    """, request);
+            releaseS3.countDown();
+            assertThat(running.get(10, TimeUnit.SECONDS)).isTrue();
+        }
+        org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                .deleteAndVerify("disposable", "erasure/lease/" + second);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_objects WHERE id=?",
+                String.class, first)).isEqualTo("VERIFIED");
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_objects WHERE id=?",
+                String.class, second)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT active_cleaned_at FROM fitness.account_erasure_requests WHERE id=?",
+                java.sql.Timestamp.class, request)).isNull();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.account_erasure_events
+                WHERE request_id=? AND event_type='OBJECT_VERIFIED'
+                """, Integer.class, request)).isEqualTo(1);
+        // A fresh request lease may resume the remaining object; the first
+        // worker did not silently lose it or mark the request complete.
+        assertThat(worker.processOne()).isTrue();
+        org.mockito.Mockito.verify(storage).deleteAndVerify("disposable", "erasure/lease/" + second);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_objects WHERE id=?",
+                String.class, second)).isEqualTo("VERIFIED");
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.account_erasure_requests WHERE id=?",
+                String.class, request)).isEqualTo("DOMAIN_REVIEW_PENDING");
     }
 
     private static String newStatusKey() {

@@ -29,5 +29,22 @@ public class NutritionAccountErasureService implements NutritionAccountErasure {
                 UPDATE fitness.nutrition_goal_versions SET change_summary=NULL
                 WHERE created_by=? AND locked_at IS NULL AND change_summary IS NOT NULL
                 """, userId);
+        // V39 makes these catalog entries explicitly Student-owned and
+        // USER_REPORTED. Keep their IDs for referenced food-log history, but
+        // remove the current private name, serving label and nutrient values.
+        // Food-item snapshots and append-only correction JSON need separate
+        // provenance/retention review; this is not a Nutrition attestation.
+        jdbc.update("""
+                UPDATE fitness.student_private_foods
+                SET name='ERASED',serving_label='ERASED',
+                    energy_kcal_per_serving=NULL,protein_g_per_serving=NULL,
+                    carbohydrate_g_per_serving=NULL,fat_g_per_serving=NULL,
+                    archived_at=COALESCE(archived_at,clock_timestamp()),
+                    updated_at=clock_timestamp()
+                WHERE student_id=? AND (name<>'ERASED' OR serving_label<>'ERASED'
+                    OR energy_kcal_per_serving IS NOT NULL OR protein_g_per_serving IS NOT NULL
+                    OR carbohydrate_g_per_serving IS NOT NULL OR fat_g_per_serving IS NOT NULL
+                    OR archived_at IS NULL)
+                """, userId);
     }
 }
