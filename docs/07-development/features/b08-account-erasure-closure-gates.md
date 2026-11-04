@@ -1,6 +1,6 @@
 # B08 Account Erasure closure — source-checked residual gates
 
-Base: `origin/main@8430f4ae5eb9e7cd5f3ac7fab72f77ba1cccc627` (PR #137 merge, V55 remains highest). This checkpoint is a **partial local candidate**, not an enabled erasure workflow. `account.erasure.request-enabled` and `account.erasure.worker-enabled` remain default OFF. No domain has issued a persisted COMPLETE attestation; requests remain `DOMAIN_REVIEW_PENDING`. V55 A01 schema design is `APPROVED_BY_PERSON_A` per user-reported direct approval, not GitHub review or merge/CI inference; rollout details remain open.
+Base: `origin/main@b51c3b3ac4c029a4a8112e01a4caed2e10dc6c0e` (PR #139 merge, V55 remains highest). This checkpoint is a **partial local candidate**, not an enabled erasure workflow. `account.erasure.request-enabled` and `account.erasure.worker-enabled` remain default OFF. No domain has issued a persisted COMPLETE attestation; requests remain `DOMAIN_REVIEW_PENDING`. V55 A01 schema design is `APPROVED_BY_PERSON_A` per user-reported direct approval, not GitHub review or merge/CI inference; rollout details remain open.
 
 ## What the owner ports do, and do not prove
 
@@ -27,3 +27,23 @@ The V55 [A01 packet](b08-account-erasure-v55-a01-review.md) records Person A's u
 ## Request lease at each object claim
 
 The worker now locks and checks the request row, its current unexpired lease token, and an active hold in the same short transaction that claims the next object. An expired worker cannot start a second S3 delete after its earlier call returns. The first call may already have reached storage and cannot be recalled; object finalization remains fenced by its own claim token. This is a claim boundary, not domain or storage attestation. A hold committed while S3 is in flight still cannot reverse that call; the worker must stop before any further claim or minimization.
+
+## Closure package on PR #139 merge base
+
+Base: `origin/main@b51c3b3ac4c029a4a8112e01a4caed2e10dc6c0e`; V55 is still the highest migration. The final `minimizeCurrentScope` transaction now requires an unexpired request lease after locking the row. A matching but expired token cannot run owner ports. The unused `recordProgress` method was removed because it accepted arbitrary status without completion proof. Neither change enables erasure or supplies owner attestation.
+
+| Source group and provenance | Remaining linked data and read/export path | Approved boundary and evidence still required |
+| --- | --- | --- |
+| Workout/Plan/Schedule: `student_id`, `created_by`, `logged_by`, `requested_by` prove subject or row actor, not the last author of mutable notes. | Locked version summaries; plan/session/exercise notes; occurrence and Appointment reasons; proposal, receipt and event JSON; Student/Trainer FKs. Workout/Appointment reads use current Coaching authority; Account export excludes them. | Retain counterpart time/state/outcome. Redact only proven requester-authored text through an immutable-history correction path; audit direct-ID reads, JSON and retained identifiers before attestation. |
+| Nutrition: `meals.created_by`, version `created_by`, and V39 `student_private_foods.student_id` with `USER_REPORTED` prove narrow current-field scope. | Meal Student FK, item snapshots/nutrients, calories/macros, target/actual and correction JSON, food-analysis text/image. Basic Nutrition denies disabled actor; Account export excludes Nutrition. | No approved indefinite purpose for remaining personal nutrient values. Classify item source, design constraint-safe image worklist and verify physical object deletion before attestation. |
+| Progress: explicit `student_id` and integration `user_id` prove subjects of already minimized fields. | V55 tombstones retain Student FK; batch/photo notes, raw ingestion/validation JSON, snapshots/metrics, Attention/Review evidence and media remain. Attention/Review Trainer reads conceal disabled Student; Account export excludes Progress. | Linked tombstones are not anonymous. Map author/content, all media consumers and read paths; verify object deletion and minimal retained chronology. |
+| Account/Auth/Profile/Verification: user/actor FKs prove subject but audit details can contain others' data. | MFA/session/security events, health/profile details and verification media/JSON remain partially cleaned. New access/refresh is cut off after DISABLED; emitted stream bytes cannot be recalled. | Person A must attest credential, audit correction, profile and media paths. V50/V54/V55 schema approval is not cleanup evidence. |
+| AI: `ai_runs.student_id/requested_by` scopes a run, not every JSON/vector fact. | Prompt/context, embeddings, replay/retrieval and provider copies remain. | AI owner must prove concealment, retrieval exclusion and fenced minimization while retaining authorized counterpart provenance; provider copies need separate evidence. |
+
+### Production proof checklist (open)
+
+1. Hold: name two independent authorized principals; verify case, basis, scope, step-up, append-only audit and review. Test hold at the final S3 call and before minimization. No existing ADMIN gets hold power implicitly.
+2. Review states: approve a fenced and audited recovery operation for `OWNER_REVIEW_REQUIRED` and `STORAGE_REVIEW_REQUIRED`; recheck hold and ownership before requeue. Direct SQL is only a proposal.
+3. Storage: inventory versioning, replicas, ACL and provider; prove deletion of every relevant version/replica. HEAD 404 and S3Mock do not prove production deletion.
+4. Backup/provider: demonstrate restore-ledger replay before restored access and separate provider-copy evidence. CI and push tickets do not prove erasure at a provider or device.
+5. Operations: measure the 24-hour target under retry, hold and storage failures; settle rollout and `lock_timeout`. Keep both flags OFF and requests `DOMAIN_REVIEW_PENDING` until every owner and infrastructure attestation is recorded.
