@@ -507,37 +507,52 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
             }
 
             long currentOccVersion = occurrence.occurrenceVersion();
-            // Multi-change atomicity: F03RuntimeOutputValidator enforces changes.size() == 1 for Phase 2 release scope.
-            // Furthermore, all adjustments execute inside @Transactional(isolation = Isolation.REPEATABLE_READ);
+            // Multi-action atomicity: A single adjustment proposal (such as VOLUME_ADJUSTMENT modifying both sets and reps)
+            // may execute multiple sequential domain commands. All adjustments execute inside @Transactional;
             // any failure rolls back all adjustments atomically without partial persistence.
+            record OccurrenceSubAction(
+                    WorkoutSessionAdjustment.Type type,
+                    UUID replacementVariationId,
+                    String beforeJson,
+                    String afterJson,
+                    String subKeySuffix
+            ) {}
+
             for (int i = 0; i < payload.changes().size(); i++) {
                 TypedChange change = payload.changes().get(i);
-                WorkoutSessionAdjustment.Type adjType;
-                UUID replacementVariationId = null;
-                String beforeJson = "{}";
-                String afterJson = "{}";
+                List<OccurrenceSubAction> subActions = new ArrayList<>();
 
                 switch (change.changeType()) {
                     case EXERCISE_SUBSTITUTION -> {
-                        adjType = WorkoutSessionAdjustment.Type.EXERCISE_SWAP;
-                        replacementVariationId = UUID.fromString(change.after().path("replacementVariationId").asText());
-                        beforeJson = "{}";
-                        afterJson = "{}";
+                        UUID replacementVariationId = UUID.fromString(change.after().path("replacementVariationId").asText());
+                        subActions.add(new OccurrenceSubAction(
+                                WorkoutSessionAdjustment.Type.EXERCISE_SWAP,
+                                replacementVariationId,
+                                "{}",
+                                "{}",
+                                "swap"
+                        ));
                     }
                     case LOAD_ADJUSTMENT -> {
-                        adjType = WorkoutSessionAdjustment.Type.LOAD;
                         Map<String, Object> beforeMap = new HashMap<>();
                         if (change.before() != null && change.before().hasNonNull("targetLoad")) {
                             beforeMap.put("targetLoad", new BigDecimal(change.before().path("targetLoad").asText()));
                         }
                         try {
-                            beforeJson = objectMapper.writeValueAsString(beforeMap);
+                            String beforeJson = objectMapper.writeValueAsString(beforeMap);
                             Map<String, Object> afterMap = new HashMap<>();
                             afterMap.put("targetLoad", new BigDecimal(change.after().path("targetLoad").asText()));
                             if (change.after().hasNonNull("loadUnitId")) {
                                 afterMap.put("loadUnitId", change.after().path("loadUnitId").intValue());
                             }
-                            afterJson = objectMapper.writeValueAsString(afterMap);
+                            String afterJson = objectMapper.writeValueAsString(afterMap);
+                            subActions.add(new OccurrenceSubAction(
+                                    WorkoutSessionAdjustment.Type.LOAD,
+                                    null,
+                                    beforeJson,
+                                    afterJson,
+                                    "load"
+                            ));
                         } catch (Exception e) {
                             throw new IllegalStateException("Failed to serialize load adjustment json", e);
                         }
@@ -546,31 +561,89 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                         JsonNode aNode = change.after();
                         JsonNode bNode = change.before();
                         try {
-                            if (aNode.hasNonNull("deltaRepsMin") || aNode.hasNonNull("deltaRepsMax")) {
-                                adjType = WorkoutSessionAdjustment.Type.REPS;
+                            boolean hasSetsDelta = aNode.hasNonNull("deltaSets") && aNode.path("deltaSets").asInt() != 0;
+                            boolean hasSetsChange = hasSetsDelta
+                                    || (aNode.hasNonNull("targetSets") && bNode != null && bNode.hasNonNull("targetSets")
+                                        && aNode.path("targetSets").asInt() != bNode.path("targetSets").asInt());
+
+                            boolean hasRepsDelta = (aNode.hasNonNull("deltaRepsMin") && aNode.path("deltaRepsMin").asInt() != 0)
+                                    || (aNode.hasNonNull("deltaRepsMax") && aNode.path("deltaRepsMax").asInt() != 0);
+                            boolean hasRepsChange = hasRepsDelta
+                                    || (aNode.hasNonNull("targetRepsMin") && bNode != null && aNode.path("targetRepsMin").asInt() != bNode.path("targetRepsMin").asInt(-1))
+                                    || (aNode.hasNonNull("targetRepsMax") && bNode != null && aNode.path("targetRepsMax").asInt() != bNode.path("targetRepsMax").asInt(-1));
+
+                            boolean hasDurationDelta = aNode.hasNonNull("deltaDurationSeconds") && aNode.path("deltaDurationSeconds").asInt() != 0;
+                            boolean hasDurationChange = hasDurationDelta
+                                    || (aNode.hasNonNull("durationSeconds") && bNode != null && aNode.path("durationSeconds").asInt() != bNode.path("durationSeconds").asInt(-1));
+
+                            if (!hasSetsChange && !hasRepsChange && !hasDurationChange) {
+                                if (aNode.hasNonNull("targetRepsMin") || aNode.hasNonNull("targetRepsMax")) {
+                                    hasRepsChange = true;
+                                } else if (aNode.hasNonNull("durationSeconds")) {
+                                    hasDurationChange = true;
+                                } else {
+                                    hasSetsChange = true;
+                                }
+                            }
+
+                            // 1. SETS sub-action (if sets changed or specified)
+                            if (hasSetsChange && aNode.hasNonNull("targetSets")) {
+                                int bSets = bNode != null && bNode.hasNonNull("targetSets") ? bNode.path("targetSets").intValue() : 1;
+                                String bSetsJson = objectMapper.writeValueAsString(Map.of("targetSets", bSets));
+                                String aSetsJson = objectMapper.writeValueAsString(Map.of("targetSets", aNode.path("targetSets").intValue()));
+                                subActions.add(new OccurrenceSubAction(
+                                        WorkoutSessionAdjustment.Type.SETS,
+                                        null,
+                                        bSetsJson,
+                                        aSetsJson,
+                                        "sets"
+                                ));
+                            }
+
+                            // 2. REPS or DURATION sub-action
+                            if (hasRepsChange && (aNode.hasNonNull("targetRepsMin") || aNode.hasNonNull("targetRepsMax"))) {
                                 Map<String, Object> bMap = new HashMap<>();
                                 if (bNode != null && bNode.hasNonNull("targetRepsMin")) bMap.put("targetRepsMin", bNode.path("targetRepsMin").intValue());
                                 if (bNode != null && bNode.hasNonNull("targetRepsMax")) bMap.put("targetRepsMax", bNode.path("targetRepsMax").intValue());
-                                beforeJson = objectMapper.writeValueAsString(bMap);
+                                String bRepsJson = objectMapper.writeValueAsString(bMap);
+
                                 Map<String, Object> aMap = new HashMap<>();
                                 if (aNode.hasNonNull("targetRepsMin")) aMap.put("targetRepsMin", aNode.path("targetRepsMin").intValue());
                                 if (aNode.hasNonNull("targetRepsMax")) aMap.put("targetRepsMax", aNode.path("targetRepsMax").intValue());
-                                afterJson = objectMapper.writeValueAsString(aMap);
-                            } else if (aNode.hasNonNull("deltaSets") && aNode.path("deltaSets").asInt() != 0) {
-                                adjType = WorkoutSessionAdjustment.Type.SETS;
-                                int bSets = bNode != null && bNode.hasNonNull("targetSets") ? bNode.path("targetSets").intValue() : 1;
-                                beforeJson = objectMapper.writeValueAsString(Map.of("targetSets", bSets));
-                                afterJson = objectMapper.writeValueAsString(Map.of("targetSets", aNode.path("targetSets").intValue()));
-                            } else if (aNode.hasNonNull("deltaDurationSeconds")) {
-                                adjType = WorkoutSessionAdjustment.Type.DURATION;
+                                String aRepsJson = objectMapper.writeValueAsString(aMap);
+
+                                subActions.add(new OccurrenceSubAction(
+                                        WorkoutSessionAdjustment.Type.REPS,
+                                        null,
+                                        bRepsJson,
+                                        aRepsJson,
+                                        "reps"
+                                ));
+                            } else if (hasDurationChange && aNode.hasNonNull("durationSeconds")) {
                                 int bDur = bNode != null && bNode.hasNonNull("durationSeconds") ? bNode.path("durationSeconds").intValue() : 0;
-                                beforeJson = objectMapper.writeValueAsString(Map.of("durationSeconds", bDur));
-                                afterJson = objectMapper.writeValueAsString(Map.of("durationSeconds", aNode.path("durationSeconds").intValue()));
-                            } else {
-                                adjType = WorkoutSessionAdjustment.Type.SETS;
+                                String bDurJson = objectMapper.writeValueAsString(Map.of("durationSeconds", bDur));
+                                String aDurJson = objectMapper.writeValueAsString(Map.of("durationSeconds", aNode.path("durationSeconds").intValue()));
+                                subActions.add(new OccurrenceSubAction(
+                                        WorkoutSessionAdjustment.Type.DURATION,
+                                        null,
+                                        bDurJson,
+                                        aDurJson,
+                                        "duration"
+                                ));
+                            }
+
+                            if (subActions.isEmpty()) {
                                 int bSets = bNode != null && bNode.hasNonNull("targetSets") ? bNode.path("targetSets").intValue() : 1;
-                                beforeJson = objectMapper.writeValueAsString(Map.of("targetSets", bSets));
-                                afterJson = objectMapper.writeValueAsString(Map.of("targetSets", aNode.path("targetSets").intValue()));
+                                int aSets = aNode.hasNonNull("targetSets") ? aNode.path("targetSets").intValue() : 1;
+                                String bSetsJson = objectMapper.writeValueAsString(Map.of("targetSets", bSets));
+                                String aSetsJson = objectMapper.writeValueAsString(Map.of("targetSets", aSets));
+                                subActions.add(new OccurrenceSubAction(
+                                        WorkoutSessionAdjustment.Type.SETS,
+                                        null,
+                                        bSetsJson,
+                                        aSetsJson,
+                                        "sets"
+                                ));
                             }
                         } catch (Exception e) {
                             throw new IllegalStateException("Failed to serialize volume adjustment json", e);
@@ -579,26 +652,28 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                     default -> throw new IllegalStateException("Unexpected change type: " + change.changeType());
                 }
 
-                String subCommandKey = commandKey + ":adj:" + change.changeId();
                 String reason = change.reason() != null && !change.reason().isBlank()
                         ? change.reason()
                         : (rec.explanation() != null ? rec.explanation() : "AI Workout Adjustment");
 
-                var occResult = workoutPlanCommandUseCase.adjustOccurrence(
-                        new WorkoutPlanCommandUseCase.AdjustOccurrenceCommand(
-                                plannedWorkoutId,
-                                actorId,
-                                currentOccVersion,
-                                subCommandKey,
-                                adjType,
-                                sourceSnapshot.plannedSessionExerciseId(),
-                                replacementVariationId,
-                                beforeJson,
-                                afterJson,
-                                reason
-                        )
-                );
-                currentOccVersion = occResult.occurrenceVersion();
+                for (OccurrenceSubAction subAction : subActions) {
+                    String subCommandKey = commandKey + ":adj:" + change.changeId() + ":" + subAction.subKeySuffix();
+                    var occResult = workoutPlanCommandUseCase.adjustOccurrence(
+                            new WorkoutPlanCommandUseCase.AdjustOccurrenceCommand(
+                                    plannedWorkoutId,
+                                    actorId,
+                                    currentOccVersion,
+                                    subCommandKey,
+                                    subAction.type(),
+                                    sourceSnapshot.plannedSessionExerciseId(),
+                                    subAction.replacementVariationId(),
+                                    subAction.beforeJson(),
+                                    subAction.afterJson(),
+                                    reason
+                            )
+                    );
+                    currentOccVersion = occResult.occurrenceVersion();
+                }
             }
 
             resultingEntityType = "WORKOUT_OCCURRENCE";

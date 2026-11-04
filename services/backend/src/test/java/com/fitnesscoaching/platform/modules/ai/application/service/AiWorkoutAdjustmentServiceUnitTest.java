@@ -625,4 +625,106 @@ class AiWorkoutAdjustmentServiceUnitTest {
                 .isInstanceOf(AiRunLifecycleConflictException.class)
                 .hasMessageContaining("not a workout adjustment proposal");
     }
+    @Test
+    void acceptAdjustment_occurrenceScope_volumeAdjustment_bothSetsAndReps_executesBothCommandsSequentially() throws Exception {
+        UUID recId = UUID.randomUUID();
+        when(accountStatusQuery.getAccountStatus(STUDENT_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+
+        F03SourceSnapshot snapshot = buildSnapshot("SELF_DIRECTED", null);
+        String snapshotJson = objectMapper.writeValueAsString(snapshot);
+
+        String payloadJson = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Volume adjustment",
+          "reasoning": ["progression"],
+          "usedData": ["rpe"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.9,
+          "targetRef": {
+            "scope": "ONE_MATERIALIZED_OCCURRENCE",
+            "plannedWorkoutId": "%s",
+            "plannedSessionExerciseId": "%s"
+          },
+          "changes": [
+            {
+              "changeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              "changeType": "VOLUME_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetSets": 3, "targetRepsMin": 10, "targetRepsMax": 12 },
+              "after": { "targetSets": 4, "targetRepsMin": 8, "targetRepsMax": 10, "deltaSets": 1, "deltaRepsMin": -2, "deltaRepsMax": -2 },
+              "reason": "Volume and rep range progression"
+            }
+          ]
+        }
+        """.formatted(OCCURRENCE_ID, PRESCRIPTION_ID, OCCURRENCE_ID, PRESCRIPTION_ID);
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(STUDENT_ID)
+                .coachingPeriodId(PERIOD_ID)
+                .recommendationType("WORKOUT_ADJUSTMENT_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .structuredPayload(payloadJson)
+                .sourceSnapshot(snapshotJson)
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(STUDENT_ID, false)).thenReturn(Optional.of(
+                new CurrentCoachingContext(PERIOD_ID, Mode.SELF_DIRECTED, null, null, Instant.now(), null)
+        ));
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(eq(payloadJson), any())).thenReturn(F03RuntimeOutputValidator.ValidationResult.valid());
+
+        WorkoutScheduleCalendarQuery calendarQuery = mock(WorkoutScheduleCalendarQuery.class);
+        when(scheduleCalendarProvider.getIfAvailable()).thenReturn(calendarQuery);
+        WorkoutScheduleCalendarQuery.Occurrence occurrence = new WorkoutScheduleCalendarQuery.Occurrence(
+                OCCURRENCE_ID, 2L, STUDENT_ID, "SCHEDULED",
+                Instant.now(), Instant.now(), null, null, Instant.now().plus(1, ChronoUnit.HOURS),
+                "UTC", "10:00", "11:00", "+00:00", "+00:00", null, null, List.of(), null, null
+        );
+        when(calendarQuery.detail(STUDENT_ID, OCCURRENCE_ID)).thenReturn(occurrence);
+
+        // Sequence of adjustments: 1st returns version 3L, 2nd returns version 4L
+        when(workoutPlanCommandUseCase.adjustOccurrence(any()))
+                .thenReturn(new WorkoutPlanCommandUseCase.OccurrenceResult(OCCURRENCE_ID, UUID.randomUUID(), 3L, false))
+                .thenReturn(new WorkoutPlanCommandUseCase.OccurrenceResult(OCCURRENCE_ID, UUID.randomUUID(), 4L, false));
+
+        AcceptAdjustmentApiRequest req = new AcceptAdjustmentApiRequest("key-vol-both", "Approved volume", 1, 2L);
+        AcceptAdjustmentApiResponse res = adjustmentService.acceptAdjustment(STUDENT_ID, recId, req);
+
+        assertThat(res).isNotNull();
+        assertThat(res.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        org.mockito.ArgumentCaptor<WorkoutPlanCommandUseCase.AdjustOccurrenceCommand> captor =
+                org.mockito.ArgumentCaptor.forClass(WorkoutPlanCommandUseCase.AdjustOccurrenceCommand.class);
+        verify(workoutPlanCommandUseCase, org.mockito.Mockito.times(2)).adjustOccurrence(captor.capture());
+
+        List<WorkoutPlanCommandUseCase.AdjustOccurrenceCommand> capturedCommands = captor.getAllValues();
+        assertThat(capturedCommands).hasSize(2);
+
+        // First command: SETS
+        WorkoutPlanCommandUseCase.AdjustOccurrenceCommand cmd1 = capturedCommands.get(0);
+        assertThat(cmd1.type()).isEqualTo(WorkoutSessionAdjustment.Type.SETS);
+        assertThat(cmd1.expectedVersion()).isEqualTo(2L);
+        assertThat(cmd1.commandKey()).endsWith(":sets");
+        assertThat(cmd1.afterJson()).contains("\"targetSets\":4");
+
+        // Second command: REPS (chained on resulting version 3L)
+        WorkoutPlanCommandUseCase.AdjustOccurrenceCommand cmd2 = capturedCommands.get(1);
+        assertThat(cmd2.type()).isEqualTo(WorkoutSessionAdjustment.Type.REPS);
+        assertThat(cmd2.expectedVersion()).isEqualTo(3L);
+        assertThat(cmd2.commandKey()).endsWith(":reps");
+        assertThat(cmd2.afterJson()).contains("\"targetRepsMin\":8");
+        assertThat(cmd2.afterJson()).contains("\"targetRepsMax\":10");
+    }
 }

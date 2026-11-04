@@ -37,6 +37,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import com.fitnesscoaching.platform.modules.audit.AuditRecord;
+import com.fitnesscoaching.platform.modules.audit.AuditService;
+import static org.mockito.ArgumentMatchers.any;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -83,11 +90,15 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
     @Autowired
     private WorkoutPlanQueryUseCase workoutPlanQuery;
 
-    @Autowired
+    @MockitoSpyBean
     private WorkoutPlanCommandUseCase workoutPlanCommands;
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @MockitoSpyBean
+    private AuditService auditService;
+
 
     private UUID exerciseVariation1;
     private UUID exerciseVariation2;
@@ -869,5 +880,385 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
         assertThatThrownBy(() -> adjustmentService.acceptAdjustment(student, genRes.recommendationId(), tamperedReq))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
                 .hasMessageContaining("Idempotency conflict: commandKey matches a previous command with differing parameters");
+    }
+    @Test
+    @DisplayName("VOLUME_ADJUSTMENT sets+reps applies full before/after values, increments version and prevents duplicate adjustments on replay")
+    void volumeAdjustment_occurrenceScope_withBothSetsAndReps_appliesBothAdjustmentsToDatabase() {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-vol-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.VOLUME_ADJUSTMENT,
+                "Deload reduction in sets and reps",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        // Multi-action payload with sets and reps
+        String multiActionPayload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Deload adjustment",
+          "reasoning": ["fatigue"],
+          "usedData": ["rpe"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "VOLUME_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetSets": 3, "targetRepsMin": 8, "targetRepsMax": 12 },
+              "after": { "targetSets": 2, "targetRepsMin": 6, "targetRepsMax": 10, "deltaSets": -1, "deltaRepsMin": -2, "deltaRepsMax": -2 },
+              "reason": "Deload reduction in sets and reps",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId);
+
+        jdbc.update("UPDATE fitness.ai_recommendations SET structured_payload = ?::jsonb WHERE id = ?", multiActionPayload, recId);
+
+        String acceptCommandKey = "cmd-f03-vol-acc-" + UUID.randomUUID();
+        var acceptReq = new AcceptAdjustmentApiRequest(acceptCommandKey, "Accept both sets and reps", 1, 1L);
+        AcceptAdjustmentApiResponse acceptRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(acceptRes.replayed()).isFalse();
+
+        // 1. Verify two separate adjustments recorded with exact values
+        Integer adjCount = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId);
+        assertThat(adjCount).isEqualTo(2);
+
+        List<Map<String, Object>> adjustments = jdbc.queryForList(
+                "SELECT adjustment_type, before_value::text, after_value::text FROM fitness.workout_session_adjustments WHERE planned_workout_id = ? ORDER BY created_at ASC",
+                occurrenceId
+        );
+        assertThat(adjustments).hasSize(2);
+
+        // First adjustment: SETS
+        assertThat(adjustments.get(0).get("adjustment_type")).isEqualTo("SETS");
+        assertThat((String) adjustments.get(0).get("before_value")).contains("\"targetSets\": 3");
+        assertThat((String) adjustments.get(0).get("after_value")).contains("\"targetSets\": 2");
+
+        // Second adjustment: REPS
+        assertThat(adjustments.get(1).get("adjustment_type")).isEqualTo("REPS");
+        assertThat((String) adjustments.get(1).get("before_value")).contains("\"targetRepsMin\": 8");
+        assertThat((String) adjustments.get(1).get("before_value")).contains("\"targetRepsMax\": 12");
+        assertThat((String) adjustments.get(1).get("after_value")).contains("\"targetRepsMin\": 6");
+        assertThat((String) adjustments.get(1).get("after_value")).contains("\"targetRepsMax\": 10");
+
+        // 2. Planned workout version incremented sequentially from 1 to 3
+        Integer finalOccVer = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(finalOccVer).isEqualTo(3);
+
+        // 3. Recommendation status is APPLIED
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // 4. Exactly 1 application receipt
+        Integer appCount = jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?", Integer.class, recId);
+        assertThat(appCount).isEqualTo(1);
+
+        // 5. Idempotent Replay: verify replay does NOT create duplicate adjustments or receipts
+        AcceptAdjustmentApiResponse replayRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(replayRes.replayed()).isTrue();
+        assertThat(replayRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        Integer adjCountAfterReplay = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId);
+        assertThat(adjCountAfterReplay).isEqualTo(2);
+
+        Integer appCountAfterReplay = jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?", Integer.class, recId);
+        assertThat(appCountAfterReplay).isEqualTo(1);
+
+        Integer occVerAfterReplay = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(occVerAfterReplay).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("VOLUME_ADJUSTMENT sets+duration applies full before/after values, increments version and prevents duplicate adjustments on replay")
+    void volumeAdjustment_occurrenceScope_withBothSetsAndDuration_appliesBothValuesAndVerifiesReceipt() {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-dur-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.VOLUME_ADJUSTMENT,
+                "Deload reduction in sets and duration",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        // Multi-action payload with sets and duration
+        String multiActionPayload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Duration deload adjustment",
+          "reasoning": ["time constraints"],
+          "usedData": ["rpe"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "VOLUME_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetSets": 3, "durationSeconds": 60 },
+              "after": { "targetSets": 2, "durationSeconds": 45, "deltaSets": -1, "deltaDurationSeconds": -15 },
+              "reason": "Deload reduction in sets and duration",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId);
+
+        jdbc.update("UPDATE fitness.ai_recommendations SET structured_payload = ?::jsonb WHERE id = ?", multiActionPayload, recId);
+
+        String acceptCommandKey = "cmd-f03-dur-acc-" + UUID.randomUUID();
+        var acceptReq = new AcceptAdjustmentApiRequest(acceptCommandKey, "Accept both sets and duration", 1, 1L);
+        AcceptAdjustmentApiResponse acceptRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(acceptRes.replayed()).isFalse();
+
+        // 1. Verify two separate adjustments recorded: SETS and DURATION
+        List<Map<String, Object>> adjustments = jdbc.queryForList(
+                "SELECT adjustment_type, before_value::text, after_value::text FROM fitness.workout_session_adjustments WHERE planned_workout_id = ? ORDER BY created_at ASC",
+                occurrenceId
+        );
+        assertThat(adjustments).hasSize(2);
+
+        // First adjustment: SETS
+        assertThat(adjustments.get(0).get("adjustment_type")).isEqualTo("SETS");
+        assertThat((String) adjustments.get(0).get("before_value")).contains("\"targetSets\": 3");
+        assertThat((String) adjustments.get(0).get("after_value")).contains("\"targetSets\": 2");
+
+        // Second adjustment: DURATION
+        assertThat(adjustments.get(1).get("adjustment_type")).isEqualTo("DURATION");
+        assertThat((String) adjustments.get(1).get("before_value")).contains("\"durationSeconds\": 60");
+        assertThat((String) adjustments.get(1).get("after_value")).contains("\"durationSeconds\": 45");
+
+        // 2. Planned workout version incremented from 1 to 3
+        Integer finalOccVer = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(finalOccVer).isEqualTo(3);
+
+        // 3. Idempotent Replay preserves exact state
+        AcceptAdjustmentApiResponse replayRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(replayRes.replayed()).isTrue();
+
+        Integer adjCountAfterReplay = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId);
+        assertThat(adjCountAfterReplay).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Rollback when second sub-command fails after first sub-command already executed")
+    void volumeAdjustment_whenSecondSubCommandFails_rollsBackFirstCommandAndDatabaseCompletely() {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-vol-fail2-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.VOLUME_ADJUSTMENT,
+                "Deload reduction in sets and reps",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        // Multi-action payload with sets and reps
+        String multiActionPayload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Deload adjustment",
+          "reasoning": ["fatigue"],
+          "usedData": ["rpe"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "VOLUME_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetSets": 3, "targetRepsMin": 8, "targetRepsMax": 12 },
+              "after": { "targetSets": 2, "targetRepsMin": 6, "targetRepsMax": 10, "deltaSets": -1, "deltaRepsMin": -2, "deltaRepsMax": -2 },
+              "reason": "Deload reduction in sets and reps",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId);
+
+        jdbc.update("UPDATE fitness.ai_recommendations SET structured_payload = ?::jsonb WHERE id = ?", multiActionPayload, recId);
+
+        // Spy workoutPlanCommands: call 1 (SETS) succeeds and writes to DB; call 2 (REPS) throws RuntimeException
+        AtomicInteger commandCounter = new AtomicInteger(0);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            if (commandCounter.incrementAndGet() == 2) {
+                throw new RuntimeException("Simulated second sub-command domain failure");
+            }
+            return invocation.callRealMethod();
+        }).when(workoutPlanCommands).adjustOccurrence(any());
+
+        String acceptCommandKey = "cmd-f03-vol-fail2-acc-" + UUID.randomUUID();
+        var acceptReq = new AcceptAdjustmentApiRequest(acceptCommandKey, "Accept sets and reps", 1, 1L);
+
+        assertThatThrownBy(() -> adjustmentService.acceptAdjustment(student, recId, acceptReq))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Simulated second sub-command domain failure");
+
+        // Verify PostgreSQL Database Rollback:
+        // 1. Occurrence version rolled back to 1 (not 2 from command 1)
+        Integer occVersion = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(occVersion).isEqualTo(1);
+
+        // 2. Adjustments inserted by command 1 rolled back completely (count = 0)
+        Integer adjCount = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId);
+        assertThat(adjCount).isEqualTo(0);
+
+        // 3. Domain command receipts from command 1 rolled back completely (count = 0)
+        Integer receiptCount = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_plan_command_receipts WHERE actor_id = ? AND command_key LIKE ?", Integer.class, student, acceptCommandKey + "%");
+        assertThat(receiptCount).isEqualTo(0);
+
+        // 4. Domain audit from command 1 rolled back completely (count = 0)
+        Integer domainAuditCount = jdbc.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ? AND action = 'PLANNED_WORKOUT_ADJUSTED'", Integer.class, occurrenceId);
+        assertThat(domainAuditCount).isEqualTo(0);
+
+        // 5. Recommendation status remains PENDING
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // 6. No application receipt persisted
+        Integer appCount = jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?", Integer.class, recId);
+        assertThat(appCount).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Rollback specifically when final audit AI_RECOMMENDATION_APPLIED fails, allowing domain audit to run real")
+    void acceptAdjustment_whenFinalRecommendationAuditFails_rollsBackDomainChangesAndDomainAudits() {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-audit-fail-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Audit failure test",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        // Spy AuditService: Allow domain audits (e.g. PLANNED_WORKOUT_ADJUSTED) to call real method and write to DB!
+        // Only throw exception when the final AI_RECOMMENDATION_APPLIED audit is recorded at step 6 of acceptAdjustment.
+        org.mockito.Mockito.doAnswer(invocation -> {
+            AuditRecord record = invocation.getArgument(0);
+            if ("AI_RECOMMENDATION_APPLIED".equals(record.action())) {
+                throw new RuntimeException("Simulated audit failure specifically during AI_RECOMMENDATION_APPLIED final audit");
+            }
+            return invocation.callRealMethod();
+        }).when(auditService).recordAudit(any());
+
+        String acceptCommandKey = "cmd-f03-audit-fail-acc-" + UUID.randomUUID();
+        var acceptReq = new AcceptAdjustmentApiRequest(acceptCommandKey, "Accept should rollback on final audit", 1, 1L);
+
+        // When accepting, it must throw RuntimeException from the final audit step
+        assertThatThrownBy(() -> adjustmentService.acceptAdjustment(student, recId, acceptReq))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Simulated audit failure specifically during AI_RECOMMENDATION_APPLIED final audit");
+
+        // Verify PostgreSQL Database Rollback of both domain mutation AND domain audit:
+        // 1. Occurrence version rolled back to 1
+        Integer occVersion = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(occVersion).isEqualTo(1);
+
+        // 2. Workout session adjustments rolled back
+        Integer adjCount = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId);
+        assertThat(adjCount).isEqualTo(0);
+
+        // 3. Domain command receipts rolled back
+        Integer receiptCount = jdbc.queryForObject("SELECT count(*) FROM fitness.workout_plan_command_receipts WHERE actor_id = ? AND command_key LIKE ?", Integer.class, student, acceptCommandKey + "%");
+        assertThat(receiptCount).isEqualTo(0);
+
+        // 4. Domain audit (which executed real method) rolled back by database transaction
+        Integer domainAuditCount = jdbc.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ? AND action = 'PLANNED_WORKOUT_ADJUSTED'", Integer.class, occurrenceId);
+        assertThat(domainAuditCount).isEqualTo(0);
+
+        // 5. Final AI recommendation audit was not persisted
+        Integer appliedAuditCount = jdbc.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id = ? AND action = 'AI_RECOMMENDATION_APPLIED'", Integer.class, recId);
+        assertThat(appliedAuditCount).isEqualTo(0);
+
+        // 6. Recommendation status remains PENDING
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // 7. No application receipt persisted
+        Integer appCount = jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?", Integer.class, recId);
+        assertThat(appCount).isEqualTo(0);
     }
 }
