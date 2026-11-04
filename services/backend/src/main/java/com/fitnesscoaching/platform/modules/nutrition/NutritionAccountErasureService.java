@@ -16,6 +16,16 @@ public class NutritionAccountErasureService implements NutritionAccountErasure {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void minimizeAuthoredMealText(UUID userId) {
+        // A TEXT analysis request is Student-owned and its input is supplied
+        // by that Student. The legacy CHECK requires non-NULL input_text, so
+        // retain a fixed non-identifying sentinel rather than violating it.
+        // IMAGE requests and AI candidate text require separate media and
+        // provenance review.
+        jdbc.update("""
+                UPDATE fitness.food_analysis_requests SET input_text='ERASED'
+                WHERE student_id=? AND input_type='TEXT'
+                  AND input_text IS DISTINCT FROM 'ERASED'
+                """, userId);
         // The meal has an explicit creator; item snapshots and analysis media do not
         // have equivalent per-field/object proof and must not be guessed from this FK.
         jdbc.update("""

@@ -80,6 +80,11 @@ public class AdminAiRunQueryService implements AdminAiRunQueryUseCase {
 
         AiRun run = runRepository.findById(runId)
                 .orElseThrow(() -> new AiRunNotFoundException("AI Run not found with ID: " + runId));
+        // Operational telemetry may contain subject text in error/validation
+        // fields. Keep the row for governance, but conceal direct-ID detail
+        // after either identified participant loses Account authority.
+        if (!activeOrUnscoped(run.studentId()) || !activeOrUnscoped(run.requestedBy()))
+            throw new AiRunNotFoundException("AI Run not found with ID: " + runId);
 
         List<AiValidationResult> validationResults = provenanceRepository.findValidationResultsByRunId(runId);
         List<AiRunKnowledgeChunk> chunkReferences = provenanceRepository.findKnowledgeChunkReferencesByRunId(runId);
@@ -172,6 +177,10 @@ public class AdminAiRunQueryService implements AdminAiRunQueryUseCase {
             total += output;
         }
         return total;
+    }
+
+    private boolean activeOrUnscoped(UUID userId) {
+        return userId == null || accountStatusQuery.getAccountStatus(userId).orElse(null) == AccountStatus.ACTIVE;
     }
 
     private void validateAdminActor(UUID actorId) {

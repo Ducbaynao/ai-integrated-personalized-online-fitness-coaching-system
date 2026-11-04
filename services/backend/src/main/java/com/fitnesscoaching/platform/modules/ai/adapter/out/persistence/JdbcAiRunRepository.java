@@ -252,7 +252,7 @@ public class JdbcAiRunRepository implements AiRunRepository {
 
     @Override
     public List<AiRun> findRuns(int offset, int limit, AiRunStatus status, String requestType) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM fitness.ai_runs WHERE 1=1");
+        StringBuilder sql = new StringBuilder("SELECT * FROM fitness.ai_runs WHERE " + activeParticipantsSql());
         List<Object> params = new ArrayList<>();
         if (status != null) {
             sql.append(" AND status = ?::fitness.ai_run_status");
@@ -271,7 +271,7 @@ public class JdbcAiRunRepository implements AiRunRepository {
 
     @Override
     public long countRuns(AiRunStatus status, String requestType) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM fitness.ai_runs WHERE 1=1");
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM fitness.ai_runs WHERE " + activeParticipantsSql());
         List<Object> params = new ArrayList<>();
         if (status != null) {
             sql.append(" AND status = ?::fitness.ai_run_status");
@@ -283,5 +283,14 @@ public class JdbcAiRunRepository implements AiRunRepository {
         }
         Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
         return count != null ? count : 0L;
+    }
+
+    private static String activeParticipantsSql() {
+        return """
+                (student_id IS NULL OR EXISTS (SELECT 1 FROM fitness.users subject
+                    WHERE subject.id=fitness.ai_runs.student_id AND subject.status='ACTIVE'))
+                AND (requested_by IS NULL OR EXISTS (SELECT 1 FROM fitness.users requester
+                    WHERE requester.id=fitness.ai_runs.requested_by AND requester.status='ACTIVE'))
+                """;
     }
 }

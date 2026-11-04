@@ -1,5 +1,7 @@
 # B08 Account Erasure closure — source-checked residual gates
 
+The [unified closure candidate](b08-account-erasure-unified-closure.md) records the PR #140 base, the current field/read-path inventory, and the single remaining decision/evidence table. This earlier checkpoint remains historical evidence for the narrower lease and owner-port gates.
+
 Base: `origin/main@b51c3b3ac4c029a4a8112e01a4caed2e10dc6c0e` (PR #139 merge, V55 remains highest). This checkpoint is a **partial local candidate**, not an enabled erasure workflow. `account.erasure.request-enabled` and `account.erasure.worker-enabled` remain default OFF. No domain has issued a persisted COMPLETE attestation; requests remain `DOMAIN_REVIEW_PENDING`. V55 A01 schema design is `APPROVED_BY_PERSON_A` per user-reported direct approval, not GitHub review or merge/CI inference; rollout details remain open.
 
 ## What the owner ports do, and do not prove

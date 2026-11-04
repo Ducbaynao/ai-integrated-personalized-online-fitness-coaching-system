@@ -16,8 +16,20 @@ public class ProgressAccountErasureService implements ProgressAccountErasure {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void minimizeOwnedConnectionIdentifiers(UUID userId) {
-        // user_id is an explicit owner here. Orphaned ingestion batches/raw payloads
-        // are deliberately excluded until their provenance is reconciled.
+        // The non-null connection FK and connection.user_id prove ownership of
+        // these raw records. Orphaned batches remain unresolved; do not infer
+        // an owner from their source or payload.
+        jdbc.update("""
+                UPDATE fitness.raw_ingestion_records r
+                SET payload='{}'::jsonb,external_record_id=NULL,error_message=NULL
+                FROM fitness.ingestion_batches b
+                JOIN fitness.integration_connections c ON c.id=b.connection_id
+                WHERE r.batch_id=b.id AND c.user_id=?
+                  AND (r.payload<>'{}'::jsonb OR r.external_record_id IS NOT NULL
+                       OR r.error_message IS NOT NULL)
+                """, userId);
+        // The stable batch/hash chronology remains for owner review; the hash
+        // is not an anonymity claim or a completed Progress attestation.
         jdbc.update("""
                 UPDATE fitness.integration_connections
                 SET external_account_id=NULL,encrypted_credentials_ref=NULL,
