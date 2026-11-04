@@ -160,6 +160,17 @@ public class AccountErasureWorker {
 
     private ObjectClaim claimObject(RequestClaim request) {
         return transactions.execute(ignored -> {
+            // Fence each object claim with the request lease. A worker can lose
+            // its lease while an earlier S3 call is in flight; it must not
+            // start another irreversible delete after that point. FOR UPDATE
+            // also serializes this check with a concurrent request re-claim.
+            Boolean current = jdbc.queryForObject("""
+                    SELECT lease_token=? AND lease_expires_at>clock_timestamp()
+                      AND NOT EXISTS (SELECT 1 FROM fitness.account_erasure_holds h
+                                      WHERE h.request_id=r.id AND h.released_at IS NULL)
+                    FROM fitness.account_erasure_requests r WHERE r.id=? FOR UPDATE
+                    """, Boolean.class, request.token(), request.id());
+            if (!Boolean.TRUE.equals(current)) return null;
             List<ObjectClaim> due = jdbc.query("""
                     SELECT id,bucket_name,object_key FROM fitness.account_erasure_objects
                     WHERE request_id=? AND status IN ('PENDING','RETRYABLE','CLAIMED')
