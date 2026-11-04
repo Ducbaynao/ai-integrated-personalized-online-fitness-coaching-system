@@ -136,23 +136,14 @@ public class AccountErasureService {
         return load(id);
     }
 
-    public void recordProgress(UUID id, String status, String error) {
-        transactions.executeWithoutResult(ignored -> {
-            jdbc.update("""
-                    UPDATE fitness.account_erasure_requests SET status=?,last_error_code=?,updated_at=clock_timestamp()
-                    WHERE id=? AND status<>'ACTIVE_DATA_CLEANED'
-                    """, status, error, id);
-            event(id, status, error);
-        });
-    }
-
     /** null means a newer worker owns the request lease; never commit a stale finalization. */
     public Boolean minimizeCurrentScope(UUID id, UUID userId, UUID claimToken) {
         return transactions.execute(ignored -> {
-            List<UUID> owners = jdbc.query("""
-                    SELECT lease_token FROM fitness.account_erasure_requests WHERE id=? FOR UPDATE
-                    """, (rs, row) -> rs.getObject(1, UUID.class), id);
-            if (owners.isEmpty() || !claimToken.equals(owners.getFirst())) return null;
+            List<Boolean> current = jdbc.query("""
+                    SELECT lease_token=? AND lease_expires_at>clock_timestamp()
+                    FROM fitness.account_erasure_requests WHERE id=? FOR UPDATE
+                    """, (rs, row) -> rs.getBoolean(1), claimToken, id);
+            if (current.isEmpty() || !Boolean.TRUE.equals(current.getFirst())) return null;
             List<Integer> holds = jdbc.query("""
                     SELECT 1 FROM fitness.account_erasure_holds
                     WHERE request_id=? AND released_at IS NULL LIMIT 1

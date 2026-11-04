@@ -281,6 +281,13 @@ class AccountErasureHttpIntegrationTest {
                 .readTree(body).get("id").asText());
         // A stale/non-owner lease cannot invoke any owner port.
         assertThat(erasure.minimizeCurrentScope(request, requester, UUID.randomUUID())).isNull();
+        UUID expiredLease = UUID.randomUUID();
+        jdbc.update("""
+                UPDATE fitness.account_erasure_requests
+                SET lease_token=?,lease_expires_at=clock_timestamp()-interval '1 second'
+                WHERE id=?
+                """, expiredLease, request);
+        assertThat(erasure.minimizeCurrentScope(request, requester, expiredLease)).isNull();
         assertThat(jdbc.queryForObject("SELECT label FROM fitness.mfa_factors WHERE id=?", String.class, heldFactor))
                 .isEqualTo("Held label");
         assertThat(jdbc.queryForObject("SELECT change_summary FROM fitness.workout_plan_versions WHERE id=?",
