@@ -564,6 +564,7 @@ class AiP2M2ImportantFlowsUnitTest {
         @DisplayName("Admin xem chi tiết AI Run: ghi nhận audit log VIEW_AI_RUN_DETAIL")
         void adminGetDetail_logsAudit() {
             when(accountStatusQuery.getAccountStatus(adminId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+            when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
             when(userRoleQuery.hasActiveRole(adminId, "ADMIN")).thenReturn(true);
 
             AiRun rawRun = AiRun.builder()

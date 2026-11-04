@@ -130,9 +130,10 @@ class AdminAiRunQueryServiceUnitTest {
         when(accountStatusQuery.getAccountStatus(adminId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(userRoleQuery.hasActiveRole(adminId, "ADMIN")).thenReturn(true);
 
+        UUID requesterId = UUID.randomUUID();
         AiRun mockRun = new AiRun(
                 runId,
-                UUID.randomUUID(),
+                requesterId,
                 null,
                 null,
                 "F01_GENERAL_KNOWLEDGE",
@@ -156,6 +157,7 @@ class AdminAiRunQueryServiceUnitTest {
         );
 
         when(runRepository.findById(runId)).thenReturn(Optional.of(mockRun));
+        when(accountStatusQuery.getAccountStatus(requesterId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
 
         AiValidationResult validation = new AiValidationResult(
                 UUID.randomUUID(),
@@ -193,6 +195,20 @@ class AdminAiRunQueryServiceUnitTest {
         assertThat(audit.action()).isEqualTo("VIEW_AI_RUN_DETAIL");
         assertThat(audit.targetType()).isEqualTo("AI_RUN");
         assertThat(audit.targetId()).isEqualTo(runId);
+    }
+
+    @Test
+    void disabledAiRunSubjectIsConcealedBeforeProvenanceOrAuditRead() {
+        UUID subject = UUID.randomUUID();
+        when(accountStatusQuery.getAccountStatus(adminId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(adminId, "ADMIN")).thenReturn(true);
+        when(runRepository.findById(runId)).thenReturn(Optional.of(AiRun.builder()
+                .id(runId).studentId(subject).status(AiRunStatus.SUCCEEDED).build()));
+        when(accountStatusQuery.getAccountStatus(subject)).thenReturn(Optional.of(AccountStatus.DISABLED));
+
+        assertThatThrownBy(() -> service.getRunDetail(adminId, runId))
+                .isInstanceOf(AiRunNotFoundException.class);
+        org.mockito.Mockito.verifyNoInteractions(provenanceRepository, auditService);
     }
 
     @Test

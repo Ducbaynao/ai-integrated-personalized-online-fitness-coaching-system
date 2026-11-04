@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.modules.user.application.service.AccountEras
 import com.fitnesscoaching.platform.modules.chat.ChatObjectStorage;
 import com.fitnesscoaching.platform.modules.chat.ChatFailure;
 import com.fitnesscoaching.platform.modules.auth.domain.TokenHasher;
+import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +65,7 @@ class AccountErasureHttpIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired AccountErasureWorker worker;
     @Autowired AccountErasureService erasure;
+    @Autowired AiRunRepository aiRuns;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping requestMappings;
     @MockitoBean ChatObjectStorage storage;
 
@@ -161,6 +163,13 @@ class AccountErasureHttpIntegrationTest {
                 VALUES (?,?,1,'USER_REASON','locked private summary',?,clock_timestamp(),'APPROVED')
                 """, lockedVersion, lockedPlan, requester);
         UUID ownerMeal = UUID.randomUUID(), otherMeal = UUID.randomUUID();
+        UUID ownAnalysis = UUID.randomUUID(), otherAnalysis = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownAnalysis, requester}, {otherAnalysis, other}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.food_analysis_requests(id,student_id,input_type,input_text)
+                    VALUES (?,?,'TEXT','private food description')
+                    """, values[0], values[1]);
+        }
         jdbc.update("""
                 INSERT INTO fitness.meals(id,student_id,meal_type,consumed_at,title,notes,created_by)
                 VALUES (?,?,'BREAKFAST',clock_timestamp(),'my food','my note',?)
@@ -270,6 +279,26 @@ class AccountErasureHttpIntegrationTest {
                     VALUES (?,?,?,'external','secret-ref',ARRAY['read']::text[])
                     """, values[0], values[1], provider);
         }
+        UUID ownRaw = UUID.randomUUID(), otherRaw = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownRaw, ownerConnection}, {otherRaw, otherConnection}}) {
+            UUID batch = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO fitness.ingestion_batches(id,connection_id,source_id)
+                    VALUES (?,?,(SELECT id FROM fitness.measurement_sources WHERE code=?))
+                    """, batch, values[1], sourceCode);
+            jdbc.update("""
+                    INSERT INTO fitness.raw_ingestion_records
+                      (id,batch_id,external_record_id,payload,payload_hash,error_message)
+                    VALUES (?,?,'private-record','{"weight":75}'::jsonb,?,'private error')
+                    """, values[0], batch, values[0].toString());
+        }
+        UUID ownAiRun = UUID.randomUUID(), otherAiRun = UUID.randomUUID();
+        for (UUID[] values : new UUID[][]{{ownAiRun, requester}, {otherAiRun, other}}) {
+            jdbc.update("""
+                    INSERT INTO fitness.ai_runs(id,requested_by,student_id,request_type,input_payload)
+                    VALUES (?,?,?,'F01_GENERAL_KNOWLEDGE','{"private":"subject text"}'::jsonb)
+                    """, values[0], values[1], values[1]);
+        }
 
         String body = mvc.perform(post("/api/v1/account-erasure-requests")
                         .with(jwt().jwt(j -> j.subject(requester.toString())))
@@ -279,6 +308,9 @@ class AccountErasureHttpIntegrationTest {
                 .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
         UUID request = UUID.fromString(new tools.jackson.databind.ObjectMapper()
                 .readTree(body).get("id").asText());
+        var visibleAiRuns = aiRuns.findRuns(0, 100, null, "F01_GENERAL_KNOWLEDGE");
+        assertThat(visibleAiRuns).extracting(com.fitnesscoaching.platform.modules.ai.domain.AiRun::id)
+                .contains(otherAiRun).doesNotContain(ownAiRun);
         // A stale/non-owner lease cannot invoke any owner port.
         assertThat(erasure.minimizeCurrentScope(request, requester, UUID.randomUUID())).isNull();
         UUID expiredLease = UUID.randomUUID();
@@ -306,6 +338,10 @@ class AccountErasureHttpIntegrationTest {
                 .isEqualTo("Held label");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, ownerMeal)).isEqualTo("my food");
+        assertThat(jdbc.queryForObject("SELECT input_text FROM fitness.food_analysis_requests WHERE id=?",
+                String.class, ownAnalysis)).isEqualTo("private food description");
+        assertThat(jdbc.queryForObject("SELECT payload::text FROM fitness.raw_ingestion_records WHERE id=?",
+                String.class, ownRaw)).contains("weight");
         assertThat(jdbc.queryForObject("SELECT weight_at_time FROM fitness.progress_photos WHERE id=?",
                 java.math.BigDecimal.class, ownPhoto)).isEqualByComparingTo("75");
         assertThat(jdbc.queryForObject("SELECT device_identifier FROM fitness.measurement_batches WHERE id=?",
@@ -331,6 +367,16 @@ class AccountErasureHttpIntegrationTest {
                 String.class, lockedVersion)).isEqualTo("locked private summary");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, ownerMeal)).isNull();
+        assertThat(jdbc.queryForObject("SELECT input_text FROM fitness.food_analysis_requests WHERE id=?",
+                String.class, ownAnalysis)).isEqualTo("ERASED");
+        assertThat(jdbc.queryForObject("SELECT input_text FROM fitness.food_analysis_requests WHERE id=?",
+                String.class, otherAnalysis)).isEqualTo("private food description");
+        assertThat(jdbc.queryForObject("SELECT payload::text FROM fitness.raw_ingestion_records WHERE id=?",
+                String.class, ownRaw)).isEqualTo("{}");
+        assertThat(jdbc.queryForObject("SELECT external_record_id FROM fitness.raw_ingestion_records WHERE id=?",
+                String.class, ownRaw)).isNull();
+        assertThat(jdbc.queryForObject("SELECT payload::text FROM fitness.raw_ingestion_records WHERE id=?",
+                String.class, otherRaw)).contains("weight");
         assertThat(jdbc.queryForObject("SELECT title FROM fitness.meals WHERE id=?",
                 String.class, otherMeal)).isEqualTo("other food");
         assertThat(jdbc.queryForObject("SELECT name FROM fitness.student_private_foods WHERE id=?",
