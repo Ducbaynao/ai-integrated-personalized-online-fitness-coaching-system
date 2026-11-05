@@ -1322,10 +1322,11 @@ class WorkoutProgressAggregationIntegrationTest {
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO fitness.workout_session_logs
-                (id, student_id, planned_workout_id, performed_start_at, performed_end_at, status, overall_rpe, notes, logged_by)
-                VALUES (?, ?, ?, ?, ?, ?::fitness.actual_workout_status, ?, 'Actual log notes', ?)
+                (id, student_id, planned_workout_id, performed_start_at, performed_end_at, status,
+                 overall_rpe, notes, logged_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?::fitness.actual_workout_status, ?, 'Actual log notes', ?, ?, ?)
                 """, id, student, plannedId, Timestamp.from(start), end != null ? Timestamp.from(end) : null,
-                status, rpe, student);
+                status, rpe, student, Timestamp.from(start), Timestamp.from(start));
         return id;
     }
 
@@ -1343,11 +1344,15 @@ class WorkoutProgressAggregationIntegrationTest {
 
         UUID setLogId = UUID.randomUUID();
         UUID clientSetId = UUID.randomUUID();
+        Timestamp loggedAt = jdbc.queryForObject("SELECT performed_start_at FROM fitness.workout_session_logs WHERE id=?",
+                Timestamp.class, executionId);
         jdbc.update("""
                 INSERT INTO fitness.set_logs
-                (id, exercise_log_id, client_set_id, set_number, set_type, completion_status, repetitions, load_value, load_unit_id, rpe, duration_seconds)
-                VALUES (?, ?, ?, ?, ?::fitness.set_type, ?::fitness.set_completion_status, ?, ?, ?, ?, ?)
-                """, setLogId, exerciseLogId, clientSetId, seq, setType, completionStatus, reps, load, loadUnitId, rpe, durationSeconds);
+                (id, exercise_log_id, client_set_id, set_number, set_type, completion_status, repetitions,
+                 load_value, load_unit_id, rpe, duration_seconds, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?::fitness.set_type, ?::fitness.set_completion_status, ?, ?, ?, ?, ?, ?, ?)
+                """, setLogId, exerciseLogId, clientSetId, seq, setType, completionStatus, reps,
+                load, loadUnitId, rpe, durationSeconds, loggedAt, loggedAt);
 
         return setLogId;
     }

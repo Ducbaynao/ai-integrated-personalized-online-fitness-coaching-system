@@ -153,7 +153,8 @@ public class ChatService implements ChatOwnedExportQuery {
         return visibleMessage(actor, student, context.periodId(), message(id));
     }
 
-    @Transactional(readOnly = true)
+    // Source-owner reads acquire Coaching authority's FOR SHARE lock.
+    @Transactional
     public LinkedResource openLinked(UUID actor, UUID messageId) {
         requireAccount(actor);
         Message row = message(messageId);
@@ -355,7 +356,8 @@ public class ChatService implements ChatOwnedExportQuery {
         return withSendAllowed(actor, row);
     }
 
-    @Transactional(readOnly = true)
+    // Linked message availability rechecks source authority under FOR SHARE.
+    @Transactional
     public Page<Message> messages(UUID actor, UUID conversationId, int page, int size) {
         validatePage(page, size);
         Conversation conversation = detail(actor, conversationId);
