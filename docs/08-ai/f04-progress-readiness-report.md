@@ -328,11 +328,87 @@ Tổng cộng bộ test F04-T1: 34 tests (28 integration tests, 6 unit tests: 34
 Kiểm thử F03: `AiWorkoutAdjustmentFullSliceIntegrationTest`: 19 tests (19 passed, 0 failures, 0 errors, gồm 4 test mới và 15 test hồi quy); `AiWorkoutAdjustmentServiceUnitTest`: 12 tests (12 passed, 0 failures, 0 errors, gồm 1 test mới và 11 test hồi quy).
 Toàn bộ backend test suite (`mvn test`): 1.657 tests được ghi nhận: 1.652 passed, 5 skipped, 0 failures, 0 errors. Không có mutable test hook trong production service.
 
-### 8.3. Giới Hạn Nghiệm Thu Còn Lại Của F04 (Không Tuyên Bố Hoàn Tất F04)
-Việc sửa lỗi và hoàn thiện F04-T1 là nền tảng truy vấn nguồn Workout, **tuyệt đối không coi là hoàn tất toàn bộ tính năng F04**. Các hạng mục tiếp theo cần giải quyết:
-1. **F04-T2 (Measurement Progress Query):** Triển khai query port đọc số đo thể chất hợp lệ (`VALID`, `superseded_by_id IS NULL`, `erased_at IS NULL`) và digest watermark của module Measurement (không mặc định gộp Nutrition, Admin UI hay data ingestion vào scope F04-T2).
-2. **Progress Engine Domain Service:** Tổng hợp tín hiệu giữa Workout Adherence/Volume và Thể chất (Cân nặng, Số đo), phát hiện các tín hiệu an toàn (như gián đoạn tập luyện $\ge 100$ ngày). F04 không lấy Nutrition mặc định.
-3. **FastAPI AI Progress Summarization Service:** Xây dựng context builder, prompt template và schema JSON output cho báo cáo tiến độ tuần/tháng.
-4. **Mobile Client Progress UI:** Giao diện hiển thị tiến độ và công cụ review của HLV trên Mobile (giữ trạng thái Live GUI Smoke Test là NOT RUN trên emulator hiện tại).
-5. **Thẩm định Chuyên môn (D06 / OD-3):** Phê duyệt quy tắc phân loại minor vs significant và các ngưỡng cảnh báo an toàn từ Hội đồng Thể hình (gate chuyên môn còn mở).
+### 8.3. Chuyển Tiếp Từ F04-T1 Sang F04-T2
+Việc hoàn thiện F04-T1 là nền tảng truy vấn nguồn Workout, khép lại tầng dữ liệu tập luyện cho F04.
+
+---
+
+## 9. Hoàn Thành & Kiểm Chứng Kỹ Thuật F04-T2: `MeasurementProgressQuery`
+
+> **Branch thực hiện:** `feat/p2-m4-f04-measurement-progress-query`
+> **Commit nền xác minh:** `d32d3c817fdf3a3a3ce0817d7782abc68c06ef90` (HEAD origin/main)
+> **Thời điểm hoàn thành:** 2026-11-06 (UTC+7)
+
+### 9.1. Phạm Vi Triển Khai & Hợp Đồng (Contract)
+- **Cổng giao tiếp Inbound (Port):** [`MeasurementProgressQuery.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/measurement/application/port/in/MeasurementProgressQuery.java)
+- **Dịch vụ thực thi (Service):** [`MeasurementProgressService.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/measurement/application/service/MeasurementProgressService.java)
+- **Chính sách phân quyền (Access Policy):** [`MeasurementAccessPolicy.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/measurement/application/service/MeasurementAccessPolicy.java)
+- **Lỗi & Ngoại lệ Domain:** [`MeasurementError.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/measurement/domain/MeasurementError.java), [`MeasurementFailure.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/measurement/domain/MeasurementFailure.java)
+- **Chữ ký phương thức chính:**
+  ```java
+  MeasurementProgressSnapshot query(
+          UUID actorId,
+          UUID studentId,
+          Set<String> metricCodes,
+          LocalDate fromDate,
+          LocalDate toDate,
+          ZoneId timezone,
+          Instant asOf
+  );
+  ```
+
+### 9.2. Các Bất Biến Nghiệp Vụ & Kỹ Thuật Đã Bảo Đảm
+1. **Lọc Dữ Liệu Hợp Lệ Chuẩn V55:**
+   - Sử dụng đúng 3 điều kiện: `validation_status = 'VALID'`, `superseded_by_id IS NULL`, `erased_at IS NULL`.
+   - Lọc bỏ hoàn toàn các bản ghi `PENDING`, `SUSPECT`, `REJECTED`, các bản ghi bị thay thế và các bản ghi tombstone xóa theo GDPR/B08.
+   - Đọc toàn bộ chuỗi quan sát lịch sử phù hợp trong kỳ, tuyệt đối không dùng view `current_valid_measurements` (vốn chỉ lấy 1 điểm mới nhất) làm sai lệch chuỗi thời gian.
+2. **Bảo Toàn Giá Trị & Metadata:**
+   - Bảo toàn giá trị `0` hợp lệ (`BigDecimal.ZERO`), khuyết thiếu/unknown vẫn giữ nguyên `null`, không tự động thế số 0.
+   - Giữ nguyên `confidence_score`, `quality_score`, `notes`, `source`, `method`, `entered_by`, `external_record_id`.
+   - Không tự áp đặt ngưỡng `quality_score` (như $\ge 80\%$) khi chưa có quy định phê duyệt.
+   - Không tự ý suy diễn tăng cơ/giảm mỡ từ cân nặng thuần túy.
+3. **Phân Quyền Độc Lập & Phạm Vi Thời Gian:**
+   - Kiểm tra `DataScope.BODY_METRICS` độc lập hoàn toàn với quyền Workout hay Plan.
+   - Với Actor là Học viên (`isSelf`): kiểm tra tài khoản `ACTIVE` và hồ sơ `StudentProfile`.
+   - Với Actor là HLV: kiểm tra tài khoản `ACTIVE`, hồ sơ học viên, và đánh giá quyền qua `CoachingAuthorityQuery`. Nếu chưa được cấp quyền: trả HTTP 403 `MEASUREMENT_ACCESS_DENIED`.
+   - Áp dụng chặt chẽ `historyFrom` và `historyUntil`: dữ liệu ngoài phạm vi thời gian được cấp quyền bị loại bỏ hoàn toàn khỏi kết quả.
+   - **Không Rò Rỉ Kênh Phụ (Verified in Paired Tests for Out-Of-Scope Mutations):** Đạt kiểm chứng Paired Tests: các thao tác tạo mới, sửa đổi, thay thế hay xóa số đo ngoài scope của HLV hoàn toàn không làm thay đổi response, metadata hay watermark của HLV.
+4. **Timezone, Biên Ngày & asOf Semantics:**
+   - Quy đổi chính xác `[fromDate, toDate]` theo `timezone` thành `[windowStartInstant, windowEndInstant)`.
+   - Lọc strictly: `measured_at <= asOf` và `created_at <= asOf`. Các bản ghi phát sinh hoặc nhập sau `asOf` không được tính vào snapshot tại `asOf`.
+   - Phân biệt rõ ràng xóa trước/tại `asOf` với xóa sau `asOf`:
+     + Bản ghi bị xóa *sau* `asOf` (`erased_at > asOf`): Tại `asOf` bản ghi này từng tồn tại và hợp lệ, nhưng ở hiện tại đã bị xóa trắng giá trị theo GDPR V55. Hệ thống nhận diện sự thiếu hụt dữ liệu lịch sử này, tự động đánh dấu `hasHistoricalReconstructionLimits = true` và dán nhãn `historicalReconstructionStatus = 'HISTORICAL_RECONSTRUCTION_LIMITED'`. Dữ liệu trả về tuyệt đối giữ bộ lọc `erased_at IS NULL` và không làm lộ bất kỳ giá trị nào đã bị xóa.
+     + Bản ghi bị xóa *trước hoặc tại* `asOf` (`erased_at <= asOf`): Tại thời điểm `asOf`, bản ghi này đã ở trạng thái tombstone/erased. Việc loại bỏ bản ghi này qua `erased_at IS NULL` là phản ánh đúng hiện trạng tại `asOf` nên không bị coi là đột biến sau `asOf` làm giới hạn phục dựng.
+     + Tương tự, các bản ghi backfill (`created_at > asOf`), thay thế sau `asOf` (`sup.created_at > asOf`) hoặc sự kiện thẩm định sau `asOf` (`occurred_at > asOf`) đều được phát hiện và kích hoạt cờ giới hạn phục dựng.
+5. **Composite Source Watermark Toàn Vẹn & Phạm Vi Phụ Thuộc Tối Thiểu Hợp Lệ:**
+   - Bao phủ: `WINDOW`, `AUTH` (isSelf, effectiveStart, effectiveEnd), `SUMMARY` (record count, distinct days, flags), `UNITS` catalog dependencies (chỉ hash các đơn vị đo liên quan đến metric hoặc quan sát trong window: id, code, multiplierToBase), `METRICS` catalog (id, code, displayName, defaultUnitId), và danh sách `MEAS` chi tiết (id, metricCode, measuredAt, numericValue, textValue, booleanValue, unitCode, qualityScore, confidenceScore, sourceCode, methodCode, externalRecordId, historicalReconstructionStatus, validationStatus, supersededById, createdAt).
+   - Bảo đảm tính tất định và nhạy bén với thay đổi: sửa bản ghi cũ, bản ghi di chuyển ranh giới window, thay thế số đo, xóa số đo hoặc sửa hệ số đơn vị đo (`multiplier_to_base`) đều làm thay đổi watermark. Các đơn vị đo ngoài phạm vi không làm rò rỉ hoặc vô hiệu hóa nhầm watermark.
+6. **Snapshot Consistency & Transaction Isolation:**
+   - Triển khai `@Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)`.
+   - Bảo đảm giao dịch đọc độc lập, ngăn snapshot tearing giữa các lần đọc danh mục đơn vị, định nghĩa metric và quan sát số đo ngay cả khi có writer đồng thời commit dữ liệu mới.
+
+### 9.3. Kết Quả Kiểm Thử PostgreSQL Integration Test Thực Chạy
+Bộ kiểm thử [`MeasurementProgressIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/MeasurementProgressIntegrationTest.java) gồm **15 kịch bản tích hợp** (15 passed, 0 failures, 0 errors) trên Testcontainers PostgreSQL `pgvector/pgvector:pg18`:
+1. `returnsFullHistorySeries_notJustLatestObservation`: PASS — Trả đủ chuỗi 3 quan sát theo thứ tự thời gian, `totalObservationsCount = 3`, `distinctDaysCount = 3`.
+2. `filtersByStudent_metricCodes_dateWindow_andTimezone`: PASS — Cô lập theo Student, lọc metric `F_WEIGHT` vs all, lọc ngoài window, kiểm chứng ranh giới múi giờ `Asia/Ho_Chi_Minh`.
+3. `excludesNonValid_superseded_andErasedRecords`: PASS — Loại bỏ `PENDING`, `SUSPECT`, `SUPERSEDED` và `ERASED` tombstone.
+4. `preservesValidZeroValue_andUnknownValuesRemainNull`: PASS — Bảo toàn giá trị 0 hợp lệ (không biến thành null), giá trị khuyết thiếu giữ nguyên null (không biến thành 0).
+5. `preservesUnit_provenance_andQualityMetadata`: PASS — Bảo toàn unit, batch ID, provenance (source, method, entered_by, external_record_id), quality/confidence metadata.
+6. `actorAuthority_rejectsUnauthorizedActor`: PASS — Chặn người lạ (403), chặn HLV chưa có quyền `BODY_METRICS` (403), ném 404 cho học viên không tồn tại.
+7. `trainerTimeScope_clipsDataAndDoesNotExposeOutOfScopeMeasurements`: PASS — HLV bị giới hạn thời gian chỉ thấy dữ liệu trong scope, báo cáo lý do `MEASUREMENT_HISTORY_PARTIALLY_RESTRICTED`.
+8. `pairedTest_outOfScopeDataChange_hasZeroSideChannelLeakageOnResponseAndWatermark`: PASS — Thay đổi dữ liệu ngoài scope không làm thay đổi snapshot hoặc watermark của HLV.
+9. `asOfFiltering_excludesMeasurementsMeasuredOrCreatedAfterAsOf`: PASS — Loại bỏ số đo đo sau `asOf` hoặc tạo sau `asOf`.
+10. `historicalReconstructionLimits_detectedWhenDataModifiedAfterAsOf`: PASS — Phát hiện dữ liệu backfill sau `asOf` (`created_at > asOf`), thay thế sau `asOf` (`sup.created_at > asOf`), thẩm định sau `asOf` (`occurred_at > asOf`), và xóa sau `asOf` (`erased_at > asOf`); phân biệt chính xác với xóa trước `asOf` (`erased_at <= asOf` không gây limited). Dữ liệu xóa luôn được bảo đảm không rò rỉ.
+11. `stableDeterministicOrdering_whenObservationsShareTimestamp`: PASS — Thứ tự ổn định theo `measured_at`, `created_at`, `id` khi trùng thời điểm.
+12. `sourceWatermarkDeterminism_andDependencySensitivity`: PASS — Watermark tất định; thay đổi hệ số đơn vị catalog `multiplier_to_base` làm thay đổi watermark ngay lập tức.
+13. `availabilityReasons_emptyWindowVsRestrictedTimeScope`: PASS — Phân biệt rõ `NO_MEASUREMENTS_RECORDED` và `MEASUREMENT_HISTORY_RESTRICTED`.
+14. `snapshotConsistency_repeatableReadIsolationProtectsQuery`: PASS — Khởi chạy trong outer transaction vẫn độc lập thực thi dưới `REQUIRES_NEW REPEATABLE READ`.
+15. `snapshotConsistency_repeatableReadShieldsAgainstConcurrentWriterCommit`: PASS — Writer thực hiện commit bản ghi mới ở transaction/connection riêng giữa các lượt đọc của Query; Reader bảo toàn snapshot nhất quán, không rò rỉ bản ghi mới, facts và watermark đồng bộ hoàn toàn.
+
+### 9.4. Giới Hạn Còn Lại & Các Bước Tiếp Theo (Không Tuyên Bố Hoàn Tất F04 / Phase 2)
+F04-T2 đã hoàn thành khép lại tầng dữ liệu đo lường thể chất cho F04. Tuy nhiên, toàn bộ tính năng F04 vẫn còn các hạng mục tiếp theo:
+1. **Progress Engine Domain Service:** Tổng hợp tín hiệu giữa Workout Adherence/Volume (F04-T1) và Thể chất (F04-T2), phát hiện các tín hiệu an toàn (như gián đoạn tập luyện $\ge 100$ ngày).
+2. **FastAPI AI Progress Summarization Service:** Xây dựng context builder, prompt template và schema JSON output cho báo cáo tiến độ tuần/tháng.
+3. **Mobile Client Progress UI:** Giao diện hiển thị tiến độ và công cụ review của HLV trên Mobile (Live GUI Smoke Test hiện tại là NOT RUN).
+4. **Thẩm định Chuyên môn (D06 / OD-3):** Phê duyệt quy tắc phân loại minor vs significant và các ngưỡng cảnh báo an toàn từ Hội đồng Thể hình (gate chuyên môn còn mở).
 
