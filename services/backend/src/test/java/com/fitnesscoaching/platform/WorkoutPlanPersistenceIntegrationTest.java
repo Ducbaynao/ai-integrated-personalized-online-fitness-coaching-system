@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.audit.AuditService;
+import com.fitnesscoaching.platform.modules.chat.ChatService;
 import com.fitnesscoaching.platform.common.exception.DataSharingAccessLevelInsufficientException;
 import com.fitnesscoaching.platform.common.exception.DataSharingPermissionRequiredException;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
@@ -70,6 +71,7 @@ class WorkoutPlanPersistenceIntegrationTest {
 
     @Autowired WorkoutPlanCommandUseCase commands;
     @Autowired WorkoutPlanQueryUseCase queries;
+    @Autowired ChatService chat;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @MockitoSpyBean AuditService audit;
@@ -77,6 +79,30 @@ class WorkoutPlanPersistenceIntegrationTest {
     @Autowired ExerciseReferenceQuery exerciseReferences;
 
     @BeforeEach void resetSpies() { reset(audit, store); }
+
+    @Test
+    void linkedPlanMessageAndOpenRecheckRealTrainerAuthorityWithoutReadOnlyLockFailure() throws Exception {
+        TrainerFixture owner = trainerFixture("VIEW");
+        Fixture plan = owner.plan();
+        jdbc.update("""
+                UPDATE fitness.workout_plan_versions
+                SET locked_at=clock_timestamp(),locked_by=?,lock_reason='ACTIVATED'
+                WHERE id=?
+                """, owner.trainerId(), plan.versionId());
+        jdbc.update("UPDATE fitness.workout_plans SET status='ACTIVE',version=version+1 WHERE id=?",
+                plan.planId());
+        var linked = chat.sendLinked(plan.studentId(), plan.studentId(), "WORKOUT_PLAN_VERSION",
+                plan.versionId(), plan.planId(), UUID.randomUUID());
+
+        mvc.perform(get("/api/v1/chat/conversations/{id}/messages", linked.conversationId())
+                        .with(jwt().jwt(j -> j.subject(owner.trainerId().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].linkedResourceAvailable").value(true));
+        mvc.perform(get("/api/v1/chat/messages/{id}/linked-resource", linked.id())
+                        .with(jwt().jwt(j -> j.subject(owner.trainerId().toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resourceId").value(plan.versionId().toString()));
+    }
 
     @Test
     void versionHttpReadsStoredSupervisionForAllThreeValuesAndLegacyDefault() throws Exception {
