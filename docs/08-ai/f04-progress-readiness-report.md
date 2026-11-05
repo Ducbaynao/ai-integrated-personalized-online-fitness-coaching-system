@@ -1,16 +1,16 @@
 # Báo Cáo Kiểm Tra Mức Sẵn Sàng Dữ Liệu Progress Phục Vụ Tính Năng F04
 
-> **Mã tính năng:** F04 — Workout & Progress Summarization, Signal Explanation & Trainer Review Support  
-> **Milestone liên quan:** P2-M4 — Mở Rộng Hỗ Trợ Tập Luyện  
-> **Repository:** `D:\Projects\ai-integrated-personalized-online-fitness-coaching-system`  
-> **Branch thực hiện:** `chore/p2-m4-f03-closure-f04-readiness`  
-> **Baseline commit:** `03d33aa58e2518ed14ff4073cbdd26d042efc990`  
-> **Thời điểm lập và cập nhật báo cáo:** 2026-11-05 00:05 (UTC+7)  
-> **Tài liệu căn cứ:**  
-> - [`phase-2-release-scope.md`](../00-project-overview/phase-2-release-scope.md) (Mục 4, F04)  
-> - [`phase-2-feature-data-authority-matrix.md`](phase-2-feature-data-authority-matrix.md) (Mục 1.2, 1.3, 1.4, 1.8, 5)  
-> - [`phase-2-implementation-plan.md`](../07-development/phase-2-implementation-plan.md) (Mục 1, 1.1, 6)  
-> - [`business-rules.md`](../02-domain/business-rules.md) & [`lifecycles.md`](../02-domain/lifecycles.md)  
+> **Mã tính năng:** F04 — Workout & Progress Summarization, Signal Explanation & Trainer Review Support
+> **Milestone liên quan:** P2-M4 — Mở Rộng Hỗ Trợ Tập Luyện
+> **Repository:** `D:\Projects\ai-integrated-personalized-online-fitness-coaching-system`
+> **Branch thực hiện:** `chore/p2-m4-f03-closure-f04-readiness`
+> **Baseline commit:** `03d33aa58e2518ed14ff4073cbdd26d042efc990`
+> **Thời điểm lập và cập nhật báo cáo:** 2026-11-05 00:05 (UTC+7)
+> **Tài liệu căn cứ:**
+> - [`phase-2-release-scope.md`](../00-project-overview/phase-2-release-scope.md) (Mục 4, F04)
+> - [`phase-2-feature-data-authority-matrix.md`](phase-2-feature-data-authority-matrix.md) (Mục 1.2, 1.3, 1.4, 1.8, 5)
+> - [`phase-2-implementation-plan.md`](../07-development/phase-2-implementation-plan.md) (Mục 1, 1.1, 6)
+> - [`business-rules.md`](../02-domain/business-rules.md) & [`lifecycles.md`](../02-domain/lifecycles.md)
 
 ---
 
@@ -405,10 +405,151 @@ Bộ kiểm thử [`MeasurementProgressIntegrationTest.java`](../../services/bac
 14. `snapshotConsistency_repeatableReadIsolationProtectsQuery`: PASS — Khởi chạy trong outer transaction vẫn độc lập thực thi dưới `REQUIRES_NEW REPEATABLE READ`.
 15. `snapshotConsistency_repeatableReadShieldsAgainstConcurrentWriterCommit`: PASS — Writer thực hiện commit bản ghi mới ở transaction/connection riêng giữa các lượt đọc của Query; Reader bảo toàn snapshot nhất quán, không rò rỉ bản ghi mới, facts và watermark đồng bộ hoàn toàn.
 
-### 9.4. Giới Hạn Còn Lại & Các Bước Tiếp Theo (Không Tuyên Bố Hoàn Tất F04 / Phase 2)
-F04-T2 đã hoàn thành khép lại tầng dữ liệu đo lường thể chất cho F04. Tuy nhiên, toàn bộ tính năng F04 vẫn còn các hạng mục tiếp theo:
-1. **Progress Engine Domain Service:** Tổng hợp tín hiệu giữa Workout Adherence/Volume (F04-T1) và Thể chất (F04-T2), phát hiện các tín hiệu an toàn (như gián đoạn tập luyện $\ge 100$ ngày).
-2. **FastAPI AI Progress Summarization Service:** Xây dựng context builder, prompt template và schema JSON output cho báo cáo tiến độ tuần/tháng.
-3. **Mobile Client Progress UI:** Giao diện hiển thị tiến độ và công cụ review của HLV trên Mobile (Live GUI Smoke Test hiện tại là NOT RUN).
-4. **Thẩm định Chuyên môn (D06 / OD-3):** Phê duyệt quy tắc phân loại minor vs significant và các ngưỡng cảnh báo an toàn từ Hội đồng Thể hình (gate chuyên môn còn mở).
+### 9.4. Giới Hạn Còn Lại & Các Bước Tiếp Theo Sau F04-T2
+F04-T2 đã hoàn thành khép lại tầng dữ liệu đo lường thể chất cho F04. Bước tiếp theo là triển khai Progress Engine Domain Service để tổng hợp dữ liệu Workout (F04-T1) và Measurement (F04-T2).
 
+---
+
+## 10. Hoàn Thành & Kiểm Chứng Kỹ Thuật Progress Engine Tổng Hợp (F04)
+
+> **Branch thực hiện:** `feat/p2-m4-f04-progress-engine`
+> **Baseline commit:** `480f60bf658c8cd127eb859824922192a6c2a014` (Merge PR #144 của F04-T2 vào `main`)
+> **Mục tiêu hoàn thành:** Triển khai tầng Application Service / Domain của Progress Engine hợp nhất hai nguồn dữ liệu Workout (F04-T1) và Measurement (F04-T2) thành một `ProgressSnapshot` toàn vẹn, tất định, chuẩn bị context an toàn trước khi chuyển giao cho AI summarization.
+
+### 10.1. Cấu Trúc Khối Mã Nguồn & Ranh Giới Module Kiến Trúc
+
+Tầng Progress Engine tuân thủ nghiêm ngặt kiến trúc Modular Monolith, không truy cập trực tiếp repository/table của module khác. Thay vào đó, service tích hợp thông qua các Inbound Ports chính thức:
+- **`WorkoutProgressAggregationQuery`** (module `workout`): Đọc snapshot tổng hợp workout, adherence và volume trong window `[fromDate, toDate]`.
+- **`MeasurementProgressQuery`** (module `measurement`): Đọc snapshot chuỗi đo lường thể chất và facts quan sát trong window `[fromDate, toDate]`.
+- **`CoachingAuthorityQuery`** (module `coaching`): Thẩm định quyền HLV, scope và giới hạn thời gian lịch sử (`historyFrom`, `historyUntil`).
+- **`UserAccountStatusQuery`** (module `user`): Xác thực tài khoản Học viên và Actor tồn tại và ở trạng thái `AccountStatus.ACTIVE`.
+- **`MeasurementUnitReferenceQuery`** (module `measurement`): Mở rộng phương thức `resolveByCodes` cung cấp thông tin quy đổi đơn vị (`multiplier_to_base`, `offset_to_base`, `dimension`) thuộc quyền sở hữu của module `measurement`.
+- **`WorkoutCompletionEvidenceQuery`** (module `workout`): Truy vấn bằng chứng hoàn thành bài tập thực tế để đánh giá tính liền mạch lịch sử (`completedForStudent`).
+- **`GetStudentProfileUseCase`** (module `student`): Đọc hồ sơ học viên (`trainingExperienceLevel`, `trainingExperienceMonths`, `onboardingCompletedAt`) phục vụ nhận diện học viên mới.
+
+**Inbound Port Chính:** [`ProgressEngineQuery.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/progress/application/port/in/ProgressEngineQuery.java)
+- Phương thức query:
+  ```java
+  ProgressSnapshot query(
+      UUID actorId,
+      UUID studentId,
+      Set<String> metricCodes,
+      LocalDate fromDate,
+      LocalDate toDate,
+      ZoneId timezone,
+      Instant asOf
+  );
+  ```
+- Định nghĩa các record cấu trúc snapshot:
+  * `ProgressSnapshot`: Chứa `studentId`, `actorId`, `dateWindow`, `effectiveAsOf`, `workoutSection`, `measurementSection`, `continuitySignal`, `historicalLimitsSummary`, `compositeWatermark`.
+  * `WorkoutProgressSection`: Trạng thái nguồn (`SourceAvailability`), facts tóm tắt workout (`AdherenceSummary`, `VolumeAndIntensitySummary`), danh sách kế hoạch (`plannedOccurrences`), danh sách buổi tập (`actualSessions`), `sourceWatermark`.
+  * `MeasurementProgressSection`: Trạng thái nguồn (`SourceAvailability`), facts tóm tắt số đo (`MeasurementSummary`), danh sách quan sát (`observations`), danh sách delta xu hướng (`metricDeltas`), `sourceWatermark`.
+  * `MetricTrendDelta`: Quan sát baseline, quan sát mới nhất (`latest`), delta tuyệt đối (`deltaValue`), tỷ lệ phần trăm (`percentageChange`), hướng xu hướng (`TrendDirection`), số lượng quan sát số (`numericObservationsCount`).
+  * `ContinuitySignal`: Trạng thái liền mạch (`ContinuityState`), số ngày kể từ buổi tập gần nhất (`daysSinceLastWorkout`), ngày buổi tập gần nhất (`lastWorkoutDate`), ID buổi tập gần nhất (`lastWorkoutExecutionId`), nhãn an toàn (`safetyFlags`), và căn cứ giải trình (`rationale`).
+  * `HistoricalLimitsSummary`: Cờ tổng hợp `hasHistoricalLimits`, `workoutLimits`, `measurementLimits`, và giải trình `explanation`.
+- Định nghĩa enum trạng thái:
+  * `SourceAvailability`: `AVAILABLE`, `RESTRICTED`, `NO_DATA`.
+  * `TrendDirection`: `INCREASED`, `DECREASED`, `STABLE`, `INSUFFICIENT_DATA`.
+  * `ContinuityState`: `CONFIRMED_NEW`, `PROLONGED_INACTIVITY`, `RECENT_ACTIVITY_OBSERVED`, `UNKNOWN_HISTORY`, `RESTRICTED_HISTORY`.
+
+**Domain Errors & Failures:**
+- [`ProgressError.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/progress/domain/ProgressError.java): `PROGRESS_ACCESS_DENIED`, `STUDENT_NOT_FOUND`, `INVALID_WINDOW_PARAMETERS`.
+- [`ProgressFailure.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/progress/domain/ProgressFailure.java): Runtime exception mang mã lỗi `ProgressError`.
+
+**Application Service:** [`ProgressEngineService.java`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/progress/application/service/ProgressEngineService.java)
+- Đảm bảo giao dịch `@Transactional` (read-write để hỗ trợ `CoachingAuthorityQuery` execute `SELECT ... FOR SHARE`).
+- Hoàn toàn không chứa raw SQL cross-module; 100% truy vấn dữ liệu được điều phối qua các domain ports.
+
+### 10.2. Các Quyết Định Kỹ Thuật & Bất Biến Nghiệp Vụ Đã Hiệu Chỉnh
+
+1. **Phân Định Tính Liền Mạch (Continuity State Determination):**
+   - **Quy tắc `CONFIRMED_NEW` khắt khe và bảo toàn mốc `asOf` lịch sử:** Chỉ trả `CONFIRMED_NEW` khi có bằng chứng tường minh: học viên hoàn thành onboarding trước hoặc tại mốc `asOf` (`onboardingCompletedAt != null && !onboardingCompletedAt.isAfter(asOf)`), trình độ khai báo `BEGINNER`, và kinh nghiệm khai báo chính xác bằng 0 (`trainingExperienceMonths == 0`) cùng 0 buổi tập hoàn thành trong hệ thống. Nếu onboarding hoàn thành sau `asOf` hoặc thiếu dữ liệu, trả `UNKNOWN_HISTORY` để tránh ngộ nhận bằng chứng hiện tại đã tồn tại ở quá khứ.
+   - **Bỏ nhãn chuyên môn `RECENT_CONSISTENT` chưa phê duyệt:** Bỏ việc coi 1 buổi tập trong 14 ngày là "tập đều đặn". Thay vào đó, trả trạng thái khách quan `RECENT_ACTIVITY_OBSERVED`, ghi nhận facts quan sát (`daysSinceLastWorkout`, `lastWorkoutDate`, `lastWorkoutExecutionId`) và không tự gán nhãn chuyên môn khi chưa có ngưỡng phê duyệt từ Hội đồng Thể hình.
+   - **Ca gián đoạn 100 ngày (`RETURN_AFTER_100_DAYS_V1`):**
+     * Đánh giá dựa trên toàn bộ lịch sử tập luyện hợp lệ trong phạm vi quyền được cấp của Actor tính đến `effectiveAsOf`.
+     * Nếu quyền của HLV bị giới hạn thời gian (`historyUntil < effectiveAsOf`): không thể xác nhận học viên có tập sau đó hay không -> trả `RESTRICTED_HISTORY`.
+     * Nếu độ bao phủ lịch sử của HLV bắt đầu sau mốc 100 ngày trước `asOf` (`historyFrom > asOf - 100d`): không đủ 100 ngày lịch sử -> trả `RESTRICTED_HISTORY`.
+     * Khi và chỉ khi xác nhận buổi tập hoàn thành gần nhất cách thời điểm tham chiếu >= 100 ngày: gán `PROLONGED_INACTIVITY` và kích hoạt cờ an toàn `RETURN_AFTER_100_DAYS_V1`.
+
+2. **Tính Toán Delta & Quy Đổi Đơn Vị Tất Định (Metric Deltas & Unit Conversion):**
+   - **Kiểm tra tương thích đơn vị:** Khi hai quan sát có đơn vị khác nhau, hệ thống tra cứu bảng `fitness.measurement_units` qua port `MeasurementUnitReferenceQuery.resolveByCodes`. Nếu cùng `dimension` (ví dụ `MASS`: KG vs LB), hệ thống tự động quy đổi về đơn vị mốc để tính delta. Nếu khác `dimension` hoặc không thể quy đổi: gán `TrendDirection.INSUFFICIENT_DATA`, `deltaValue = null`, `percentageChange = null`.
+   - **Ức chế tính tỷ lệ phần trăm trên thang đo affine có offset:** Đối với các đơn vị có `offset_to_base != 0` (như nhiệt độ Celsius/Fahrenheit), tỷ lệ phần trăm thay đổi không có ý nghĩa toán học bất biến scale -> hệ thống gán `percentageChange = null`.
+   - **Quan sát trùng thời điểm:** Nếu quan sát đầu và quan sát cuối có cùng thời điểm `measuredAt`, không có khoảng thời gian trôi qua để xác lập xu hướng -> gán `TrendDirection.INSUFFICIENT_DATA`, `deltaValue = null`.
+   - **Mốc ban đầu bằng 0:** Nếu `baselineValue == 0`, `deltaValue = latestValue`, nhưng `percentageChange = null` để tránh chia cho 0.
+   - **Bảo toàn tính khuyết thiếu:** Unknown giữ nguyên `null`, tuyệt đối không tự động thế bằng `0`. Không suy diễn tăng cơ/giảm mỡ từ biến thiên cân nặng thuần túy.
+
+3. **Phân Quyền, Cô Lập Kênh Phụ & Xử Lý Lỗi Chặt Chẽ:**
+   - Kiểm tra trạng thái tài khoản người dùng qua `UserAccountStatusQuery`: Học viên và Actor phải tồn tại và có `status = AccountStatus.ACTIVE`. Nếu học viên không tồn tại -> 404 `STUDENT_NOT_FOUND`; nếu inactive -> 403 `PROGRESS_ACCESS_DENIED`.
+   - Giữ độc lập hoàn toàn quyền Workout (`WORKOUT_HISTORY`/`WORKOUT_PLAN`) và Body Metrics (`BODY_METRICS`).
+   - Xử lý Partial Access: Nguồn bị từ chối trả về `RESTRICTED` với facts trống và `sourceWatermark = null`.
+   - Băm digest cho nguồn bị từ chối bằng token cố định `"RESTRICTED"`, ngăn chặn việc theo dõi dữ liệu ẩn qua watermark. Đã được kiểm chứng qua Paired Tests: đột biến dữ liệu ngoài quyền không làm thay đổi response hay watermark của HLV.
+   - Xử lý lỗi nghiêm ngặt: Chỉ chuyển đúng exception `WORKOUT_EXECUTION_ACCESS_DENIED` và `MEASUREMENT_ACCESS_DENIED` thành `RESTRICTED`. Mọi lỗi kỹ thuật (kết nối cơ sở dữ liệu, lỗi cú pháp SQL, NullPointer) đều được rethrow nguyên trạng.
+
+4. **Composite Watermark Toàn Vẹn Không Mất Độ Chính Xác:**
+   - Sử dụng định dạng chuỗi chuẩn hóa canonical:
+     ```
+     ENGINE:progress-engine-v1.0|STUDENT:studentId|WINDOW:fromDate:toDate:timezone|METRICS:sortedMetricCodes|ASOF:asOfIsoString|WORKOUT:workoutWatermark|MEAS:measurementWatermark|CONTINUITY:state:daysSince:lastDate
+     ```
+   - Lưu trữ `asOf` dưới dạng ISO-8601 đầy đủ (bảo toàn độ chính xác nanosecond).
+   - Bao phủ đầy đủ tham số lọc `metricCodes`, cửa sổ thời gian, trạng thái continuity và source watermarks của cả hai nguồn (bao gồm cả phụ thuộc phiên bản catalog đơn vị đo lường).
+
+5. **Làm Rõ Mức Độ Nhất Quán Dữ Liệu Giữa Các Nguồn (Cross-Source Consistency):**
+   - Cùng `effectiveAsOf` bảo đảm tính nhất quán ở mức logic ứng dụng: cả hai adapter Workout và Measurement đều lọc sự kiện xảy ra <= `asOf`.
+   - Tuy nhiên, vì các adapter thực thi trong các transaction hoặc snapshot connection độc lập, hệ thống không bảo đảm một atomic cross-source database snapshot giữa hai nguồn: một writer concurrent có thể commit vào một nguồn sau khi nguồn kia đã đọc xong. Giới hạn này được phản ánh minh bạch qua `compositeWatermark` và `historicalLimitsSummary`.
+
+---
+
+### 10.3. Kết Quả Kiểm Thử Thực Tế (100% Passed)
+
+Toàn bộ các bài kiểm thử đã được chạy và xác minh thực tế trên môi trường Testcontainers PostgreSQL `pgvector/pgvector:pg18`:
+
+1. **Bộ Kiểm Thử Đơn Vị [`ProgressEngineUnitTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/modules/progress/ProgressEngineUnitTest.java) (15/15 passed):**
+   - `inputValidation_rejectsInvalidWindow`: PASS — Kiểm tra tính hợp lệ của tham số cửa sổ ngày.
+   - `passesIdenticalEffectiveAsOf_whenCallerAsOfIsNull`: PASS — Truyền `effectiveAsOf` duy nhất sang cả 2 adapter.
+   - `metricDeltas_computesCorrectValuesAndDirections`: PASS — Tính chính xác delta tuyệt đối, % thay đổi và hướng xu hướng `INCREASED`/`DECREASED`/`STABLE`.
+   - `metricDeltas_incompatibleUnitsOrIdenticalTimestamps_returnInsufficientData`: PASS — Đơn vị không tương thích hoặc quan sát trùng timestamp trả về `INSUFFICIENT_DATA` với `deltaValue = null`.
+   - `metricDeltas_nonZeroOffset_suppressesPercentageChange`: PASS — Đơn vị có offset khác 0 (nhiệt độ) triệt tiêu tỷ lệ phần trăm (`percentageChange = null`).
+   - `continuity_prolongedInactivity_whenWorkout100DaysAgo`: PASS — Kích hoạt cờ an toàn `RETURN_AFTER_100_DAYS_V1` khi gián đoạn >= 100 ngày.
+   - `continuity_recentActivityObserved_withoutUnapprovedConsistentLabel`: PASS — Quan sát buổi tập 5 ngày trước trả về `RECENT_ACTIVITY_OBSERVED` không gán nhãn chuyên môn.
+   - `continuity_confirmedNew_whenOnboardingCompletedWithZeroMonthsAndZeroLogs`: PASS — Học viên có xác nhận `BEGINNER`, kinh nghiệm 0 tháng và hoàn thành onboarding trước `asOf` được gán `CONFIRMED_NEW`.
+   - `continuity_unknownHistory_whenOnboardingCompletedAfterAsOf`: PASS — Học viên hoàn thành onboarding sau `asOf` bảo toàn tính quá khứ -> trả về `UNKNOWN_HISTORY`.
+   - `continuity_unknownHistory_whenBeginnerLacksZeroMonthsEvidence`: PASS — Học viên beginner nhưng thiếu xác nhận 0 tháng trả về `UNKNOWN_HISTORY`.
+   - `continuity_trainerWithHistoryUntilBeforeAsOf_returnsRestrictedHistory`: PASS — HLV có phạm vi lịch sử kết thúc trước `asOf` nhận `RESTRICTED_HISTORY`.
+   - `authority_partialAccess_workoutAllowed_measurementDenied`: PASS — HLV chỉ có quyền Workout nhận dữ liệu Workout, Measurement bị đánh dấu `RESTRICTED` không rò rỉ metadata.
+   - `authority_deniedOnAllSources_throwsProgressAccessDenied`: PASS — Ném 403 khi bị từ chối cả 2 quyền.
+   - `technicalError_atSource_isRethrown`: PASS — Lỗi kỹ thuật nguồn (DB pool) được rethrow, không bị nuốt thành `RESTRICTED`.
+   - `compositeWatermark_determinismAndSensitivity`: PASS — Watermark tất định và nhạy bén với thay đổi của watermark thành phần.
+
+2. **Bộ Kiểm Thử Tích Hợp PostgreSQL [`ProgressEngineIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/ProgressEngineIntegrationTest.java) (16/16 passed):**
+   - `bothSourcesHaveData_returnsUnifiedSnapshotWithCalculatedDeltasAndCompositeWatermark`: PASS — Snapshot đầy đủ trên DB thật.
+   - `onlyWorkoutHasData_measurementReportsNoData`: PASS — Xử lý đúng khi chỉ có workout.
+   - `onlyMeasurementHasData_workoutReportsNoData`: PASS — Xử lý đúng khi chỉ có measurement.
+   - `bothSourcesEmpty_validActor_returnsEmptySectionsWithoutError`: PASS — Xử lý sạch sẽ khi cả hai nguồn đều trống.
+   - `trainerWithWorkoutAccess_butDeniedMeasurement_returnsPartialSnapshot`: PASS — Phân quyền độc lập, che giấu measurement khỏi HLV.
+   - `strangerActor_deniedOnAllSources_throwsProgressAccessDenied`: PASS — Chặn người lạ không có quan hệ coaching (403).
+   - `nonExistentStudent_throwsStudentNotFound`: PASS — Ném 404 cho học viên không tồn tại.
+   - `pairedTest_outOfScopeDataChange_doesNotAffectTrainerResponseOrCompositeWatermark`: PASS — Đột biến ngoài quyền không làm rò rỉ response hay watermark.
+   - `continuity_prolongedInactivityFlagged_whenLastWorkout100DaysAgo`: PASS — Phát hiện gián đoạn 120 ngày, gắn cờ `RETURN_AFTER_100_DAYS_V1`.
+   - `historicalLimits_correctlySummarized_whenMeasurementHasPostAsOfModification`: PASS — Nhận diện số đo backfill sau `asOf`.
+   - `continuity_recentActivityObserved_withoutUnapprovedSpecialistLabel`: PASS — Quan sát buổi tập 3 ngày trước trên DB thật, trả facts không gán nhãn chuyên môn.
+   - `continuity_confirmedNew_whenBeginnerWithZeroMonthsAndOnboarding`: PASS — Kiểm chứng profile `BEGINNER` với 0.0 tháng trên DB thật -> `CONFIRMED_NEW`.
+   - `continuity_unknownHistory_whenBeginnerLacksZeroMonthsEvidence`: PASS — Profile `BEGINNER` với 6.0 tháng trên DB thật -> `UNKNOWN_HISTORY`.
+   - `metricDeltas_unitConversionAcrossCompatibleUnits`: PASS — Quy đổi đơn vị thật trên DB (LB sang KG) tính chính xác delta.
+   - `metricDeltas_identicalTimestamps_yieldInsufficientData`: PASS — Hai số đo trùng timestamp trả `INSUFFICIENT_DATA`, `deltaValue = null`.
+   - `continuity_trainerWithHistoryUntilBeforeAsOf_returnsRestrictedHistory`: PASS — HLV bị giới hạn thời gian nhận `RESTRICTED_HISTORY`.
+
+3. **Kiểm Thử Hồi Quy Toàn Diện Các Module Liên Quan (51/51 passed):**
+   - `MeasurementProgressIntegrationTest`: 15/15 passed.
+   - `WorkoutProgressAggregationIntegrationTest`: 28/28 passed.
+   - `SourceWatermarkUnitTest`: 6/6 passed.
+   - `V55MeasurementErasureMigrationTest`: 2/2 passed.
+   - **Tổng cộng kiểm thử đã thực thi và đạt:** **82/82 tests PASS (0 failures, 0 errors)**.
+
+---
+
+### 10.4. Giới Hạn Còn Lại & Lộ Trình Triển Khai Tiếp Theo (Không Tự Tuyên Bố Hoàn Tất Toàn Bộ F04 / Phase 2)
+
+Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn lớp nghiệp vụ tổng hợp dữ liệu chuẩn bị context cho F04. Tuy nhiên, theo phạm vi Phase 2 và kế hoạch P2-M4:
+1. **FastAPI AI Progress Summarization Service (Task tiếp theo):** Xây dựng AI context builder (gọi Spring Boot `ProgressEngineQuery`), prompt template, RAG reference và schema JSON output cho tóm tắt tiến độ tuần/tháng.
+2. **Mobile Client Progress UI:** Giao diện trực quan hóa tiến độ cho Học viên và Workspace Review của Huấn luyện viên trên React Native Expo.
+3. **Thẩm Định Chuyên Môn Thể Hình (D06 / OD-3):** Phê duyệt bộ quy tắc phân loại tiến độ minor vs significant và quy định can thiệp khi học viên trở lại sau gián đoạn dài hạn từ Hội đồng Thể hình.
