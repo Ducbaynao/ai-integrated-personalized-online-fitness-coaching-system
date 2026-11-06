@@ -98,15 +98,23 @@ public class F04ContextBuilder {
         Instant asOf = Instant.now(clock);
 
         // 4. Query Progress Engine (handles independent source access control)
-        ProgressSnapshot snapshot = progressEngineQuery.query(
-                actorId,
-                studentId,
-                request.metricCodes(),
-                request.fromDate(),
-                request.toDate(),
-                timezone,
-                asOf
-        );
+        ProgressSnapshot snapshot;
+        try {
+            snapshot = progressEngineQuery.query(
+                    actorId,
+                    studentId,
+                    request.metricCodes(),
+                    request.fromDate(),
+                    request.toDate(),
+                    timezone,
+                    asOf
+            );
+        } catch (com.fitnesscoaching.platform.modules.progress.domain.ProgressFailure pf) {
+            if (pf.error() == com.fitnesscoaching.platform.modules.progress.domain.ProgressError.PROGRESS_ACCESS_DENIED) {
+                throw new AiRunAccessDeniedException(pf.getMessage(), pf);
+            }
+            throw new AiRunValidationException(pf.getMessage(), pf);
+        }
 
         // 5. Minimize Context according to Data Minimization Invariants
         WorkoutSectionDto workoutDto = mapWorkoutSection(snapshot);

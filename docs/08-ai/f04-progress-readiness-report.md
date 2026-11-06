@@ -620,3 +620,150 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
 2. **Post-Provider Authority Revalidation:** Sau khi nhận kết quả từ FastAPI và trước khi ghi nhận `SUCCEEDED` hoặc trả cho client, hệ thống tái thẩm định trạng thái tài khoản (`AccountStatus.ACTIVE`) và quan hệ huấn luyện (`CoachingRelationshipStatus.ACTIVE`). Nếu bị vô hiệu hóa trong khi provider đang xử lý, hệ thống hủy xuất bản, đánh dấu run `FAILED` với lý do `ACCESS_REVOKED` / `COACHING_REVOKED` và trả 403.
 3. **Bảo Vệ Đọc Lại Khi Quyền Bị Thu Hồi Từng Phần (Readback Single-Source Masking):** Khi đọc lại bản tóm tắt đã lưu qua `GET`, nếu một trong hai nguồn dữ liệu (Workout hoặc Measurement) bị thu hồi quyền truy cập, hệ thống tự động che giấu (`null`) phần tóm tắt của nguồn đó, loại bỏ các facts tham chiếu tương ứng khỏi `factsReferenced` và bổ sung cảnh báo giới hạn vào `limitations`, ngăn ngừa rò rỉ thông tin lịch sử khi quyền hạn bị thu hẹp.
 4. **Phân Biệt Cảnh Báo An Toàn Khách Quan vs Đề Xuất Điều Chỉnh Tải:** Cờ `RETURN_AFTER_100_DAYS_V1` do backend tính toán từ facts gián đoạn lịch sử được thể hiện rõ ràng trong phần `safetyFlags` và tóm tắt tiến độ, nhưng giữ đúng ranh giới `INFORMATION`: không tự ý điều chỉnh bài tập hay kế hoạch dinh dưỡng khi chưa có đề xuất và thẩm định chuyên môn.
+
+---
+
+## 12. Triển Khai & Kiểm Chứng Mobile Progress UI Cho Student & Trainer (F04 Mobile)
+
+> **Branch làm việc:** `feat/p2-m4-f04-mobile-progress`
+> **Baseline Git:** `origin/main` (`3893aab` - Merge pull request #146 backend F04)
+> **Nền tảng:** React Native Expo (React Native 0.86, React 19, TypeScript), Expo Router, TanStack Query, Axios apiClient.
+
+### 12.1. Cấu Trúc Khối Mã Nguồn & Luồng Nghiệp Vụ Mobile
+
+1. **Hợp Đồng Dữ Liệu Client & API Service:**
+   - [`types/aiProgressSummary.ts`](../../apps/mobile/src/types/aiProgressSummary.ts): Định nghĩa `F04ProgressSummaryApiRequest`, `F04ProgressSummaryResponse`, `F04WorkoutProgressSummary`, `F04MeasurementProgressSummary`, `F04ContinuityEvaluation` với kiểu dữ liệu an toàn (hỗ trợ `isStale` và `needsRefresh` nullable).
+   - [`services/aiProgressSummaryApi.ts`](../../apps/mobile/src/services/aiProgressSummaryApi.ts):
+     - `getUserTimezone(preferredTimezone)`: Xác định múi giờ người dùng linh hoạt (`user?.timezone` -> `Intl.DateTimeFormat().resolvedOptions().timeZone` -> `Asia/Ho_Chi_Minh`), không cố định cứng một múi giờ.
+     - `METRIC_OPTIONS` & `METRIC_LABELS`: Khớp hoàn toàn danh mục chuẩn cơ sở dữ liệu (`WEIGHT`, `BODY_FAT_PERCENTAGE`, `WAIST_CIRCUMFERENCE`, `CHEST_CIRCUMFERENCE`) và hỗ trợ ánh xạ nhãn tiếng Việt tương thích ngược với các fixture kiểm thử (`F_WEIGHT`, v.v.).
+     - `generate(request, signal)`: Gọi endpoint `POST /api/v1/ai/progress/summary` kèm múi giờ giải quyết động và hỗ trợ `AbortSignal`.
+     - `getSummary(runId, signal)`: Đọc lại bản tóm tắt qua `GET /api/v1/ai/progress/summary/{runId}` kèm `AbortSignal`.
+     - `getAiProgressSummaryErrorMessage(err)`: Phân định rạch ròi giữa huỷ yêu cầu (`AbortError` -> "Yêu cầu đã bị hủy") với timeout thực sự (`TimeoutError` -> "Quá thời gian chờ"), phân biệt `504` (Gateway Timeout), `502` (Bad Gateway), `503` (Service Unavailable), `400` (dữ liệu/ngày không hợp lệ), `403` (mất quyền hoặc quan hệ huấn luyện kết thúc), `404` (không tìm thấy), `422` (vi phạm hợp đồng kiểm định), và `0` (mất kết nối mạng).
+
+2. **Thành Phần Giao Diện Chính (`ProgressSummaryScreen.tsx`):**
+   - [`ProgressSummaryScreen.tsx`](../../apps/mobile/src/features/progress-summary/ProgressSummaryScreen.tsx):
+     - **Bộ chọn phạm vi thời gian (Scope Selector):** Cung cấp các nút chọn nhanh ("7 ngày qua", "14 ngày qua", "30 ngày qua", "Tùy chọn") và 2 ô nhập ngày `fromDate`, `toDate` (YYYY-MM-DD). Kiểm tra tính hợp lệ lịch nghiêm ngặt (chặn ngày không tồn tại như 30/02 và chặn `fromDate > toDate`), hiển thị cảnh báo tức thì và vô hiệu hóa nút submit.
+     - **Lọc chỉ số thể chất (Metrics Chips):** Hỗ trợ chọn lọc linh hoạt theo danh mục số đo chuẩn (`WEIGHT`, `BODY_FAT_PERCENTAGE`, `WAIST_CIRCUMFERENCE`, `CHEST_CIRCUMFERENCE`).
+     - **Chống Submit Trùng & Bảo Vệ Race Condition (A -> B -> A):** Sử dụng bộ đếm thứ tự yêu cầu `activeRequestIdRef` và `AbortController` (`inFlightAbortRef`). Khi người dùng gửi request mới, chuyển đổi học viên hoặc unmount, request đang chạy dở lập tức bị huỷ; phản hồi muộn từ request cũ bị bỏ qua hoàn toàn, bảo đảm không bao giờ ghi đè kết quả sai lệch ngay cả trong kịch bản A -> B -> A.
+     - **Cô Lập Trạng Thái Học Viên Tuyệt Đối (Student State Isolation):** Sử dụng `currentStudentIdRef`. Khi Huấn luyện viên chuyển đổi giữa các học viên hoặc tài khoản thay đổi, toàn bộ kết quả, lỗi và trạng thái của học viên trước lập tức bị xóa trắng (`setResult(null)`), ngăn ngừa triệt để rò rỉ dữ liệu chéo giữa các học viên.
+     - **Hộp Cảnh Báo An Toàn Khách Quan:** Khi phát hiện cờ an toàn (`RETURN_AFTER_100_DAYS_V1`), giao diện hiển thị banner nổi bật `⚠️ CẢNH BÁO AN TOÀN KHI TRỞ LẠI TẬP LUYỆN` dựa hoàn toàn vào `continuityEvaluation.message` có nguồn, tuyệt đối không tự ý thêm lời khuyên điều chỉnh mức tạ hay kết luận chuyên môn chưa được kiểm chứng.
+     - **Hiển Thị Nguồn Bị Giới Hạn (Restricted Sources):** Phân biệt minh bạch giữa không có dữ liệu với nguồn bị hạn chế quyền. Nếu `workoutProgressSummary` hoặc `measurementProgressSummary` là `null`, hiển thị hộp thông báo nguồn bị giới hạn theo chính sách chia sẻ.
+     - **Nhận Biết Dữ Liệu Cũ & Nút Làm Mới (Stale / Refresh Needed):** Phản ánh đúng ngữ nghĩa: `isStale` nullable không bị ngộ nhận là đã xác nhận mới; chỉ hiển thị banner cảnh báo `Dữ liệu nguồn đã thay đổi` khi có cờ `isStale` hoặc `needsRefresh` rõ ràng, kèm nút "Làm mới ngay" kích hoạt tạo request mới có chủ đích.
+     - **Ranh Giới `INFORMATION` Tuyệt Đối:** Không có nút "Accept", "Apply", hay hành vi tự động sửa đổi kế hoạch tập luyện nào.
+
+3. **Điều Hướng & Điểm Truy Cập (Navigation & Route Integration):**
+   - **Student Flow:**
+     - Điểm truy cập tại [`HomeScreen.tsx`](../../apps/mobile/src/features/auth/HomeScreen.tsx) qua nút "Tóm tắt tiến độ (AI) →" dẫn tới route [`/progress-summary`](../../apps/mobile/src/app/(app)/progress-summary/index.tsx).
+     - Hỗ trợ route đọc lại trực tiếp [`/progress-summary/[runId]`](../../apps/mobile/src/app/(app)/progress-summary/[runId].tsx).
+   - **Trainer Flow:**
+     - Điểm truy cập tại Workspace học viên trong [`RelationshipDetailScreen.tsx`](../../apps/mobile/src/features/coaching/RelationshipDetailScreen.tsx) qua nút "Tóm tắt tiến độ học viên (AI) →" dẫn tới route [`/coaching/[relationshipId]/progress-summary`](../../apps/mobile/src/app/(app)/coaching/[relationshipId]/progress-summary.tsx).
+     - Ràng buộc chặt chẽ với `studentId` của mối quan hệ huấn luyện đang chọn; điều hướng an toàn nếu quan hệ bị lỗi hoặc không tìm thấy.
+   - **Route Guards & Layout:**
+     - Cập nhật [`routeGuard.ts`](../../apps/mobile/src/features/auth/routeGuard.ts) với `canAccessProgressSummary` (chỉ cho phép tài khoản `ACTIVE` có profile `STUDENT` hoặc `TRAINER`).
+     - Đăng ký đầy đủ 3 màn hình mới trong [`_layout.tsx`](../../apps/mobile/src/app/(app)/_layout.tsx).
+
+---
+
+### 12.2. Kiểm Chứng Môi Trường Android GUI Thực Tế (Live Android Emulator Verification)
+
+1. **Khôi Phục Môi Trường Android Pixel_8:**
+   - **Nguyên nhân Pixel_8 offline:** Quá trình chạy trước đây bị tắt đột ngột, để lại các tệp khoá chết `multiinstance.lock` và thư mục khoá `hardware-qemu.ini.lock/pid` trong thư mục AVD `D:\Android\Avd\Pixel_8.avd`, khiến QEMU từ chối khởi động và chuyển sang trạng thái offline. Đồng thời, tiến trình ADB client trong môi trường nền bị ngắt phiên gây lỗi khởi động lại daemon lặp đi lặp lại.
+   - **Biện pháp khôi phục không phá huỷ dữ liệu:**
+     - Tạo liên kết (Directory Junction) `C:\Users\Admin\.android\avd -> D:\Android\Avd` để Android CLI nhận diện đầy đủ AVD `Pixel_8`.
+     - Xoá triệt để các tệp khoá chết mồ côi mà không xoá dữ liệu ứng dụng hay wipe emulator.
+     - Khởi chạy ADB daemon ổn định (`adb server nodaemon`) và khởi động Pixel_8 (`emulator-5554`) qua WHPX + gfxstream GPU tăng tốc phần cứng. Thiết bị khởi động thành công (`sys.boot_completed = 1`).
+     - Thiết lập chuyển tiếp cổng qua ADB reverse: `adb reverse tcp:8080 tcp:8080` và `adb reverse tcp:8081 tcp:8081`.
+
+2. **Chạy Hệ Thống Thực Tế Kết Nối Full-Stack:**
+   - **PostgreSQL 18:** Khởi chạy trên cổng 5433 qua container `digital-fitness-postgres`.
+   - **Redis 7:** Khởi chạy trên cổng 6379.
+   - **Spring Boot Backend:** Khởi chạy trên cổng 8080 với profile `dev`, tải đầy đủ 84 tài liệu chuyên môn và kết nối PostgreSQL/Flyway.
+   - **FastAPI AI Service:** Khởi chạy trên cổng 8000 với `simulated_f04_provider.py` tất định phục vụ F04.
+   - **Metro Bundler / Expo Go:** Khởi chạy trên cổng 8081 và kết nối trực tiếp đến ứng dụng trên thiết bị Pixel_8.
+
+3. **Các Kịch Bản GUI Đã Kiểm Chứng Thành Công Trên Pixel_8:**
+   - **Kịch bản 1 — Khởi tạo màn hình Student:** Từ màn hình chính Student, bấm "Tóm tắt tiến độ (AI) →", mở thành công giao diện chọn phạm vi ngày (`2026-10-23` đến `2026-11-06`), các nút presets ("7 ngày qua", "14 ngày qua", "30 ngày qua", "Tùy chọn") và các chip chỉ số thể chất (`WEIGHT`, `BODY_FAT_PERCENTAGE`, `WAIST_CIRCUMFERENCE`, `CHEST_CIRCUMFERENCE`).
+     - *Bằng chứng screenshot:* `pixel8_f04_initial.png`
+   - **Kịch bản 2 — Tạo và nhận bản tóm tắt tiến độ:** Bấm nút "Tạo tóm tắt tiến độ AI", request gửi qua Spring Boot (port 8080) và FastAPI (port 8000). Kết quả trả về và render đầy đủ với huy hiệu `THÔNG TIN TIẾN ĐỘ`, tóm tắt tổng quan tiến độ tập luyện, nhận diện dữ liệu mới (`Dữ liệu nguồn đã thay đổi`) và nút "Cập nhật lại tóm tắt".
+     - *Bằng chứng screenshot:* `pixel8_f04_summary_result.png`
+   - **Kịch bản 3 — Cuộn trang và kiểm tra các khối nội dung chi tiết:** Cuộn trang kiểm tra:
+     - Khối `Tính liền mạch tập luyện`: Nhãn `Lịch sử chưa xác định đầy đủ` (`UNKNOWN_HISTORY`) kèm thông báo không đủ dữ liệu đánh giá liên tục.
+     - Khối `Tiến độ tập luyện`: Đánh giá hoàn thành buổi tập, độ tuân thủ đúng lịch và khối lượng tập.
+     - Khối `Số đo thể chất`: Hiển thị thông báo giới hạn dữ liệu khi học viên chưa có số đo trong kỳ.
+     - Khối `Giới hạn và dữ liệu khuyết thiếu`: Liệt kê các thành phần thiếu dữ liệu.
+     - Khối `Metadata Footer`: Hiển thị thời điểm tính, mã phiên `runId: 51bff66e-51d1-4dd8-bada-cc58514afb0a`, và watermark dữ liệu nguồn.
+     - *Bằng chứng screenshot:* `pixel8_f04_scrolled_sections.png`
+   - **Kịch bản 4 — Đọc lại bản tóm tắt cũ theo `runId`:** Khởi chạy intent deep link trực tiếp đến route `/progress-summary/51bff66e-51d1-4dd8-bada-cc58514afb0a`. Giao diện tải trực tiếp bản tóm tắt đã lưu qua `GET /api/v1/ai/progress/summary/{runId}` và hiển thị đầy đủ, chính xác.
+     - *Bằng chứng screenshot:* `pixel8_f04_readback_by_run_id.png`
+   - **Kịch bản 5 — Kiểm tra kiểm định ngày (Validation & Error State):** Nhập ngày bắt đầu `2026-11-20` lớn hơn ngày kết thúc `2026-11-06`. Giao diện lập tức hiển thị thông báo lỗi `Ngày bắt đầu không được sau ngày kết thúc.` và vô hiệu hoá nút submit. Khi bấm preset "14 ngày qua", khoảng ngày hợp lệ được phục hồi và thông báo lỗi biến mất ngay lập tức.
+     - *Bằng chứng screenshot:* `pixel8_f04_validation_error.png`
+   - **Kịch bản 6 — Điều hướng quay lại:** Bấm phím quay lại hệ thống, màn hình điều hướng mượt mà trở lại màn hình chính của học viên.
+
+---
+
+### 12.3. Kết Quả Kiểm Thử Tự Động (100% Passed)
+
+1. **TypeScript Typecheck (`npm run typecheck`):**
+   - Đạt **0 lỗi** biên dịch trên toàn bộ dự án mobile (`tsc --noEmit` hoàn tất thành công).
+
+2. **Linter Check (`npm run lint` / `expo lint`):**
+   - Đạt **0 lỗi, 0 cảnh báo** (hoàn toàn tuân thủ các quy tắc React 19 / React Compiler: không gọi setState đồng bộ trong effect, bảo toàn manual memoization dependencies, và chuẩn hoá kiểu mảng TypeScript).
+
+3. **Kiểm Thử Đơn Vị & Tích Hợp Giao Diện Mobile (`jest`):**
+   - [`aiProgressSummaryApi.test.ts`](../../apps/mobile/src/__tests__/aiProgressSummaryApi.test.ts) (**11/11 tests PASS**):
+     - `generate`: Gửi request đúng body, endpoint và múi giờ giải quyết động.
+     - `getSummary`: Đọc lại theo `runId`.
+     - `getAiProgressSummaryErrorMessage`: Phân biệt rõ ràng giữa huỷ yêu cầu (`AbortError`), timeout thực tế, các lỗi gateway (`502`, `503`, `504`), `400`, `403`, `404`, `422`, và mất mạng `0`.
+     - Kiểm tra nhãn danh mục số đo chuẩn (`METRIC_OPTIONS`, `METRIC_LABELS`), trạng thái liền mạch và biểu tượng xu hướng.
+   - [`ProgressSummaryScreen.test.tsx`](../../apps/mobile/src/__tests__/ProgressSummaryScreen.test.tsx) (**13/13 tests PASS**):
+     - Khởi tạo giao diện với presets, ô nhập ngày và nút tạo tóm tắt.
+     - Validation: Chặn submit khi `fromDate > toDate`.
+     - Validation: Chặn submit khi ngày không tồn tại trên lịch (như 30/02).
+     - Render thành công đầy đủ các phần: tóm tắt, buổi tập, số đo thể chất, tính liền mạch.
+     - Hiển thị banner cảnh báo an toàn khách quan khi có cờ gián đoạn dài ngày.
+     - Hiển thị hộp thông báo khi nguồn buổi tập hoặc số đo bị hạn chế quyền (`measurement-restricted-notice` vs `measurement-no-data-notice`).
+     - Hiển thị thanh cảnh báo dữ liệu cũ (`isStale: true` hoặc `needsRefresh: true`) và kích hoạt làm mới tóm tắt qua nút `Làm mới ngay`.
+     - Chặn submit trùng lặp (Anti-double submit guard) khi thao tác submit đang xử lý.
+     - Kiểm chứng cô lập học viên: Chuyển đổi `studentId` lập tức xóa sạch dữ liệu của học viên cũ, chống rò rỉ chéo và chống race condition A -> B -> A.
+     - Đọc lại dữ liệu qua `initialRunId`.
+     - Xử lý lỗi API và hiển thị hộp thông báo lỗi có nút thử lại.
+   - [`routeGuard.test.ts`](../../apps/mobile/src/__tests__/routeGuard.test.ts) (**12/12 tests PASS**): Bổ sung kiểm tra quyền truy cập `canAccessProgressSummary`.
+   - [`progressSummaryNavigation.test.tsx`](../../apps/mobile/src/__tests__/progressSummaryNavigation.test.tsx) (**1/1 test PASS**): Kiểm chứng nút bấm điều hướng từ màn hình Student Home.
+   - **Toàn bộ 87 test suites trong `apps/mobile` đạt 696/696 tests PASS (0 failures, 0 errors).**
+
+---
+
+### 12.4. Khắc Phục Lỗi Watermark & Hoàn Thiện Kiểm Chứng Live End-to-End
+
+Trong quá trình nghiệm thu live trên Android Pixel 8 và hệ thống full-stack cục bộ, các khiếm khuyết sau đã được phát hiện, phân tích nguyên nhân gốc rễ và xử lý triệt để:
+
+1. **Hiện Tượng Báo Dữ Liệu Cũ (`isStale: true`) Ngay Khi Vừa Tạo:**
+   - *Nguyên nhân 1 (Timestamp jitter trong composite watermark):* `ProgressEngineService.calculateCompositeWatermark` băm chuỗi `"ASOF:" + asOf.toString() + "|"`. Do `asOf` trôi vài mili-giây giữa thời điểm tạo context và bước kiểm tra 5e, giá trị băm luôn khác nhau dù không hề có bản ghi tập luyện hay số đo nào thay đổi.
+   - *Nguyên nhân 2 (Lệch tham số trong `MeasurementProgressService`):* Hàm `calculateSourceWatermark` nhận nhầm `queryUpper` (thời điểm `asOf`) làm mốc thời gian giới hạn quyền của Actor thay vì `access.historyUntil()`. Do đó mỗi mili-giây clock trôi đi đều làm biến đổi watermark số đo thể chất.
+   - *Giải pháp triệt để:*
+     - Sửa `MeasurementProgressService` sử dụng `access.historyFrom()` và `access.historyUntil()`, loại bỏ phụ thuộc mili-giây vào clock runtime.
+     - Cập nhật `AiProgressSummarizationService` (bước 5e và bước 4 readback): so sánh tính tươi mới dựa trên chính xác các domain watermarks (`workout.sourceWatermark()`, `measurement.sourceWatermark()`, `continuity.state()`, và tính sẵn sàng của nguồn) thay vì băm timestamp `asOf`.
+     - Sửa giải quyết `dwNode` trong readback: đọc chính xác cấu trúc bọc `rootNode.path("context").path("dateWindow")`.
+
+2. **Xung Đột Khóa Đọc PostgreSQL Trong `getProgressSummary`:**
+   - *Nguyên nhân:* Annotation `@Transactional(readOnly = true)` trên hàm readback `getProgressSummary` xung đột với lệnh `SELECT ... FOR SHARE` được thực thi bởi `CoachingAuthorityQuery` để bảo vệ quyền hạn HLV, dẫn tới `SQLException: cannot execute SELECT FOR SHARE in a read-only transaction`.
+   - *Giải pháp:* Đổi thành `@Transactional` để cho phép cơ chế khóa dòng chia sẻ (`FOR SHARE`) hoạt động an toàn và đồng bộ.
+
+3. **Chuyển Đổi Mã Lỗi Phân Quyền HLV (`ProgressFailure` sang HTTP 403):**
+   - *Nguyên nhân:* Khi quan hệ huấn luyện đã kết thúc (`ENDED`), `ProgressEngineService` ném `ProgressFailure(PROGRESS_ACCESS_DENIED)` chưa được bắt riêng trong AI service, dẫn tới phản hồi HTTP 500 thay vì 403 Forbidden.
+   - *Giải pháp:* Bổ sung khối bắt `ProgressFailure.PROGRESS_ACCESS_DENIED` tại `F04ContextBuilder` và `AiProgressSummarizationService`, chuyển đổi thành `AiRunAccessDeniedException` (HTTP 403 `AI_FORBIDDEN`) với thông điệp rõ ràng, ngăn ngừa rò rỉ dữ liệu.
+
+4. **Kiểm Chứng Thực Nghiệm Hoàn Chỉnh Trên Android Pixel 8 & Full-Stack:**
+   - **Tạo Tóm Tắt Tươi Mới (Fresh Summary):** Học viên tạo tóm tắt -> kết quả `isStale: false, needsRefresh: false`, hiển thị sạch đẹp không còn banner cảnh báo thừa (`pixel8_student_summary_fresh.png`, `pixel8_refreshed_fresh.png`).
+   - **Đột Biến Dữ Liệu & Nhận Biết Dữ Liệu Cũ (Live Mutation Detection):** Chèn một số đo thể chất mới vào PostgreSQL (`fitness.measurements`); đọc lại bản tóm tắt cũ qua deep link -> hệ thống phát hiện chính xác sự thay đổi dữ liệu nguồn và hiển thị banner `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay" (`pixel8_stale_banner_after_mutation.png`).
+   - **Làm Mới Trực Tiếp:** Bấm nút "Làm mới ngay" trên GUI -> hệ thống kích hoạt tạo bản tóm tắt mới tích hợp số đo vừa thêm, banner cảnh báo biến mất và kết quả trở lại trạng thái tươi mới (`pixel8_refreshed_fresh.png`).
+   - **HLV Với Quyền Hạn Hạn Chế (Workout-only vs Measurement-only):** Đăng nhập HLV `smoke.trainer@example.com` xem học viên `smoke.student@example.com` (chỉ cấp quyền Workout, hạn chế Body Metrics). Kết quả: tiến độ tập luyện hiển thị đầy đủ, trong khi mục số đo thể chất hiển thị rõ ràng thông báo `Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.` (`resource-id="measurement-restricted-notice"`, `pixel8_trainer_restricted_measurement.png`).
+   - **Thu Hồi Quyền & Quan Hệ Đã Kết Thúc:** HLV gọi API đối với học viên đã kết thúc huấn luyện -> nhận phản hồi chuẩn HTTP 403 `AI_FORBIDDEN`, bảo toàn ranh giới bảo mật và quyền riêng tư của học viên.
+
+---
+
+### 12.5. Ranh Giới Nghiệm Thu & Các Giới Hạn Đang Mở
+
+- **Mô Hình Live LLM:** Hệ thống sử dụng provider tất định (`simulated_f04_provider.py`) để kiểm chứng toàn bộ luồng contract, HTTP, giao diện và thẩm định dữ liệu. Việc tích hợp live LLM (Google Gemini / OpenAI) và đánh giá chất lượng văn phong ngôn ngữ tự nhiên vẫn là hạng mục mở cho P2-M6 theo đúng kế hoạch triển khai.
+- **Quy Tắc Chuyên Môn Thể Hình (D06 / OD-3):** Chưa áp dụng các ngưỡng can thiệp tải hay phân loại tiến độ phức tạp của Hội đồng Thể hình; giữ đúng nguyên tắc `INFORMATION` trung lập.
+- **Ranh Giới Nghiệm Thu:** Việc hoàn thành Mobile Progress UI khép lại tầng giao diện người dùng cho F04 trên nhánh `feat/p2-m4-f04-mobile-progress`. Đây chưa phải là tuyên bố nghiệm thu toàn bộ Phase 2 hay P2-M4.
