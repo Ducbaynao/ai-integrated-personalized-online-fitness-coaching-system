@@ -1,0 +1,25 @@
+{
+  "runId": "88888888-8888-4888-8888-888888888888",
+  "correlationId": "99999999-9999-4999-8999-999999999999",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INSUFFICIENT_DATA",
+  "reasonCode": "INSUFFICIENT_DATA",
+  "summary": "Không có đủ dữ liệu tập luyện hoặc đo lường được ghi nhận trong chu kỳ được chọn để xác lập xu hướng tiến độ.",
+  "continuityEvaluation": {
+    "state": "UNKNOWN_HISTORY",
+    "message": "Chưa có đủ dữ liệu lịch sử để đánh giá tính liên tục tập luyện.",
+    "hasSafetyAlert": false
+  },
+  "limitations": [
+    "Không thể phân tích xu hướng hoặc hiệu suất khi không có quan sát trong kỳ."
+  ],
+  "missingData": [
+    "workout",
+    "measurement"
+  ],
+  "factsReferenced": [
+    "continuity.state:UNKNOWN_HISTORY"
+  ],
+  "asOf": "2026-10-28T12:00:00Z",
+  "sourceWatermark": "ENGINE:progress-engine-v1.0|COMPOSITE:empty-demo"
+}

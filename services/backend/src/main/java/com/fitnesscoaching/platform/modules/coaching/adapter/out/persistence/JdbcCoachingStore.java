@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.modules.coaching.domain.CoachingState.*;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
@@ -47,7 +48,7 @@ public class JdbcCoachingStore implements CoachingStore {
 
     @Override public void lockStudent(UUID studentId) {
         jdbc.query("SELECT user_id FROM fitness.student_profiles WHERE user_id = ? FOR NO KEY UPDATE",
-                rs -> { while (rs.next()) { /* row lock held to transaction end */ } }, studentId);
+                (RowCallbackHandler) rs -> { /* row lock held to transaction end */ }, studentId);
     }
 
     @Override public Optional<Relationship> relationship(UUID id) {

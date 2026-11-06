@@ -1,0 +1,29 @@
+{
+  "runId": "66666666-6666-4666-8666-666666666666",
+  "correlationId": "77777777-7777-4777-8777-777777777777",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "reasonCode": "NONE",
+  "summary": "CẢNH BÁO AN TOÀN: Học viên có khoảng gián đoạn tập luyện kéo dài 115 ngày. Không có buổi tập nào diễn ra trong chu kỳ báo cáo.",
+  "workoutProgressSummary": {
+    "completionEvaluation": "Không có buổi tập nào hoàn thành trong kỳ.",
+    "adherenceEvaluation": "Không áp dụng do không có lịch tập đến hạn.",
+    "volumeEvaluation": "Khối lượng tập trong kỳ là 0 kg."
+  },
+  "continuityEvaluation": {
+    "state": "PROLONGED_INACTIVITY",
+    "message": "Khoảng cách từ buổi tập gần nhất đến hiện tại là 115 ngày (vượt ngưỡng an toàn 100 ngày).",
+    "hasSafetyAlert": true
+  },
+  "limitations": [
+    "Kích hoạt cờ an toàn RETURN_AFTER_100_DAYS_V1: Không được sử dụng thành tích tạ cũ làm mốc tăng tiến. Cần tuần thích nghi lại (re-onboarding)."
+  ],
+  "missingData": [],
+  "factsReferenced": [
+    "continuity.state:PROLONGED_INACTIVITY",
+    "continuity.safetyFlags:RETURN_AFTER_100_DAYS_V1",
+    "continuity.daysSinceLastWorkout:115"
+  ],
+  "asOf": "2026-10-28T12:00:00Z",
+  "sourceWatermark": "ENGINE:progress-engine-v1.0|COMPOSITE:prolonged-demo"
+}

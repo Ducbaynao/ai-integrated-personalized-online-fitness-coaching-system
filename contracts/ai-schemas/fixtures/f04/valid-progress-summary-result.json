@@ -1,0 +1,45 @@
+{
+  "runId": "11111111-1111-4111-8111-111111111111",
+  "correlationId": "22222222-2222-4222-8222-222222222222",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "reasonCode": "NONE",
+  "summary": "Trong chu kỳ 28 ngày qua (01/10/2026 - 28/10/2026), học viên đã hoàn thành 11/12 buổi tập theo kế hoạch (tỷ lệ hoàn thành 91.67%), trong đó 10 buổi hoàn thành đúng ngày và 1 buổi lệch ngày. Cân nặng ghi nhận xu hướng giảm 0.7 kg từ 72.5 kg xuống 71.8 kg qua 4 lần đo.",
+  "workoutProgressSummary": {
+    "completionEvaluation": "Học viên hoàn thành 11 trên 12 buổi tập đã đến hạn, bỏ lỡ 1 buổi.",
+    "adherenceEvaluation": "10 buổi đúng lịch, 1 buổi hoàn thành lệch lịch; tỷ lệ tuân thủ đúng lịch đạt 83.33%.",
+    "volumeEvaluation": "Tổng khối lượng tập đạt 14,500.5 kg với 40 hiệp chính hoàn thành, RPE trung bình 7.5."
+  },
+  "measurementProgressSummary": {
+    "metricsEvaluations": [
+      {
+        "metricCode": "F_WEIGHT",
+        "trendDirection": "DECREASED",
+        "message": "Cân nặng giảm 0.70 kg (-0.97%) từ 72.50 kg xuống 71.80 kg qua 4 lần đo."
+      }
+    ]
+  },
+  "continuityEvaluation": {
+    "state": "RECENT_ACTIVITY_OBSERVED",
+    "message": "Học viên duy trì hoạt động tập luyện gần đây; buổi tập gần nhất diễn ra cách đây 2 ngày.",
+    "hasSafetyAlert": false
+  },
+  "limitations": [
+    "Biến thiên cân nặng không phản ánh thành phần mỡ hoặc cơ thể do thiếu chỉ số Body Fat %."
+  ],
+  "missingData": [],
+  "factsReferenced": [
+    "workout.adherence.rawCompletionRate:0.9167",
+    "workout.adherence.onTimeAdherenceRate:0.8333",
+    "workout.volume.knownVolumeKg:14500.50",
+    "measurement.F_WEIGHT.delta:-0.7",
+    "continuity.state:RECENT_ACTIVITY_OBSERVED"
+  ],
+  "asOf": "2026-10-28T12:00:00Z",
+  "sourceWatermark": "ENGINE:progress-engine-v1.0|COMPOSITE:abcdef123456",
+  "usage": {
+    "promptTokens": 350,
+    "completionTokens": 180,
+    "totalTokens": 530
+  }
+}

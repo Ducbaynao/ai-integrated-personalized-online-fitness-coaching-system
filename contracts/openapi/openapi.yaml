@@ -63,6 +63,11 @@ tags:
       General fitness and exercise science knowledge inquiry grounded in governed ACTIVE knowledge sources (ISSN, WHO, NIDDK, NIH ODS).
       Spring Boot validates actor capability, builds minimal authorized context, and orchestrates AI pipeline.
       Returns resultType: INFORMATION with citations; no recommendation lifecycle or apply actions.
+  - name: AI Progress Summarization (F04)
+    description: >-
+      Progress summarization, signal explanation, and review support grounded in verified Progress Engine facts.
+      Spring Boot validates authority, builds minimal context, invokes FastAPI summarization, and returns an INFORMATION projection.
+      Supports readback with real-time authority revalidation and source watermark freshness detection.
 
 paths:
   /review-timezone/me:
@@ -4310,6 +4315,72 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '409':
           description: Recommendation not PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/progress/summary:
+    post:
+      tags: [AI Progress Summarization (F04)]
+      operationId: summarizeFitnessProgress
+      summary: Generate contextual progress summary and signal explanation (F04)
+      description: >-
+        Summarizes fitness progress over a date window grounded in verified facts from ProgressEngineQuery.
+        Enforces independent authority for Workout and Body Metrics, minimizes context sent to AI,
+        and returns an immutable INFORMATION projection without creating plan proposals or mutations.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/F04ProgressSummaryRequest' }
+      responses:
+        '200':
+          description: Progress summary generated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F04ProgressSummaryResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '502':
+          description: AI service provider or validator failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F04ProgressSummaryResponse' }
+        '504':
+          description: AI invocation timed out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F04ProgressSummaryResponse' }
+
+  /ai/progress/summary/{runId}:
+    get:
+      tags: [AI Progress Summarization (F04)]
+      operationId: getProgressSummary
+      summary: Read back historical AI progress summary by runId (F04)
+      description: >-
+        Reads an existing F04 progress summary with real-time authority revalidation and source watermark freshness detection.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Progress summary retrieved successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/F04ProgressSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: AI Run not found
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -10057,6 +10128,122 @@ components:
         rejectedAt:
           type: string
           format: date-time
+
+    F04ProgressSummaryRequest:
+      type: object
+      required: [fromDate, toDate]
+      properties:
+        studentId:
+          type: string
+          format: uuid
+          description: Target student user ID. Defaults to authenticated student if omitted.
+        fromDate:
+          type: string
+          format: date
+          description: Start date of summary window (inclusive, local date).
+        toDate:
+          type: string
+          format: date
+          description: End date of summary window (inclusive, local date).
+        timezone:
+          type: string
+          default: "Asia/Ho_Chi_Minh"
+          description: IANA timezone identifier for local window calculation.
+        metricCodes:
+          type: array
+          items:
+            type: string
+          description: Optional set of metric codes to filter (e.g. F_WEIGHT, F_BODY_FAT).
+        correlationId:
+          type: string
+          format: uuid
+          description: Correlation identifier for tracing.
+
+    F04ProgressSummaryResponse:
+      type: object
+      required: [runId, runStatus, resultType, reasonCode, summary, asOf]
+      properties:
+        runId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        runStatus:
+          type: string
+          enum: [SUCCEEDED, FAILED, REJECTED_BY_VALIDATOR]
+        resultType:
+          type: string
+          enum: [INFORMATION, INSUFFICIENT_DATA, BLOCKED]
+        reasonCode:
+          type: string
+        summary:
+          type: string
+        workoutProgressSummary:
+          type: object
+          properties:
+            completionEvaluation:
+              type: string
+            adherenceEvaluation:
+              type: string
+            volumeEvaluation:
+              type: string
+        measurementProgressSummary:
+          type: object
+          properties:
+            metricsEvaluations:
+              type: array
+              items:
+                type: object
+                required: [metricCode, message]
+                properties:
+                  metricCode:
+                    type: string
+                  trendDirection:
+                    type: string
+                    enum: [INCREASED, DECREASED, STABLE, INSUFFICIENT_DATA]
+                  message:
+                    type: string
+        continuityEvaluation:
+          type: object
+          required: [state, message, hasSafetyAlert]
+          properties:
+            state:
+              type: string
+              enum: [CONFIRMED_NEW, PROLONGED_INACTIVITY, RECENT_ACTIVITY_OBSERVED, UNKNOWN_HISTORY, RESTRICTED_HISTORY]
+            message:
+              type: string
+            hasSafetyAlert:
+              type: boolean
+        limitations:
+          type: array
+          items:
+            type: string
+        missingData:
+          type: array
+          items:
+            type: string
+        factsReferenced:
+          type: array
+          items:
+            type: string
+        asOf:
+          type: string
+          format: date-time
+        sourceWatermark:
+          type: string
+        isStale:
+          type: boolean
+        needsRefresh:
+          type: boolean
+        currentWatermark:
+          type: string
 
 security:
   - bearerAuth: []
