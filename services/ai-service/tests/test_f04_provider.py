@@ -1,9 +1,7 @@
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
-
-import pytest
 
 from app.integrations.simulated_f04_provider import SimulatedF04ProgressProvider
 from app.schemas.f04_schemas import (
@@ -40,7 +38,7 @@ def create_base_request(
                 toDate=date(2026, 10, 28),
                 timezone="Asia/Ho_Chi_Minh",
             ),
-            effectiveAsOf=datetime(2026, 10, 28, 12, 0, 0, tzinfo=timezone.utc),
+            effectiveAsOf=datetime(2026, 10, 28, 12, 0, 0, tzinfo=UTC),
             workout=WorkoutSectionSchema(
                 availability=workout_availability,
                 restrictionReason="Access denied" if workout_availability == "RESTRICTED" else None,

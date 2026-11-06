@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -48,7 +48,7 @@ def test_internal_progress_summary_success(client):
                 toDate=date(2026, 10, 28),
                 timezone="Asia/Ho_Chi_Minh",
             ),
-            effectiveAsOf=datetime(2026, 10, 28, 12, 0, 0, tzinfo=timezone.utc),
+            effectiveAsOf=datetime(2026, 10, 28, 12, 0, 0, tzinfo=UTC),
             workout=WorkoutSectionSchema(
                 availability="AVAILABLE",
                 adherenceSummary=WorkoutAdherenceSummarySchema(

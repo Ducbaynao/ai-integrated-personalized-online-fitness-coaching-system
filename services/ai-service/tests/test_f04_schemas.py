@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -33,7 +33,7 @@ def test_valid_f04_progress_summary_request():
                 toDate=date(2026, 10, 28),
                 timezone="Asia/Ho_Chi_Minh",
             ),
-            effectiveAsOf=datetime.now(timezone.utc),
+            effectiveAsOf=datetime.now(UTC),
             workout=WorkoutSectionSchema(
                 availability="AVAILABLE",
                 adherenceSummary=WorkoutAdherenceSummarySchema(
@@ -105,5 +105,5 @@ def test_f04_result_rejects_unauthorized_result_type():
             resultType="PROPOSAL",  # Not allowed in F04 INFORMATION contract
             reasonCode="NONE",
             summary="Invalid proposal",
-            asOf=datetime.now(timezone.utc),
+            asOf=datetime.now(UTC),
         )
