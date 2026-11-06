@@ -7,12 +7,36 @@ import {
 
 export const F04_DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
-export const METRIC_OPTIONS: Array<{ code: string; label: string }> = [
-  { code: 'F_WEIGHT', label: 'Cân nặng (kg)' },
-  { code: 'F_BODY_FAT', label: 'Tỷ lệ mỡ (%)' },
-  { code: 'F_WAIST', label: 'Vòng eo (cm)' },
-  { code: 'F_CHEST', label: 'Vòng ngực (cm)' },
+export function getUserTimezone(preferredTimezone?: string): string {
+  if (preferredTimezone) return preferredTimezone;
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (resolved) return resolved;
+  } catch {
+    // fallback if Intl is not available
+  }
+  return F04_DEFAULT_TIMEZONE;
+}
+
+export const METRIC_OPTIONS: { code: string; label: string }[] = [
+  { code: 'WEIGHT', label: 'Cân nặng (kg)' },
+  { code: 'BODY_FAT_PERCENTAGE', label: 'Tỷ lệ mỡ (%)' },
+  { code: 'WAIST_CIRCUMFERENCE', label: 'Vòng eo (cm)' },
+  { code: 'CHEST_CIRCUMFERENCE', label: 'Vòng ngực (cm)' },
 ];
+
+export const METRIC_LABELS: Record<string, string> = {
+  WEIGHT: 'Cân nặng (kg)',
+  F_WEIGHT: 'Cân nặng (kg)',
+  BODY_FAT_PERCENTAGE: 'Tỷ lệ mỡ (%)',
+  F_BODY_FAT: 'Tỷ lệ mỡ (%)',
+  WAIST_CIRCUMFERENCE: 'Vòng eo (cm)',
+  F_WAIST: 'Vòng eo (cm)',
+  CHEST_CIRCUMFERENCE: 'Vòng ngực (cm)',
+  F_CHEST: 'Vòng ngực (cm)',
+  BMI: 'Chỉ số BMI',
+  MUSCLE_MASS: 'Khối lượng cơ (kg)',
+};
 
 export const CONTINUITY_STATE_LABELS: Record<string, string> = {
   CONFIRMED_NEW: 'Học viên mới bắt đầu',
@@ -30,11 +54,17 @@ export const TREND_DIRECTION_LABELS: Record<string, { label: string; symbol: str
 };
 
 export function getAiProgressSummaryErrorMessage(error: unknown): string {
-  if (
-    error instanceof Error &&
-    (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout'))
-  ) {
-    return 'Yêu cầu tóm tắt quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+  if (error instanceof Error) {
+    if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      return 'Yêu cầu đã bị hủy.';
+    }
+    if (
+      error.name === 'TimeoutError' ||
+      error.message.includes('timeout') ||
+      error.message.includes('timed out')
+    ) {
+      return 'Yêu cầu tóm tắt quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+    }
   }
 
   if (error instanceof ApiError) {
@@ -64,8 +94,16 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
       return 'Tính năng tóm tắt tiến độ AI hiện đang tạm tắt theo cấu hình quản trị.';
     }
 
-    if (error.status === 502 || error.status === 503 || error.status === 504) {
-      return 'Dịch vụ phân tích AI tạm thời không khả dụng hoặc quá thời gian chờ. Vui lòng thử lại.';
+    if (error.status === 504) {
+      return 'Dịch vụ phản hồi quá thời gian chờ (Gateway Timeout). Vui lòng thử lại.';
+    }
+
+    if (error.status === 502) {
+      return 'Không thể kết nối đến dịch vụ phân tích AI (Bad Gateway). Vui lòng thử lại sau.';
+    }
+
+    if (error.status === 503) {
+      return 'Dịch vụ phân tích AI tạm thời không khả dụng hoặc quá tải (Service Unavailable). Vui lòng thử lại sau.';
     }
 
     if (error.status === 0) {
@@ -90,7 +128,7 @@ export const aiProgressSummaryApi = {
       method: 'POST',
       body: {
         ...requestPayload,
-        timezone: requestPayload.timezone || F04_DEFAULT_TIMEZONE,
+        timezone: requestPayload.timezone || getUserTimezone(),
       },
       signal,
     });

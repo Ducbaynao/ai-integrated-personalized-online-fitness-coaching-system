@@ -22,8 +22,9 @@ import { typography } from '@/design-system/tokens/typography';
 import {
   aiProgressSummaryApi,
   getAiProgressSummaryErrorMessage,
+  getUserTimezone,
   CONTINUITY_STATE_LABELS,
-  F04_DEFAULT_TIMEZONE,
+  METRIC_LABELS,
   METRIC_OPTIONS,
   TREND_DIRECTION_LABELS,
 } from '@/services/aiProgressSummaryApi';
@@ -67,11 +68,13 @@ export function ProgressSummaryScreen({
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingRun, setIsLoadingRun] = useState(false);
+  const [isLoadingRun, setIsLoadingRun] = useState(() => Boolean(initialRunId));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<F04ProgressSummaryResponse | null>(null);
 
-  // Guards for anti-double-submit and late responses on unmount / student switch
+  // Request counter and abort controller for robust race-condition and cancellation protection (covers A -> B -> A)
+  const activeRequestIdRef = useRef(0);
+  const inFlightAbortRef = useRef<AbortController | null>(null);
   const isSubmittingRef = useRef(false);
   const isMountedRef = useRef(true);
   const currentStudentIdRef = useRef(targetStudentId);
@@ -80,13 +83,22 @@ export function ProgressSummaryScreen({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (inFlightAbortRef.current) {
+        inFlightAbortRef.current.abort();
+        inFlightAbortRef.current = null;
+      }
     };
   }, []);
 
-  // When target student changes, immediately reset state to prevent data leakage across students
+  // When target student changes or user logs out, immediately cancel pending requests and clear state
   useEffect(() => {
     if (currentStudentIdRef.current !== targetStudentId) {
       currentStudentIdRef.current = targetStudentId;
+      if (inFlightAbortRef.current) {
+        inFlightAbortRef.current.abort();
+        inFlightAbortRef.current = null;
+      }
+      activeRequestIdRef.current++;
       setResult(null);
       setErrorMessage(null);
       setIsSubmitting(false);
@@ -97,30 +109,34 @@ export function ProgressSummaryScreen({
   // Load initial run if requested via prop
   useEffect(() => {
     if (initialRunId) {
-      let isCancelled = false;
-      setIsLoadingRun(true);
-      setErrorMessage(null);
+      const controller = new AbortController();
+      queueMicrotask(() => {
+        if (isMountedRef.current && !controller.signal.aborted) {
+          setIsLoadingRun(true);
+          setErrorMessage(null);
+        }
+      });
 
       aiProgressSummaryApi
-        .getSummary(initialRunId)
+        .getSummary(initialRunId, controller.signal)
         .then((data) => {
-          if (!isCancelled && isMountedRef.current) {
+          if (isMountedRef.current && !controller.signal.aborted) {
             setResult(data);
           }
         })
         .catch((err) => {
-          if (!isCancelled && isMountedRef.current) {
+          if (isMountedRef.current && !controller.signal.aborted) {
             setErrorMessage(getAiProgressSummaryErrorMessage(err));
           }
         })
         .finally(() => {
-          if (!isCancelled && isMountedRef.current) {
+          if (isMountedRef.current && !controller.signal.aborted) {
             setIsLoadingRun(false);
           }
         });
 
       return () => {
-        isCancelled = true;
+        controller.abort();
       };
     }
   }, [initialRunId]);
@@ -143,13 +159,13 @@ export function ProgressSummaryScreen({
     );
   };
 
-  // Date range validation
+  // Date range validation with strict calendar and order checks
   const validationError = useMemo(() => {
-    if (!moment(fromDate, 'YYYY-MM-DD', true).isValid()) {
-      return 'Ngày bắt đầu không đúng định dạng YYYY-MM-DD.';
+    if (!fromDate || !moment(fromDate, 'YYYY-MM-DD', true).isValid()) {
+      return 'Ngày bắt đầu không hợp lệ (định dạng YYYY-MM-DD hoặc ngày không tồn tại).';
     }
-    if (!moment(toDate, 'YYYY-MM-DD', true).isValid()) {
-      return 'Ngày kết thúc không đúng định dạng YYYY-MM-DD.';
+    if (!toDate || !moment(toDate, 'YYYY-MM-DD', true).isValid()) {
+      return 'Ngày kết thúc không hợp lệ (định dạng YYYY-MM-DD hoặc ngày không tồn tại).';
     }
     if (moment(fromDate).isAfter(moment(toDate))) {
       return 'Ngày bắt đầu không được sau ngày kết thúc.';
@@ -157,7 +173,7 @@ export function ProgressSummaryScreen({
     return null;
   }, [fromDate, toDate]);
 
-  // Submit handler
+  // Submit handler with sequence guarding against A -> B -> A race conditions
   const handleGenerateSummary = useCallback(async () => {
     if (isSubmittingRef.current) {
       return; // Anti-double submit
@@ -169,34 +185,59 @@ export function ProgressSummaryScreen({
     }
 
     const callingStudentId = targetStudentId;
+    const reqId = ++activeRequestIdRef.current;
+
+    if (inFlightAbortRef.current) {
+      inFlightAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    inFlightAbortRef.current = controller;
+
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
-      const response = await aiProgressSummaryApi.generate({
-        studentId: callingStudentId,
-        fromDate,
-        toDate,
-        timezone: user?.timezone || F04_DEFAULT_TIMEZONE,
-        metricCodes: selectedMetrics.length > 0 ? selectedMetrics : undefined,
-      });
+      const resolvedTimezone = getUserTimezone(user?.timezone);
 
-      // Guard against response arriving after unmount or student switch
-      if (isMountedRef.current && currentStudentIdRef.current === callingStudentId) {
+      const response = await aiProgressSummaryApi.generate(
+        {
+          studentId: callingStudentId,
+          fromDate,
+          toDate,
+          timezone: resolvedTimezone,
+          metricCodes: selectedMetrics.length > 0 ? selectedMetrics : undefined,
+        },
+        controller.signal
+      );
+
+      // Verify mounting, student identity, AND exact sequence ID (prevents A -> B -> A race conditions)
+      if (
+        isMountedRef.current &&
+        currentStudentIdRef.current === callingStudentId &&
+        activeRequestIdRef.current === reqId
+      ) {
         setResult(response);
       }
     } catch (err) {
-      if (isMountedRef.current && currentStudentIdRef.current === callingStudentId) {
+      if (controller.signal.aborted) {
+        return; // Request was cleanly cancelled; ignore without showing error
+      }
+      if (
+        isMountedRef.current &&
+        currentStudentIdRef.current === callingStudentId &&
+        activeRequestIdRef.current === reqId
+      ) {
         setErrorMessage(getAiProgressSummaryErrorMessage(err));
       }
     } finally {
-      if (isMountedRef.current) {
+      if (activeRequestIdRef.current === reqId && isMountedRef.current) {
         setIsSubmitting(false);
         isSubmittingRef.current = false;
+        inFlightAbortRef.current = null;
       }
     }
-  }, [targetStudentId, fromDate, toDate, user?.timezone, selectedMetrics, validationError]);
+  }, [targetStudentId, fromDate, toDate, user, selectedMetrics, validationError]);
 
   const handleBack = () => {
     if (onBack) {
@@ -518,7 +559,7 @@ export function ProgressSummaryScreen({
                 </View>
               </View>
 
-              {/* Prolonged Inactivity / Safety Alert Card */}
+              {/* Prolonged Inactivity / Safety Alert Card (strictly from continuityEvaluation without ungrounded load adjustment advice) */}
               {result.continuityEvaluation?.hasSafetyAlert && (
                 <View
                   testID="continuity-safety-alert"
@@ -532,9 +573,6 @@ export function ProgressSummaryScreen({
                   </Text>
                   <Text style={[styles.alertCardMessage, { color: theme.warningText }]}>
                     {result.continuityEvaluation.message}
-                  </Text>
-                  <Text style={[styles.alertCardNotice, { color: theme.textSecondary }]}>
-                    Lưu ý: Không tự ý áp dụng mức tạ hoặc khối lượng tập cũ. Cần khởi động kỹ và thích nghi dần.
                   </Text>
                 </View>
               )}
@@ -626,6 +664,7 @@ export function ProgressSummaryScreen({
                           symbol: '•',
                         };
                       const metricLabel =
+                        METRIC_LABELS[metric.metricCode] ||
                         METRIC_OPTIONS.find((m) => m.code === metric.metricCode)?.label ||
                         metric.metricCode;
                       return (
@@ -638,7 +677,7 @@ export function ProgressSummaryScreen({
                               style={[
                                 styles.trendBadge,
                                 {
-                                  backgroundColor:
+                                 backgroundColor:
                                     metric.trendDirection === 'STABLE'
                                       ? colors.neutral[100]
                                       : colors.brand[50],
@@ -655,9 +694,6 @@ export function ProgressSummaryScreen({
                         </View>
                       );
                     })}
-                    <Text style={[styles.bodySmall, { color: theme.textSecondary, fontStyle: 'italic', marginTop: spacing.xs }]}>
-                      Lưu ý: Biến động cân nặng tổng thể không phản ánh sự thay đổi thành phần cơ hoặc mỡ khi chưa có số đo chuyên sâu.
-                    </Text>
                   </View>
                 ) : (
                   <View
@@ -848,6 +884,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
     gap: spacing.sm,
   },
@@ -855,34 +892,34 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
   },
   errorCard: {
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    padding: spacing.md,
     gap: spacing.xs,
   },
   errorTitle: {
-    ...typography.body,
-    fontWeight: '700',
+    ...typography.h3,
+    fontSize: 16,
   },
   errorMessage: {
     ...typography.bodySmall,
   },
   retryButton: {
-    alignSelf: 'flex-start',
     borderWidth: 1,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xxs,
+    alignSelf: 'flex-start',
     marginTop: spacing.xs,
   },
   retryButtonText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   warningBanner: {
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.lg,
     padding: spacing.md,
+    borderWidth: 1,
     gap: spacing.sm,
   },
   warningContent: {
@@ -897,36 +934,35 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     alignSelf: 'flex-start',
-    borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    borderRadius: radius.md,
   },
   refreshButtonText: {
     ...typography.caption,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
   resultContainer: {
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   resultTypeHeader: {
-    alignItems: 'flex-start',
+    flexDirection: 'row',
   },
   resultTypeBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.full,
     borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
   },
   resultTypeBadgeText: {
     ...typography.caption,
     fontWeight: '700',
-    letterSpacing: 0.5,
   },
   alertCard: {
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    padding: spacing.md,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
     gap: spacing.xs,
   },
   alertCardTitle: {
@@ -935,11 +971,7 @@ const styles = StyleSheet.create({
   },
   alertCardMessage: {
     ...typography.bodySmall,
-    fontWeight: '600',
-  },
-  alertCardNotice: {
-    ...typography.caption,
-    fontStyle: 'italic',
+    lineHeight: 20,
   },
   summaryBody: {
     ...typography.body,
@@ -951,7 +983,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   label: {
-    ...typography.bodySmall,
+    ...typography.caption,
+    fontWeight: '600',
   },
   value: {
     ...typography.body,
@@ -959,20 +992,21 @@ const styles = StyleSheet.create({
   },
   bodySmall: {
     ...typography.bodySmall,
+    lineHeight: 18,
   },
   evaluationsList: {
     gap: spacing.sm,
-    marginTop: spacing.xxs,
   },
   evalItem: {
     gap: spacing.xxs,
   },
   evalLabel: {
-    ...typography.bodySmall,
+    ...typography.caption,
     fontWeight: '700',
   },
   evalText: {
     ...typography.bodySmall,
+    lineHeight: 18,
   },
   noticeBox: {
     padding: spacing.md,
@@ -983,10 +1017,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   metricItemRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral[200],
+    paddingBottom: spacing.sm,
     gap: spacing.xxs,
-    paddingBottom: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#00000015',
   },
   metricHeaderRow: {
     flexDirection: 'row',
@@ -999,7 +1033,7 @@ const styles = StyleSheet.create({
   },
   trendBadge: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: spacing.xxs,
     borderRadius: radius.full,
   },
   trendBadgeText: {
@@ -1014,14 +1048,14 @@ const styles = StyleSheet.create({
   },
   bulletItem: {
     ...typography.bodySmall,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   footerMetadata: {
-    paddingVertical: spacing.md,
-    gap: 4,
-    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.xxs,
   },
   footerText: {
     ...typography.caption,
+    fontSize: 11,
   },
 });

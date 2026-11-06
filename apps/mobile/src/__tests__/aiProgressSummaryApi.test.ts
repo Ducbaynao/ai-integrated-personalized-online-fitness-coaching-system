@@ -2,9 +2,10 @@ import {
   aiProgressSummaryApi,
   getAiProgressSummaryErrorMessage,
   CONTINUITY_STATE_LABELS,
+  METRIC_LABELS,
   METRIC_OPTIONS,
   TREND_DIRECTION_LABELS,
-  F04_DEFAULT_TIMEZONE,
+  getUserTimezone,
 } from '@/services/aiProgressSummaryApi';
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
@@ -32,7 +33,7 @@ describe('aiProgressSummaryApi', () => {
     measurementProgressSummary: {
       metricsEvaluations: [
         {
-          metricCode: 'F_WEIGHT',
+          metricCode: 'WEIGHT',
           trendDirection: 'STABLE',
           message: 'Cân nặng duy trì ổn định ở mức 70.0 kg.',
         },
@@ -44,8 +45,8 @@ describe('aiProgressSummaryApi', () => {
       hasSafetyAlert: false,
     },
     limitations: ['Chưa có chỉ số % mỡ chi tiết'],
-    missingData: ['F_BODY_FAT'],
-    factsReferenced: ['workout.completed_count', 'measurement.F_WEIGHT.latest'],
+    missingData: ['BODY_FAT_PERCENTAGE'],
+    factsReferenced: ['workout.completed_count', 'measurement.WEIGHT.latest'],
     asOf: '2026-11-06T10:00:00Z',
     sourceWatermark: 'watermark-12345',
     usage: {
@@ -63,7 +64,7 @@ describe('aiProgressSummaryApi', () => {
   });
 
   describe('generate', () => {
-    it('sends POST request to /ai/progress/summary with defaults', async () => {
+    it('sends POST request to /ai/progress/summary with resolved user timezone', async () => {
       (request as jest.Mock).mockResolvedValueOnce(sampleSuccessResponse);
 
       const result = await aiProgressSummaryApi.generate({
@@ -79,7 +80,7 @@ describe('aiProgressSummaryApi', () => {
           studentId: '33333333-3333-3333-3333-333333333333',
           fromDate: '2026-10-23',
           toDate: '2026-11-06',
-          timezone: F04_DEFAULT_TIMEZONE,
+          timezone: getUserTimezone(),
         },
         signal: undefined,
       });
@@ -96,7 +97,7 @@ describe('aiProgressSummaryApi', () => {
           fromDate: '2026-10-01',
           toDate: '2026-10-31',
           timezone: 'Asia/Bangkok',
-          metricCodes: ['F_WEIGHT', 'F_BODY_FAT'],
+          metricCodes: ['WEIGHT', 'BODY_FAT_PERCENTAGE'],
         },
         controller.signal
       );
@@ -108,7 +109,7 @@ describe('aiProgressSummaryApi', () => {
           fromDate: '2026-10-01',
           toDate: '2026-10-31',
           timezone: 'Asia/Bangkok',
-          metricCodes: ['F_WEIGHT', 'F_BODY_FAT'],
+          metricCodes: ['WEIGHT', 'BODY_FAT_PERCENTAGE'],
         },
         signal: controller.signal,
       });
@@ -134,16 +135,37 @@ describe('aiProgressSummaryApi', () => {
   });
 
   describe('getAiProgressSummaryErrorMessage', () => {
-    it('returns timeout message on AbortError', () => {
+    it('distinguishes cancellation from timeout on AbortError', () => {
       const abortError = new Error('The user aborted a request.');
       abortError.name = 'AbortError';
-      expect(getAiProgressSummaryErrorMessage(abortError)).toContain('quá thời gian chờ');
+      expect(getAiProgressSummaryErrorMessage(abortError)).toBe('Yêu cầu đã bị hủy.');
+    });
+
+    it('returns timeout message on actual timeout error', () => {
+      const timeoutError = new Error('Request timeout after 15000ms');
+      expect(getAiProgressSummaryErrorMessage(timeoutError)).toContain('quá thời gian chờ (timeout)');
+    });
+
+    it('returns distinct messages for 502 Bad Gateway and 503 Service Unavailable', () => {
+      const err502 = new ApiError(502, 'Bad Gateway');
+      expect(getAiProgressSummaryErrorMessage(err502)).toContain('Bad Gateway');
+
+      const err503 = new ApiError(503, 'Service Unavailable');
+      expect(getAiProgressSummaryErrorMessage(err503)).toContain('Service Unavailable');
+    });
+
+    it('returns server timeout message on 504 Gateway Timeout', () => {
+      const err = new ApiError(504, 'Gateway Timeout');
+      expect(getAiProgressSummaryErrorMessage(err)).toContain('Gateway Timeout');
     });
 
     it('returns access denied message on 403 ApiError', () => {
       const err = new ApiError(403, 'Forbidden', {
         errorCode: 'AI_RUN_ACCESS_DENIED',
         message: 'No active coaching relationship',
+        timestamp: '2026-11-06T10:00:00Z',
+        requestId: 'req-1',
+        fieldErrors: [],
       });
       expect(getAiProgressSummaryErrorMessage(err)).toContain('không có quyền truy cập');
     });
@@ -152,6 +174,9 @@ describe('aiProgressSummaryApi', () => {
       const err = new ApiError(404, 'Not Found', {
         errorCode: 'STUDENT_NOT_FOUND',
         message: 'Student not found',
+        timestamp: '2026-11-06T10:00:00Z',
+        requestId: 'req-2',
+        fieldErrors: [],
       });
       expect(getAiProgressSummaryErrorMessage(err)).toContain('Không tìm thấy');
     });
@@ -160,7 +185,9 @@ describe('aiProgressSummaryApi', () => {
       const err = new ApiError(400, 'Bad Request', {
         errorCode: 'VALIDATION_FAILED',
         message: 'Validation failed',
-        fieldErrors: [{ field: 'fromDate', message: 'fromDate cannot be after toDate' }],
+        timestamp: '2026-11-06T10:00:00Z',
+        requestId: 'req-3',
+        fieldErrors: [{ field: 'fromDate', message: 'fromDate cannot be after toDate', code: 'INVALID' }],
       });
       expect(getAiProgressSummaryErrorMessage(err)).toContain('fromDate cannot be after toDate');
     });
@@ -169,13 +196,11 @@ describe('aiProgressSummaryApi', () => {
       const err = new ApiError(422, 'Unprocessable Entity', {
         errorCode: 'AI_OUTPUT_VALIDATION_FAILED',
         message: 'Contract violated',
+        timestamp: '2026-11-06T10:00:00Z',
+        requestId: 'req-4',
+        fieldErrors: [],
       });
       expect(getAiProgressSummaryErrorMessage(err)).toContain('không vượt qua kiểm định an toàn');
-    });
-
-    it('returns server timeout message on 504 Gateway Timeout', () => {
-      const err = new ApiError(504, 'Gateway Timeout');
-      expect(getAiProgressSummaryErrorMessage(err)).toContain('tạm thời không khả dụng hoặc quá thời gian chờ');
     });
 
     it('returns network error message on status 0', () => {
@@ -186,7 +211,9 @@ describe('aiProgressSummaryApi', () => {
 
   describe('Constants and Labels', () => {
     it('defines expected metric options and continuity labels', () => {
-      expect(METRIC_OPTIONS.some((m) => m.code === 'F_WEIGHT')).toBe(true);
+      expect(METRIC_OPTIONS.some((m) => m.code === 'WEIGHT')).toBe(true);
+      expect(METRIC_LABELS['WEIGHT']).toBe('Cân nặng (kg)');
+      expect(METRIC_LABELS['F_WEIGHT']).toBe('Cân nặng (kg)');
       expect(CONTINUITY_STATE_LABELS['PROLONGED_INACTIVITY']).toContain('Gián đoạn');
       expect(TREND_DIRECTION_LABELS['STABLE'].symbol).toBe('→');
       expect(TREND_DIRECTION_LABELS['INCREASED'].symbol).toBe('↑');

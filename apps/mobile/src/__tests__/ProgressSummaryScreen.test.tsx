@@ -46,7 +46,7 @@ describe('ProgressSummaryScreen', () => {
     measurementProgressSummary: {
       metricsEvaluations: [
         {
-          metricCode: 'F_WEIGHT',
+          metricCode: 'WEIGHT',
           trendDirection: 'STABLE',
           message: 'Cân nặng duy trì ổn định ở mức 70.0 kg.',
         },
@@ -58,8 +58,8 @@ describe('ProgressSummaryScreen', () => {
       hasSafetyAlert: false,
     },
     limitations: ['Chưa có chỉ số % mỡ chi tiết'],
-    missingData: ['F_BODY_FAT'],
-    factsReferenced: ['workout.completed_count', 'measurement.F_WEIGHT.latest'],
+    missingData: ['BODY_FAT_PERCENTAGE'],
+    factsReferenced: ['workout.completed_count', 'measurement.WEIGHT.latest'],
     asOf: '2026-11-06T10:00:00Z',
     sourceWatermark: 'watermark-sample-12345',
     usage: {
@@ -116,6 +116,25 @@ describe('ProgressSummaryScreen', () => {
 
     const errorText = tree.root.findByProps({ testID: 'validation-error-text' });
     expect(errorText.props.children).toBe('Ngày bắt đầu không được sau ngày kết thúc.');
+
+    const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
+    expect(generateBtn.props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('validates non-existent calendar dates strictly (e.g. Feb 30)', async () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<ProgressSummaryScreen />);
+    });
+
+    const fromDateInput = tree.root.findByProps({ testID: 'from-date-input' });
+
+    await renderer.act(async () => {
+      fromDateInput.props.onChangeText('2026-02-30');
+    });
+
+    const errorText = tree.root.findByProps({ testID: 'validation-error-text' });
+    expect(errorText.props.children).toContain('Ngày bắt đầu không hợp lệ');
 
     const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
     expect(generateBtn.props.accessibilityState.disabled).toBe(true);
@@ -271,14 +290,23 @@ describe('ProgressSummaryScreen', () => {
     });
     await settle();
 
-    expect(aiProgressSummaryApi.getSummary).toHaveBeenCalledWith('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    expect(aiProgressSummaryApi.getSummary).toHaveBeenCalledWith(
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      expect.any(Object)
+    );
     const summaryText = tree.root.findByProps({ testID: 'progress-overall-summary' });
     expect(summaryText.props.children).toContain('Bạn đã hoàn thành 4/4 buổi tập');
   });
 
   it('displays error card when api call fails with ApiError', async () => {
     (aiProgressSummaryApi.generate as jest.Mock).mockRejectedValueOnce(
-      new ApiError(403, 'Forbidden', { errorCode: 'AI_RUN_ACCESS_DENIED' })
+      new ApiError(403, 'Forbidden', {
+        errorCode: 'AI_RUN_ACCESS_DENIED',
+        message: 'Forbidden',
+        timestamp: '2026-11-06T10:00:00Z',
+        requestId: 'req-err',
+        fieldErrors: [],
+      })
     );
 
     let tree!: renderer.ReactTestRenderer;

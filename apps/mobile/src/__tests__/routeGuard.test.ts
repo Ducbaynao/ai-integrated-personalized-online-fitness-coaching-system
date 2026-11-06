@@ -152,6 +152,10 @@ describe('Route Guard & Capability Resolution (PROFILE-04)', () => {
     expect(canAccessAiKnowledge(trainerOnly)).toBe(true);
     expect(canAccessAiKnowledge(dualRole)).toBe(true);
 
+    // Non-ACTIVE account is rejected
+    const suspendedUser: CurrentUserResponse = { ...studentOnly, status: 'SUSPENDED' };
+    expect(canAccessAiKnowledge(suspendedUser)).toBe(false);
+
     // canAccessProgressSummary: requires ACTIVE status and STUDENT or TRAINER capability
     expect(canAccessProgressSummary(null)).toBe(false);
     expect(canAccessProgressSummary(noProfiles)).toBe(false);
@@ -159,10 +163,6 @@ describe('Route Guard & Capability Resolution (PROFILE-04)', () => {
     expect(canAccessProgressSummary(trainerOnly)).toBe(true);
     expect(canAccessProgressSummary(dualRole)).toBe(true);
     expect(canAccessProgressSummary(suspendedUser)).toBe(false);
-
-    // Non-ACTIVE account is rejected
-    const suspendedUser: CurrentUserResponse = { ...studentOnly, status: 'SUSPENDED' };
-    expect(canAccessAiKnowledge(suspendedUser)).toBe(false);
 
     // Base ADMIN alone is forbidden
     const adminOnly: CurrentUserResponse = {
