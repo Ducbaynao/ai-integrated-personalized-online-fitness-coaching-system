@@ -247,7 +247,7 @@ export function ProgressSummaryScreen({
     }
   };
 
-  const isStale = Boolean(result?.isStale || result?.needsRefresh);
+  const isStale = result?.isStale === true || result?.needsRefresh === true;
 
   return (
     <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: theme.canvas }]}>
@@ -654,53 +654,63 @@ export function ProgressSummaryScreen({
               {/* Measurement Progress Section */}
               <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>Số đo thể chất</Text>
-                {result.measurementProgressSummary?.metricsEvaluations &&
-                result.measurementProgressSummary.metricsEvaluations.length > 0 ? (
-                  <View testID="measurement-progress-section" style={styles.evaluationsList}>
-                    {result.measurementProgressSummary.metricsEvaluations.map((metric) => {
-                      const trend =
-                        TREND_DIRECTION_LABELS[metric.trendDirection] || {
-                          label: metric.trendDirection,
-                          symbol: '•',
-                        };
-                      const metricLabel =
-                        METRIC_LABELS[metric.metricCode] ||
-                        METRIC_OPTIONS.find((m) => m.code === metric.metricCode)?.label ||
-                        metric.metricCode;
-                      return (
-                        <View key={metric.metricCode} style={styles.metricItemRow}>
-                          <View style={styles.metricHeaderRow}>
-                            <Text style={[styles.metricCodeText, { color: theme.textPrimary }]}>
-                              {metricLabel}
-                            </Text>
-                            <View
-                              style={[
-                                styles.trendBadge,
-                                {
-                                 backgroundColor:
-                                    metric.trendDirection === 'STABLE'
-                                      ? colors.neutral[100]
-                                      : colors.brand[50],
-                                },
-                              ]}>
-                              <Text style={[styles.trendBadgeText, { color: theme.primary }]}>
-                                {trend.symbol} {trend.label}
+                {result.measurementProgressSummary ? (
+                  result.measurementProgressSummary.metricsEvaluations &&
+                  result.measurementProgressSummary.metricsEvaluations.length > 0 ? (
+                    <View testID="measurement-progress-section" style={styles.evaluationsList}>
+                      {result.measurementProgressSummary.metricsEvaluations.map((metric) => {
+                        const trend =
+                          TREND_DIRECTION_LABELS[metric.trendDirection] || {
+                            label: metric.trendDirection,
+                            symbol: '•',
+                          };
+                        const metricLabel =
+                          METRIC_LABELS[metric.metricCode] ||
+                          METRIC_OPTIONS.find((m) => m.code === metric.metricCode)?.label ||
+                          metric.metricCode;
+                        return (
+                          <View key={metric.metricCode} style={styles.metricItemRow}>
+                            <View style={styles.metricHeaderRow}>
+                              <Text style={[styles.metricCodeText, { color: theme.textPrimary }]}>
+                                {metricLabel}
                               </Text>
+                              <View
+                                style={[
+                                  styles.trendBadge,
+                                  {
+                                    backgroundColor:
+                                      metric.trendDirection === 'STABLE'
+                                        ? colors.neutral[100]
+                                        : colors.brand[50],
+                                  },
+                                ]}>
+                                <Text style={[styles.trendBadgeText, { color: theme.primary }]}>
+                                  {trend.symbol} {trend.label}
+                                </Text>
+                              </View>
                             </View>
+                            <Text style={[styles.metricMessageText, { color: theme.textSecondary }]}>
+                              {metric.message}
+                            </Text>
                           </View>
-                          <Text style={[styles.metricMessageText, { color: theme.textSecondary }]}>
-                            {metric.message}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View
+                      testID="measurement-no-data-notice"
+                      style={[styles.noticeBox, { backgroundColor: theme.surfaceSubtle }]}>
+                      <Text style={[styles.noticeText, { color: theme.textSecondary }]}>
+                        Chưa có dữ liệu số đo thể chất trong khoảng thời gian đã chọn.
+                      </Text>
+                    </View>
+                  )
                 ) : (
                   <View
                     testID="measurement-restricted-notice"
                     style={[styles.noticeBox, { backgroundColor: theme.surfaceSubtle }]}>
                     <Text style={[styles.noticeText, { color: theme.textSecondary }]}>
-                      Dữ liệu số đo thể chất không khả dụng hoặc bị hạn chế quyền truy cập theo chính sách chia sẻ.
+                      Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.
                     </Text>
                   </View>
                 )}
@@ -741,16 +751,11 @@ export function ProgressSummaryScreen({
               {/* Metadata Footer */}
               <View style={styles.footerMetadata}>
                 <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-                  Thời điểm tính: {moment(result.asOf).format('DD/MM/YYYY HH:mm:ss')}
+                  Thời điểm tổng hợp: {moment(result.asOf).format('DD/MM/YYYY HH:mm')}
                 </Text>
                 <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-                  Mã phiên (runId): {result.runId}
+                  Mã phiên hỗ trợ: {result.runId}
                 </Text>
-                {result.sourceWatermark && (
-                  <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-                    Watermark: {result.sourceWatermark.substring(0, 16)}...
-                  </Text>
-                )}
               </View>
             </View>
           )}

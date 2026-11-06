@@ -323,4 +323,99 @@ describe('ProgressSummaryScreen', () => {
     const errorCard = tree.root.findByProps({ testID: 'progress-summary-error-card' });
     expect(errorCard).toBeDefined();
   });
+
+  it('does not display stale banner when isStale is false or null', async () => {
+    const freshResponse: F04ProgressSummaryResponse = {
+      ...sampleSuccessResponse,
+      isStale: false,
+      needsRefresh: false,
+    };
+    (aiProgressSummaryApi.generate as jest.Mock).mockResolvedValueOnce(freshResponse);
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<ProgressSummaryScreen />);
+    });
+
+    const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+    await settle();
+
+    expect(tree.root.findAllByProps({ testID: 'progress-summary-stale-banner' }).length).toBe(0);
+  });
+
+  it('distinguishes measurement-no-data-notice vs measurement-restricted-notice', async () => {
+    // 1. Measurement available but no data logged in window
+    const noDataResponse: F04ProgressSummaryResponse = {
+      ...sampleSuccessResponse,
+      measurementProgressSummary: {
+        metricsEvaluations: [],
+      },
+    };
+    (aiProgressSummaryApi.generate as jest.Mock).mockResolvedValueOnce(noDataResponse);
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<ProgressSummaryScreen />);
+    });
+
+    const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+    await settle();
+
+    expect(tree.root.findByProps({ testID: 'measurement-no-data-notice' })).toBeDefined();
+    expect(tree.root.findAllByProps({ testID: 'measurement-restricted-notice' }).length).toBe(0);
+
+    // 2. Measurement restricted by sharing policy
+    const restrictedResponse: F04ProgressSummaryResponse = {
+      ...sampleSuccessResponse,
+      measurementProgressSummary: null,
+    };
+    (aiProgressSummaryApi.generate as jest.Mock).mockResolvedValueOnce(restrictedResponse);
+
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+    await settle();
+
+    expect(tree.root.findByProps({ testID: 'measurement-restricted-notice' })).toBeDefined();
+    expect(tree.root.findAllByProps({ testID: 'measurement-no-data-notice' }).length).toBe(0);
+  });
+
+  it('prevents double submit when user rapidly clicks generate button', async () => {
+    let resolvePromise!: (val: any) => void;
+    const delayedPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    (aiProgressSummaryApi.generate as jest.Mock).mockReturnValue(delayedPromise);
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<ProgressSummaryScreen />);
+    });
+
+    const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
+
+    // First click initiates request
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+
+    // Rapid second click while in-flight
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+
+    // Resolve the delayed call
+    await renderer.act(async () => {
+      resolvePromise(sampleSuccessResponse);
+    });
+    await settle();
+
+    expect(aiProgressSummaryApi.generate).toHaveBeenCalledTimes(1);
+  });
 });

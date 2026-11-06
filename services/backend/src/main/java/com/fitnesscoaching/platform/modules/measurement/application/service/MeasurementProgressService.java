@@ -108,7 +108,7 @@ public class MeasurementProgressService implements MeasurementProgressQuery {
             );
             String watermark = calculateSourceWatermark(
                     fromDate, toDate, timezone,
-                    access.isSelf(), effectiveStart, queryUpper,
+                    access.isSelf(), historyFrom, historyUntil,
                     false, summary.availabilityReason(),
                     List.of(), metricCatalog, List.of()
             );
@@ -189,7 +189,7 @@ public class MeasurementProgressService implements MeasurementProgressQuery {
         // 6. Compute composite source watermark
         String sourceWatermark = calculateSourceWatermark(
                 fromDate, toDate, timezone,
-                access.isSelf(), effectiveStart, queryUpper,
+                access.isSelf(), historyFrom, historyUntil,
                 hasHistoricalLimits, availabilityReason,
                 unitCatalog, metricCatalog, observations
         );

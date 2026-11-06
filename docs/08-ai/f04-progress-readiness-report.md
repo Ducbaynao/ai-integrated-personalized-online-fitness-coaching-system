@@ -715,24 +715,54 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
      - `getSummary`: Đọc lại theo `runId`.
      - `getAiProgressSummaryErrorMessage`: Phân biệt rõ ràng giữa huỷ yêu cầu (`AbortError`), timeout thực tế, các lỗi gateway (`502`, `503`, `504`), `400`, `403`, `404`, `422`, và mất mạng `0`.
      - Kiểm tra nhãn danh mục số đo chuẩn (`METRIC_OPTIONS`, `METRIC_LABELS`), trạng thái liền mạch và biểu tượng xu hướng.
-   - [`ProgressSummaryScreen.test.tsx`](../../apps/mobile/src/__tests__/ProgressSummaryScreen.test.tsx) (**10/10 tests PASS**):
+   - [`ProgressSummaryScreen.test.tsx`](../../apps/mobile/src/__tests__/ProgressSummaryScreen.test.tsx) (**13/13 tests PASS**):
      - Khởi tạo giao diện với presets, ô nhập ngày và nút tạo tóm tắt.
      - Validation: Chặn submit khi `fromDate > toDate`.
      - Validation: Chặn submit khi ngày không tồn tại trên lịch (như 30/02).
      - Render thành công đầy đủ các phần: tóm tắt, buổi tập, số đo thể chất, tính liền mạch.
      - Hiển thị banner cảnh báo an toàn khách quan khi có cờ gián đoạn dài ngày.
-     - Hiển thị hộp thông báo khi nguồn buổi tập hoặc số đo bị hạn chế quyền.
-     - Hiển thị thanh cảnh báo dữ liệu cũ (`isStale`) và kích hoạt làm mới tóm tắt.
-     - Kiểm chứng cô lập học viên: Chuyển đổi `studentId` lập tức xóa sạch dữ liệu của học viên cũ, chống rò rỉ chéo.
+     - Hiển thị hộp thông báo khi nguồn buổi tập hoặc số đo bị hạn chế quyền (`measurement-restricted-notice` vs `measurement-no-data-notice`).
+     - Hiển thị thanh cảnh báo dữ liệu cũ (`isStale: true` hoặc `needsRefresh: true`) và kích hoạt làm mới tóm tắt qua nút `Làm mới ngay`.
+     - Chặn submit trùng lặp (Anti-double submit guard) khi thao tác submit đang xử lý.
+     - Kiểm chứng cô lập học viên: Chuyển đổi `studentId` lập tức xóa sạch dữ liệu của học viên cũ, chống rò rỉ chéo và chống race condition A -> B -> A.
      - Đọc lại dữ liệu qua `initialRunId`.
      - Xử lý lỗi API và hiển thị hộp thông báo lỗi có nút thử lại.
    - [`routeGuard.test.ts`](../../apps/mobile/src/__tests__/routeGuard.test.ts) (**12/12 tests PASS**): Bổ sung kiểm tra quyền truy cập `canAccessProgressSummary`.
    - [`progressSummaryNavigation.test.tsx`](../../apps/mobile/src/__tests__/progressSummaryNavigation.test.tsx) (**1/1 test PASS**): Kiểm chứng nút bấm điều hướng từ màn hình Student Home.
-   - **Toàn bộ 87 test suites trong `apps/mobile` đạt 693/693 tests PASS (0 failures, 0 errors).**
+   - **Toàn bộ 87 test suites trong `apps/mobile` đạt 696/696 tests PASS (0 failures, 0 errors).**
 
 ---
 
-### 12.4. Ranh Giới Nghiệm Thu & Các Giới Hạn Đang Mở
+### 12.4. Khắc Phục Lỗi Watermark & Hoàn Thiện Kiểm Chứng Live End-to-End
+
+Trong quá trình nghiệm thu live trên Android Pixel 8 và hệ thống full-stack cục bộ, các khiếm khuyết sau đã được phát hiện, phân tích nguyên nhân gốc rễ và xử lý triệt để:
+
+1. **Hiện Tượng Báo Dữ Liệu Cũ (`isStale: true`) Ngay Khi Vừa Tạo:**
+   - *Nguyên nhân 1 (Timestamp jitter trong composite watermark):* `ProgressEngineService.calculateCompositeWatermark` băm chuỗi `"ASOF:" + asOf.toString() + "|"`. Do `asOf` trôi vài mili-giây giữa thời điểm tạo context và bước kiểm tra 5e, giá trị băm luôn khác nhau dù không hề có bản ghi tập luyện hay số đo nào thay đổi.
+   - *Nguyên nhân 2 (Lệch tham số trong `MeasurementProgressService`):* Hàm `calculateSourceWatermark` nhận nhầm `queryUpper` (thời điểm `asOf`) làm mốc thời gian giới hạn quyền của Actor thay vì `access.historyUntil()`. Do đó mỗi mili-giây clock trôi đi đều làm biến đổi watermark số đo thể chất.
+   - *Giải pháp triệt để:*
+     - Sửa `MeasurementProgressService` sử dụng `access.historyFrom()` và `access.historyUntil()`, loại bỏ phụ thuộc mili-giây vào clock runtime.
+     - Cập nhật `AiProgressSummarizationService` (bước 5e và bước 4 readback): so sánh tính tươi mới dựa trên chính xác các domain watermarks (`workout.sourceWatermark()`, `measurement.sourceWatermark()`, `continuity.state()`, và tính sẵn sàng của nguồn) thay vì băm timestamp `asOf`.
+     - Sửa giải quyết `dwNode` trong readback: đọc chính xác cấu trúc bọc `rootNode.path("context").path("dateWindow")`.
+
+2. **Xung Đột Khóa Đọc PostgreSQL Trong `getProgressSummary`:**
+   - *Nguyên nhân:* Annotation `@Transactional(readOnly = true)` trên hàm readback `getProgressSummary` xung đột với lệnh `SELECT ... FOR SHARE` được thực thi bởi `CoachingAuthorityQuery` để bảo vệ quyền hạn HLV, dẫn tới `SQLException: cannot execute SELECT FOR SHARE in a read-only transaction`.
+   - *Giải pháp:* Đổi thành `@Transactional` để cho phép cơ chế khóa dòng chia sẻ (`FOR SHARE`) hoạt động an toàn và đồng bộ.
+
+3. **Chuyển Đổi Mã Lỗi Phân Quyền HLV (`ProgressFailure` sang HTTP 403):**
+   - *Nguyên nhân:* Khi quan hệ huấn luyện đã kết thúc (`ENDED`), `ProgressEngineService` ném `ProgressFailure(PROGRESS_ACCESS_DENIED)` chưa được bắt riêng trong AI service, dẫn tới phản hồi HTTP 500 thay vì 403 Forbidden.
+   - *Giải pháp:* Bổ sung khối bắt `ProgressFailure.PROGRESS_ACCESS_DENIED` tại `F04ContextBuilder` và `AiProgressSummarizationService`, chuyển đổi thành `AiRunAccessDeniedException` (HTTP 403 `AI_FORBIDDEN`) với thông điệp rõ ràng, ngăn ngừa rò rỉ dữ liệu.
+
+4. **Kiểm Chứng Thực Nghiệm Hoàn Chỉnh Trên Android Pixel 8 & Full-Stack:**
+   - **Tạo Tóm Tắt Tươi Mới (Fresh Summary):** Học viên tạo tóm tắt -> kết quả `isStale: false, needsRefresh: false`, hiển thị sạch đẹp không còn banner cảnh báo thừa (`pixel8_student_summary_fresh.png`, `pixel8_refreshed_fresh.png`).
+   - **Đột Biến Dữ Liệu & Nhận Biết Dữ Liệu Cũ (Live Mutation Detection):** Chèn một số đo thể chất mới vào PostgreSQL (`fitness.measurements`); đọc lại bản tóm tắt cũ qua deep link -> hệ thống phát hiện chính xác sự thay đổi dữ liệu nguồn và hiển thị banner `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay" (`pixel8_stale_banner_after_mutation.png`).
+   - **Làm Mới Trực Tiếp:** Bấm nút "Làm mới ngay" trên GUI -> hệ thống kích hoạt tạo bản tóm tắt mới tích hợp số đo vừa thêm, banner cảnh báo biến mất và kết quả trở lại trạng thái tươi mới (`pixel8_refreshed_fresh.png`).
+   - **HLV Với Quyền Hạn Hạn Chế (Workout-only vs Measurement-only):** Đăng nhập HLV `smoke.trainer@example.com` xem học viên `smoke.student@example.com` (chỉ cấp quyền Workout, hạn chế Body Metrics). Kết quả: tiến độ tập luyện hiển thị đầy đủ, trong khi mục số đo thể chất hiển thị rõ ràng thông báo `Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.` (`resource-id="measurement-restricted-notice"`, `pixel8_trainer_restricted_measurement.png`).
+   - **Thu Hồi Quyền & Quan Hệ Đã Kết Thúc:** HLV gọi API đối với học viên đã kết thúc huấn luyện -> nhận phản hồi chuẩn HTTP 403 `AI_FORBIDDEN`, bảo toàn ranh giới bảo mật và quyền riêng tư của học viên.
+
+---
+
+### 12.5. Ranh Giới Nghiệm Thu & Các Giới Hạn Đang Mở
 
 - **Mô Hình Live LLM:** Hệ thống sử dụng provider tất định (`simulated_f04_provider.py`) để kiểm chứng toàn bộ luồng contract, HTTP, giao diện và thẩm định dữ liệu. Việc tích hợp live LLM (Google Gemini / OpenAI) và đánh giá chất lượng văn phong ngôn ngữ tự nhiên vẫn là hạng mục mở cho P2-M6 theo đúng kế hoạch triển khai.
 - **Quy Tắc Chuyên Môn Thể Hình (D06 / OD-3):** Chưa áp dụng các ngưỡng can thiệp tải hay phân loại tiến độ phức tạp của Hội đồng Thể hình; giữ đúng nguyên tắc `INFORMATION` trung lập.
