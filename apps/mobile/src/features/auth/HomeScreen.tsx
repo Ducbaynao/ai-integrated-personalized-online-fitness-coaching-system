@@ -198,6 +198,15 @@ export function HomeScreen() {
                 onPress={() => router.push('/ai-knowledge' as any)}>
                 <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Kiến thức thể hình (AI) →</Text>
               </Pressable>
+
+              <Pressable
+                testID="view-progress-summary-button"
+                accessibilityRole="button"
+                accessibilityLabel="Xem tóm tắt tiến độ AI"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/progress-summary' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Tóm tắt tiến độ (AI) →</Text>
+              </Pressable>
             </>
           )}
 

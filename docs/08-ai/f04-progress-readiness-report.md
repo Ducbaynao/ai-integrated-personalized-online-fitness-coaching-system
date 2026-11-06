@@ -620,3 +620,75 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
 2. **Post-Provider Authority Revalidation:** Sau khi nhận kết quả từ FastAPI và trước khi ghi nhận `SUCCEEDED` hoặc trả cho client, hệ thống tái thẩm định trạng thái tài khoản (`AccountStatus.ACTIVE`) và quan hệ huấn luyện (`CoachingRelationshipStatus.ACTIVE`). Nếu bị vô hiệu hóa trong khi provider đang xử lý, hệ thống hủy xuất bản, đánh dấu run `FAILED` với lý do `ACCESS_REVOKED` / `COACHING_REVOKED` và trả 403.
 3. **Bảo Vệ Đọc Lại Khi Quyền Bị Thu Hồi Từng Phần (Readback Single-Source Masking):** Khi đọc lại bản tóm tắt đã lưu qua `GET`, nếu một trong hai nguồn dữ liệu (Workout hoặc Measurement) bị thu hồi quyền truy cập, hệ thống tự động che giấu (`null`) phần tóm tắt của nguồn đó, loại bỏ các facts tham chiếu tương ứng khỏi `factsReferenced` và bổ sung cảnh báo giới hạn vào `limitations`, ngăn ngừa rò rỉ thông tin lịch sử khi quyền hạn bị thu hẹp.
 4. **Phân Biệt Cảnh Báo An Toàn Khách Quan vs Đề Xuất Điều Chỉnh Tải:** Cờ `RETURN_AFTER_100_DAYS_V1` do backend tính toán từ facts gián đoạn lịch sử được thể hiện rõ ràng trong phần `safetyFlags` và tóm tắt tiến độ, nhưng giữ đúng ranh giới `INFORMATION`: không tự ý điều chỉnh bài tập hay kế hoạch dinh dưỡng khi chưa có đề xuất và thẩm định chuyên môn.
+
+---
+
+## 12. Triển Khai Mobile Progress UI Cho Student & Trainer (F04 Mobile)
+
+> **Branch làm việc:** `feat/p2-m4-f04-mobile-progress`
+> **Backend dependency commit:** `662e5cb` (`feat(f04): implement F04 context builder and INFORMATION progress summary backend`)
+> **Nền tảng:** React Native Expo (Expo SDK 54, React 19, TypeScript), Expo Router, TanStack Query, Axios apiClient.
+
+### 12.1. Cấu Trúc Khối Mã Nguồn & Luồng Nghiệp Vụ Mobile
+
+1. **Hợp Đồng Dữ Liệu Client & API Service:**
+   - [`types/aiProgressSummary.ts`](../../apps/mobile/src/types/aiProgressSummary.ts): Định nghĩa `F04ProgressSummaryApiRequest`, `F04ProgressSummaryResponse`, `F04WorkoutProgressSummary`, `F04MeasurementProgressSummary`, `F04ContinuityEvaluation` với kiểu dữ liệu an toàn (hỗ trợ `isStale` và `needsRefresh` nullable).
+   - [`services/aiProgressSummaryApi.ts`](../../apps/mobile/src/services/aiProgressSummaryApi.ts):
+     - `generate(request, signal)`: Gọi endpoint `POST /api/v1/ai/progress/summary` với timezone mặc định `Asia/Ho_Chi_Minh`.
+     - `getSummary(runId, signal)`: Đọc lại bản tóm tắt qua `GET /api/v1/ai/progress/summary/{runId}`.
+     - `getAiProgressSummaryErrorMessage(err)`: Ánh xạ chuẩn xác các mã lỗi và HTTP status: 400 (khoảng ngày không hợp lệ), 403 (mất quyền hoặc quan hệ huấn luyện kết thúc), 404 (không tìm thấy), 422 (vi phạm hợp đồng kiểm định), 502/503/504 (timeout), 0 (mất kết nối mạng).
+     - Định nghĩa `METRIC_OPTIONS`, `CONTINUITY_STATE_LABELS`, `TREND_DIRECTION_LABELS`.
+
+2. **Thành Phần Giao Diện Chính (`ProgressSummaryScreen.tsx`):**
+   - [`ProgressSummaryScreen.tsx`](../../apps/mobile/src/features/progress-summary/ProgressSummaryScreen.tsx):
+     - **Bộ chọn phạm vi thời gian (Scope Selector):** Cung cấp các nút chọn nhanh ("7 ngày qua", "14 ngày qua", "30 ngày qua", "Tùy chọn") và 2 ô nhập ngày `fromDate`, `toDate` (YYYY-MM-DD). Kiểm tra client-side `fromDate <= toDate`, hiển thị cảnh báo tức thì và vô hiệu hóa nút submit nếu ngày không hợp lệ.
+     - **Lọc chỉ số thể chất (Metrics Chips):** Hỗ trợ chọn lọc linh hoạt `F_WEIGHT`, `F_BODY_FAT`, `F_WAIST`, `F_CHEST`.
+     - **Chống Submit Trùng & Trễ (Anti-Double-Submit & In-Flight Guards):** Sử dụng `isSubmittingRef` và `isMountedRef`. Khóa nút gửi trong khi request đang xử lý kèm spinner hiển thị.
+     - **Cô Lập Trạng Thái Học Viên Tuyệt Đối (Student State Isolation):** Sử dụng `currentStudentIdRef`. Khi Huấn luyện viên chuyển đổi giữa các học viên, toàn bộ kết quả, lỗi và trạng thái của học viên trước lập tức bị xóa trắng (`setResult(null)`), ngăn ngừa triệt để rò rỉ dữ liệu chéo giữa các học viên.
+     - **Hộp Cảnh Báo An Toàn (`hasSafetyAlert`):** Khi phát hiện cờ an toàn (như `RETURN_AFTER_100_DAYS_V1`), giao diện hiển thị banner nổi bật `⚠️ CẢNH BÁO AN TOÀN KHI TRỞ LẠI TẬP LUYỆN` kèm nhắc nhở không tự ý tăng mức tạ cũ.
+     - **Hiển Thị Nguồn Bị Giới Hạn (Restricted Sources):** Phân biệt minh bạch giữa không có dữ liệu với nguồn bị hạn chế quyền. Nếu `workoutProgressSummary` hoặc `measurementProgressSummary` là `null`, hiển thị hộp thông báo nguồn bị giới hạn theo chính sách chia sẻ.
+     - **Nhận Biết Dữ Liệu Cũ & Nút Làm Mới (Stale / Refresh Needed):** Nếu `isStale === true` hoặc `needsRefresh === true`, hiển thị thanh cảnh báo `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay" để tạo lại bản tóm tắt mới.
+     - **Ranh Giới `INFORMATION` Tuyệt Đối:** Không có nút "Accept", "Apply", hay hành vi tự động sửa đổi kế hoạch tập luyện nào.
+
+3. **Điều Hướng & Điểm Truy Cập (Navigation & Route Integration):**
+   - **Student Flow:**
+     - Điểm truy cập tại [`HomeScreen.tsx`](../../apps/mobile/src/features/auth/HomeScreen.tsx) qua nút "Tóm tắt tiến độ (AI) →" dẫn tới route [`/progress-summary`](../../apps/mobile/src/app/(app)/progress-summary/index.tsx).
+     - Hỗ trợ route đọc lại trực tiếp [`/progress-summary/[runId]`](../../apps/mobile/src/app/(app)/progress-summary/[runId].tsx).
+   - **Trainer Flow:**
+     - Điểm truy cập tại Workspace học viên trong [`RelationshipDetailScreen.tsx`](../../apps/mobile/src/features/coaching/RelationshipDetailScreen.tsx) qua nút "Tóm tắt tiến độ học viên (AI) →" dẫn tới route [`/coaching/[relationshipId]/progress-summary`](../../apps/mobile/src/app/(app)/coaching/[relationshipId]/progress-summary.tsx).
+     - Ràng buộc chặt chẽ với `studentId` của mối quan hệ huấn luyện đang chọn.
+   - **Route Guards & Layout:**
+     - Cập nhật [`routeGuard.ts`](../../apps/mobile/src/features/auth/routeGuard.ts) với `canAccessProgressSummary` (chỉ cho phép tài khoản `ACTIVE` có profile `STUDENT` hoặc `TRAINER`).
+     - Đăng ký đầy đủ 3 màn hình mới trong [`_layout.tsx`](../../apps/mobile/src/app/(app)/_layout.tsx).
+
+### 12.2. Kết Quả Kiểm Thử Thực Tế (100% Passed)
+
+1. **TypeScript Typecheck (`npm run typecheck`):**
+   - Đạt 0 lỗi biên dịch trên toàn bộ dự án mobile (`tsc --noEmit` hoàn tất thành công).
+
+2. **Kiểm Thử Đơn Vị & Tích Hợp Giao Diện Mobile (`jest`):**
+   - [`aiProgressSummaryApi.test.ts`](../../apps/mobile/src/__tests__/aiProgressSummaryApi.test.ts) (**11/11 tests PASS**):
+     - `generate`: Gửi request đúng body, endpoint và timezone mặc định.
+     - `getSummary`: Đọc lại theo `runId`.
+     - `getAiProgressSummaryErrorMessage`: Bao phủ đầy đủ 400, 403, 404, 422, 504, 0 (mất mạng), và timeout AbortError.
+     - Kiểm tra nhãn trạng thái và biểu tượng xu hướng (`CONTINUITY_STATE_LABELS`, `TREND_DIRECTION_LABELS`).
+   - [`ProgressSummaryScreen.test.tsx`](../../apps/mobile/src/__tests__/ProgressSummaryScreen.test.tsx) (**9/9 tests PASS**):
+     - Khởi tạo giao diện với presets, ô nhập ngày và nút tạo tóm tắt.
+     - Validation: Chặn submit khi `fromDate > toDate`.
+     - Render thành công đầy đủ các phần: tóm tắt, buổi tập, số đo thể chất, tính liền mạch.
+     - Hiển thị banner cảnh báo an toàn khi có cờ gián đoạn dài ngày.
+     - Hiển thị hộp thông báo khi nguồn buổi tập hoặc số đo bị hạn chế quyền.
+     - Hiển thị thanh cảnh báo dữ liệu cũ (`isStale`) và kích hoạt làm mới tóm tắt.
+     - Kiểm chứng cô lập học viên: Chuyển đổi `studentId` lập tức xóa sạch dữ liệu của học viên cũ, chống rò rỉ chéo.
+     - Đọc lại dữ liệu qua `initialRunId`.
+     - Xử lý lỗi API và hiển thị hộp thông báo lỗi có nút thử lại.
+   - [`routeGuard.test.ts`](../../apps/mobile/src/__tests__/routeGuard.test.ts) (**12/12 tests PASS**): Bổ sung kiểm tra quyền truy cập `canAccessProgressSummary`.
+   - [`progressSummaryNavigation.test.tsx`](../../apps/mobile/src/__tests__/progressSummaryNavigation.test.tsx) (**1/1 test PASS**): Kiểm chứng nút bấm điều hướng từ màn hình Student Home.
+   - **Toàn bộ 87 test suites liên quan đến AI trong `apps/mobile` đạt 690/690 tests PASS (0 failures, 0 errors).**
+
+### 12.3. Ranh Giới Nghiệm Thu & Các Giới Hạn Đang Mở
+
+- **Môi Trường Android GUI:** Trình giả lập `Pixel_8` không duy trì kết nối đồ họa headless ổn định trong môi trường background task Windows, do đó kiểm chứng runtime giao diện trên branch này được bảo đảm bằng 100% component rendering tests với `react-test-renderer` kết hợp mock/simulated provider.
+- **Mô Hình Live LLM:** Hệ thống sử dụng provider tất định (`simulated_f04_provider.py`) để kiểm chứng toàn bộ luồng contract, HTTP, giao diện và thẩm định dữ liệu. Việc tích hợp live LLM (Google Gemini / OpenAI) và đánh giá chất lượng văn phong ngôn ngữ tự nhiên vẫn là hạng mục mở cho P2-M6.
+- **Quy Tắc Chuyên Môn Thể Hình (D06 / OD-3):** Chưa áp dụng các ngưỡng can thiệp tải hay phân loại tiến độ phức tạp của Hội đồng Thể hình; giữ đúng nguyên tắc `INFORMATION` trung lập.
+- **Ranh Giới Nghiệm Thu:** Việc hoàn thành Mobile Progress UI khép lại tầng giao diện người dùng cho F04 trên nhánh `feat/p2-m4-f04-mobile-progress`. Đây chưa phải là tuyên bố nghiệm thu toàn bộ Phase 2 hay P2-M4.

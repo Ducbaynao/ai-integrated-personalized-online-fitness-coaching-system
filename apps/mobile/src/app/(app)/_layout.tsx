@@ -86,6 +86,9 @@ export default function AppLayout() {
       <Stack.Screen name="attention/index" />
       <Stack.Screen name="coaching/[relationshipId]/attention" />
       <Stack.Screen name="ai-knowledge/index" />
+      <Stack.Screen name="progress-summary/index" />
+      <Stack.Screen name="progress-summary/[runId]" />
+      <Stack.Screen name="coaching/[relationshipId]/progress-summary" />
     </Stack>
   );
 }
