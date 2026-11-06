@@ -11,6 +11,7 @@ import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.coaching.domain.SharingDecision;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
@@ -65,24 +66,24 @@ public class JdbcCoachingSharingStore implements CoachingSharingStore {
     @Override
     public void lockStudent(UUID studentId) {
         jdbc.query("SELECT user_id FROM fitness.student_profiles WHERE user_id = ? FOR NO KEY UPDATE",
-                rs -> { while (rs.next()) { /* lock held until transaction completion */ } }, studentId);
+                (RowCallbackHandler) rs -> { /* lock held until transaction completion */ }, studentId);
     }
 
     @Override
     public void lockAuthorityBoundary(UUID studentId, UUID trainerId) {
         jdbc.query("SELECT user_id FROM fitness.student_profiles WHERE user_id = ? FOR SHARE",
-                rs -> { while (rs.next()) { /* lock held until consumer transaction completion */ } }, studentId);
+                (RowCallbackHandler) rs -> { /* lock held until consumer transaction completion */ }, studentId);
         jdbc.query("SELECT id FROM fitness.users WHERE id = ? FOR SHARE",
-                rs -> { while (rs.next()) { /* fixed lock order */ } }, trainerId);
+                (RowCallbackHandler) rs -> { /* fixed lock order */ }, trainerId);
         jdbc.query("""
                 SELECT ur.user_id
                 FROM fitness.user_roles ur
                 JOIN fitness.roles r ON r.id = ur.role_id
                 WHERE ur.user_id = ? AND r.code = 'TRAINER'
                 FOR SHARE OF ur
-                """, rs -> { while (rs.next()) { /* fixed lock order */ } }, trainerId);
+                """, (RowCallbackHandler) rs -> { /* fixed lock order */ }, trainerId);
         jdbc.query("SELECT user_id FROM fitness.trainer_profiles WHERE user_id = ? FOR SHARE",
-                rs -> { while (rs.next()) { /* fixed lock order */ } }, trainerId);
+                (RowCallbackHandler) rs -> { /* fixed lock order */ }, trainerId);
     }
 
     @Override

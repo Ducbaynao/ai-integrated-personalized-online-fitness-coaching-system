@@ -549,7 +549,74 @@ Toàn bộ các bài kiểm thử đã được chạy và xác minh thực tế
 
 ### 10.4. Giới Hạn Còn Lại & Lộ Trình Triển Khai Tiếp Theo (Không Tự Tuyên Bố Hoàn Tất Toàn Bộ F04 / Phase 2)
 
-Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn lớp nghiệp vụ tổng hợp dữ liệu chuẩn bị context cho F04. Tuy nhiên, theo phạm vi Phase 2 và kế hoạch P2-M4:
-1. **FastAPI AI Progress Summarization Service (Task tiếp theo):** Xây dựng AI context builder (gọi Spring Boot `ProgressEngineQuery`), prompt template, RAG reference và schema JSON output cho tóm tắt tiến độ tuần/tháng.
+Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn lớp nghiệp vụ tổng hợp dữ liệu chuẩn bị context cho F04. Kế hoạch tiếp theo gồm:
+1. **F04 Context Builder & FastAPI Summarization (Đã hoàn thành tại Mục 11):** Xây dựng Context Builder tại Spring Boot, schema hợp đồng JSON/OpenAPI, FastAPI summarization, validation độc lập và readback kiểm quyền thời gian thực.
 2. **Mobile Client Progress UI:** Giao diện trực quan hóa tiến độ cho Học viên và Workspace Review của Huấn luyện viên trên React Native Expo.
 3. **Thẩm Định Chuyên Môn Thể Hình (D06 / OD-3):** Phê duyệt bộ quy tắc phân loại tiến độ minor vs significant và quy định can thiệp khi học viên trở lại sau gián đoạn dài hạn từ Hội đồng Thể hình.
+
+---
+
+## 11. Triển Khai F04 Context Builder Tại Spring Boot & Luồng INFORMATION Tích Hợp FastAPI
+
+### 11.1. Mục Tiêu & Phạm Vi Đạt Được
+Đã hoàn thành toàn diện luồng backend từ `ProgressEngineQuery` → F04 Context Builder tại Spring → context tối thiểu đã kiểm quyền → FastAPI summarization → validation và revalidation → lưu trữ và readback bản tóm tắt `INFORMATION` theo kiến trúc module hiện có.
+
+1. **Hợp Đồng Dữ Liệu (Contracts & Schemas):**
+   - [`contracts/ai-schemas/f04-progress-summary-request.schema.json`](../../contracts/ai-schemas/f04-progress-summary-request.schema.json): Định nghĩa JSON Schema Draft 2020-12 cho context gửi sang AI service. Không bao gồm thông tin định danh cá nhân, không gửi domain entity thô, che giấu hoàn toàn dữ liệu/watermark của nguồn bị hạn chế quyền.
+   - [`contracts/ai-schemas/f04-progress-summary-result.schema.json`](../../contracts/ai-schemas/f04-progress-summary-result.schema.json): Định nghĩa kết quả tóm tắt `INFORMATION`. Ràng buộc `resultType` chỉ chấp nhận `INFORMATION`, `INSUFFICIENT_DATA`, hoặc `BLOCKED`. Nghiêm cấm sinh proposal điều chỉnh buổi tập (`actionableProposals` bị cấm).
+   - Bộ 8 fixtures kiểm thử trong [`contracts/ai-schemas/fixtures/f04/`](../../contracts/ai-schemas/fixtures/f04/) bao phủ đầy đủ trường hợp hợp lệ, thiếu dữ liệu, hạn chế quyền, gián đoạn dài ngày (`RETURN_AFTER_100_DAYS_V1`), và các trường hợp vi phạm hợp đồng (trộn proposal, thiếu context).
+   - Tích hợp và cập nhật [`contracts/openapi/openapi.yaml`](../../contracts/openapi/openapi.yaml) với tag `AI Progress Summarization (F04)` gồm các endpoint:
+     - `POST /api/v1/ai/progress/summary`: Yêu cầu tóm tắt tiến độ.
+     - `GET /api/v1/ai/progress/summary/{runId}`: Đọc lại bản tóm tắt đã lưu với kiểm quyền thời gian thực và đánh giá độ tươi (`freshness`) theo watermark.
+
+2. **Dịch Vụ FastAPI AI Service:**
+   - [`services/ai-service/app/schemas/f04_schemas.py`](../../services/ai-service/app/schemas/f04_schemas.py): Pydantic v2 schemas với cấu hình nghiêm ngặt `extra="forbid"`.
+   - [`services/ai-service/app/integrations/simulated_f04_provider.py`](../../services/ai-service/app/integrations/simulated_f04_provider.py): Bộ sinh tóm tắt tất định tuân thủ quy tắc nghiệp vụ:
+     - Tóm tắt dựa trên facts được cung cấp, không bịa đặt số liệu.
+     - Phát hiện cờ `RETURN_AFTER_100_DAYS_V1` và kích hoạt cảnh báo an toàn bắt buộc khi trở lại tập luyện.
+     - Diễn đạt chính xác giới hạn khi nguồn dữ liệu bị hạn chế quyền (`RESTRICTED`) hoặc chưa đủ dữ liệu (`INSUFFICIENT_DATA`).
+     - Tôn trọng giới hạn diễn giải thành phần cơ thể khi chỉ có cân nặng tổng thể.
+   - [`services/ai-service/app/api/routes/internal_progress_summary.py`](../../services/ai-service/app/api/routes/internal_progress_summary.py): Endpoint nội bộ `POST /internal/v1/progress/summarize` được bảo vệ bằng header `X-Internal-Service-Key`.
+
+3. **Spring Boot Backend (Module AI):**
+   - [`F04ContextBuilder`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/F04ContextBuilder.java): Gọi `ProgressEngineQuery.query(...)` để lấy facts đã xác thực, kiểm tra quyền tác nhân (`STUDENT` hoặc `TRAINER` có active relationship), thực hiện tối thiểu hóa context (chỉ gửi facts và số liệu cần thiết), triệt tiêu watermark và dữ liệu của nguồn bị hạn chế.
+   - [`F04RuntimeOutputValidator`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/F04RuntimeOutputValidator.java): Kiểm tra tính toàn vẹn của kết quả trả về từ AI:
+     - Khớp `runId`.
+     - Phải là `INFORMATION`, `INSUFFICIENT_DATA`, hoặc `BLOCKED`; từ chối nếu có proposal điều chỉnh.
+     - Kiểm tra rò rỉ kênh phụ (side-channel leak): nghiêm cấm nhắc tới chỉ số hoặc buổi tập của nguồn bị hạn chế quyền.
+     - Bắt buộc phải có cờ an toàn khi context ghi nhận gián đoạn >= 100 ngày.
+   - [`AiProgressSummarizationService`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/AiProgressSummarizationService.java): Quản lý vòng đời `AIRun` (`QUEUED` → `RUNNING` → `SUCCEEDED` / `FAILED` / `REJECTED_BY_VALIDATOR`), lưu vết snapshot, gọi AI provider bên ngoài giao dịch cơ sở dữ liệu, ghi log audit đầy đủ.
+   - **Xử Lý Freshness & Đọc Lại (Readback):**
+     - Tại thời điểm đọc lại qua `getSummary(runId, actorId, role)`: Re-validate quyền của tác nhân tại thời điểm hiện tại. Nếu học viên/HLV bị vô hiệu hóa hoặc kết thúc quan hệ huấn luyện, trả về `403 Forbidden`.
+     - Lấy watermark nguồn hiện tại thông qua `ProgressEngineQuery`. Nếu watermark hiện tại khác watermark ghi nhận lúc tóm tắt, trả về cờ `isStale = true` và `needsRefresh = true` để thân thiện với client nhưng không tự động ghi đè dữ liệu.
+   - [`AiProgressSummaryController`](../../services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/adapter/in/web/AiProgressSummaryController.java): REST API có chứng thực Bearer JWT cho `POST` và `GET`.
+
+### 11.2. Kết Quả Kiểm Thử Đạt Được (100% Passed)
+
+1. **Kiểm Tra Hợp Đồng & Fixtures (`tools/validate-ai-schemas.mjs` & Ajv 2020):**
+   - 9 JSON schemas và 40 fixtures (trong đó có 8 fixtures F04 mới) đạt 100% hợp lệ.
+   - OpenAPI linting đạt chuẩn OpenAPI 3.1.0 qua Redocly CLI (`npm run test:contracts` đạt 21/21 passed).
+
+2. **Kiểm Thử FastAPI AI Service (`pytest`):**
+   - 76/76 bài kiểm thử đạt (`test_f04_schemas.py`, `test_f04_provider.py`, `test_internal_progress_summary.py` cùng toàn bộ suite hiện hữu).
+
+3. **Kiểm Thử Đơn Vị Spring Boot Module AI & Progress Engine (`mvn test`):**
+   - `F04ContextBuilderUnitTest`: 6/6 tests PASS.
+   - `F04RuntimeOutputValidatorUnitTest`: 7/7 tests PASS.
+   - `AiProgressSummarizationServiceUnitTest`: 11/11 tests PASS (kiểm tra phân quyền, leak detection, timeout, freshness check, post-provider account deactivation, post-provider coaching revocation, readback single-source masking).
+   - `AiProgressSummaryControllerUnitTest`: 4/4 tests PASS (kiểm tra MockMvc HTTP endpoint).
+   - `ProgressEngineUnitTest`: 15/15 tests PASS.
+   - `SourceWatermarkUnitTest`: 6/6 tests PASS.
+   - Tổng cộng unit test suites đạt: **49/49 tests PASS (0 failures, 0 errors)**.
+
+4. **Kiểm Thử Tích Hợp PostgreSQL Thật & FastAPI Process Thật ([`AiProgressSummaryRealFastApiIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/AiProgressSummaryRealFastApiIntegrationTest.java)):**
+   - Khởi chạy Testcontainers PostgreSQL 18 (`pgvector/pgvector:pg18`) và tiến trình background Uvicorn FastAPI thực tế (`app.main:app` trên cổng động ngẫu nhiên).
+   - `endToEndProgressSummaryFlow_withRealFastApiAndPostgres`: PASS — Xác minh trọn vẹn luồng HTTP `POST /api/v1/ai/progress/summary` → Spring Context Builder → FastAPI internal HTTP endpoint → deterministic summarization → Spring runtime validator → PostgreSQL persist AI Run → `GET /api/v1/ai/progress/summary/{runId}` readback. Xác nhận 0 domain mutation trên `workout_session_logs` và `measurements`.
+   - `fastApiAuthentication_failsWithInvalidKey`: PASS — FastAPI trả về 403 Forbidden khi thiếu hoặc sai `X-Internal-Service-Key`.
+   - `strangerActor_cannotTriggerSummaryForStudent`: PASS — Chặn tác nhân không có quan hệ huấn luyện (403 Forbidden), bảo vệ an toàn dữ liệu học viên.
+
+### 11.3. Các Tinh Chỉnh & Củng Cố Bất Biến Nghiệp Vụ Trong Quá Trình Kiểm Chứng
+1. **Ràng Buộc Cơ Sở Dữ Liệu `ai_runs_purpose_check`:** Cột `purpose` trong bảng `ai_runs` tuân thủ check constraint `CHECK (purpose IN ('BUSINESS_ASSISTANCE','EVALUATION','REPLAY','REGRESSION_TEST'))`. Đã chuẩn hóa giá trị purpose về `BUSINESS_ASSISTANCE` đồng nhất với `AiRunF01Service` và `AiWorkoutProposalService`.
+2. **Post-Provider Authority Revalidation:** Sau khi nhận kết quả từ FastAPI và trước khi ghi nhận `SUCCEEDED` hoặc trả cho client, hệ thống tái thẩm định trạng thái tài khoản (`AccountStatus.ACTIVE`) và quan hệ huấn luyện (`CoachingRelationshipStatus.ACTIVE`). Nếu bị vô hiệu hóa trong khi provider đang xử lý, hệ thống hủy xuất bản, đánh dấu run `FAILED` với lý do `ACCESS_REVOKED` / `COACHING_REVOKED` và trả 403.
+3. **Bảo Vệ Đọc Lại Khi Quyền Bị Thu Hồi Từng Phần (Readback Single-Source Masking):** Khi đọc lại bản tóm tắt đã lưu qua `GET`, nếu một trong hai nguồn dữ liệu (Workout hoặc Measurement) bị thu hồi quyền truy cập, hệ thống tự động che giấu (`null`) phần tóm tắt của nguồn đó, loại bỏ các facts tham chiếu tương ứng khỏi `factsReferenced` và bổ sung cảnh báo giới hạn vào `limitations`, ngăn ngừa rò rỉ thông tin lịch sử khi quyền hạn bị thu hẹp.
+4. **Phân Biệt Cảnh Báo An Toàn Khách Quan vs Đề Xuất Điều Chỉnh Tải:** Cờ `RETURN_AFTER_100_DAYS_V1` do backend tính toán từ facts gián đoạn lịch sử được thể hiện rõ ràng trong phần `safetyFlags` và tóm tắt tiến độ, nhưng giữ đúng ranh giới `INFORMATION`: không tự ý điều chỉnh bài tập hay kế hoạch dinh dưỡng khi chưa có đề xuất và thẩm định chuyên môn.

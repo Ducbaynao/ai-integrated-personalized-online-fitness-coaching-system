@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f04-progress-summary-request.schema.json",
+  "title": "F04 Progress Summary Context Envelope",
+  "description": "Minimal verified context envelope sent from Spring Boot to FastAPI AI Service for F04 progress summarization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requestId",
+    "correlationId",
+    "studentId",
+    "actorId",
+    "actorRole",
+    "context"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the AI Run record."
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation identifier for tracing."
+    },
+    "studentId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Target student profile user ID."
+    },
+    "actorId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Requesting actor user ID (student self or authorized trainer)."
+    },
+    "actorRole": {
+      "type": "string",
+      "enum": [
+        "STUDENT",
+        "TRAINER"
+      ],
+      "description": "Role of the requesting actor in relation to this student."
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dateWindow",
+        "effectiveAsOf",
+        "workout",
+        "measurement",
+        "continuity",
+        "historicalLimits",
+        "compositeWatermark"
+      ],
+      "properties": {
+        "dateWindow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fromDate",
+            "toDate",
+            "timezone"
+          ],
+          "properties": {
+            "fromDate": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "toDate": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "effectiveAsOf": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "workout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "availability"
+          ],
+          "properties": {
+            "availability": {
+              "type": "string",
+              "enum": [
+                "AVAILABLE",
+                "RESTRICTED",
+                "NO_DATA"
+              ]
+            },
+            "restrictionReason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "adherenceSummary": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "scheduledDueCount": { "type": "integer", "minimum": 0 },
+                "completedDueCount": { "type": "integer", "minimum": 0 },
+                "completedOnTimeCount": { "type": "integer", "minimum": 0 },
+                "completedOffScheduleCount": { "type": "integer", "minimum": 0 },
+                "missedCount": { "type": "integer", "minimum": 0 },
+                "todayPendingCount": { "type": "integer", "minimum": 0 },
+                "inProgressCount": { "type": "integer", "minimum": 0 },
+                "partiallyCompletedCount": { "type": "integer", "minimum": 0 },
+                "abortedCount": { "type": "integer", "minimum": 0 },
+                "rescheduledCount": { "type": "integer", "minimum": 0 },
+                "cancelledCount": { "type": "integer", "minimum": 0 },
+                "upcomingCount": { "type": "integer", "minimum": 0 },
+                "unplannedCompletedCount": { "type": "integer", "minimum": 0 },
+                "unverifiableDueCount": { "type": "integer", "minimum": 0 },
+                "rawCompletionRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                "onTimeAdherenceRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                "availabilityReason": { "type": ["string", "null"] }
+              }
+            },
+            "volumeSummary": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "knownVolumeKg": { "type": ["number", "null"], "minimum": 0 },
+                "totalSetsCompleted": { "type": "integer", "minimum": 0 },
+                "workingSetsCompleted": { "type": "integer", "minimum": 0 },
+                "warmupSetsCompleted": { "type": "integer", "minimum": 0 },
+                "bodyweightSetsCompleted": { "type": "integer", "minimum": 0 },
+                "setsWithMissingLoadCount": { "type": "integer", "minimum": 0 },
+                "setsWithZeroLoadCount": { "type": "integer", "minimum": 0 },
+                "setsWithMissingRepsCount": { "type": "integer", "minimum": 0 },
+                "setsWithUnknownUnitCount": { "type": "integer", "minimum": 0 },
+                "setsWithCalculableVolumeCount": { "type": "integer", "minimum": 0 },
+                "loadCoverageRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                "hasIncompleteVolumeCoverage": { "type": "boolean" },
+                "totalRepsCompleted": { "type": "integer", "minimum": 0 },
+                "totalSetDurationSeconds": { "type": ["integer", "null"], "minimum": 0 },
+                "totalSessionElapsedSeconds": { "type": ["integer", "null"], "minimum": 0 },
+                "averageSessionRpe": { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+                "averageSetRpe": { "type": ["number", "null"], "minimum": 0, "maximum": 10 }
+              }
+            },
+            "sourceWatermark": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "measurement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "availability"
+          ],
+          "properties": {
+            "availability": {
+              "type": "string",
+              "enum": [
+                "AVAILABLE",
+                "RESTRICTED",
+                "NO_DATA"
+              ]
+            },
+            "restrictionReason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "totalObservationsCount": { "type": "integer", "minimum": 0 },
+                "distinctDaysCount": { "type": "integer", "minimum": 0 },
+                "trackedMetricsCount": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "metricDeltas": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "metricCode",
+                  "trendDirection",
+                  "numericObservationsCount"
+                ],
+                "properties": {
+                  "metricCode": { "type": "string", "minLength": 1 },
+                  "metricDisplayName": { "type": ["string", "null"] },
+                  "unitCode": { "type": ["string", "null"] },
+                  "baselineValue": { "type": ["number", "null"] },
+                  "baselineMeasuredAt": { "type": ["string", "null"], "format": "date-time" },
+                  "latestValue": { "type": ["number", "null"] },
+                  "latestMeasuredAt": { "type": ["string", "null"], "format": "date-time" },
+                  "deltaValue": { "type": ["number", "null"] },
+                  "percentageChange": { "type": ["number", "null"] },
+                  "trendDirection": {
+                    "type": "string",
+                    "enum": [
+                      "INCREASED",
+                      "DECREASED",
+                      "STABLE",
+                      "INSUFFICIENT_DATA"
+                    ]
+                  },
+                  "numericObservationsCount": { "type": "integer", "minimum": 0 }
+                }
+              }
+            },
+            "sourceWatermark": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "continuity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "CONFIRMED_NEW",
+                "PROLONGED_INACTIVITY",
+                "RECENT_ACTIVITY_OBSERVED",
+                "UNKNOWN_HISTORY",
+                "RESTRICTED_HISTORY"
+              ]
+            },
+            "daysSinceLastWorkout": { "type": ["integer", "null"], "minimum": 0 },
+            "lastWorkoutDate": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            "safetyFlags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true
+            },
+            "rationale": { "type": ["string", "null"] }
+          }
+        },
+        "historicalLimits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hasHistoricalLimits",
+            "workoutLimits",
+            "measurementLimits"
+          ],
+          "properties": {
+            "hasHistoricalLimits": { "type": "boolean" },
+            "workoutLimits": { "type": "boolean" },
+            "measurementLimits": { "type": "boolean" },
+            "explanation": { "type": ["string", "null"] }
+          }
+        },
+        "compositeWatermark": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

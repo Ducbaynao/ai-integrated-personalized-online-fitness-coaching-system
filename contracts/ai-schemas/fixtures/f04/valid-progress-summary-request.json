@@ -1,0 +1,97 @@
+{
+  "requestId": "11111111-1111-4111-8111-111111111111",
+  "correlationId": "22222222-2222-4222-8222-222222222222",
+  "studentId": "33333333-3333-4333-8333-333333333333",
+  "actorId": "33333333-3333-4333-8333-333333333333",
+  "actorRole": "STUDENT",
+  "context": {
+    "dateWindow": {
+      "fromDate": "2026-10-01",
+      "toDate": "2026-10-28",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    "effectiveAsOf": "2026-10-28T12:00:00Z",
+    "workout": {
+      "availability": "AVAILABLE",
+      "restrictionReason": null,
+      "adherenceSummary": {
+        "scheduledDueCount": 12,
+        "completedDueCount": 11,
+        "completedOnTimeCount": 10,
+        "completedOffScheduleCount": 1,
+        "missedCount": 1,
+        "todayPendingCount": 0,
+        "inProgressCount": 0,
+        "partiallyCompletedCount": 0,
+        "abortedCount": 0,
+        "rescheduledCount": 0,
+        "cancelledCount": 0,
+        "upcomingCount": 2,
+        "unplannedCompletedCount": 0,
+        "unverifiableDueCount": 0,
+        "rawCompletionRate": 0.9167,
+        "onTimeAdherenceRate": 0.8333,
+        "availabilityReason": null
+      },
+      "volumeSummary": {
+        "knownVolumeKg": 14500.50,
+        "totalSetsCompleted": 48,
+        "workingSetsCompleted": 40,
+        "warmupSetsCompleted": 8,
+        "bodyweightSetsCompleted": 0,
+        "setsWithMissingLoadCount": 0,
+        "setsWithZeroLoadCount": 0,
+        "setsWithMissingRepsCount": 0,
+        "setsWithUnknownUnitCount": 0,
+        "setsWithCalculableVolumeCount": 40,
+        "loadCoverageRate": 1.0,
+        "hasIncompleteVolumeCoverage": false,
+        "totalRepsCompleted": 400,
+        "totalSetDurationSeconds": 2400,
+        "totalSessionElapsedSeconds": 14400,
+        "averageSessionRpe": 7.5,
+        "averageSetRpe": 7.8
+      },
+      "sourceWatermark": "workout-watermark-12345"
+    },
+    "measurement": {
+      "availability": "AVAILABLE",
+      "restrictionReason": null,
+      "summary": {
+        "totalObservationsCount": 4,
+        "distinctDaysCount": 4,
+        "trackedMetricsCount": 1
+      },
+      "metricDeltas": [
+        {
+          "metricCode": "F_WEIGHT",
+          "metricDisplayName": "Body Weight",
+          "unitCode": "KG",
+          "baselineValue": 72.5,
+          "baselineMeasuredAt": "2026-10-02T07:00:00Z",
+          "latestValue": 71.8,
+          "latestMeasuredAt": "2026-10-27T07:00:00Z",
+          "deltaValue": -0.7,
+          "percentageChange": -0.9655,
+          "trendDirection": "DECREASED",
+          "numericObservationsCount": 4
+        }
+      ],
+      "sourceWatermark": "measurement-watermark-67890"
+    },
+    "continuity": {
+      "state": "RECENT_ACTIVITY_OBSERVED",
+      "daysSinceLastWorkout": 2,
+      "lastWorkoutDate": "2026-10-26",
+      "safetyFlags": [],
+      "rationale": "Observed 11 completed sessions within the period, most recent 2 days ago."
+    },
+    "historicalLimits": {
+      "hasHistoricalLimits": false,
+      "workoutLimits": false,
+      "measurementLimits": false,
+      "explanation": null
+    },
+    "compositeWatermark": "ENGINE:progress-engine-v1.0|COMPOSITE:abcdef123456"
+  }
+}

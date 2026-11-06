@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F01AiServiceClient;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F02AiServiceClient;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F03AiServiceClient;
+import com.fitnesscoaching.platform.modules.ai.application.port.out.F04AiServiceClient;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -52,5 +53,17 @@ public class AiServiceClientConfiguration {
     public F03AiServiceClient simulatedF03AiServiceClient(ObjectMapper objectMapper,
                                                           org.springframework.beans.factory.ObjectProvider<ExerciseReferenceQuery> exerciseReferenceQueryProvider) {
         return new SimulatedF03AiServiceClient(objectMapper, exerciseReferenceQueryProvider.getIfAvailable());
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "ai.service.mode", havingValue = "http")
+    public F04AiServiceClient httpF04AiServiceClient(AiServiceProperties properties) {
+        return new HttpF04AiServiceClient(properties);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "ai.service.mode", havingValue = "simulated", matchIfMissing = true)
+    public F04AiServiceClient simulatedF04AiServiceClient() {
+        return new SimulatedF04AiServiceClient();
     }
 }

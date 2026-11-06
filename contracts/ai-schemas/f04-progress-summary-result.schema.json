@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f04-progress-summary-result.schema.json",
+  "title": "F04 Progress Summarization Information Result",
+  "description": "Structured INFORMATION result for progress summarization and signal explanation. Grounded strictly in provided facts. Does not mutate domain records or propose plan changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId",
+    "runStatus",
+    "resultType",
+    "reasonCode",
+    "asOf"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the AI Run record in the database."
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation identifier for tracing."
+    },
+    "runStatus": {
+      "type": "string",
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "REJECTED_BY_VALIDATOR"
+      ],
+      "description": "Database-level lifecycle status of the AI Run."
+    },
+    "resultType": {
+      "type": "string",
+      "enum": [
+        "INFORMATION",
+        "INSUFFICIENT_DATA",
+        "BLOCKED"
+      ],
+      "description": "Contract-level result classification. Distinct from PROPOSAL and ESTIMATE."
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "MISSING_REQUIRED_CONTEXT",
+        "RESTRICTED_SOURCE",
+        "INSUFFICIENT_DATA",
+        "RULE_BLOCKED",
+        "VALIDATION_FAILED",
+        "MODEL_ERROR",
+        "PROVIDER_ERROR",
+        "TIMEOUT",
+        "PROCESSING_ERROR"
+      ],
+      "description": "Machine-readable reason or error code distinguishing domain outcome from system state."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000,
+      "description": "Synthesized explanatory progress summary grounded strictly in provided facts."
+    },
+    "workoutProgressSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "completionEvaluation": { "type": ["string", "null"] },
+        "adherenceEvaluation": { "type": ["string", "null"] },
+        "volumeEvaluation": { "type": ["string", "null"] }
+      }
+    },
+    "measurementProgressSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metricsEvaluations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metricCode",
+              "message"
+            ],
+            "properties": {
+              "metricCode": { "type": "string" },
+              "trendDirection": {
+                "type": "string",
+                "enum": [
+                  "INCREASED",
+                  "DECREASED",
+                  "STABLE",
+                  "INSUFFICIENT_DATA"
+                ]
+              },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "continuityEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "message"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "CONFIRMED_NEW",
+            "PROLONGED_INACTIVITY",
+            "RECENT_ACTIVITY_OBSERVED",
+            "UNKNOWN_HISTORY",
+            "RESTRICTED_HISTORY"
+          ]
+        },
+        "message": { "type": "string" },
+        "hasSafetyAlert": { "type": "boolean" }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "description": "Explicit boundaries, restrictions, or missingness limits of the progress summary."
+    },
+    "missingData": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "description": "Clarifications or unobserved sources."
+    },
+    "factsReferenced": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "description": "References to specific facts in the context that grounded the summary."
+    },
+    "asOf": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the summary was computed."
+    },
+    "sourceWatermark": {
+      "type": "string",
+      "description": "Composite source watermark reflecting snapshot state."
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promptTokens": { "type": "integer", "minimum": 0 },
+        "completionTokens": { "type": "integer", "minimum": 0 },
+        "totalTokens": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "runId": "44444444-4444-4444-8444-444444444444",
+  "correlationId": "55555555-5555-4555-8555-555555555555",
+  "runStatus": "SUCCEEDED",
+  "resultType": "INFORMATION",
+  "reasonCode": "NONE",
+  "summary": "Trong chu kỳ báo cáo, học viên hoàn thành 8/8 buổi tập theo kế hoạch. Dữ liệu đo lường thể chất của học viên bị giới hạn quyền truy cập đối với vai trò hiện tại.",
+  "workoutProgressSummary": {
+    "completionEvaluation": "Học viên hoàn thành 8 trên 8 buổi tập đã đến hạn (100%).",
+    "adherenceEvaluation": "8 buổi đúng lịch, không có buổi bỏ lỡ.",
+    "volumeEvaluation": "Tổng khối lượng tập đạt 9,200.0 kg."
+  },
+  "continuityEvaluation": {
+    "state": "RECENT_ACTIVITY_OBSERVED",
+    "message": "Buổi tập gần nhất diễn ra cách đây 1 ngày.",
+    "hasSafetyAlert": false
+  },
+  "limitations": [
+    "Dữ liệu đo lường thể chất (Body Metrics) bị hạn chế theo quyền chia sẻ dữ liệu của học viên."
+  ],
+  "missingData": [
+    "measurement"
+  ],
+  "factsReferenced": [
+    "workout.adherence.rawCompletionRate:1.0",
+    "continuity.state:RECENT_ACTIVITY_OBSERVED"
+  ],
+  "asOf": "2026-10-28T12:00:00Z",
+  "sourceWatermark": "ENGINE:progress-engine-v1.0|COMPOSITE:restricted-demo"
+}

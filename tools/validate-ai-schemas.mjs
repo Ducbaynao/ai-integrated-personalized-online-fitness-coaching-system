@@ -203,6 +203,47 @@ if (fs.existsSync(f03FixturesDir)) {
   }
 }
 
+// 5. F04 fixtures verification
+const f04FixturesDir = path.join(schemasDir, 'fixtures', 'f04');
+if (fs.existsSync(f04FixturesDir)) {
+  const f04RequestValidator = compiledSchemas.get('f04-progress-summary-request.schema.json');
+  const f04ResultValidator = compiledSchemas.get('f04-progress-summary-result.schema.json');
+  const f04TestCases = [
+    { file: 'valid-progress-summary-request.json', validator: f04RequestValidator, expectValid: true, desc: 'Valid F04 progress summary context envelope' },
+    { file: 'valid-progress-summary-result.json', validator: f04ResultValidator, expectValid: true, desc: 'Valid F04 progress summary INFORMATION result' },
+    { file: 'valid-progress-summary-restricted-result.json', validator: f04ResultValidator, expectValid: true, desc: 'Valid F04 result with restricted source' },
+    { file: 'valid-progress-summary-prolonged-inactivity-result.json', validator: f04ResultValidator, expectValid: true, desc: 'Valid F04 result with prolonged inactivity' },
+    { file: 'valid-progress-summary-insufficient-data-result.json', validator: f04ResultValidator, expectValid: true, desc: 'Valid F04 INSUFFICIENT_DATA result' },
+    { file: 'invalid-request-missing-context.json', validator: f04RequestValidator, expectValid: false, desc: 'Invalid F04 request missing context' },
+    { file: 'invalid-result-mixed-proposal.json', validator: f04ResultValidator, expectValid: false, desc: 'Invalid F04 result mixing INFORMATION with PROPOSAL' },
+    { file: 'invalid-result-invalid-date-time.json', validator: f04ResultValidator, expectValid: false, desc: 'Invalid F04 result with invalid date-time format' },
+  ];
+
+  for (const tc of f04TestCases) {
+    const fixturePath = path.join(f04FixturesDir, tc.file);
+    if (!fs.existsSync(fixturePath)) {
+      failures.push(`F04 Fixture missing: ${tc.file}`);
+      continue;
+    }
+    try {
+      const data = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+      if (!tc.validator) {
+        failures.push(`Validator not found for fixture: ${tc.file}`);
+        continue;
+      }
+      const isValid = tc.validator(data);
+      fixtureCount++;
+      if (tc.expectValid && !isValid) {
+        failures.push(`Fixture failed unexpectedly [${tc.desc}]: ${ajv.errorsText(tc.validator.errors)}`);
+      } else if (!tc.expectValid && isValid) {
+        failures.push(`Fixture passed but was expected to fail [${tc.desc}] (${tc.file})`);
+      }
+    } catch (err) {
+      failures.push(`Fixture parse error [${tc.file}]: ${err.message}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI schema and contract validation failed:');
   for (const failure of failures) {
