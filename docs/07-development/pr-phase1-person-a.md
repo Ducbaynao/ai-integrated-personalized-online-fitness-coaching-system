@@ -159,33 +159,48 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 ## 7. Hướng dẫn Nghiệm thu Thực tế Có thể Chạy Được (Runnable Acceptance Guide)
 
-### 7.1 Lệnh khởi chạy các dịch vụ
+### 7.1 Lệnh khởi chạy các dịch vụ (Theo cấu hình thực tế của repository)
+
+Build tool của backend được xác nhận là **Maven** (`pom.xml`, Java 21, Spring Boot 4.1.1); wrapper là `./mvnw` (Linux/macOS) và `mvnw.cmd` (Windows). Repository không sử dụng Gradle.
 
 ```bash
 # 1. Khởi chạy Backend (Spring Boot)
+# Working Directory: services/backend
 cd services/backend
 ./mvnw spring-boot:run
+# Trên Windows: .\mvnw.cmd spring-boot:run
+# Hoặc từ repo root: .\services\backend\mvnw.cmd -f services/backend/pom.xml spring-boot:run
+# Hoặc script: .\services\backend\run-dev.ps1
 
 # 2. Khởi chạy Admin Web (Vite + React)
-cd apps/admin-web
-npm run dev
+# Working Directory: Repo root
+npm run dev:admin
+# Hoặc từ apps/admin-web:
+# cd apps/admin-web && npm run dev
+# Mở trình duyệt tại: http://localhost:5173
 
 # 3. Khởi chạy Mobile (Expo / React Native)
-cd apps/mobile
-npm start
+# Working Directory: Repo root
+npm run dev:mobile
+# Hoặc từ apps/mobile:
+# cd apps/mobile && npx expo start
 ```
 
 ### 7.2 Biến cấu hình cần thiết (Mẫu không nhạy cảm)
 
-- **Backend (`application-local.yml` / ENV):**
-  - `DATABASE_URL=jdbc:postgresql://localhost:5432/digital_fitness`
-  - `CHAT_ATTACHMENTS_S3_ENDPOINT=http://localhost:9000` (MinIO local)
-  - `CHAT_ATTACHMENTS_S3_BUCKET=fitness-media`
-  - `CHAT_ATTACHMENTS_S3_ACCESS_KEY=local-minio-key`
-  - `CHAT_ATTACHMENTS_S3_SECRET_KEY=local-minio-secret`
-  - `CHAT_ATTACHMENTS_CLAMD_HOST=localhost`
-  - `CHAT_ATTACHMENTS_CLAMD_PORT=3310`
-  - `AI_SERVICE_URL=http://localhost:8000`
+Khớp chính xác với cấu hình `services/backend/src/main/resources/application.yml` và `docker-compose.yml`:
+
+- **Backend (`application-dev.yml` hoặc biến môi trường):**
+  - `DATABASE_URL=jdbc:postgresql://localhost:5433/digital_fitness` (Port 5433 theo docker-compose)
+  - `DATABASE_USERNAME=fitness_app`
+  - `DATABASE_PASSWORD=change-me`
+  - `CHAT_S3_ENDPOINT=http://localhost:9000` (MinIO local)
+  - `CHAT_S3_PRIVATE_BUCKET=fitness-media`
+  - `CHAT_S3_ACCESS_KEY=local-minio-key`
+  - `CHAT_S3_SECRET_KEY=local-minio-secret`
+  - `CHAT_CLAMD_INTERNAL_HOST=localhost`
+  - `CHAT_CLAMD_INTERNAL_PORT=3310`
+  - `AI_SERVICE_BASE_URL=http://localhost:8000`
 - **Mobile (`apps/mobile/.env`):**
   - `EXPO_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1`
 - **Admin Web (`apps/admin-web/.env`):**
@@ -193,9 +208,25 @@ npm start
 
 ### 7.3 Health check & Xác nhận dịch vụ sẵn sàng
 
-- **Backend:** `curl -s http://localhost:8080/actuator/health` -> Phản hồi `{"status":"UP"}`.
-- **S3-compatible Storage (MinIO local):** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200.
-- **ClamAV daemon:** Mở socket TCP tới `localhost:3310` gửi lệnh `PING\0`, nhận phản hồi `PONG`. (Nếu clamd chưa bật, backend sẽ trả về lỗi `SCANNER_UNAVAILABLE`, tuân thủ nguyên tắc fail-closed).
+- **Backend Actuator Health:** `curl -s http://localhost:8080/actuator/health` -> Phản hồi `{"status":"UP"}`. Endpoint quản lý cấu hình tại `management.endpoints.web.exposure.include: health,info`.
+- **S3-compatible Storage (MinIO local):** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200. (Lớp lưu trữ `TrainerDocumentStorageService` có fallback cache bộ nhớ `localCache` khi MinIO chưa khởi chạy).
+- **ClamAV daemon & Cơ chế Fail-Closed:**
+  - Kiểm tra kết nối TCP tới daemon: Mở socket TCP tới `localhost:3310` gửi `PING\0`, nhận phản hồi `PONG`.
+  - Cơ chế fail-closed của backend: Khi `CHAT_CLAMD_INTERNAL_HOST` được cấu hình nhưng daemon ClamAV tắt hoặc không kết nối được, `TrainerDocumentStorageService.java#L122` ném `ApplicationValidationException` ("Antivirus scanner is currently unavailable"). `GlobalExceptionHandler.java#L794-L804` bắt exception này và trả về **HTTP 400 Bad Request** với thân JSON:
+    ```json
+    {
+      "errorCode": "VALIDATION_FAILED",
+      "message": "Antivirus scanner is currently unavailable",
+      "fieldErrors": [
+        {
+          "field": "file",
+          "code": "SCANNER_UNAVAILABLE",
+          "message": "Antivirus scanner is currently unavailable"
+        }
+      ]
+    }
+    ```
+    Tệp nhị phân không được lưu vào storage và hồ sơ không được tạo. (Lưu ý: HTTP 503 chỉ trả về trong module chat qua `ClamdAttachmentScanner`, còn upload tài liệu xác thực trả về HTTP 400 `VALIDATION_FAILED` kèm field error `SCANNER_UNAVAILABLE`).
 
 ### 7.4 Chuẩn bị tài khoản kiểm thử (Roles & Capabilities)
 
