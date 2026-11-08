@@ -29,6 +29,7 @@ public class MediaPersistenceAdapter implements MediaQueryPort {
                 WHERE id IN (:mediaIds)
                   AND owner_user_id = :ownerUserId
                   AND deleted_at IS NULL
+                  AND scan_status = 'CLEAN'
                 """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()

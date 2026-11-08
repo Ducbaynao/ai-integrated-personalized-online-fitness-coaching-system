@@ -91,7 +91,8 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
             throw new TrainerApplicationAlreadyActiveException("An active verification application already exists for this trainer.");
         }
 
-        if (profile.verificationStatus() != TrainerVerificationStatus.NOT_SUBMITTED) {
+        if (profile.verificationStatus() != TrainerVerificationStatus.NOT_SUBMITTED
+                && profile.verificationStatus() != TrainerVerificationStatus.REJECTED) {
             throw new InvalidLifecycleTransitionException(
                     "Cannot submit application when trainer profile verification status is " + profile.verificationStatus());
         }

@@ -11,6 +11,9 @@ export function AdminLayout() {
   const canManageAi =
     (auth.user?.roles.includes('ADMIN') ?? false) ||
     (auth.user?.permissions.includes('SYSTEM_CONFIG_MANAGE') ?? false)
+  const canManageTrainers =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('TRAINER_VERIFY') ?? false)
 
   return (
     <div className="app-shell">
@@ -28,6 +31,7 @@ export function AdminLayout() {
       <div className="app-body">
         <nav className="sidebar" aria-label="Điều hướng quản trị">
           <NavLink to="/" end>Trang tổng quan</NavLink>
+          {canManageTrainers ? <NavLink to="/trainer-applications">Hồ sơ HLV</NavLink> : null}
           {canManageCatalog ? <NavLink to="/exercises">Bài tập</NavLink> : null}
           {canManageCatalog ? <NavLink to="/nutrition/catalog">Danh mục thực phẩm</NavLink> : null}
           {canManageKnowledge ? <NavLink to="/knowledge">Cơ sở tri thức</NavLink> : null}

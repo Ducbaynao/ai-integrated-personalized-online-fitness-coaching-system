@@ -26,6 +26,15 @@ jest.mock('@/services/trainerProfileApi', () => ({
   },
 }));
 
+jest.mock('@/services/trainerApplicationApi', () => ({
+  trainerApplicationApi: {
+    submitApplication: jest.fn(),
+    getCurrentApplication: jest.fn(),
+  },
+}));
+
+import { trainerApplicationApi } from '@/services/trainerApplicationApi';
+
 describe('TrainerProfileScreen Component', () => {
   const mockUser = {
     id: 'user-trainer-1',
@@ -302,5 +311,130 @@ describe('TrainerProfileScreen Component', () => {
         return text.includes('Unavailable');
       }).length
     ).toBeGreaterThan(0);
+  });
+
+  it('renders submit application form when NOT_SUBMITTED and submits successfully', async () => {
+    const unsubmittedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['APPLICATION_NOT_SUBMITTED'],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(unsubmittedProfile)
+      .mockResolvedValueOnce({ ...unsubmittedProfile, verificationStatus: 'PENDING' });
+
+    (trainerApplicationApi.submitApplication as jest.Mock).mockResolvedValueOnce({
+      id: 'app-new',
+      trainerId: 'user-trainer-1',
+      status: 'PENDING',
+      submittedAt: '2026-11-08T10:00:00Z',
+      reviewedAt: null,
+      rejectionReason: null,
+      updatedAt: '2026-11-08T10:00:00Z',
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-not-submitted-card' })).toBeDefined();
+
+    const noteInput = root.findByProps({ testID: 'trainer-application-note-input' });
+    renderer.act(() => {
+      noteInput.props.onChangeText('Experienced coach with certifications');
+    });
+
+    const submitBtn = root.findByProps({ testID: 'trainer-application-submit-button' });
+    await renderer.act(async () => {
+      submitBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.submitApplication).toHaveBeenCalledWith({
+      applicantNote: 'Experienced coach with certifications',
+    });
+    expect(root.findByProps({ testID: 'trainer-application-success-banner' })).toBeDefined();
+  });
+
+  it('displays rejection reason and allows resubmitting when REJECTED', async () => {
+    const rejectedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'REJECTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['VERIFICATION_REJECTED'],
+      },
+    };
+    const mockApp = {
+      id: 'app-rej',
+      trainerId: 'user-trainer-1',
+      status: 'REJECTED',
+      submittedAt: '2026-11-07T10:00:00Z',
+      reviewedAt: '2026-11-07T14:00:00Z',
+      rejectionReason: 'Certification expired. Please submit current certification.',
+      updatedAt: '2026-11-07T14:00:00Z',
+    };
+
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(rejectedProfile)
+      .mockResolvedValueOnce({ ...rejectedProfile, verificationStatus: 'PENDING' });
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValueOnce(mockApp);
+
+    (trainerApplicationApi.submitApplication as jest.Mock).mockResolvedValueOnce({
+      ...mockApp,
+      status: 'PENDING',
+      rejectionReason: null,
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-rejected-card' })).toBeDefined();
+    const reasonNode = root.findByProps({ testID: 'trainer-application-rejection-reason' });
+    expect(
+      reasonNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('Certification expired')).length
+    ).toBeGreaterThan(0);
+
+    const noteInput = root.findByProps({ testID: 'trainer-application-resubmit-note-input' });
+    renderer.act(() => {
+      noteInput.props.onChangeText('Uploaded renewed certificate valid through 2028');
+    });
+
+    const resubmitBtn = root.findByProps({ testID: 'trainer-application-resubmit-button' });
+    await renderer.act(async () => {
+      resubmitBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.submitApplication).toHaveBeenCalledWith({
+      applicantNote: 'Uploaded renewed certificate valid through 2028',
+    });
+  });
+
+  it('displays verified banner when VERIFIED', async () => {
+    const verifiedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'VERIFIED',
+      verifiedAt: '2026-11-01T08:00:00Z',
+      coachingEligibility: {
+        eligible: true,
+        blockingReasons: [],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(verifiedProfile);
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-verified-banner' })).toBeDefined();
   });
 });

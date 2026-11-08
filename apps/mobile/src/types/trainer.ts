@@ -50,3 +50,20 @@ export interface UpdateTrainerProfileRequest {
   yearsExperience?: number | null;
   acceptingStudents?: boolean;
 }
+
+export interface TrainerApplicationResponse {
+  id: string;
+  trainerId: string;
+  status: TrainerVerificationStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  updatedAt: string | null;
+}
+
+export interface SubmitTrainerApplicationRequest {
+  certificateIds?: string[];
+  documentMediaIds?: string[];
+  applicantNote?: string;
+}
+

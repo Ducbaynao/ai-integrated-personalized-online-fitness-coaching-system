@@ -219,24 +219,30 @@ class TrainerApplicationServiceUnitTest {
     }
 
     @Test
-    @DisplayName("Submit: throws InvalidLifecycleTransitionException when profile is REJECTED")
-    void submitApplication_rejectedProfile_throwsInvalidLifecycleTransition() {
+    @DisplayName("Submit: resubmission succeeds when profile is REJECTED")
+    void submitApplication_rejectedProfile_resubmissionSucceeds() {
         when(userAccountStatusQuery.getAccountStatus(TRAINER_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
         when(trainerProfilePort.findByUserId(TRAINER_ID)).thenReturn(Optional.of(createTestProfile(TrainerVerificationStatus.REJECTED, true)));
+        when(trainerApplicationPort.hasActiveApplication(TRAINER_ID)).thenReturn(false);
+        when(trainerApplicationPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         SubmitTrainerApplicationCommand command = new SubmitTrainerApplicationCommand(
                 TRAINER_ID,
                 List.of(),
                 List.of(),
-                null
+                "Updated qualifications for resubmission"
         );
 
-        assertThatThrownBy(() -> service.submitApplication(command))
-                .isInstanceOf(InvalidLifecycleTransitionException.class)
-                .hasMessageContaining("Cannot submit application when trainer profile verification status is REJECTED");
+        TrainerApplication result = service.submitApplication(command);
 
-        verify(trainerApplicationPort, never()).save(any());
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(TrainerVerificationStatus.PENDING);
+        assertThat(result.applicantNote()).isEqualTo("Updated qualifications for resubmission");
+
+        verify(trainerApplicationPort).save(any());
+        verify(trainerProfilePort).updateVerificationStatus(eq(TRAINER_ID), eq(TrainerVerificationStatus.PENDING), any(Instant.class));
+        verify(auditService).recordAudit(any(AuditRecord.class));
     }
 
     @Test
