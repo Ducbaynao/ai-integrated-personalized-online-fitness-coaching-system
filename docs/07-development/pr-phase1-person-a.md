@@ -319,3 +319,11 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 3. **Về tính bền vững (Persistence after restart):** Chưa thực hiện kịch bản restart container storage để kiểm tra dữ liệu sau restart.
 4. **Về Concurrency:** Kiểm tra mã lỗi 409 qua tình huống stale proposal chứng minh có logic kiểm tra phiên bản mục tiêu; chưa khẳng định toàn bộ các nhánh concurrency đa luồng đều đã được kiểm chứng hết.
 
+## 9. Khắc phục CI PR #149 — 08/11/2026
+
+- Nguồn: [Backend job](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/42478659039/job/128725556275) và [Client Mobile job](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/42478659039/job/128725556262).
+- Backend: CI chạy 1.789 test, có một failure tại `continuity_confirmedNew_whenBeginnerWithZeroMonthsAndOnboarding`. Fixture dùng `now()` cho onboarding nhưng truy vấn dùng `asOfFixed=2026-11-08T00:00:00Z`, khiến onboarding nằm sau thời điểm tham chiếu. Đã tái hiện trên PostgreSQL Testcontainers; sửa hai fixture onboarding sang timestamp cố định trước `asOfFixed`, và thêm integration test xác nhận onboarding sau `asOfFixed` vẫn trả `UNKNOWN_HISTORY`. Giữ nguyên quy tắc production.
+- Mobile: test đạt nhưng lint thất bại tại `TrainerStudentGoalScreen` do cập nhật state đồng bộ khi effect gọi `loadData`. Chuyển cập nhật kết quả sang callback Promise; loading/retry/refresh được khởi động tại event handler, loading ban đầu dùng state khởi tạo. Thêm test retry từ lỗi qua loading đến dữ liệu thành công; sắp xếp lại hai import trong `TrainerProfileScreen.test.tsx`.
+- Kiểm tra local sau sửa: Mobile lint và TypeScript đạt; toàn bộ 89 suite / 721 test Mobile đạt. Regression Backend `ProgressEngineIntegrationTest` (17 test) và `ProgressEngineUnitTest` (15 test) đạt, không failure/error/skip.
+- Giới hạn: chưa chạy lại toàn bộ suite Backend sau sửa; GitHub CI cần chạy lại trên commit chứa bản sửa trước khi kết luận PR đạt CI. Bản sửa chưa được commit/push/merge trong phiên xử lý này.
+

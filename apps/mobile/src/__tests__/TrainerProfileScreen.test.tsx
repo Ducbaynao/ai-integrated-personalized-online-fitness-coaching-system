@@ -5,6 +5,8 @@ import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { TrainerProfileResponse } from '@/types/trainer';
 import { ApiError } from '@/types/auth';
 import { useAuth } from '@/features/auth/AuthContext';
+import * as DocumentPicker from 'expo-document-picker';
+import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -37,9 +39,6 @@ jest.mock('@/services/trainerApplicationApi', () => ({
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
 }));
-
-import * as DocumentPicker from 'expo-document-picker';
-import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 
 describe('TrainerProfileScreen Component', () => {
   const mockUser = {

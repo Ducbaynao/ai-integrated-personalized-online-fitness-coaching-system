@@ -350,9 +350,9 @@ class ProgressEngineIntegrationTest {
                 UPDATE fitness.student_profiles
                 SET training_experience_level = 'BEGINNER',
                     training_experience_months = 0.0,
-                    onboarding_completed_at = now()
+                    onboarding_completed_at = ?
                 WHERE user_id = ?
-                """, student);
+                """, Timestamp.from(asOfFixed.minus(1, ChronoUnit.DAYS)), student);
 
         ProgressSnapshot snapshot = query.query(student, student, fromDate, toDate, zoneVn, asOfFixed);
 
@@ -363,6 +363,24 @@ class ProgressEngineIntegrationTest {
     }
 
     @Test
+    @DisplayName("Continuity: onboarding completed after asOf cannot confirm a new beginner")
+    void continuity_unknownHistory_whenOnboardingCompletedAfterAsOf() {
+        UUID student = createStudent("student_future_onboarding");
+        jdbc.update("""
+                UPDATE fitness.student_profiles
+                SET training_experience_level = 'BEGINNER',
+                    training_experience_months = 0.0,
+                    onboarding_completed_at = ?
+                WHERE user_id = ?
+                """, Timestamp.from(asOfFixed.plus(1, ChronoUnit.DAYS)), student);
+
+        ProgressSnapshot snapshot = query.query(student, student, fromDate, toDate, zoneVn, asOfFixed);
+
+        assertThat(snapshot.continuity().state()).isEqualTo(ContinuityState.UNKNOWN_HISTORY);
+        assertThat(snapshot.continuity().daysSinceLastWorkout()).isNull();
+    }
+
+    @Test
     @DisplayName("13. Continuity: beginner with non-zero or missing months returns UNKNOWN_HISTORY")
     void continuity_unknownHistory_whenBeginnerLacksZeroMonthsEvidence() {
         UUID student = createStudent("student_unconf_new");
@@ -370,9 +388,9 @@ class ProgressEngineIntegrationTest {
                 UPDATE fitness.student_profiles
                 SET training_experience_level = 'BEGINNER',
                     training_experience_months = 6.0,
-                    onboarding_completed_at = now()
+                    onboarding_completed_at = ?
                 WHERE user_id = ?
-                """, student);
+                """, Timestamp.from(asOfFixed.minus(1, ChronoUnit.DAYS)), student);
 
         ProgressSnapshot snapshot = query.query(student, student, fromDate, toDate, zoneVn, asOfFixed);
 

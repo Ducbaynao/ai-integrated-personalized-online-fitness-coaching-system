@@ -39,12 +39,10 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
-  const loadData = useCallback(async (showLoading = true) => {
+  const loadData = useCallback(() => {
     if (!studentId) return;
-    if (showLoading) setIsLoading(true);
-    setError(null);
-    try {
-      const studentGoal = await fitnessGoalApi.getStudentCurrentGoalForTrainer(studentId);
+    return fitnessGoalApi.getStudentCurrentGoalForTrainer(studentId).then(async (studentGoal) => {
+      setError(null);
       setGoal(studentGoal);
 
       try {
@@ -55,28 +53,35 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
       } catch {
         // Non-blocking if proposals fail
       }
-    } catch (err: any) {
+    }).catch((err: any) => {
       if (err instanceof ApiError && err.status === 404) {
         setGoal(null);
         setError('Học viên chưa có mục tiêu thể chất đang hoạt động.');
       } else {
         setError(err?.message || 'Không thể tải mục tiêu thể chất của học viên.');
       }
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
       setIsRefreshing(false);
-    }
+    });
   }, [studentId]);
 
   useEffect(() => {
     if (studentId) {
-      loadData(true);
+      void loadData();
     }
   }, [studentId, loadData]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    loadData(false);
+    setError(null);
+    void loadData();
+  };
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    void loadData();
   };
 
   const handleCreateProposal = async (payload: {
@@ -101,7 +106,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
       });
       setIsModalOpen(false);
       Alert.alert('Thành công', 'Đề xuất thay đổi mục tiêu đã được gửi tới học viên.');
-      await loadData(false);
+      await loadData();
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 409) {
         Alert.alert('Xung đột', err.errorResponse?.message || 'Không thể gửi đề xuất do mục tiêu đã thay đổi trạng thái.');
@@ -159,7 +164,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
               accessibilityRole="button"
               accessibilityLabel="Thử lại"
               style={[styles.primaryButton, { backgroundColor: theme.primary, marginTop: spacing.md }]}
-              onPress={() => loadData(true)}>
+              onPress={handleRetry}>
               <Text style={styles.primaryButtonText}>Tải lại</Text>
             </Pressable>
           </View>

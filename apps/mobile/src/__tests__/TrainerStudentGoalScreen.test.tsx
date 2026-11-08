@@ -154,6 +154,32 @@ describe('TrainerStudentGoalScreen', () => {
     expect(root.findAllByProps({ testID: 'propose-goal-change-button' }).length).toBe(0);
   });
 
+  it('shows loading while retrying a failed request, then renders the recovered goal', async () => {
+    (fitnessGoalApi.getStudentCurrentGoalForTrainer as jest.Mock).mockRejectedValueOnce(
+      new Error('Network unavailable')
+    );
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerStudentGoalScreen relationshipId="rel-123" />);
+    });
+    expect(tree.root.findByProps({ testID: 'trainer-goal-error-card' })).toBeDefined();
+
+    let resolveGoal!: (goal: FitnessGoal) => void;
+    (fitnessGoalApi.getStudentCurrentGoalForTrainer as jest.Mock).mockReturnValueOnce(
+      new Promise<FitnessGoal>((resolve) => { resolveGoal = resolve; })
+    );
+    (fitnessGoalApi.getStudentGoalProposalsForTrainer as jest.Mock).mockResolvedValueOnce({ items: [] });
+    await renderer.act(async () => {
+      tree.root.findByProps({ testID: 'retry-trainer-goal-button' }).props.onPress();
+    });
+    expect(tree.root.findByProps({ testID: 'trainer-goal-loading' })).toBeDefined();
+    expect(tree.root.findAllByProps({ testID: 'trainer-goal-error-card' })).toHaveLength(0);
+
+    await renderer.act(async () => { resolveGoal(activeStudentGoal); });
+    expect(tree.root.findByProps({ testID: 'student-active-goal-card' })).toBeDefined();
+    expect(tree.root.findAllByProps({ testID: 'trainer-goal-loading' })).toHaveLength(0);
+  });
+
   it('opens proposal modal, validates mandatory coaching reason, and submits proposal', async () => {
     (fitnessGoalApi.getStudentCurrentGoalForTrainer as jest.Mock).mockResolvedValue(activeStudentGoal);
     (fitnessGoalApi.getStudentGoalProposalsForTrainer as jest.Mock).mockResolvedValue({
