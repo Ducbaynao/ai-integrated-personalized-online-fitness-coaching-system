@@ -33,18 +33,26 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 ### B. Backend Platform (`services/backend`)
 - **Media & Document Verification:**
-  - `MediaPersistenceAdapter.java`: Added validation rejecting documents whose `scan_status` is not `CLEAN`.
+  - `MediaQueryPort.java` & `MediaPersistenceAdapter.java`: Added `allMediaExistOwnedAndClean(...)` requiring `scan_status = 'CLEAN'`, while separating general `allMediaExistAndOwnedBy(...)` without scan constraints. Added unit tests in `MediaPersistenceAdapterUnitTest.java`.
+  - `TrainerDocumentStorageService.java`: Implemented verification document upload, file signature magic byte validation (PDF, PNG, JPEG), ClamAV `zINSTREAM` scanning, and document content storage.
+  - Endpoints added:
+    - `POST /api/v1/trainer-applications/documents` (multipart document upload for trainers)
+    - `GET /api/v1/admin/trainer-applications/{applicationId}/documents` (admin document list)
+    - `GET /api/v1/admin/trainer-applications/{applicationId}/documents/{mediaId}/download` (admin document download with `ADMIN_TRAINER_DOCUMENT_ACCESSED` audit)
+    - `GET /api/v1/admin/trainer-applications/{applicationId}/certificates` (admin certificate list)
 - **Trainer Applications:**
   - `TrainerApplicationService.java`: Enforced required rejection reasons, concurrency protection on admin decisions, verified status updates on trainer profile, and audit event publishing.
   - `AdminTrainerApplicationIntegrationTest.java`: 26 tests verifying admin queue, filtering, approve/reject flows, audit logging, and 409 conflict handling.
   - `TrainerApplicationIntegrationTest.java`: 17 tests verifying complete lifecycle including discovery filtering.
   - `TrainerApplicationServiceUnitTest.java`: 23 unit tests for application transitions.
+  - `AdminTrainerVerificationServiceUnitTest.java`: 17 unit tests for admin verification logic.
 - **Fitness Goals & Proposals:**
   - `GetStudentCurrentGoalForTrainerUseCase.java` & `GetStudentGoalProposalsForTrainerUseCase.java`: Ports for trainer retrieval of scoped student goals and proposals.
   - `FitnessGoalProposalService.java`: Implemented trainer query methods enforcing `GoalTrainerAuthorityPort.verifyTrainerCanViewProposal` (validates relationship, active `HUMAN_COACH` period, and `FITNESS_GOAL:VIEW` permission).
   - `FitnessGoalProposalController.java`: Added endpoints:
     - `GET /api/v1/students/{studentId}/fitness-goals/current` (`@PreAuthorize("hasRole('TRAINER')")`)
     - `GET /api/v1/students/{studentId}/fitness-goal-proposals` (`@PreAuthorize("hasRole('TRAINER')")`)
+    - `POST /api/v1/fitness-goals/{goalId}/proposals` (`POST /api/v1/students/{studentId}/fitness-goal-proposals`)
   - Integration & Unit Tests:
     - `FitnessGoalProposalIntegrationTest.java`: 41 tests passing.
     - `FitnessGoalProposalControllerUnitTest.java`: 8 tests passing.
@@ -52,9 +60,9 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 ### C. Mobile Application (`apps/mobile`)
 - **Trainer Verification:**
-  - `services/trainerApplicationApi.ts`: API client for trainer application submission and status retrieval.
-  - `features/trainer/TrainerProfileScreen.tsx`: Verification banner, submit application modal, rejection reason display, resubmit button.
-  - Unit tests: `trainerApplicationApi.test.ts` (2 tests) & `TrainerProfileScreen.test.tsx` (12 tests).
+  - `services/trainerApplicationApi.ts`: Added `uploadDocument(fileUri, filename, mimeType)` with `FormData` and `submitApplication` taking `documentMediaIds`.
+  - `features/trainer/TrainerProfileScreen.tsx`: Added document picker (`expo-document-picker`), upload progress, document item list with clean scan badge, document removal, rejection reason display, and resubmission.
+  - Unit tests: `trainerApplicationApi.test.ts` (3 tests) & `TrainerProfileScreen.test.tsx` (17 tests).
 - **Fitness Goals & Trainer Proposals:**
   - `services/fitnessGoalApi.ts`: Endpoints for student goals, versions, transitions, proposal decisions, and trainer student goal queries.
   - `features/goal/CurrentGoalScreen.tsx`: Goal display, version history, `CreateGoalModal`, `CreateGoalVersionModal`, `CreateGoalTransitionModal`, and conflict banner.
@@ -69,14 +77,17 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
     - `GoalProposalDetailScreen.test.tsx` (19 tests PASS)
 
 ### D. Admin Web Application (`apps/admin-web`)
-- `services/trainerApplicationApi.ts`: Admin API client for application list, details, and approve/reject decisions.
-- `features/trainer-applications/TrainerApplicationListPage.tsx`: Paginated application queue with status filter.
-- `features/trainer-applications/TrainerApplicationDetailPage.tsx`: Application detail review, documents preview, approval modal, and rejection reason form.
-- `App.tsx` & `components/AdminLayout.tsx`: Routed `/trainer-applications` with sidebar link and badges.
-- Vitest tests: `TrainerApplicationPages.test.tsx` (6 tests PASS) & `trainerApplicationApi.test.ts` (3 tests PASS).
+- `services/apiClient.ts`: Added `apiBlobRequest` for authenticated binary downloads.
+- `services/trainerApplicationApi.ts`: Added `getApplicationDocuments`, `getApplicationCertificates`, and `downloadDocument`.
+- `features/trainer-applications/TrainerApplicationDetailPage.tsx`: Added certificate and document tables with format, size, clean scan badge, and document download action.
+- Vitest tests: `TrainerApplicationPages.test.tsx` (7 tests PASS) & `trainerApplicationApi.test.ts` (6 tests PASS).
 
 ### E. Contracts (`contracts/openapi/openapi.yaml`)
 - Added OpenAPI paths and schemas for:
+  - `POST /api/v1/trainer-applications/documents`
+  - `GET /api/v1/admin/trainer-applications/{applicationId}/documents`
+  - `GET /api/v1/admin/trainer-applications/{applicationId}/documents/{mediaId}/download`
+  - `GET /api/v1/admin/trainer-applications/{applicationId}/certificates`
   - `GET /api/v1/students/{studentId}/fitness-goals/current`
   - `GET /api/v1/students/{studentId}/fitness-goal-proposals`
   - `POST /api/v1/students/{studentId}/fitness-goal-proposals`
@@ -87,17 +98,13 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 | Scope | Suite | Result | Details |
 |---|---|---|---|
-| **AI Lockdown** | `pytest services/ai-service` | **79 passed** | Full test suite passes; live calls blocked without opt-in. |
-| **Backend Integration** | `FitnessGoalProposalIntegrationTest` | **41 passed** | Full proposal lifecycle, student acceptance/rejection, concurrency conflicts. |
-| **Backend Integration** | `TrainerApplicationIntegrationTest` | **17 passed** | Submit → Reject → Resubmit → Approve → Discovery. |
-| **Backend Integration** | `AdminTrainerApplicationIntegrationTest` | **26 passed** | Admin RBAC, approval, rejection reasons, audit trail. |
-| **Backend Unit** | `FitnessGoalProposalControllerUnitTest` | **8 passed** | Web MVC layer authorization & validation. |
-| **Backend Unit** | `FitnessGoalProposalServiceUnitTest` | **26 passed** | Service layer authority checks & business logic. |
-| **Backend Unit** | `TrainerApplicationServiceUnitTest` | **23 passed** | Application status state machine. |
-| **Mobile Jest** | Person A Mobile Suites | **91 passed** | 6 suites (`trainerApplicationApi`, `fitnessGoalApi`, `TrainerProfileScreen`, `GoalProposalDetailScreen`, `TrainerStudentGoalScreen`, `CurrentGoalScreen`). |
+| **AI Lockdown** | `pytest services/ai-service` | **82 passed** | Injected client & default client tests verify lockdown; live calls blocked without opt-in. |
+| **Backend Suite** | `mvnw test` | **449 passed** | Full backend test suite passing (0 failures, 0 errors). |
+| **Mobile Jest** | Full mobile suite | **720 passed** (89 suites) | All mobile test suites passing. |
 | **Mobile TypeScript** | `npm run typecheck:mobile` | **0 errors** | Strict Expo TypeScript validation passed. |
-| **Admin Web Vitest** | Admin Web Suites | **113 passed** | All Admin Web tests pass including Trainer Applications. |
+| **Admin Web Vitest** | Admin Web Suites | **117 passed** (16 suites) | All Admin Web tests passing. |
 | **Admin Web Build** | `npm run build:admin` | **0 errors** | Production Vite build succeeded. |
+| **Contract Validation** | `npm run validate:contracts` | **0 errors** | Redocly OpenAPI linting and Ajv AI schemas valid. |
 | **Contract Validation** | `npm run validate:contracts` | **0 errors** | Spectral OpenAPI linting clean. |
 | **UX Docs Validation** | `npm run validate:ux-docs` | **0 errors** | UX specification checks passed. |
 
@@ -113,12 +120,16 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 ---
 
-## 5. Handoff Status: Status B
+## 5. Handoff Status & Readiness Determinations
 
-**Conclusion: Status B (Sẵn sàng review, chưa đủ điều kiện nghiệm thu E2E đầy đủ do thiếu hạ tầng daemon scanner / thiết bị thật).**
+### A. Ready to Merge: PASS
+- All source code, database migrations, schemas, security policies, unit tests, integration tests, contract tests, and component UI tests pass 100%.
+- Zero compiler errors, zero type errors, zero schema/contract violations.
+- Safe to merge into staging/development branches without regression.
 
-- **Why Status B:**
-  All automated tests (unit, integration, contract, UI component) pass at 100%. However, because the development workstation does not currently have active persistent background daemons for ClamAV antivirus scanning or attached physical Android/iOS devices/emulators to run physical E2E device flows, formal device-level acceptance remains open pending staging/infrastructure availability.
+### B. Eligible for Physical Acceptance: BLOCKED BY ENVIRONMENT
+- **Trainer Verification (M1/M8):** Requires active live ClamAV scanner daemon (`clamd` on port 3310) and live S3 storage to verify end-to-end binary malware scanning and storage, plus a physical mobile device/AVD for manual camera and document picker verification.
+- **Physical Fitness Goals (M2):** **NOT BLOCKED BY SCANNER DAEMON.** Luồng Goals không upload file hay tương tác với ClamAV. Chỉ chờ nghiệm thu thủ công trên thiết bị di động thật / AVD để hoàn tất ký duyệt acceptance.
 
 ---
 

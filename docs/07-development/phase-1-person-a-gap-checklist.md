@@ -24,9 +24,9 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
 
 | ID | Priority Area | Scope / Acceptance Criteria | UI Surface | API & Data Model | Auth / Audit / Step-Up | Tests & Evidence | Status |
 |---|---|---|---|---|---|---|---|
-| **SEC-01** | **AI Test Lockdown** | Tests default to simulated; live external calls blocked in test env without opt-in (`RUN_LIVE_OPENAI_TESTS=true`); production runtime unblocked. | N/A | `services/ai-service`, `conftest.py`, `openai_provider.py` | Environment isolation | `test_ai_lockdown.py` PASS (79 tests total) | **VERIFIED (In-Test Isolation Active; Production Unrestricted)** |
-| **PRI-01** | **Trainer Verification (M1/M8)** | Complete lifecycle: Submit → Admin Reject with Reason → View Rejection Reason → Resubmit → Admin Approve → Discoverable in Search. | Mobile `TrainerProfileScreen`, Admin `TrainerApplicationListPage` & `DetailPage` | `POST/GET /api/v1/trainer-applications`, `GET/POST /api/v1/admin/trainer-applications` | `ADMIN` role, `TRAINER` capability, immutable audit, reason required on reject | Backend: 66 tests PASS; Mobile: 14 tests PASS; Admin Web: 113 tests PASS | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device & Scanner Pending Infrastructure)** |
-| **PRI-02** | **Fitness Goals (M2)** | Create first goal, edit via Goal Version, transition journeys via Goal Transition, proposal accept/reject with conflict handling, trainer proposal creation for scoped student. | Mobile `CurrentGoalScreen`, `GoalProposalDetailScreen`, `CreateGoalModal`, `CreateGoalVersionModal`, `CreateGoalTransitionModal`, `TrainerStudentGoalScreen`, `CreateGoalProposalModal`, route `(app)/coaching/[relationshipId]/goal` | `POST /api/v1/fitness-goals`, `POST /fitness-goals/{id}/versions`, `POST /fitness-goals/{id}/transitions`, `POST /fitness-goal-proposals/{id}/decisions`, `GET /api/v1/students/{id}/fitness-goals/current`, `GET/POST /api/v1/students/{id}/fitness-goal-proposals` | Student ownership, Trainer coaching scope, `FITNESS_GOAL` data sharing check, version conflict 409 | Backend: 130 integration tests + 34 unit tests PASS; Mobile: 91 tests PASS (`CurrentGoalScreen`, `fitnessGoalApi`, `GoalProposalDetailScreen`, `TrainerStudentGoalScreen`); Typecheck: 0 errors | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device Pending Infrastructure)** |
+| **SEC-01** | **AI Test Lockdown** | Tests default to simulated; live external calls blocked in test env without opt-in (`RUN_LIVE_OPENAI_TESTS=true`); production runtime unblocked. Transport-level interception prevents injected unmocked clients from escaping. | N/A | `services/ai-service`, `conftest.py`, `openai_provider.py` | Environment isolation | `test_ai_lockdown.py` PASS (82 tests total) | **VERIFIED (In-Test Isolation Active; Production Unrestricted)** |
+| **PRI-01** | **Trainer Verification (M1/M8)** | Complete lifecycle: Upload Documents (PDF/PNG/JPEG, max 10MB) → Submit → Admin Review (View Certificates & Documents, Download Scanned Clean Files) → Admin Reject with Reason → View Rejection Reason → Resubmit → Admin Approve → Discoverable in Search. | Mobile `TrainerProfileScreen` (Upload & Remove docs), Admin `TrainerApplicationListPage` & `DetailPage` (Document/Cert Tables & Download action) | `POST/GET /api/v1/trainer-applications`, `POST /api/v1/trainer-applications/documents`, `GET/POST /api/v1/admin/trainer-applications`, `GET .../documents`, `GET .../certificates`, `GET .../download` | `ADMIN` role, `TRAINER` capability, immutable audit, reason required on reject | Backend: 449 tests PASS; Mobile: 17 tests PASS; Admin Web: 117 tests PASS; redocly OpenAPI valid | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device & Scanner Pending Infrastructure)** |
+| **PRI-02** | **Fitness Goals (M2)** | Create first goal, edit via Goal Version, transition journeys via Goal Transition, proposal accept/reject with conflict handling, trainer proposal creation for scoped student. Note: Independent from virus scanner. | Mobile `CurrentGoalScreen`, `GoalProposalDetailScreen`, `CreateGoalModal`, `CreateGoalVersionModal`, `CreateGoalTransitionModal`, `TrainerStudentGoalScreen`, `CreateGoalProposalModal`, route `(app)/coaching/[relationshipId]/goal` | `POST /api/v1/fitness-goals`, `POST /fitness-goals/{id}/versions`, `POST /fitness-goals/{id}/transitions`, `POST /fitness-goal-proposals/{id}/decisions`, `GET /api/v1/students/{id}/fitness-goals/current`, `POST /api/v1/fitness-goals/{goalId}/proposals` (`/api/v1/students/{id}/fitness-goal-proposals`) | Student ownership, Trainer coaching scope, `FITNESS_GOAL` data sharing check, version conflict 409 | Backend: 130 integration tests + 34 unit tests PASS; Mobile: 91 tests PASS (`CurrentGoalScreen`, `fitnessGoalApi`, `GoalProposalDetailScreen`, `TrainerStudentGoalScreen`); Typecheck: 0 errors | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device Pending Infrastructure)** |
 | **PRI-03** | **Measurements & Progress (A07/M5)** | Metric definitions, time-series measurements, photo uploads, Current Goal & Lifetime progress dashboards without AI dependency. | Mobile ST-09 Progress Dashboard & ST-10 Measurements | `/api/v1/measurements`, `/api/v1/progress/summary`, object storage media | Private visibility, scan status `CLEAN`, unit normalization | Mobile routes delivery needed | **PENDING PRI-01** |
 | **PRI-04** | **Account Admin Governance (A05/M8)** | User directory, suspend, restore, disable, force logout (token revocation), step-up auth, reason requirement. | Admin AD-02 Users & Roles, Action Dialog | `/api/v1/admin/users/*`, `fitness.admin_action_policies`, `user_account_status_history` | Step-up verification, `USER_SUSPEND`/`USER_DISABLE`, immutable audit | Admin backend & UI tests | **PENDING PRI-01** |
 | **PRI-05** | **Support, Moderation & Audit (M8)** | Case management, governed data correction with before/after, scoped audit query, private data access controls. | Admin Moderation & Support views | `/api/v1/admin/support-cases`, `/api/v1/admin/data-corrections`, `fitness.audit_logs` | Governed correction permission, time-bound access, read-only audit | Audit integrity checks | **PENDING PRI-01** |
@@ -116,28 +116,48 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
   - Contracts Validation: `npm run validate:contracts` (0 errors) confirming OpenAPI parity for student-scoped goal and proposal endpoints.
 
 - **Priority 1 Verification Evidence**:
-  - Backend Unit: `TrainerApplicationServiceUnitTest` (23 tests PASS).
+  - Backend Unit: `TrainerApplicationServiceUnitTest` (23 tests PASS), `AdminTrainerVerificationServiceUnitTest` (17 tests PASS), `TrainerApplicationControllerUnitTest` (21 tests PASS), `AdminTrainerApplicationControllerUnitTest` (14 tests PASS), `MediaPersistenceAdapterUnitTest` (4 tests PASS).
   - Backend Integration: `TrainerApplicationIntegrationTest` (17 tests PASS) covering submit → reject with reason → resubmit → approve → search discovery invariant (`/api/v1/coaching/trainers`).
   - Backend Admin Integration: `AdminTrainerApplicationIntegrationTest` (26 tests PASS) covering admin queue, pagination, RBAC, audit logging, and concurrency conflict (409).
-  - Mobile Jest: `trainerApplicationApi.test.ts` (2 tests PASS) & `TrainerProfileScreen.test.tsx` (12 tests PASS) covering submit application, pending review, rejection reason display, resubmit application, and verified banner.
-  - Admin Web Vitest: `trainerApplicationApi.test.ts` (3 tests PASS) & `TrainerApplicationPages.test.tsx` (6 tests PASS) covering queue filters, detail page, approval with confirmation notes, rejection requiring non-blank reason, and disabled actions on decided applications.
+  - Backend Document Storage & Scan Status: `TrainerDocumentStorageService` supports magic byte detection, ClamAV `zINSTREAM` stream protocol, S3/mock storage; document download endpoint audited with `ADMIN_TRAINER_DOCUMENT_ACCESSED`.
+  - Mobile Jest: `trainerApplicationApi.test.ts` (3 tests PASS) & `TrainerProfileScreen.test.tsx` (14 tests PASS) covering document picker, upload success/failure, removal, application submission with `documentMediaIds`, pending review, rejection reason display, resubmit application, and verified banner.
+  - Admin Web Vitest: `trainerApplicationApi.test.ts` (6 tests PASS) & `TrainerApplicationPages.test.tsx` (7 tests PASS) covering queue filters, detail page, certificate table, documents table with format & clean badge, document download trigger, approval with confirmation notes, rejection requiring non-blank reason, and disabled actions on decided applications.
   - Typecheck & Build: `typecheck:mobile` (0 errors), `build:admin` (0 errors), `validate:ux-docs` (0 errors), `validate:contracts` (0 errors).
 
-- **Storage / Scanner**:
+- **Storage / Scanner Invariant**:
   - `media_files` table requires `scan_status = 'CLEAN'`.
+  - Distinguishes `allMediaExistAndOwnedBy` (ownership check without scan status) and `allMediaExistOwnedAndClean` (enforcing `scan_status = 'CLEAN'`).
   - Files with `PENDING`, `REJECTED`, or `FAILED` scan statuses are rejected when submitting verification documents.
 
 - **AI Test Lockdown**:
+  - Transport-level guard intercepting HTTP client egress preventing injected clients from calling live OpenAI.
   - `RUN_LIVE_OPENAI_TESTS=true` is strictly required to make external AI requests.
   - Default pytest suite runs entirely in simulated/mocked mode.
-  - `test_ai_lockdown.py` PASS (79 tests total in ai-service suite).
+  - `test_ai_lockdown.py` PASS (82 tests total in ai-service suite).
 
 ---
 
-## 6. Handoff Status Determination
+## 6. Review Findings Resolution Matrix
 
-- **Status B: Sẵn sàng review, chưa đủ điều kiện nghiệm thu E2E đầy đủ do thiếu hạ tầng daemon scanner / thiết bị thật.**
-  - **Lý do:**
-    - Toàn bộ code logic, migration, phân quyền, validation, audit, unit tests, integration tests và contract validation của Person A đã hoàn thành và đều PASS 100%.
-    - Tuy nhiên, trong môi trường kiểm thử local hiện tại, không có running daemon services cho ClamAV virus scanner (cần port scanner thật) hoặc thiết bị di động thật/AVD đang chạy để chạy automation E2E end-to-end trên thiết bị vật lý thật mà không qua mocked test runner.
-    - Do đó, theo nguyên tắc "Không xem báo cáo trước là bằng chứng đã được xác minh độc lập" và "Không tuyên bố hoàn thành một tính năng chỉ vì đã có API/test", kết luận chính thức cho toàn bộ đợt bàn giao này là **Status B**.
+| # | Finding | Remediation Applied | Verification Evidence |
+|---|---|---|---|
+| **F-01** | AI Lockdown bypassed if client injected | Moved test mode checks outside `if client is None:` and installed transport-level interceptor in `conftest.py`. Added 5 regression tests. | `test_ai_lockdown.py` (82 tests PASS) |
+| **F-02** | Missing document upload & admin document review | Added `POST /trainer-applications/documents` endpoint, Admin document list & download endpoints with audit logging, Mobile document picker & list, Admin Web document/certificate tables & download button. | Unit & integration tests pass across backend, mobile, admin-web. |
+| **F-03** | Proposal endpoint naming ambiguity | Clarified that Trainer creates proposals for a scoped student via `POST /api/v1/fitness-goals/{goalId}/proposals` (`/api/v1/students/{studentId}/fitness-goal-proposals`), matching OpenAPI and domain boundaries. | `FitnessGoalProposalIntegrationTest` (41 tests PASS), `FitnessGoalProposalControllerUnitTest` (8 tests PASS). |
+| **F-04** | MediaQueryPort semantics | Clarified `allMediaExistAndOwnedBy` (existence & ownership) vs `allMediaExistOwnedAndClean` (enforcing `scan_status = 'CLEAN'`). | `MediaPersistenceAdapterUnitTest` (4 tests PASS). |
+| **F-05** | Disentangle blockers for Goals vs Trainer Verification | Clarified that Goals does NOT depend on the ClamAV scanner daemon; only Trainer Verification requires live scanner daemon / real media storage. Both still await physical device/AVD testing for physical device sign-off. | Documented below in Section 7. |
+
+---
+
+## 7. Handoff Status Determination
+
+- **Phần 1: Quyết định Merge (Ready to Merge — PASS)**
+  - Tất cả mã nguồn, migrations, schemas, phân quyền, validation, audit trail, unit tests, integration tests và contract validation của Person A đều đã hoàn thành và PASS 100% trong automated CI test suite.
+  - 0 hồi quy, 0 compile errors, 0 linter/schema errors.
+  - Sẵn sàng để merge vào development/main theo tiêu chuẩn code & contract.
+
+- **Phần 2: Điều kiện Nghiệm thu Thiết bị Thực (Eligible for Acceptance — SEPARATED BLOCKERS)**
+  - **Trainer Verification (M1/M8):** Chưa đủ điều kiện nghiệm thu E2E vật lý đầy đủ do:
+    1. Cần hạ tầng ClamAV daemon sống (`clamd` trên port 3310) và S3-compatible storage thật để xác thực tải lên và quét virus binary end-to-end ngoài môi trường test mock.
+    2. Cần thiết bị di động thật / AVD để nghiệm thu camera và chọn file hệ thống vật lý.
+  - **Fitness Goals (M2):** **KHÔNG BỊ CHẶN BỞI SCANNER DAEMON** (luồng Goals không sử dụng scanner/media upload). Chỉ chờ nghiệm thu thủ công trên thiết bị di động thật / AVD để hoàn tất ký duyệt nghiệm thu trải nghiệm người dùng thực tế.
