@@ -547,6 +547,8 @@ public class FitnessGoalProposalService implements
     }
 
     @Override
+    // Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction in PostgreSQL.
+    @Transactional
     public FitnessGoal getStudentCurrentGoalForTrainer(UUID trainerId, UUID studentId) {
         if (trainerId == null) {
             throw new ApplicationValidationException("Trainer ID cannot be null");
@@ -560,6 +562,8 @@ public class FitnessGoalProposalService implements
     }
 
     @Override
+    // Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction in PostgreSQL.
+    @Transactional
     public GoalProposalPage getStudentProposalsForTrainer(
             UUID trainerId,
             UUID studentId,

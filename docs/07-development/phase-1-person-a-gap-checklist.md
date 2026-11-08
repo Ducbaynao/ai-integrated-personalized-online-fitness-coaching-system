@@ -327,3 +327,25 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 5. **Bằng chứng cần lưu:**
    - Ảnh chụp tải tài liệu trên Mobile, bảng tài liệu trên Admin Web, tệp tải về máy qua Admin, bản ghi audit trong `fitness.audit_logs`.
    - *Lưu ý nguyên tắc:* Không dùng cập nhật database trực tiếp để giả lập trạng thái scanner hay bỏ qua các bước giao diện. Nghiệp vụ chỉ yêu cầu Document Picker (không bắt buộc camera vật lý). Môi trường cục bộ tương thích S3 (như MinIO) là đáp ứng kiến trúc, không bắt buộc cloud AWS S3.
+
+---
+
+## 9. Lịch sử Xử lý FINDING-READONLY-TX-01 & Kiểm chứng Hạ tầng Thực tế
+
+### 9.1 Chi tiết Finding & Nguyên nhân gốc
+- **Mã:** `FINDING-READONLY-TX-01`
+- **Lỗi:** Gọi `GET /api/v1/students/{studentId}/fitness-goals/current` hoặc `GET /api/v1/students/{studentId}/fitness-goal-proposals` bằng tài khoản Trainer gây HTTP 500 do `PSQLException: ERROR: cannot execute SELECT FOR SHARE in a read-only transaction` (SQLState 25006).
+- **Nguyên nhân:** Class `FitnessGoalProposalService` có `@Transactional(readOnly = true)`. Quyền truy cập của HLV được kiểm tra qua `trainerAuthorityPort.verifyTrainerCanViewProposal()` -> `CoachingAuthorityService.evaluateCurrent()` -> `store.lockAuthorityBoundary(studentId, actorId)` -> `SELECT user_id FROM fitness.student_profiles WHERE user_id = ? FOR SHARE;`. PostgreSQL cấm hoàn toàn khóa dòng trong giao dịch chỉ đọc.
+- **Nguyên nhân test trước bỏ sót:** Test cho hai endpoint này trước đó là unit test mock (`@MockBean` usecase hoặc `@Mock GoalTrainerAuthorityPort`), không có integration test nào gọi hai endpoint này qua Spring context và PostgreSQL thật.
+
+### 9.2 Cách sửa tối thiểu & Bảo toàn kiến trúc
+- Bổ sung `@Transactional` (read-write) vào `getStudentCurrentGoalForTrainer` và `getStudentProposalsForTrainer` trong `FitnessGoalProposalService.java`.
+- Kế thừa mẫu thiết kế sẵn có trong `WorkoutPlanQueryService` và `NutritionBasicService.readForTrainer`.
+- Bảo toàn nguyên vẹn cơ chế khóa chia sẻ `FOR SHARE` để đảm bảo tính an toàn đồng thời khi học viên thay đổi/thu hồi quyền chia sẻ.
+
+### 9.3 Kết quả Kiểm chứng
+- Đã bổ sung 5 integration test trên PostgreSQL Testcontainers trong `FitnessGoalProposalIntegrationTest.java`: Tất cả đều **PASS**.
+- Đã chạy 132 unit test module goal: **132 PASS, 0 FAIL**.
+- Đã kiểm chứng trực tiếp trên backend chạy live cổng 8080 kết nối PostgreSQL thật cổng 5433: Cả hai endpoint đều trả lời **HTTP 200 OK** với dữ liệu đầy đủ.
+- **Phân định rõ ràng:** Đã hoàn thành nghiệm thu API trên hạ tầng dịch vụ thật; phần thao tác UI trên thiết bị di động Native vẫn cần bước nghiệm thu trực tiếp bằng mắt/tay của reviewer.
+- **Về Object Storage:** Đang sử dụng container `adobe/s3mock:latest` (port 9000); không coi đây là bằng chứng tương thích production AWS S3/MinIO. Tính bền vững sau restart container chưa được thử nghiệm.

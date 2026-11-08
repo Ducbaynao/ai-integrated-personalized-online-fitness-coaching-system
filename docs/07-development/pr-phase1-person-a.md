@@ -262,3 +262,60 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 5. **Admin phê duyệt (Approve flow) & Tìm kiếm:** Admin mở lại hồ sơ trên Admin Web -> Bấm "Phê duyệt hồ sơ" -> Nhập ghi chú duyệt -> Xác nhận -> Hồ sơ và profile HLV chuyển `VERIFIED`, ghi vết audit `TRAINER_APPLICATION_APPROVED` -> HLV bật công tắc "Accepting Students" trên Mobile -> Gọi `GET /api/v1/coaching/trainers` -> HLV xuất hiện trong danh sách tìm kiếm công khai.
 6. **Bằng chứng cần lưu:** Ảnh chụp tải tài liệu trên Mobile, bảng tài liệu trên Admin Web, tệp tải về máy, bản ghi audit trong `fitness.audit_logs`.
 7. **Lưu ý nguyên tắc:** Không dùng cập nhật database trực tiếp để giả lập trạng thái scanner hay bỏ qua các bước giao diện. Nghiệp vụ chỉ yêu cầu Document Picker (không bắt buộc camera vật lý). Môi trường cục bộ tương thích S3 (như MinIO) là đáp ứng kiến trúc, không bắt buộc cloud AWS S3.
+
+---
+
+## 8. Báo cáo Khắc phục FINDING-READONLY-TX-01 & Kiểm chứng Hạ tầng Thực tế
+
+### 8.1 Chi tiết Finding & Nguyên nhân gốc
+- **Mã finding:** `FINDING-READONLY-TX-01`
+- **Hiện tượng:** Hai endpoint đọc của Huấn luyện viên:
+  - `GET /api/v1/students/{studentId}/fitness-goals/current`
+  - `GET /api/v1/students/{studentId}/fitness-goal-proposals`
+  trả về HTTP 500 với lỗi:
+  `PSQLException: ERROR: cannot execute SELECT FOR SHARE in a read-only transaction` (SQLState `25006`).
+- **Nguyên nhân gốc:**
+  - Class `FitnessGoalProposalService` được cấu hình `@Transactional(readOnly = true)`.
+  - Cả hai phương thức trên gọi `trainerAuthorityPort.verifyTrainerCanViewProposal(trainerId, studentId)`, đi qua `CoachingAuthorityService.evaluateCurrent()`.
+  - `CoachingAuthorityService` gọi `store.lockAuthorityBoundary(studentId, actorId)` thực thi SQL:
+    `SELECT user_id FROM fitness.student_profiles WHERE user_id = ? FOR SHARE;`
+  - Trên PostgreSQL thật, câu lệnh khóa dòng `FOR SHARE` / `FOR UPDATE` bị từ chối tuyệt đối trong một transaction chỉ đọc.
+- **Lý do bị bỏ sót trước đây:**
+  - Không phải "do H2" (dự án dùng PostgreSQL Testcontainers cho integration test).
+  - Lý do thực tế: Các bài test trước đây cho hai endpoint này chỉ dừng ở mức WebMvcTest mock use case (`@MockBean`) hoặc Unit Test mock authority port (`@Mock GoalTrainerAuthorityPort`). Không có integration test nào gọi hai endpoint này qua toàn bộ Spring context và PostgreSQL thật.
+
+### 8.2 Phương án khắc phục & Tính bảo toàn kiến trúc
+- **Giải pháp tối thiểu:** Bổ sung `@Transactional` (read-write) trực tiếp vào hai phương thức `getStudentCurrentGoalForTrainer` và `getStudentProposalsForTrainer` trong `FitnessGoalProposalService.java`.
+- **Lý do kiến trúc:**
+  - Kế thừa đúng mẫu thiết kế đã có trong codebase:
+    - `WorkoutPlanQueryService`: Đánh dấu `@Transactional` với ghi chú *"Current Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction."*
+    - `NutritionBasicService.readForTrainer`: Đánh dấu `@Transactional` cho Trainer đọc dữ liệu học viên qua `coaching.evaluateCurrent()`.
+    - `FitnessGoalProposalService.getProposalDetail`: Đã được đánh dấu `@Transactional` từ trước.
+  - Bảo toàn hoàn toàn cơ chế khóa `FOR SHARE` để ngăn ngừa race condition khi học viên thu hồi quyền/quan hệ đồng thời với lúc Trainer đọc dữ liệu.
+  - Không thay đổi transaction mặc định toàn hệ thống, không loại bỏ khóa chia sẻ, không sửa đổi các caller dùng chung.
+
+### 8.3 Kết quả Regression Test trên PostgreSQL Thật
+Đã bổ sung 5 bài test tích hợp trong `FitnessGoalProposalIntegrationTest.java` chạy trên PostgreSQL Testcontainers (`pgvector/pgvector:pg18`, 55 Flyway migrations):
+1. `trainerGetStudentCurrentGoal_success_onPostgreSQL`: Trainer có quyền đọc mục tiêu hiện tại của học viên thành công (HTTP 200, trả về version và title chính xác, không còn lỗi 500 / SQLState 25006).
+2. `trainerGetStudentProposals_success_onPostgreSQL`: Trainer đọc danh sách đề xuất thành công (HTTP 200, `totalItems: 1`).
+3. `trainerGetStudentCurrentGoal_unrelatedTrainerForbidden_onPostgreSQL`: Trainer ngoài quan hệ bị từ chối với HTTP 403 Forbidden.
+4. `trainerGetStudentCurrentGoal_permissionDenied_forbidden_onPostgreSQL`: Khi quyền chia sẻ bị `DENY`, Trainer bị từ chối với HTTP 403 Forbidden.
+5. `trainerGetStudentCurrentGoal_notFoundWhenNoGoal_onPostgreSQL`: Trả về HTTP 404 khi học viên chưa có mục tiêu.
+- **Kết quả chạy:** `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0` (BUILD SUCCESS).
+- **Hồi quy Unit Test:** Đã chạy 132 unit tests thuộc module `goal` (`FitnessGoalProposalServiceUnitTest`, `FitnessGoalProposalControllerUnitTest`, `FitnessGoalServiceUnitTest`, `FitnessGoalControllerUnitTest`), kết quả: **132 passed, 0 failures**.
+
+### 8.4 Kiểm chứng trên Live Services (Cổng 8080)
+- Đã khởi chạy lại Spring Boot backend với mã nguồn đã sửa kết nối trực tiếp PostgreSQL thật (port 5433).
+- Gọi lại hai endpoint bằng script thực tế:
+  - `GET /api/v1/students/5c6f49c6-f4f6-4941-b217-2574b3830395/fitness-goals/current` -> **HTTP 200 OK** (ID: `39021d3c-605c-4ea5-bca5-c1fd8f3cfccc`, Title: `Summer Definition & Fat Loss Journey (Coach Optimized)`, Version: 2, Duration: 75 days).
+  - `GET /api/v1/students/5c6f49c6-f4f6-4941-b217-2574b3830395/fitness-goal-proposals` -> **HTTP 200 OK** (Trả về danh sách 9 proposals đầy đủ).
+  - Gọi với tài khoản Trainer không hợp lệ -> Bị từ chối chính xác.
+
+### 8.5 Giới hạn & Phân định Rõ ràng về Bằng chứng
+1. **Phân biệt API Live Integration và UI Acceptance:**
+   - Đã kiểm chứng API hoạt động hoàn hảo trên hạ tầng live services (Spring Boot 8080, PostgreSQL 5433, ClamAV daemon 3310, S3Mock 9000).
+   - Admin Web (port 5173) và Mobile Metro Bundler (port 8081) đang hoạt động và sẵn sàng. Tuy nhiên, việc chạm/vuốt trên màn hình thiết bị di động (Native Mobile UI) chưa được nghiệm thu thực tế bằng mắt/tay của tester. Không đồng nhất việc service đang chạy với việc UI E2E đã hoàn tất.
+2. **Về đối tượng lưu trữ S3:** Môi trường local sử dụng container `adobe/s3mock:latest` (port 9000). Điều này chứng minh tính tương thích giao thức S3 API của code, nhưng không được coi là bằng chứng về khả năng tương thích tuyệt đối trên môi trường production AWS S3 hoặc MinIO phân tán.
+3. **Về tính bền vững (Persistence after restart):** Chưa thực hiện kịch bản restart container storage để kiểm tra dữ liệu sau restart.
+4. **Về Concurrency:** Kiểm tra mã lỗi 409 qua tình huống stale proposal chứng minh có logic kiểm tra phiên bản mục tiêu; chưa khẳng định toàn bộ các nhánh concurrency đa luồng đều đã được kiểm chứng hết.
+
