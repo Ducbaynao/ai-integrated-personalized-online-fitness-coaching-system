@@ -462,12 +462,26 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
         # Use injected client if provided, else create managed client
         should_close_client = False
         client = self.http_client
-        if client is None:
-            # SAFETY GUARD: In test/evaluation environments, prevent unmocked live external API calls
-            # unless explicitly opted in with RUN_LIVE_OPENAI_TESTS=true
-            is_test_env = "PYTEST_CURRENT_TEST" in os.environ or os.getenv("TESTING", "").lower() == "true"
-            if is_test_env and os.getenv("RUN_LIVE_OPENAI_TESTS", "").lower() != "true":
-                logger.error("Live external OpenAI call blocked in test environment: RUN_LIVE_OPENAI_TESTS is not 'true'")
+
+        # SAFETY GUARD: In test/evaluation environments, prevent unmocked live external API calls
+        # whether using a default or injected live network client, unless explicitly opted in with RUN_LIVE_OPENAI_TESTS=true
+        is_test_env = (
+            os.getenv("AI_TEST_MODE", "").lower() == "true"
+            or "PYTEST_CURRENT_TEST" in os.environ
+            or os.getenv("TESTING", "").lower() == "true"
+        )
+        run_live_opt_in = os.getenv("RUN_LIVE_OPENAI_TESTS", "").lower() == "true"
+
+        if is_test_env and not run_live_opt_in:
+            # Allow clients configured with an offline mock transport for test verification;
+            # block any unmocked live network client (both client is None and injected live client)
+            is_mock_client = client is not None and isinstance(
+                getattr(client, "_transport", None), httpx.MockTransport
+            )
+            if not is_mock_client:
+                logger.error(
+                    "Live external OpenAI call blocked in test environment: RUN_LIVE_OPENAI_TESTS is not 'true'"
+                )
                 return F01KnowledgeQueryResult(
                     runId=run_id,
                     correlationId=correlation_id,
@@ -475,10 +489,15 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                     reasonCode="PROVIDER_ERROR",
                     error=ErrorDto(
                         code="LIVE_CALL_BLOCKED",
-                        message="Live external OpenAI calls are blocked in default offline/test mode. Set RUN_LIVE_OPENAI_TESTS=true to enable.",
+                        message=(
+                            "Live external OpenAI calls are blocked in default offline/test mode. "
+                            "Set RUN_LIVE_OPENAI_TESTS=true to enable."
+                        ),
                     ),
                     asOf=now_str,
                 )
+
+        if client is None:
             client = httpx.AsyncClient()
             should_close_client = True
 

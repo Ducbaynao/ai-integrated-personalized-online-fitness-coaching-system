@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import httpx
 import pytest
 from pydantic import SecretStr
 
@@ -65,6 +66,7 @@ def test_default_test_suite_uses_simulated_provider():
 @pytest.mark.anyio
 async def test_live_openai_call_blocked_when_unmocked_and_no_opt_in(monkeypatch):
     """
+    Scenario 1: Default client (client is None).
     Verify that if an unmocked OpenAiKnowledgeProvider is instantiated with fake credentials,
     it is strictly blocked from making live external HTTP calls unless RUN_LIVE_OPENAI_TESTS=true.
     """
@@ -85,6 +87,160 @@ async def test_live_openai_call_blocked_when_unmocked_and_no_opt_in(monkeypatch)
 
 
 @pytest.mark.anyio
+async def test_live_openai_call_blocked_when_injected_live_client(monkeypatch):
+    """
+    Scenario 2: Injected live client.
+    Verify that if a live httpx.AsyncClient (without MockTransport) is injected into
+    OpenAiKnowledgeProvider, the provider blocks it prior to issuing any live external call.
+    """
+    monkeypatch.setattr(settings, "f01_provider", "openai")
+    monkeypatch.setattr(settings, "openai_api_key", SecretStr("sk-fake-test-credential-never-live"))
+    monkeypatch.setenv("RUN_LIVE_OPENAI_TESTS", "false")
+
+    # Inject an unmocked AsyncClient that would normally make network requests
+    live_client = httpx.AsyncClient()
+    try:
+        provider = OpenAiKnowledgeProvider(retriever=DummyRetriever(), http_client=live_client)
+        result = await provider.query(SAMPLE_ENVELOPE)
+
+        assert result.runStatus == "FAILED"
+        assert result.reasonCode == "PROVIDER_ERROR"
+        assert result.error is not None
+        assert result.error.code == "LIVE_CALL_BLOCKED"
+        assert "Live external OpenAI calls are blocked" in result.error.message
+    finally:
+        await live_client.aclose()
+
+
+@pytest.mark.anyio
+async def test_mock_transport_allowed_without_opt_in(monkeypatch):
+    """
+    Scenario 3: Injected client with MockTransport.
+    Verify that a client configured with MockTransport is permitted to run in tests
+    without requiring RUN_LIVE_OPENAI_TESTS=true.
+    """
+    monkeypatch.setattr(settings, "f01_provider", "openai")
+    monkeypatch.setattr(settings, "openai_api_key", SecretStr("sk-fake-mock-test-key"))
+    monkeypatch.setenv("RUN_LIVE_OPENAI_TESTS", "false")
+
+    import json
+
+    captured_requests = []
+
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        captured_requests.append(request)
+        return httpx.Response(
+            status_code=200,
+            json={
+                "id": "chatcmpl-mock-transport",
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({
+                                "status": "ANSWERED",
+                                "answer": "Khởi động giúp làm ấm cơ bắp và giảm chấn thương trong tập luyện.",
+                                "citations": [
+                                    {
+                                        "documentId": "WHO-PA-SB-2020-VI-01",
+                                        "version": "1.0.0",
+                                        "sourceId": "WHO-PA-SB-2020",
+                                        "locator": {
+                                            "sourcePath": "derivatives/who-2020/01-scope.vi.md",
+                                            "heading": "Khởi động",
+                                            "sectionIndex": 0,
+                                        },
+                                        "quoteOrExcerpt": "Khởi động giúp làm ấm cơ bắp và giảm chấn thương trong tập luyện.",
+                                    }
+                                ],
+                                "limitations": [],
+                                "missingData": [],
+                                "refusalReason": "",
+                            }),
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15},
+            },
+        )
+
+    mock_client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
+    try:
+        provider = OpenAiKnowledgeProvider(retriever=DummyRetriever(), http_client=mock_client)
+        result = await provider.query(SAMPLE_ENVELOPE)
+
+        assert result.runStatus == "SUCCEEDED"
+        assert result.resultType == "INFORMATION"
+        assert len(captured_requests) == 1
+    finally:
+        await mock_client.aclose()
+
+
+@pytest.mark.anyio
+async def test_opt_in_allows_execution_flow(monkeypatch):
+    """
+    Scenario 4: Explicit opt-in (RUN_LIVE_OPENAI_TESTS=true).
+    Verify that when explicit opt-in is provided, the LIVE_CALL_BLOCKED guard is not triggered.
+    A mock transport verifies the client reaches invocation without being blocked by the test guard.
+    """
+    monkeypatch.setattr(settings, "f01_provider", "openai")
+    monkeypatch.setattr(settings, "openai_api_key", SecretStr("sk-fake-opt-in-key"))
+    monkeypatch.setenv("RUN_LIVE_OPENAI_TESTS", "true")
+
+    import json
+
+    called = False
+
+    def spy_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return httpx.Response(
+            status_code=200,
+            json={
+                "id": "chatcmpl-opt-in",
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({
+                                "status": "ANSWERED",
+                                "answer": "Khởi động giúp làm ấm cơ bắp và giảm chấn thương trong tập luyện.",
+                                "citations": [
+                                    {
+                                        "documentId": "WHO-PA-SB-2020-VI-01",
+                                        "version": "1.0.0",
+                                        "sourceId": "WHO-PA-SB-2020",
+                                        "locator": {
+                                            "sourcePath": "derivatives/who-2020/01-scope.vi.md",
+                                            "heading": "Khởi động",
+                                            "sectionIndex": 0,
+                                        },
+                                        "quoteOrExcerpt": "Khởi động giúp làm ấm cơ bắp và giảm chấn thương trong tập luyện.",
+                                    }
+                                ],
+                                "limitations": [],
+                                "missingData": [],
+                                "refusalReason": "",
+                            }),
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15},
+            },
+        )
+
+    mock_client = httpx.AsyncClient(transport=httpx.MockTransport(spy_handler))
+    try:
+        provider = OpenAiKnowledgeProvider(retriever=DummyRetriever(), http_client=mock_client)
+        result = await provider.query(SAMPLE_ENVELOPE)
+
+        assert result.runStatus == "SUCCEEDED"
+        assert called is True
+    finally:
+        await mock_client.aclose()
+
+
+@pytest.mark.anyio
 async def test_runtime_mode_does_not_require_test_opt_in_flag(monkeypatch):
     """
     Verify that outside of the test environment (normal production runtime),
@@ -95,6 +251,7 @@ async def test_runtime_mode_does_not_require_test_opt_in_flag(monkeypatch):
     monkeypatch.setattr(settings, "openai_api_key", SecretStr("sk-fake-runtime-key"))
 
     # Simulate non-test runtime environment
+    monkeypatch.delenv("AI_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.delenv("RUN_LIVE_OPENAI_TESTS", raising=False)
