@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.goal.adapter.in.web;
 import com.fitnesscoaching.platform.modules.goal.adapter.in.web.dto.*;
 import com.fitnesscoaching.platform.modules.goal.application.model.GoalProposalPage;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.*;
+import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalProposal;
 import com.fitnesscoaching.platform.modules.goal.domain.ProposalStatus;
 import jakarta.validation.Valid;
@@ -22,17 +23,23 @@ public class FitnessGoalProposalController {
     private final GetStudentGoalProposalsUseCase getStudentGoalProposalsUseCase;
     private final GetGoalProposalDetailUseCase getGoalProposalDetailUseCase;
     private final DecideGoalProposalUseCase decideGoalProposalUseCase;
+    private final GetStudentCurrentGoalForTrainerUseCase getStudentCurrentGoalForTrainerUseCase;
+    private final GetStudentGoalProposalsForTrainerUseCase getStudentGoalProposalsForTrainerUseCase;
 
     public FitnessGoalProposalController(
             CreateGoalProposalUseCase createGoalProposalUseCase,
             GetStudentGoalProposalsUseCase getStudentGoalProposalsUseCase,
             GetGoalProposalDetailUseCase getGoalProposalDetailUseCase,
-            DecideGoalProposalUseCase decideGoalProposalUseCase
+            DecideGoalProposalUseCase decideGoalProposalUseCase,
+            GetStudentCurrentGoalForTrainerUseCase getStudentCurrentGoalForTrainerUseCase,
+            GetStudentGoalProposalsForTrainerUseCase getStudentGoalProposalsForTrainerUseCase
     ) {
         this.createGoalProposalUseCase = createGoalProposalUseCase;
         this.getStudentGoalProposalsUseCase = getStudentGoalProposalsUseCase;
         this.getGoalProposalDetailUseCase = getGoalProposalDetailUseCase;
         this.decideGoalProposalUseCase = decideGoalProposalUseCase;
+        this.getStudentCurrentGoalForTrainerUseCase = getStudentCurrentGoalForTrainerUseCase;
+        this.getStudentGoalProposalsForTrainerUseCase = getStudentGoalProposalsForTrainerUseCase;
     }
 
     @PostMapping("/api/v1/fitness-goals/{goalId}/proposals")
@@ -91,5 +98,34 @@ public class FitnessGoalProposalController {
         GoalProposal decided = decideGoalProposalUseCase.decideProposal(command);
 
         return ResponseEntity.ok(GoalProposalResponse.fromDomain(decided));
+    }
+
+    @GetMapping("/api/v1/students/{studentId}/fitness-goals/current")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ResponseEntity<FitnessGoalResponse> getStudentCurrentGoalForTrainer(
+            @PathVariable UUID studentId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        UUID trainerId = UUID.fromString(jwt.getSubject());
+        FitnessGoal goal = getStudentCurrentGoalForTrainerUseCase.getStudentCurrentGoalForTrainer(trainerId, studentId);
+
+        return ResponseEntity.ok(FitnessGoalResponse.fromDomain(goal));
+    }
+
+    @GetMapping("/api/v1/students/{studentId}/fitness-goal-proposals")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ResponseEntity<GoalProposalPageResponse> getStudentProposalsForTrainer(
+            @PathVariable UUID studentId,
+            @RequestParam(required = false) UUID fitnessGoalId,
+            @RequestParam(required = false) ProposalStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        UUID trainerId = UUID.fromString(jwt.getSubject());
+        GoalProposalPage result = getStudentGoalProposalsForTrainerUseCase.getStudentProposalsForTrainer(
+                trainerId, studentId, fitnessGoalId, status, page, size);
+
+        return ResponseEntity.ok(GoalProposalPageResponse.fromDomain(result));
     }
 }

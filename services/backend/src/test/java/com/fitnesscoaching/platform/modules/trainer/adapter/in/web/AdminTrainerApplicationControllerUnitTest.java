@@ -71,6 +71,15 @@ class AdminTrainerApplicationControllerUnitTest {
     private DecideTrainerApplicationUseCase decideApplicationUseCase;
 
     @MockitoBean
+    private com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationDocumentsUseCase getDocumentsUseCase;
+
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.trainer.application.port.in.DownloadAdminTrainerApplicationDocumentUseCase downloadDocumentUseCase;
+
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationCertificatesUseCase getCertificatesUseCase;
+
+    @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     private static final UUID ADMIN_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -351,5 +360,103 @@ class AdminTrainerApplicationControllerUnitTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents: returns 200 with document list")
+    void getDocuments_success_returns200() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(getDocumentsUseCase.getApplicationDocuments(ADMIN_ID, APP_ID))
+                .thenReturn(List.of(new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo(
+                        docId,
+                        "degree.pdf",
+                        "application/pdf",
+                        2048,
+                        "CLEAN",
+                        Instant.parse("2026-09-23T12:00:00Z")
+                )));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(docId.toString())))
+                .andExpect(jsonPath("$[0].originalFilename", is("degree.pdf")))
+                .andExpect(jsonPath("$[0].downloadUrl", is("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents/{mediaId}/download: returns 200 with bytes")
+    void downloadDocument_success_returns200() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(downloadDocumentUseCase.downloadApplicationDocument(ADMIN_ID, APP_ID, docId))
+                .thenReturn(new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                        docId,
+                        "degree.pdf",
+                        "application/pdf",
+                        4,
+                        "CLEAN",
+                        "test".getBytes()
+                ));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents/{mediaId}/download: returns 404 when document not found in storage")
+    void downloadDocument_notFound_returns404() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(downloadDocumentUseCase.downloadApplicationDocument(ADMIN_ID, APP_ID, docId))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.TrainerDocumentNotFoundException("Document file not found"));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("TRAINER_DOCUMENT_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents/{mediaId}/download: returns 503 when storage unavailable")
+    void downloadDocument_storageUnavailable_returns503() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(downloadDocumentUseCase.downloadApplicationDocument(ADMIN_ID, APP_ID, docId))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.StorageUnavailableException("Storage unreachable"));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode", is("STORAGE_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/certificates: returns 200 with certificate list")
+    void getCertificates_success_returns200() throws Exception {
+        UUID certId = UUID.randomUUID();
+        when(getCertificatesUseCase.getApplicationCertificates(ADMIN_ID, APP_ID))
+                .thenReturn(List.of(new com.fitnesscoaching.platform.modules.trainer.domain.TrainerCertificateInfo(
+                        certId,
+                        "Certified Personal Trainer",
+                        "NASM",
+                        "CPT-999",
+                        java.time.LocalDate.parse("2024-01-01"),
+                        java.time.LocalDate.parse("2026-01-01"),
+                        "PENDING",
+                        null,
+                        Instant.parse("2026-09-23T12:00:00Z")
+                )));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/certificates")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("Certified Personal Trainer")))
+                .andExpect(jsonPath("$[0].issuer", is("NASM")));
     }
 }

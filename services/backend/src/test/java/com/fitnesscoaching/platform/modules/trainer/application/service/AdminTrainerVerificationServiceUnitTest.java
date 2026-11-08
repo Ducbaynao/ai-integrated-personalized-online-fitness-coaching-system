@@ -3,8 +3,10 @@ package com.fitnesscoaching.platform.modules.trainer.application.service;
 import com.fitnesscoaching.platform.common.exception.AccountUnavailableException;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
+import com.fitnesscoaching.platform.common.exception.StorageUnavailableException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationAlreadyDecidedException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationNotFoundException;
+import com.fitnesscoaching.platform.common.exception.TrainerDocumentNotFoundException;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
@@ -60,6 +62,9 @@ class AdminTrainerVerificationServiceUnitTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private TrainerDocumentStorageService documentStorageService;
+
     private final Instant fixedNow = Instant.parse("2026-09-23T10:00:00Z");
     private final Clock clock = Clock.fixed(fixedNow, ZoneOffset.UTC);
 
@@ -77,6 +82,7 @@ class AdminTrainerVerificationServiceUnitTest {
                 userAccountStatusQuery,
                 userRoleQuery,
                 auditService,
+                documentStorageService,
                 clock
         );
     }
@@ -437,5 +443,111 @@ class AdminTrainerVerificationServiceUnitTest {
 
         verify(trainerApplicationPort, never()).recordStatusHistory(any(), any(), any(), any(), any(), any());
         verify(auditService, never()).recordAudit(any());
+    }
+
+    // ==========================================
+    // downloadApplicationDocument tests
+    // ==========================================
+
+    @Test
+    @DisplayName("downloadDocument: document not found in DB throws TrainerDocumentNotFoundException (404)")
+    void downloadDocument_notFoundInDB_throws404() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+        when(trainerApplicationPort.findById(APP_ID)).thenReturn(Optional.of(app));
+        UUID mediaId = UUID.randomUUID();
+        when(trainerApplicationPort.findDocumentContent(APP_ID, mediaId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.downloadApplicationDocument(ADMIN_ID, APP_ID, mediaId))
+                .isInstanceOf(TrainerDocumentNotFoundException.class)
+                .hasMessageContaining("Document not found");
+
+        verify(documentStorageService, never()).loadFile(any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("downloadDocument: unclean media throws ApplicationValidationException (400)")
+    void downloadDocument_uncleanMedia_throws400() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+        when(trainerApplicationPort.findById(APP_ID)).thenReturn(Optional.of(app));
+        UUID mediaId = UUID.randomUUID();
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent uncleanDoc =
+                new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                        mediaId, "cert.pdf", "application/pdf", 1024L, "REJECTED", new byte[0]);
+        when(trainerApplicationPort.findDocumentContent(APP_ID, mediaId)).thenReturn(Optional.of(uncleanDoc));
+
+        assertThatThrownBy(() -> service.downloadApplicationDocument(ADMIN_ID, APP_ID, mediaId))
+                .isInstanceOf(ApplicationValidationException.class)
+                .hasMessageContaining("Media file is not clean");
+
+        verify(documentStorageService, never()).loadFile(any());
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("downloadDocument: missing object in S3 throws TrainerDocumentNotFoundException (404) and no audit recorded")
+    void downloadDocument_s3ObjectMissing_throws404AndNoAudit() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+        when(trainerApplicationPort.findById(APP_ID)).thenReturn(Optional.of(app));
+        UUID mediaId = UUID.randomUUID();
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent cleanDoc =
+                new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                        mediaId, "cert.pdf", "application/pdf", 1024L, "CLEAN", new byte[0]);
+        when(trainerApplicationPort.findDocumentContent(APP_ID, mediaId)).thenReturn(Optional.of(cleanDoc));
+        when(documentStorageService.loadFile(any()))
+                .thenThrow(new TrainerDocumentNotFoundException("Document file not found in storage"));
+
+        assertThatThrownBy(() -> service.downloadApplicationDocument(ADMIN_ID, APP_ID, mediaId))
+                .isInstanceOf(TrainerDocumentNotFoundException.class);
+
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("downloadDocument: storage down throws StorageUnavailableException (503) and no audit recorded")
+    void downloadDocument_storageDown_throws503AndNoAudit() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+        when(trainerApplicationPort.findById(APP_ID)).thenReturn(Optional.of(app));
+        UUID mediaId = UUID.randomUUID();
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent cleanDoc =
+                new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                        mediaId, "cert.pdf", "application/pdf", 1024L, "CLEAN", new byte[0]);
+        when(trainerApplicationPort.findDocumentContent(APP_ID, mediaId)).thenReturn(Optional.of(cleanDoc));
+        when(documentStorageService.loadFile(any()))
+                .thenThrow(new StorageUnavailableException("S3 unreachable"));
+
+        assertThatThrownBy(() -> service.downloadApplicationDocument(ADMIN_ID, APP_ID, mediaId))
+                .isInstanceOf(StorageUnavailableException.class);
+
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("downloadDocument: success loads bytes, records audit, and returns document content")
+    void downloadDocument_success() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+        when(trainerApplicationPort.findById(APP_ID)).thenReturn(Optional.of(app));
+        UUID mediaId = UUID.randomUUID();
+        byte[] expectedBytes = "%PDF-1.4 file content".getBytes();
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent cleanDoc =
+                new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                        mediaId, "cert.pdf", "application/pdf", (long) expectedBytes.length, "CLEAN", new byte[0]);
+        when(trainerApplicationPort.findDocumentContent(APP_ID, mediaId)).thenReturn(Optional.of(cleanDoc));
+        when(documentStorageService.loadFile("verification-docs/" + TRAINER_ID + "/" + mediaId + "/cert.pdf"))
+                .thenReturn(expectedBytes);
+
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent result =
+                service.downloadApplicationDocument(ADMIN_ID, APP_ID, mediaId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.bytes()).isEqualTo(expectedBytes);
+        assertThat(result.originalFilename()).isEqualTo("cert.pdf");
+
+        verify(auditService).recordAudit(any(AuditRecord.class));
     }
 }

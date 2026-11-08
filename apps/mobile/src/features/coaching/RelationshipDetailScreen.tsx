@@ -99,6 +99,9 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       <CoachingButton testID="open-student-nutrition-button" label="Xem nhật ký dinh dưỡng học viên" secondary
         onPress={() => router.push(`/coaching/${relationship.id}/nutrition` as never)} /> : null}
     {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ?
+      <CoachingButton testID="open-student-goal-button" label="Mục tiêu thể chất học viên" secondary
+        onPress={() => router.push(`/coaching/${relationship.id}/goal` as never)} /> : null}
+    {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ?
       <CoachingButton testID="open-student-nutrition-strategy-button" label="Mục tiêu dinh dưỡng học viên" secondary
         onPress={() => router.push(`/coaching/${relationship.id}/nutrition-strategy` as never)} /> : null}
     {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? <CoachingButton testID="open-program-button" label="Mở chương trình tập luyện" secondary onPress={() => router.push(`/coaching/${relationship.id}/program` as never)} /> : null}

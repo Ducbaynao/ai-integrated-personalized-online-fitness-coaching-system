@@ -231,10 +231,10 @@ class AdminTrainerApplicationIntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO fitness.media_files (
                     id, owner_user_id, storage_provider, bucket_name, object_key,
-                    original_filename, content_type, size_bytes, media_purpose
+                    original_filename, content_type, size_bytes, media_purpose, scan_status
                 ) VALUES (
                     ?, ?, 'S3', 'test-bucket', ?,
-                    ?, 'application/pdf', 1024, 'VERIFICATION_DOCUMENT'
+                    ?, 'application/pdf', 1024, 'VERIFICATION_DOCUMENT', 'CLEAN'
                 )
                 """, mediaId, ownerId, "keys/" + mediaId, filename);
         return mediaId;

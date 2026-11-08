@@ -43,4 +43,23 @@ public interface TrainerApplicationPort {
             String reason,
             Instant changedAt
     );
+
+    UUID saveMediaFile(
+            UUID mediaId,
+            UUID ownerUserId,
+            String bucketName,
+            String objectKey,
+            String originalFilename,
+            String contentType,
+            long sizeBytes,
+            String checksumSha256,
+            String scanStatus,
+            Instant createdAt
+    );
+
+    List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo> findDocumentsByApplicationId(UUID applicationId);
+
+    Optional<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent> findDocumentContent(UUID applicationId, UUID mediaId);
+
+    List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerCertificateInfo> findCertificatesByApplicationId(UUID applicationId);
 }

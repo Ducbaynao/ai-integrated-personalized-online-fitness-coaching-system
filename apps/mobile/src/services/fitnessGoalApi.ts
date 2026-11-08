@@ -1,5 +1,9 @@
 import { request } from '@/services/apiClient';
 import {
+  CreateFitnessGoalRequest,
+  CreateGoalProposalRequest,
+  CreateGoalTransitionRequest,
+  CreateGoalVersionRequest,
   DecideGoalProposalRequest,
   FitnessGoal,
   FitnessGoalPageResponse,
@@ -183,6 +187,104 @@ export const fitnessGoalApi = {
       method: 'POST',
       requiresAuth: true,
       body: payload,
+    });
+  },
+
+  /**
+   * Creates a new fitness goal for the authenticated student.
+   */
+  async createGoal(data: CreateFitnessGoalRequest): Promise<FitnessGoal> {
+    return request<FitnessGoal>('/fitness-goals', {
+      method: 'POST',
+      requiresAuth: true,
+      body: data,
+    });
+  },
+
+  /**
+   * Activates a draft fitness goal.
+   */
+  async activateGoal(goalId: string): Promise<FitnessGoal> {
+    return request<FitnessGoal>(`/fitness-goals/${goalId}/activate`, {
+      method: 'POST',
+      requiresAuth: true,
+    });
+  },
+
+  /**
+   * Creates a new goal version for an existing fitness goal.
+   */
+  async createGoalVersion(
+    goalId: string,
+    data: CreateGoalVersionRequest
+  ): Promise<FitnessGoalVersion> {
+    return request<FitnessGoalVersion>(`/fitness-goals/${goalId}/versions`, {
+      method: 'POST',
+      requiresAuth: true,
+      body: data,
+    });
+  },
+
+  /**
+   * Transitions an existing fitness goal to a new journey.
+   */
+  async createGoalTransition(
+    goalId: string,
+    data: CreateGoalTransitionRequest
+  ): Promise<GoalTransition> {
+    return request<GoalTransition>(`/fitness-goals/${goalId}/transitions`, {
+      method: 'POST',
+      requiresAuth: true,
+      body: data,
+    });
+  },
+
+  /**
+   * Trainer proposes changes to a student's fitness goal.
+   */
+  async createGoalProposal(
+    goalId: string,
+    data: CreateGoalProposalRequest
+  ): Promise<GoalProposal> {
+    return request<GoalProposal>(`/fitness-goals/${goalId}/proposals`, {
+      method: 'POST',
+      requiresAuth: true,
+      body: data,
+    });
+  },
+
+  /**
+   * Authorized Trainer fetches student's current active/paused fitness goal.
+   */
+  async getStudentCurrentGoalForTrainer(studentId: string): Promise<FitnessGoal> {
+    return request<FitnessGoal>(`/students/${studentId}/fitness-goals/current`, {
+      method: 'GET',
+      requiresAuth: true,
+    });
+  },
+
+  /**
+   * Authorized Trainer lists fitness goal proposals for a student.
+   */
+  async getStudentGoalProposalsForTrainer(
+    studentId: string,
+    params?: {
+      fitnessGoalId?: string;
+      status?: ProposalStatus;
+      page?: number;
+      size?: number;
+    }
+  ): Promise<GoalProposalPageResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.fitnessGoalId) searchParams.append('fitnessGoalId', params.fitnessGoalId);
+    if (params?.page !== undefined) searchParams.append('page', String(params.page));
+    if (params?.size !== undefined) searchParams.append('size', String(params.size));
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+
+    return request<GoalProposalPageResponse>(`/students/${studentId}/fitness-goal-proposals${query}`, {
+      method: 'GET',
+      requiresAuth: true,
     });
   },
 };

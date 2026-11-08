@@ -70,6 +70,12 @@ class FitnessGoalProposalControllerUnitTest {
     private DecideGoalProposalUseCase decideGoalProposalUseCase;
 
     @MockitoBean
+    private GetStudentCurrentGoalForTrainerUseCase getStudentCurrentGoalForTrainerUseCase;
+
+    @MockitoBean
+    private GetStudentGoalProposalsForTrainerUseCase getStudentGoalProposalsForTrainerUseCase;
+
+    @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     @Test
@@ -275,5 +281,67 @@ class FitnessGoalProposalControllerUnitTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(proposalId.toString())))
                 .andExpect(jsonPath("$.status", is("ACCEPTED")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/students/{studentId}/fitness-goals/current: returns 200 OK for trainer")
+    void getStudentCurrentGoalForTrainer_success() throws Exception {
+        UUID studentId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+
+        FitnessGoal dummyGoal = new FitnessGoal(
+                goalId,
+                studentId,
+                "Student Muscle Goal",
+                GoalStatus.ACTIVE,
+                studentId,
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                Instant.now(),
+                Instant.now(),
+                null
+        );
+
+        when(getStudentCurrentGoalForTrainerUseCase.getStudentCurrentGoalForTrainer(trainerId, studentId))
+                .thenReturn(dummyGoal);
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .with(jwt().jwt(b -> b.subject(trainerId.toString())).authorities(new SimpleGrantedAuthority("ROLE_TRAINER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(goalId.toString())))
+                .andExpect(jsonPath("$.title", is("Student Muscle Goal")))
+                .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/students/{studentId}/fitness-goals/current: returns 403 Forbidden for student")
+    void getStudentCurrentGoalForTrainer_forbiddenForStudent() throws Exception {
+        UUID studentId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .with(jwt().jwt(b -> b.subject(studentId.toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/students/{studentId}/fitness-goal-proposals: returns 200 OK with proposals for trainer")
+    void getStudentProposalsForTrainer_success() throws Exception {
+        UUID studentId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+
+        GoalProposalPage page = new GoalProposalPage(List.of(), 0, 20, 0, 0);
+
+        when(getStudentGoalProposalsForTrainerUseCase.getStudentProposalsForTrainer(trainerId, studentId, null, null, 0, 20))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goal-proposals", studentId)
+                        .with(jwt().jwt(b -> b.subject(trainerId.toString())).authorities(new SimpleGrantedAuthority("ROLE_TRAINER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.totalItems", is(0)));
     }
 }

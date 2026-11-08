@@ -2646,4 +2646,116 @@ class FitnessGoalProposalIntegrationTest {
         Boolean isCurrent = jdbcTemplate.queryForObject("SELECT (effective_until IS NULL) FROM fitness.fitness_goal_versions WHERE fitness_goal_id = ? AND version_number = 1", Boolean.class, goalId);
         assertThat(isCurrent).isTrue();
     }
+
+    @Test
+    @DisplayName("Regression FINDING-READONLY-TX-01: Trainer with valid coaching authority reads current student goal on real PostgreSQL without SQLState 25006")
+    void trainerGetStudentCurrentGoal_success_onPostgreSQL() throws Exception {
+        UUID studentId = createActiveStudentUser("student.curgoal@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.curgoal@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Current Active Goal Read By Coach");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.curgoal@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .header("Authorization", "Bearer " + trainerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(goalId.toString())))
+                .andExpect(jsonPath("$.title", is("Current Active Goal Read By Coach")))
+                .andExpect(jsonPath("$.currentVersion.versionNumber", is(1)));
+    }
+
+    @Test
+    @DisplayName("Regression FINDING-READONLY-TX-01: Trainer reads student proposals on real PostgreSQL without SQLState 25006")
+    void trainerGetStudentProposals_success_onPostgreSQL() throws Exception {
+        UUID studentId = createActiveStudentUser("student.proplist@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.proplist@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+        UUID goalId = createActiveGoal(studentId, "Goal For Proposal List");
+
+        String trainerToken = createAccessToken(trainerId, "trainer.proplist@example.com", List.of("TRAINER"));
+
+        // Trainer creates a proposal first
+        CreateGoalProposalRequest proposalReq = new CreateGoalProposalRequest(
+                "Trainer Proposed Goal Variation",
+                LocalDate.now().plusDays(1),
+                LocalDate.now().plusDays(76),
+                75,
+                "Coach recommendations for steady progression",
+                List.of(new CreateGoalObjectiveRequest((short) 1, null, ObjectivePriority.PRIMARY, 0, null)),
+                List.of()
+        );
+
+        mockMvc.perform(post("/api/v1/fitness-goals/{goalId}/proposals", goalId)
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposalReq)))
+                .andExpect(status().isCreated());
+
+        // Trainer reads student proposals list
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goal-proposals", studentId)
+                        .header("Authorization", "Bearer " + trainerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].proposedTitle", is("Trainer Proposed Goal Variation")))
+                .andExpect(jsonPath("$.items[0].proposedDurationDays", is(75)))
+                .andExpect(jsonPath("$.totalItems", is(1)));
+    }
+
+    @Test
+    @DisplayName("Regression FINDING-READONLY-TX-01: Unrelated trainer cannot read student current goal (403 Forbidden)")
+    void trainerGetStudentCurrentGoal_unrelatedTrainerForbidden_onPostgreSQL() throws Exception {
+        UUID studentId = createActiveStudentUser("student.unrelated@example.com");
+        UUID legitimateTrainerId = createActiveTrainerUser("legit.trainer@example.com", true, true);
+        createCoachingContext(legitimateTrainerId, studentId, true, true);
+        createActiveGoal(studentId, "Goal Legitimate Coach Only");
+
+        UUID unrelatedTrainerId = createActiveTrainerUser("unrelated.trainer@example.com", true, true);
+        String unrelatedTrainerToken = createAccessToken(unrelatedTrainerId, "unrelated.trainer@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .header("Authorization", "Bearer " + unrelatedTrainerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Regression FINDING-READONLY-TX-01: Trainer cannot read student current goal when data sharing permission is DENIED (403 Forbidden)")
+    void trainerGetStudentCurrentGoal_permissionDenied_forbidden_onPostgreSQL() throws Exception {
+        UUID studentId = createActiveStudentUser("student.revoked@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.revoked@example.com", true, true);
+        UUID relId = createCoachingContext(trainerId, studentId, true, false); // no allow permission
+        createActiveGoal(studentId, "Goal Sharing Denied");
+
+        // Explicitly set DENY
+        jdbcTemplate.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id, relationship_id, student_id, trainer_id, data_scope, decision, access_level,
+                 valid_from, granted_by, created_at)
+                VALUES (gen_random_uuid(), ?, ?, ?, 'FITNESS_GOAL'::fitness.data_scope_code,
+                        'DENY'::fitness.permission_decision, 'VIEW'::fitness.data_access_level,
+                        now(), ?, now())
+                """,
+                relId, studentId, trainerId, studentId);
+
+        String trainerToken = createAccessToken(trainerId, "trainer.revoked@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .header("Authorization", "Bearer " + trainerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Regression FINDING-READONLY-TX-01: Trainer reading student current goal returns 404 when student has no active goal")
+    void trainerGetStudentCurrentGoal_notFoundWhenNoGoal_onPostgreSQL() throws Exception {
+        UUID studentId = createActiveStudentUser("student.nogoal@example.com");
+        UUID trainerId = createActiveTrainerUser("trainer.nogoal@example.com", true, true);
+        createCoachingContext(trainerId, studentId, true, true);
+
+        String trainerToken = createAccessToken(trainerId, "trainer.nogoal@example.com", List.of("TRAINER"));
+
+        mockMvc.perform(get("/api/v1/students/{studentId}/fitness-goals/current", studentId)
+                        .header("Authorization", "Bearer " + trainerToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("FITNESS_GOAL_NOT_FOUND")));
+    }
 }

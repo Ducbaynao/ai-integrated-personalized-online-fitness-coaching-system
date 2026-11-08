@@ -5,6 +5,8 @@ import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { TrainerProfileResponse } from '@/types/trainer';
 import { ApiError } from '@/types/auth';
 import { useAuth } from '@/features/auth/AuthContext';
+import * as DocumentPicker from 'expo-document-picker';
+import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -24,6 +26,18 @@ jest.mock('@/services/trainerProfileApi', () => ({
     getMyTrainerProfile: jest.fn(),
     updateMyTrainerProfile: jest.fn(),
   },
+}));
+
+jest.mock('@/services/trainerApplicationApi', () => ({
+  trainerApplicationApi: {
+    submitApplication: jest.fn(),
+    getCurrentApplication: jest.fn(),
+    uploadDocument: jest.fn(),
+  },
+}));
+
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(),
 }));
 
 describe('TrainerProfileScreen Component', () => {
@@ -301,6 +315,289 @@ describe('TrainerProfileScreen Component', () => {
           : String(n.props.children ?? '');
         return text.includes('Unavailable');
       }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('renders submit application form when NOT_SUBMITTED and submits successfully', async () => {
+    const unsubmittedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['APPLICATION_NOT_SUBMITTED'],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(unsubmittedProfile)
+      .mockResolvedValueOnce({ ...unsubmittedProfile, verificationStatus: 'PENDING' });
+
+    (trainerApplicationApi.submitApplication as jest.Mock).mockResolvedValueOnce({
+      id: 'app-new',
+      trainerId: 'user-trainer-1',
+      status: 'PENDING',
+      submittedAt: '2026-11-08T10:00:00Z',
+      reviewedAt: null,
+      rejectionReason: null,
+      updatedAt: '2026-11-08T10:00:00Z',
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-not-submitted-card' })).toBeDefined();
+
+    const noteInput = root.findByProps({ testID: 'trainer-application-note-input' });
+    renderer.act(() => {
+      noteInput.props.onChangeText('Experienced coach with certifications');
+    });
+
+    const submitBtn = root.findByProps({ testID: 'trainer-application-submit-button' });
+    await renderer.act(async () => {
+      submitBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.submitApplication).toHaveBeenCalledWith({
+      applicantNote: 'Experienced coach with certifications',
+    });
+    expect(root.findByProps({ testID: 'trainer-application-success-banner' })).toBeDefined();
+  });
+
+  it('displays rejection reason and allows resubmitting when REJECTED', async () => {
+    const rejectedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'REJECTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['VERIFICATION_REJECTED'],
+      },
+    };
+    const mockApp = {
+      id: 'app-rej',
+      trainerId: 'user-trainer-1',
+      status: 'REJECTED',
+      submittedAt: '2026-11-07T10:00:00Z',
+      reviewedAt: '2026-11-07T14:00:00Z',
+      rejectionReason: 'Certification expired. Please submit current certification.',
+      updatedAt: '2026-11-07T14:00:00Z',
+    };
+
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(rejectedProfile)
+      .mockResolvedValueOnce({ ...rejectedProfile, verificationStatus: 'PENDING' });
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValueOnce(mockApp);
+
+    (trainerApplicationApi.submitApplication as jest.Mock).mockResolvedValueOnce({
+      ...mockApp,
+      status: 'PENDING',
+      rejectionReason: null,
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-rejected-card' })).toBeDefined();
+    const reasonNode = root.findByProps({ testID: 'trainer-application-rejection-reason' });
+    expect(
+      reasonNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('Certification expired')).length
+    ).toBeGreaterThan(0);
+
+    const noteInput = root.findByProps({ testID: 'trainer-application-resubmit-note-input' });
+    renderer.act(() => {
+      noteInput.props.onChangeText('Uploaded renewed certificate valid through 2028');
+    });
+
+    const resubmitBtn = root.findByProps({ testID: 'trainer-application-resubmit-button' });
+    await renderer.act(async () => {
+      resubmitBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.submitApplication).toHaveBeenCalledWith({
+      applicantNote: 'Uploaded renewed certificate valid through 2028',
+    });
+  });
+
+  it('displays verified banner when VERIFIED', async () => {
+    const verifiedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'VERIFIED',
+      verifiedAt: '2026-11-01T08:00:00Z',
+      coachingEligibility: {
+        eligible: true,
+        blockingReasons: [],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(verifiedProfile);
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    expect(root.findByProps({ testID: 'trainer-application-verified-banner' })).toBeDefined();
+  });
+
+  it('allows picking, uploading, removing documents and includes documentMediaIds on submit', async () => {
+    const unsubmittedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['APPLICATION_NOT_SUBMITTED'],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(unsubmittedProfile)
+      .mockResolvedValueOnce({ ...unsubmittedProfile, verificationStatus: 'PENDING' });
+
+    (DocumentPicker.getDocumentAsync as jest.Mock)
+      .mockResolvedValueOnce({
+        canceled: false,
+        assets: [
+          {
+            uri: 'file:///data/cert1.pdf',
+            name: 'cert1.pdf',
+            mimeType: 'application/pdf',
+            size: 102400,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        canceled: false,
+        assets: [
+          {
+            uri: 'file:///data/cert2.png',
+            name: 'cert2.png',
+            mimeType: 'image/png',
+            size: 204800,
+          },
+        ],
+      });
+
+    (trainerApplicationApi.uploadDocument as jest.Mock)
+      .mockResolvedValueOnce({
+        id: 'doc-uuid-1',
+        originalFilename: 'cert1.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 102400,
+        scanStatus: 'CLEAN',
+        createdAt: '2026-11-08T10:00:00Z',
+      })
+      .mockResolvedValueOnce({
+        id: 'doc-uuid-2',
+        originalFilename: 'cert2.png',
+        contentType: 'image/png',
+        sizeBytes: 204800,
+        scanStatus: 'CLEAN',
+        createdAt: '2026-11-08T10:00:00Z',
+      });
+
+    (trainerApplicationApi.submitApplication as jest.Mock).mockResolvedValueOnce({
+      id: 'app-with-docs',
+      trainerId: 'user-trainer-1',
+      status: 'PENDING',
+      submittedAt: '2026-11-08T10:00:00Z',
+      reviewedAt: null,
+      rejectionReason: null,
+      updatedAt: '2026-11-08T10:00:00Z',
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    const uploadBtn = root.findByProps({ testID: 'trainer-document-upload-button' });
+
+    // Upload first doc
+    await renderer.act(async () => {
+      await uploadBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.uploadDocument).toHaveBeenCalledWith(
+      'file:///data/cert1.pdf',
+      'cert1.pdf',
+      'application/pdf',
+    );
+    expect(root.findByProps({ testID: 'uploaded-doc-item-doc-uuid-1' })).toBeDefined();
+
+    // Upload second doc
+    await renderer.act(async () => {
+      await uploadBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.uploadDocument).toHaveBeenCalledWith(
+      'file:///data/cert2.png',
+      'cert2.png',
+      'image/png',
+    );
+    expect(root.findByProps({ testID: 'uploaded-doc-item-doc-uuid-2' })).toBeDefined();
+
+    // Remove second doc
+    const removeBtn = root.findByProps({ testID: 'remove-doc-doc-uuid-2' });
+    renderer.act(() => {
+      removeBtn.props.onPress();
+    });
+
+    expect(root.findAllByProps({ testID: 'uploaded-doc-item-doc-uuid-2' }).length).toBe(0);
+    expect(root.findByProps({ testID: 'uploaded-doc-item-doc-uuid-1' })).toBeDefined();
+
+    // Submit
+    const submitBtn = root.findByProps({ testID: 'trainer-application-submit-button' });
+    await renderer.act(async () => {
+      await submitBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.submitApplication).toHaveBeenCalledWith({
+      documentMediaIds: ['doc-uuid-1'],
+    });
+  });
+
+  it('displays error and does not upload when document exceeds 10MB limit', async () => {
+    const unsubmittedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['APPLICATION_NOT_SUBMITTED'],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(unsubmittedProfile);
+
+    (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///data/huge.pdf',
+          name: 'huge.pdf',
+          mimeType: 'application/pdf',
+          size: 15 * 1024 * 1024,
+        },
+      ],
+    });
+
+    let tree: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree!.root;
+
+    const uploadBtn = root.findByProps({ testID: 'trainer-document-upload-button' });
+    await renderer.act(async () => {
+      await uploadBtn.props.onPress();
+    });
+
+    expect(trainerApplicationApi.uploadDocument).not.toHaveBeenCalled();
+    const errorNode = root.findByProps({ testID: 'trainer-document-upload-error' });
+    expect(
+      errorNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('10 MB limit')).length
     ).toBeGreaterThan(0);
   });
 });
