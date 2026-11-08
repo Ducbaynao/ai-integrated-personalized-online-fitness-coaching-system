@@ -52,7 +52,7 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
   - `FitnessGoalProposalController.java`: Added endpoints:
     - `GET /api/v1/students/{studentId}/fitness-goals/current` (`@PreAuthorize("hasRole('TRAINER')")`)
     - `GET /api/v1/students/{studentId}/fitness-goal-proposals` (`@PreAuthorize("hasRole('TRAINER')")`)
-    - `POST /api/v1/fitness-goals/{goalId}/proposals` (`POST /api/v1/students/{studentId}/fitness-goal-proposals`)
+    - `POST /api/v1/fitness-goals/{goalId}/proposals` (`@PreAuthorize("hasRole('TRAINER')")`)
   - Integration & Unit Tests:
     - `FitnessGoalProposalIntegrationTest.java`: 41 tests passing.
     - `FitnessGoalProposalControllerUnitTest.java`: 8 tests passing.
@@ -90,7 +90,7 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
   - `GET /api/v1/admin/trainer-applications/{applicationId}/certificates`
   - `GET /api/v1/students/{studentId}/fitness-goals/current`
   - `GET /api/v1/students/{studentId}/fitness-goal-proposals`
-  - `POST /api/v1/students/{studentId}/fitness-goal-proposals`
+  - `POST /api/v1/fitness-goals/{goalId}/proposals`
 
 ---
 
@@ -122,14 +122,27 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 
 ## 5. Handoff Status & Readiness Determinations
 
-### A. Ready to Merge: PASS
-- All source code, database migrations, schemas, security policies, unit tests, integration tests, contract tests, and component UI tests pass 100%.
-- Zero compiler errors, zero type errors, zero schema/contract violations.
-- Safe to merge into staging/development branches without regression.
+> [!NOTE]
+> **Tuyên bố Bản quyền & Giới hạn Đánh giá:**  
+> Đánh giá trạng thái này là kết quả **Self-Review** của chính agent thực hiện triển khai và sửa lỗi. Đây không phải là review độc lập từ bên thứ ba và đang **chờ reviewer khác xác nhận**.
 
-### B. Eligible for Physical Acceptance: BLOCKED BY ENVIRONMENT
-- **Trainer Verification (M1/M8):** Requires active live ClamAV scanner daemon (`clamd` on port 3310) and live S3 storage to verify end-to-end binary malware scanning and storage, plus a physical mobile device/AVD for manual camera and document picker verification.
-- **Physical Fitness Goals (M2):** **NOT BLOCKED BY SCANNER DAEMON.** Luồng Goals không upload file hay tương tác với ClamAV. Chỉ chờ nghiệm thu thủ công trên thiết bị di động thật / AVD để hoàn tất ký duyệt acceptance.
+### A. Trạng thái Mã nguồn & Đủ điều kiện Review (Ready for Review)
+- Self-review chưa phát hiện finding chặn merge trong phạm vi đã kiểm tra.
+- Chờ reviewer khác xác nhận độc lập.
+- Không có lỗi biên dịch, không có lỗi type error, không có lỗi linter/OpenAPI schema.
+- **Phân định kết quả kiểm thử:**
+  - *Kiểm thử thực sự chạy lại trong phiên self-review hiện tại:* `test_ai_lockdown.py` (6 tests PASS), Admin Web TrainerApplication vitest (13 tests PASS), Mobile TrainerProfileScreen jest (17 tests PASS), Backend Media + Trainer unit tests (79 tests PASS), Contracts linting (0 errors).
+  - *Kiểm thử kế thừa từ phiên monorepo trước đó:* Backend full suite (449 tests PASS), AI service full suite (82 tests PASS), Mobile full suite (720 tests / 89 suites PASS), Admin Web full suite (117 tests / 16 suites PASS).
+  - *Lưu ý:* Việc các bài kiểm thử tự động vượt qua là điều kiện cần nhưng không đảm bảo tuyệt đối "không có hồi quy" trong mọi trường hợp biên runtime.
+
+### B. Trạng thái Nghiệm thu UI E2E (Chưa hoàn tất nghiệm thu UI E2E — Pending Acceptance)
+- Chưa khẳng định hoàn thành 100% tính năng khi chưa chạy nghiệm thu tương tác trực tiếp trên giao diện thực tế.
+- Chưa khẳng định đã kiểm chứng storage/scanner thật khi mới chỉ kiểm chứng qua lớp mock/in-memory trong automated unit tests.
+- **Blockers thực tế đã quan sát (Factual Observations):**
+  - **Mục tiêu Thể chất (Goals - M2):** Không bị chặn bởi ClamAV daemon hay S3 storage (luồng Goals không upload binary). Chưa hoàn tất nghiệm thu UI E2E trên thiết bị di động thật hoặc Android Virtual Device (AVD) / iOS Simulator.
+  - **Xác minh Huấn luyện viên (Trainer Verification - M1/M8):**
+    - Thiếu hạ tầng daemon ClamAV thật (`clamd` port 3310) và lưu trữ tương thích S3 thật (ví dụ MinIO cục bộ) đang chạy dạng background service để xác thực quét malware nhị phân trực tiếp qua stream `zINSTREAM`.
+    - Chưa chạy nghiệm thu thủ công các bước chọn file và tương tác UI trên thiết bị di động thật / AVD.
 
 ---
 
@@ -140,3 +153,71 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 - [ ] Verify that `/api/v1/coaching/trainers` strictly excludes non-verified trainers.
 - [ ] Verify that Trainer cannot access `/api/v1/students/{studentId}/fitness-goals/current` for students outside their coaching roster.
 - [ ] Verify that concurrent goal proposal acceptance returns 409 and prompts user to reload state.
+- [ ] Verify that Trainer creates proposals via `POST /api/v1/fitness-goals/{goalId}/proposals` and lists them via `GET /api/v1/students/{studentId}/fitness-goal-proposals`.
+
+---
+
+## 7. Hướng dẫn Nghiệm thu Thực tế Có thể Chạy Được (Runnable Acceptance Guide)
+
+### 7.1 Lệnh khởi chạy các dịch vụ
+
+```bash
+# 1. Khởi chạy Backend (Spring Boot)
+cd services/backend
+./mvnw spring-boot:run
+
+# 2. Khởi chạy Admin Web (Vite + React)
+cd apps/admin-web
+npm run dev
+
+# 3. Khởi chạy Mobile (Expo / React Native)
+cd apps/mobile
+npm start
+```
+
+### 7.2 Biến cấu hình cần thiết (Mẫu không nhạy cảm)
+
+- **Backend (`application-local.yml` / ENV):**
+  - `DATABASE_URL=jdbc:postgresql://localhost:5432/digital_fitness`
+  - `CHAT_ATTACHMENTS_S3_ENDPOINT=http://localhost:9000` (MinIO local)
+  - `CHAT_ATTACHMENTS_S3_BUCKET=fitness-media`
+  - `CHAT_ATTACHMENTS_S3_ACCESS_KEY=local-minio-key`
+  - `CHAT_ATTACHMENTS_S3_SECRET_KEY=local-minio-secret`
+  - `CHAT_ATTACHMENTS_CLAMD_HOST=localhost`
+  - `CHAT_ATTACHMENTS_CLAMD_PORT=3310`
+  - `AI_SERVICE_URL=http://localhost:8000`
+- **Mobile (`apps/mobile/.env`):**
+  - `EXPO_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1`
+- **Admin Web (`apps/admin-web/.env`):**
+  - `VITE_API_BASE_URL=http://localhost:8080/api/v1`
+
+### 7.3 Health check & Xác nhận dịch vụ sẵn sàng
+
+- **Backend:** `curl -s http://localhost:8080/actuator/health` -> Phản hồi `{"status":"UP"}`.
+- **S3-compatible Storage (MinIO local):** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200.
+- **ClamAV daemon:** Mở socket TCP tới `localhost:3310` gửi lệnh `PING\0`, nhận phản hồi `PONG`. (Nếu clamd chưa bật, backend sẽ trả về lỗi `SCANNER_UNAVAILABLE`, tuân thủ nguyên tắc fail-closed).
+
+### 7.4 Chuẩn bị tài khoản kiểm thử (Roles & Capabilities)
+
+1. **Tài khoản HLV (Trainer):** User vai trò `TRAINER`, trạng thái `ACTIVE`, hồ sơ `NOT_SUBMITTED` hoặc `REJECTED`, có active coaching relationship với Học viên 1.
+2. **Tài khoản Học viên (Student):** User vai trò `STUDENT`, trạng thái `ACTIVE`, có mục tiêu thể chất đang hoạt động.
+3. **Tài khoản Quản trị viên (Admin):** User vai trò `ADMIN`, trạng thái `ACTIVE`.
+
+### 7.5 Quy trình nghiệm thu từng luồng
+
+#### Luồng 1: Mục tiêu Thể chất (Physical Fitness Goals) — Không phụ thuộc scanner/storage
+1. **HLV tạo đề xuất:** Đăng nhập HLV trên Mobile -> Vào `RelationshipDetailScreen` của Học viên 1 -> Bấm nút điều hướng mục tiêu học viên (`(app)/coaching/[relationshipId]/goal`) -> Màn hình `TrainerStudentGoalScreen` tải mục tiêu và lịch sử đề xuất (`GET /api/v1/students/{studentId}/fitness-goals/current` & `GET /api/v1/students/{studentId}/fitness-goal-proposals`) -> Bấm "Đề xuất điều chỉnh mục tiêu" -> Điền lý do (bắt buộc), tiêu đề mới, thời gian -> Bấm gửi đề xuất (`POST /api/v1/fitness-goals/{goalId}/proposals`). Đề xuất mới hiển thị ở trạng thái `PENDING`.
+2. **Học viên quyết định:** Đăng nhập Học viên trên Mobile -> Vào `CurrentGoalScreen` -> `GoalProposalDetailScreen` -> So sánh mục tiêu hiện tại vs đề xuất:
+   - *Chấp nhận (Accept):* Bấm "Chấp nhận" (`POST /fitness-goal-proposals/{proposalId}/decisions` với `decision = 'ACCEPT'`). Mục tiêu chuyển version mới; đề xuất chuyển `ACCEPTED`.
+   - *Từ chối (Reject):* Bấm "Từ chối" kèm lý do. Đề xuất chuyển `REJECTED`, mục tiêu cũ giữ nguyên.
+3. **Kiểm tra tính nhất quán:** Tải lại màn hình để kiểm tra lịch sử mục tiêu không bị ghi đè.
+4. **Bằng chứng cần lưu:** Ảnh chụp màn hình HLV gửi đề xuất, màn hình học viên đối chiếu quyết định, màn hình mục tiêu sau khi cập nhật version.
+
+#### Luồng 2: Xác minh Huấn luyện viên (Trainer Verification) — Có scanner & storage tương thích S3
+1. **HLV đính kèm tài liệu & nộp hồ sơ:** Đăng nhập HLV trên Mobile -> Vào `TrainerProfileScreen` -> Trạng thái `NOT_SUBMITTED` -> Bấm "+ Attach Document" -> Document Picker chọn file PDF/PNG/JPEG (< 10MB) -> Gọi `POST /api/v1/trainer-applications/documents` -> ClamAV quét virus `zINSTREAM`, lưu S3/MinIO bucket `fitness-media` với quyền `PRIVATE` -> Tệp hiển thị trong danh sách đính kèm với nhãn "Scanned & Clean". Nút "X" cho phép bỏ đính kèm nếu muốn -> Điền ghi chú ứng viên -> Bấm "Submit Application" (`POST /api/v1/trainer-applications` kèm `documentMediaIds`) -> Hồ sơ chuyển `PENDING`, hiển thị banner "APPLICATION UNDER REVIEW".
+2. **Admin kiểm tra & tải tài liệu:** Đăng nhập Admin trên trình duyệt -> Mở `http://localhost:5173/trainer-applications` -> Danh sách hiển thị hồ sơ `PENDING` -> Bấm vào chi tiết hồ sơ (`TrainerApplicationDetailPage`) -> Hiển thị bảng chứng chỉ và bảng tài liệu đính kèm kèm badge `CLEAN` -> Bấm "Tải xuống" bên cạnh tài liệu (`GET /api/v1/admin/trainer-applications/{applicationId}/documents/{mediaId}/download`) -> File tải về máy; backend ghi vết audit `ADMIN_TRAINER_DOCUMENT_ACCESSED`. Response header có `Cache-Control: no-store` và `Content-Disposition: attachment`.
+3. **Admin từ chối (Reject flow):** Bấm "Từ chối hồ sơ" -> Nhập lý do từ chối (bắt buộc) -> Xác nhận -> Hồ sơ chuyển `REJECTED`, ghi vết audit `TRAINER_APPLICATION_REJECTED`.
+4. **HLV nộp lại (Resubmit flow):** HLV mở lại `TrainerProfileScreen` trên Mobile -> Hiển thị thông báo từ chối kèm lý do chính xác -> Đính kèm tài liệu mới bổ sung -> Bấm "Resubmit Application" -> Hồ sơ chuyển lại thành `PENDING`.
+5. **Admin phê duyệt (Approve flow) & Tìm kiếm:** Admin mở lại hồ sơ trên Admin Web -> Bấm "Phê duyệt hồ sơ" -> Nhập ghi chú duyệt -> Xác nhận -> Hồ sơ và profile HLV chuyển `VERIFIED`, ghi vết audit `TRAINER_APPLICATION_APPROVED` -> HLV bật công tắc "Accepting Students" trên Mobile -> Gọi `GET /api/v1/coaching/trainers` -> HLV xuất hiện trong danh sách tìm kiếm công khai.
+6. **Bằng chứng cần lưu:** Ảnh chụp tải tài liệu trên Mobile, bảng tài liệu trên Admin Web, tệp tải về máy, bản ghi audit trong `fitness.audit_logs`.
+7. **Lưu ý nguyên tắc:** Không dùng cập nhật database trực tiếp để giả lập trạng thái scanner hay bỏ qua các bước giao diện. Nghiệp vụ chỉ yêu cầu Document Picker (không bắt buộc camera vật lý). Môi trường cục bộ tương thích S3 (như MinIO) là đáp ứng kiến trúc, không bắt buộc cloud AWS S3.
