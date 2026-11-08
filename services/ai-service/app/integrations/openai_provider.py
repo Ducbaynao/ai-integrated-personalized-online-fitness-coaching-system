@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import math
+import os
 import random
 import re
 import time
@@ -462,6 +463,22 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
         should_close_client = False
         client = self.http_client
         if client is None:
+            # SAFETY GUARD: In test/evaluation environments, prevent unmocked live external API calls
+            # unless explicitly opted in with RUN_LIVE_OPENAI_TESTS=true
+            is_test_env = "PYTEST_CURRENT_TEST" in os.environ or os.getenv("TESTING", "").lower() == "true"
+            if is_test_env and os.getenv("RUN_LIVE_OPENAI_TESTS", "").lower() != "true":
+                logger.error("Live external OpenAI call blocked in test environment: RUN_LIVE_OPENAI_TESTS is not 'true'")
+                return F01KnowledgeQueryResult(
+                    runId=run_id,
+                    correlationId=correlation_id,
+                    runStatus="FAILED",
+                    reasonCode="PROVIDER_ERROR",
+                    error=ErrorDto(
+                        code="LIVE_CALL_BLOCKED",
+                        message="Live external OpenAI calls are blocked in default offline/test mode. Set RUN_LIVE_OPENAI_TESTS=true to enable.",
+                    ),
+                    asOf=now_str,
+                )
             client = httpx.AsyncClient()
             should_close_client = True
 
