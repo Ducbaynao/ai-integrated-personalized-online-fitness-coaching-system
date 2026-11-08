@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { Text } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentApi, AppointmentRequest } from '@/services/appointmentApi';
@@ -25,16 +26,30 @@ let client: QueryClient;
 let tree: renderer.ReactTestRenderer;
 async function renderRequest() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false, gcTime: 0 } } });
-  renderer.act(() => { tree = renderer.create(<QueryClientProvider client={client}><AppointmentRequestScreen requestId="request-1" /></QueryClientProvider>); });
-  for (let attempt = 0; attempt < 50 && !JSON.stringify(tree.toJSON()).includes('Asia/Ho_Chi_Minh'); attempt++) {
-    await settle();
-  }
-  expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh');
+  renderer.act(() => {
+    tree = renderer.create(<QueryClientProvider client={client}><AppointmentRequestScreen requestId="request-1" /></QueryClientProvider>);
+  });
+  await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh'));
 }
-async function settle() { await renderer.act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); }
-async function press(label: string) {
+async function waitForScreen(assertion: () => void) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try { assertion(); return; } catch { /* The query has not reached the rendered screen yet. */ }
+    await renderer.act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  }
+  assertion();
+}
+async function mutationSettled(status: 'success' | 'error') {
+  const cache = client.getMutationCache();
+  await renderer.act(async () => {
+    await new Promise<void>(resolve => {
+      const observed = () => cache.getAll().slice(-1)[0]?.state.status === status;
+      if (observed()) { resolve(); return; }
+      const unsubscribe = cache.subscribe(() => { if (observed()) { unsubscribe(); resolve(); } });
+    });
+  });
+}
+function press(label: string) {
   renderer.act(() => { tree.root.findByProps({ accessibilityLabel: label }).props.onPress(); });
-  await settle();
 }
 
 beforeEach(() => {
@@ -52,6 +67,7 @@ it('shows a nullable-safe request and sends the actual optimistic version only a
   await press('Chấp nhận');
   expect(appointmentApi.decide).not.toHaveBeenCalled();
   await press('Xác nhận quyết định');
+  await mutationSettled('success');
   expect(appointmentApi.decide).toHaveBeenCalledWith('request-1', {
     decision: 'ACCEPT', expectedRequestVersion: 4, expectedAppointmentVersion: undefined, commandKey: 'same-command-key',
   });
@@ -63,7 +79,10 @@ it('reuses the exact body and key after an uncertain network result', async () =
   await renderRequest();
   await press('Từ chối');
   await press('Xác nhận quyết định');
+  await mutationSettled('error');
+  await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Chưa quyết định được'));
   await press('Xác nhận quyết định');
+  await mutationSettled('success');
   expect(appointmentApi.decide).toHaveBeenCalledTimes(2);
   expect((appointmentApi.decide as jest.Mock).mock.calls[0][1]).toEqual((appointmentApi.decide as jest.Mock).mock.calls[1][1]);
   expect(createCommandKey).toHaveBeenCalledTimes(1);
@@ -71,10 +90,17 @@ it('reuses the exact body and key after an uncertain network result', async () =
 
 it('drops the old decision after 409 and refetches rather than automatically accepting', async () => {
   (appointmentApi.decide as jest.Mock).mockRejectedValueOnce(new ApiError(409, 'stale'));
+  (appointmentApi.requestDetail as jest.Mock).mockResolvedValueOnce(request)
+    .mockResolvedValueOnce({ ...request, version: 5 });
   await renderRequest();
   await press('Chấp nhận');
   await press('Xác nhận quyết định');
+  await mutationSettled('error');
   expect(appointmentApi.requestDetail).toHaveBeenCalledTimes(2);
+  expect(client.getQueryData(['appointments', 'student-1', 'STUDENT', 'request', 'request-1']))
+    .toEqual(expect.objectContaining({ version: 5 }));
+  await waitForScreen(() => expect(tree.root.findAllByType(Text)
+    .some(node => React.Children.toArray(node.props.children).join('') === 'Phiên bản yêu cầu 5')).toBe(true));
   expect(tree.root.findAllByProps({ accessibilityLabel: 'Xác nhận quyết định' })).toHaveLength(0);
   expect(appointmentApi.decide).toHaveBeenCalledTimes(1);
 });

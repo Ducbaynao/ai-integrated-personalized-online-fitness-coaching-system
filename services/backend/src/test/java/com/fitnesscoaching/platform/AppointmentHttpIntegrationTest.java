@@ -245,6 +245,39 @@ class AppointmentHttpIntegrationTest {
                         failure -> assertThat(failure.code()).isEqualTo("APPOINTMENT_VERSION_STALE"));
     }
 
+    @Test void cancellingIndependentAppointmentDoesNotCancelOverlappingPlannedWorkout() throws Exception {
+        Fixture f = fixture();
+        LocalDate day = futureDate();
+        UUID occurrence = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,coaching_period_id,planned_start_at,planned_end_at,
+                 original_planned_start_at,supervision_requirement,created_by)
+                VALUES (?,?,?,?,?,?,'SELF_ALLOWED',?)
+                """, occurrence, f.student(), f.period(),
+                Timestamp.from(day.atTime(10, 0).toInstant(ZoneOffset.UTC)),
+                Timestamp.from(day.atTime(11, 0).toInstant(ZoneOffset.UTC)),
+                Timestamp.from(day.atTime(10, 0).toInstant(ZoneOffset.UTC)), f.student());
+        var request = appointments.request(new RequestCommand(f.student(), f.student(), null,
+                interval(9, 12), UUID.randomUUID()));
+        var appointment = appointments.decide(new DecisionCommand(f.trainer(), request.request().requestId(),
+                "ACCEPT", 0, UUID.randomUUID())).appointment();
+        mvc.perform(post("/api/v1/appointments/{id}/cancel", appointment.appointmentId())
+                        .with(jwt().jwt(token -> token.subject(f.student().toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAppointmentVersion\":" + appointment.version()
+                                + ",\"reason\":\"Không thể tham gia\",\"commandKey\":\""
+                                + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointment.status").value("CANCELLED"));
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
+                String.class, occurrence)).isEqualTo("SCHEDULED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.appointments WHERE planned_workout_id=?",
+                Integer.class, occurrence)).isZero();
+        assertThat(appointments.history(f.student(), appointment.appointmentId(), 0, 20).items())
+                .anySatisfy(event -> assertThat(event.eventType()).isEqualTo("APPOINTMENT_CANCELLED"));
+    }
+
     @Test void trainerRescheduleRequestNeedsStudentDecisionAndPreservesHistory() {
         Fixture f = fixture();
         var created = appointments.request(new RequestCommand(f.student(), f.student(), null,
