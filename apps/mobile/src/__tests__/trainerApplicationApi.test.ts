@@ -58,4 +58,29 @@ describe('trainerApplicationApi', () => {
     });
     expect(result).toEqual(mockResponse);
   });
+
+  it('calls POST /trainer-applications/documents with FormData on uploadDocument', async () => {
+    const mockUploadResponse = {
+      id: 'doc-uuid-1',
+      originalFilename: 'cert.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 10240,
+      scanStatus: 'CLEAN',
+      createdAt: '2026-11-08T10:00:00Z',
+    };
+    (request as jest.Mock).mockResolvedValueOnce(mockUploadResponse);
+
+    const result = await trainerApplicationApi.uploadDocument(
+      'file://cache/cert.pdf',
+      'cert.pdf',
+      'application/pdf',
+    );
+
+    expect(request).toHaveBeenCalledWith('/trainer-applications/documents', {
+      method: 'POST',
+      requiresAuth: true,
+      body: expect.any(FormData),
+    });
+    expect(result).toEqual(mockUploadResponse);
+  });
 });

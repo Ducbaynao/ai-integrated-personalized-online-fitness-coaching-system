@@ -395,4 +395,109 @@ public class TrainerApplicationPersistenceAdapter implements TrainerApplicationP
         String sql = "SELECT media_id FROM fitness.trainer_verification_documents WHERE trainer_application_id = ? ORDER BY media_id";
         return jdbcTemplate.query(sql, (rs, rowNum) -> (UUID) rs.getObject("media_id"), applicationId);
     }
+
+    @Override
+    public UUID saveMediaFile(
+            UUID mediaId,
+            UUID ownerUserId,
+            String bucketName,
+            String objectKey,
+            String originalFilename,
+            String contentType,
+            long sizeBytes,
+            String checksumSha256,
+            String scanStatus,
+            Instant createdAt
+    ) {
+        String sql = """
+                INSERT INTO fitness.media_files (
+                    id, owner_user_id, storage_provider, bucket_name, object_key,
+                    original_filename, content_type, size_bytes, checksum_sha256,
+                    media_purpose, visibility, scan_status, created_at
+                ) VALUES (
+                    ?, ?, 'S3', ?, ?,
+                    ?, ?, ?, ?,
+                    'VERIFICATION_DOCUMENT', 'PRIVATE', ?, ?
+                )
+                """;
+        jdbcTemplate.update(
+                sql,
+                mediaId,
+                ownerUserId,
+                bucketName,
+                objectKey,
+                originalFilename,
+                contentType,
+                sizeBytes,
+                checksumSha256,
+                scanStatus,
+                Timestamp.from(createdAt)
+        );
+        return mediaId;
+    }
+
+    @Override
+    public List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo> findDocumentsByApplicationId(UUID applicationId) {
+        String sql = """
+                SELECT mf.id, mf.original_filename, mf.content_type, mf.size_bytes, mf.scan_status, mf.created_at
+                FROM fitness.trainer_verification_documents tvd
+                JOIN fitness.media_files mf ON mf.id = tvd.media_id
+                WHERE tvd.trainer_application_id = ?
+                  AND mf.deleted_at IS NULL
+                ORDER BY mf.created_at ASC, mf.id ASC
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo(
+                (UUID) rs.getObject("id"),
+                rs.getString("original_filename"),
+                rs.getString("content_type"),
+                rs.getLong("size_bytes"),
+                rs.getString("scan_status"),
+                rs.getTimestamp("created_at").toInstant()
+        ), applicationId);
+    }
+
+    @Override
+    public Optional<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent> findDocumentContent(UUID applicationId, UUID mediaId) {
+        String sql = """
+                SELECT mf.id, mf.original_filename, mf.content_type, mf.size_bytes, mf.scan_status
+                FROM fitness.trainer_verification_documents tvd
+                JOIN fitness.media_files mf ON mf.id = tvd.media_id
+                WHERE tvd.trainer_application_id = ?
+                  AND tvd.media_id = ?
+                  AND mf.deleted_at IS NULL
+                """;
+        List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent> list = jdbcTemplate.query(sql, (rs, rowNum) -> new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                (UUID) rs.getObject("id"),
+                rs.getString("original_filename"),
+                rs.getString("content_type"),
+                rs.getLong("size_bytes"),
+                rs.getString("scan_status"),
+                new byte[0]
+        ), applicationId, mediaId);
+
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
+    public List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerCertificateInfo> findCertificatesByApplicationId(UUID applicationId) {
+        String sql = """
+                SELECT tc.id, tc.name, tc.issuer, tc.credential_number, tc.issued_on, tc.expires_on,
+                       tc.verification_status, tc.document_media_id, tc.created_at
+                FROM fitness.trainer_application_certificates tac
+                JOIN fitness.trainer_certificates tc ON tc.id = tac.certificate_id
+                WHERE tac.trainer_application_id = ?
+                ORDER BY tc.created_at ASC, tc.id ASC
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new com.fitnesscoaching.platform.modules.trainer.domain.TrainerCertificateInfo(
+                (UUID) rs.getObject("id"),
+                rs.getString("name"),
+                rs.getString("issuer"),
+                rs.getString("credential_number"),
+                rs.getDate("issued_on") != null ? rs.getDate("issued_on").toLocalDate() : null,
+                rs.getDate("expires_on") != null ? rs.getDate("expires_on").toLocalDate() : null,
+                rs.getString("verification_status"),
+                (UUID) rs.getObject("document_media_id"),
+                rs.getTimestamp("created_at").toInstant()
+        ), applicationId);
+    }
 }

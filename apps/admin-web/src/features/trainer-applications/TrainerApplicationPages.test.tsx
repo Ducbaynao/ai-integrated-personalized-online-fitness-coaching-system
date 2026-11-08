@@ -12,6 +12,9 @@ vi.mock('../../services/trainerApplicationApi.ts', () => ({
   trainerApplicationApi: {
     getApplications: vi.fn(),
     getApplicationDetail: vi.fn(),
+    getApplicationDocuments: vi.fn(),
+    getApplicationCertificates: vi.fn(),
+    downloadDocument: vi.fn(),
     decideApplication: vi.fn(),
   },
 }))
@@ -27,6 +30,8 @@ function createTestQueryClient() {
 describe('Trainer Application Pages', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(trainerApplicationApi.getApplicationDocuments).mockResolvedValue([])
+    vi.mocked(trainerApplicationApi.getApplicationCertificates).mockResolvedValue([])
   })
 
   const mockAppPending: AdminTrainerApplicationResponse = {
@@ -258,6 +263,79 @@ describe('Trainer Application Pages', () => {
 
       expect(screen.queryByRole('button', { name: 'Phê duyệt hồ sơ' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Từ chối hồ sơ' })).not.toBeInTheDocument()
+    })
+
+    it('renders detailed certificates and documents table and supports document download', async () => {
+      vi.mocked(trainerApplicationApi.getApplicationDetail).mockResolvedValue(mockAppPending)
+      vi.mocked(trainerApplicationApi.getApplicationCertificates).mockResolvedValue([
+        {
+          id: 'cert-1',
+          name: 'NASM-CPT Certified Personal Trainer',
+          issuer: 'NASM',
+          credentialNumber: 'CERT-9988',
+          issuedOn: '2023-05-10',
+          expiresOn: '2025-05-10',
+          verificationStatus: 'PENDING',
+          documentMediaId: 'media-1',
+          createdAt: '2026-11-08T10:00:00Z',
+        },
+      ])
+      vi.mocked(trainerApplicationApi.getApplicationDocuments).mockResolvedValue([
+        {
+          id: 'media-1',
+          originalFilename: 'nasm-cert.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 2048576,
+          scanStatus: 'CLEAN',
+          downloadUrl: '/api/v1/admin/trainer-applications/app-pending-1234-5678-90ab/documents/media-1/download',
+          createdAt: '2026-11-08T10:00:00Z',
+        },
+      ])
+
+      const mockBlob = new Blob(['pdf-content'], { type: 'application/pdf' })
+      vi.mocked(trainerApplicationApi.downloadDocument).mockResolvedValue(mockBlob)
+
+      const createObjectURLMock = vi.fn().mockReturnValue('blob:http://localhost/dummy')
+      const revokeObjectURLMock = vi.fn()
+      window.URL.createObjectURL = createObjectURLMock
+      window.URL.revokeObjectURL = revokeObjectURLMock
+
+      const user = userEvent.setup()
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter initialEntries={['/trainer-applications/app-pending-1234-5678-90ab']}>
+            <Routes>
+              <Route path="/trainer-applications/:applicationId" element={<TrainerApplicationDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('NASM-CPT Certified Personal Trainer')).toBeInTheDocument()
+      })
+
+      expect(screen.getByText('CERT-9988')).toBeInTheDocument()
+      expect(screen.getByText('nasm-cert.pdf')).toBeInTheDocument()
+      expect(screen.getByText('application/pdf')).toBeInTheDocument()
+      expect(screen.getByText('1.95 MB')).toBeInTheDocument()
+      expect(screen.getByText('Đã quét sạch (CLEAN)')).toBeInTheDocument()
+
+      const downloadBtn = screen.getByRole('button', { name: 'Tải xuống nasm-cert.pdf' })
+      expect(downloadBtn).toBeInTheDocument()
+
+      await user.click(downloadBtn)
+
+      await waitFor(() => {
+        expect(trainerApplicationApi.downloadDocument).toHaveBeenCalledWith(
+          'app-pending-1234-5678-90ab',
+          'media-1',
+        )
+      })
+
+      expect(createObjectURLMock).toHaveBeenCalledWith(mockBlob)
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:http://localhost/dummy')
     })
   })
 })

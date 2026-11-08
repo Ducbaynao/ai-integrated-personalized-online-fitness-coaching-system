@@ -1,7 +1,9 @@
-import { apiRequest } from './apiClient.ts'
+import { apiBlobRequest, apiRequest } from './apiClient.ts'
 import type {
   AdminTrainerApplicationPageResponse,
   AdminTrainerApplicationResponse,
+  AdminTrainerCertificateResponse,
+  AdminTrainerDocumentResponse,
   DecideTrainerApplicationRequest,
 } from '../types/trainerApplication.ts'
 
@@ -19,6 +21,15 @@ export const trainerApplicationApi = {
 
   getApplicationDetail: (applicationId: string) =>
     apiRequest<AdminTrainerApplicationResponse>(`/admin/trainer-applications/${applicationId}`),
+
+  getApplicationDocuments: (applicationId: string) =>
+    apiRequest<AdminTrainerDocumentResponse[]>(`/admin/trainer-applications/${applicationId}/documents`),
+
+  getApplicationCertificates: (applicationId: string) =>
+    apiRequest<AdminTrainerCertificateResponse[]>(`/admin/trainer-applications/${applicationId}/certificates`),
+
+  downloadDocument: (applicationId: string, mediaId: string) =>
+    apiBlobRequest(`/admin/trainer-applications/${applicationId}/documents/${mediaId}/download`),
 
   decideApplication: (applicationId: string, payload: DecideTrainerApplicationRequest) =>
     apiRequest<AdminTrainerApplicationResponse>(`/admin/trainer-applications/${applicationId}/decisions`, {

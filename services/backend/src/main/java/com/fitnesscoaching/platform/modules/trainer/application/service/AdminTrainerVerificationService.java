@@ -36,13 +36,17 @@ import java.util.UUID;
 public class AdminTrainerVerificationService implements
         GetAdminTrainerApplicationsUseCase,
         GetAdminTrainerApplicationDetailUseCase,
-        DecideTrainerApplicationUseCase {
+        DecideTrainerApplicationUseCase,
+        com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationDocumentsUseCase,
+        com.fitnesscoaching.platform.modules.trainer.application.port.in.DownloadAdminTrainerApplicationDocumentUseCase,
+        com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationCertificatesUseCase {
 
     private final TrainerApplicationPort trainerApplicationPort;
     private final TrainerProfilePort trainerProfilePort;
     private final UserAccountStatusQuery userAccountStatusQuery;
     private final UserRoleQuery userRoleQuery;
     private final AuditService auditService;
+    private final TrainerDocumentStorageService documentStorageService;
     private final Clock clock;
 
     public AdminTrainerVerificationService(
@@ -51,6 +55,7 @@ public class AdminTrainerVerificationService implements
             UserAccountStatusQuery userAccountStatusQuery,
             UserRoleQuery userRoleQuery,
             AuditService auditService,
+            TrainerDocumentStorageService documentStorageService,
             Clock clock
     ) {
         this.trainerApplicationPort = trainerApplicationPort;
@@ -58,6 +63,7 @@ public class AdminTrainerVerificationService implements
         this.userAccountStatusQuery = userAccountStatusQuery;
         this.userRoleQuery = userRoleQuery;
         this.auditService = auditService;
+        this.documentStorageService = documentStorageService;
         this.clock = clock;
     }
 
@@ -265,5 +271,75 @@ public class AdminTrainerVerificationService implements
         if (!userRoleQuery.hasActiveRole(adminUserId, "ADMIN")) {
             throw new AccessDeniedException("User does not possess an active ADMIN role");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo> getApplicationDocuments(UUID adminUserId, UUID applicationId) {
+        verifyActiveAdmin(adminUserId);
+        if (applicationId == null) {
+            throw new ApplicationValidationException("Application ID cannot be null");
+        }
+        trainerApplicationPort.findById(applicationId)
+                .orElseThrow(() -> new TrainerApplicationNotFoundException("Trainer application not found: " + applicationId));
+
+        return trainerApplicationPort.findDocumentsByApplicationId(applicationId);
+    }
+
+    @Override
+    public com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent downloadApplicationDocument(
+            UUID adminUserId,
+            UUID applicationId,
+            UUID mediaId
+    ) {
+        verifyActiveAdmin(adminUserId);
+        if (applicationId == null || mediaId == null) {
+            throw new ApplicationValidationException("Application ID and Media ID cannot be null");
+        }
+        TrainerApplication app = trainerApplicationPort.findById(applicationId)
+                .orElseThrow(() -> new TrainerApplicationNotFoundException("Trainer application not found: " + applicationId));
+
+        com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent doc = trainerApplicationPort
+                .findDocumentContent(applicationId, mediaId)
+                .orElseThrow(() -> new TrainerApplicationNotFoundException("Document not found for application: " + mediaId));
+
+        if (!"CLEAN".equals(doc.scanStatus())) {
+            throw new ApplicationValidationException("Media file is not clean: " + doc.scanStatus());
+        }
+
+        byte[] bytes = documentStorageService.loadFile("verification-docs/" + app.trainerId() + "/" + mediaId + "/" + doc.originalFilename());
+
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(adminUserId)
+                .actorRole("ADMIN")
+                .action("ADMIN_TRAINER_DOCUMENT_ACCESSED")
+                .targetType("TRAINER_VERIFICATION_DOCUMENT")
+                .targetId(mediaId)
+                .requestId(RequestIdHolder.getAsUuid())
+                .metadataJson(String.format("{\"applicationId\":\"%s\",\"mediaId\":\"%s\"}", applicationId, mediaId))
+                .occurredAt(Instant.now(clock))
+                .build());
+
+        return new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent(
+                doc.id(),
+                doc.originalFilename(),
+                doc.contentType(),
+                doc.sizeBytes(),
+                doc.scanStatus(),
+                bytes
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.fitnesscoaching.platform.modules.trainer.domain.TrainerCertificateInfo> getApplicationCertificates(UUID adminUserId, UUID applicationId) {
+        verifyActiveAdmin(adminUserId);
+        if (applicationId == null) {
+            throw new ApplicationValidationException("Application ID cannot be null");
+        }
+        trainerApplicationPort.findById(applicationId)
+                .orElseThrow(() -> new TrainerApplicationNotFoundException("Trainer application not found: " + applicationId));
+
+        return trainerApplicationPort.findCertificatesByApplicationId(applicationId);
     }
 }

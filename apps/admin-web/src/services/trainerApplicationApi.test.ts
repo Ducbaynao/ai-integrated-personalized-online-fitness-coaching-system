@@ -67,4 +67,59 @@ describe('trainerApplicationApi', () => {
     expect(res).toEqual(mockResult)
     apiRequestSpy.mockRestore()
   })
+
+  it('calls GET /admin/trainer-applications/:id/documents', async () => {
+    const mockDocs = [
+      {
+        id: 'doc-1',
+        originalFilename: 'cert.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 1024,
+        scanStatus: 'CLEAN',
+        downloadUrl: '/api/v1/admin/trainer-applications/app-1/documents/doc-1/download',
+        createdAt: '2026-11-08T10:00:00Z',
+      },
+    ]
+    const apiRequestSpy = vi.spyOn(apiClient, 'apiRequest').mockResolvedValueOnce(mockDocs)
+
+    const res = await trainerApplicationApi.getApplicationDocuments('app-1')
+
+    expect(apiRequestSpy).toHaveBeenCalledWith('/admin/trainer-applications/app-1/documents')
+    expect(res).toEqual(mockDocs)
+    apiRequestSpy.mockRestore()
+  })
+
+  it('calls GET /admin/trainer-applications/:id/certificates', async () => {
+    const mockCerts = [
+      {
+        id: 'cert-1',
+        name: 'NASM-CPT',
+        issuer: 'NASM',
+        credentialNumber: '12345',
+        issuedOn: '2023-01-01',
+        expiresOn: '2025-01-01',
+        verificationStatus: 'PENDING',
+        documentMediaId: 'doc-1',
+        createdAt: '2026-11-08T10:00:00Z',
+      },
+    ]
+    const apiRequestSpy = vi.spyOn(apiClient, 'apiRequest').mockResolvedValueOnce(mockCerts)
+
+    const res = await trainerApplicationApi.getApplicationCertificates('app-1')
+
+    expect(apiRequestSpy).toHaveBeenCalledWith('/admin/trainer-applications/app-1/certificates')
+    expect(res).toEqual(mockCerts)
+    apiRequestSpy.mockRestore()
+  })
+
+  it('calls GET /admin/trainer-applications/:id/documents/:mediaId/download via apiBlobRequest', async () => {
+    const mockBlob = new Blob(['sample-data'], { type: 'application/pdf' })
+    const apiBlobSpy = vi.spyOn(apiClient, 'apiBlobRequest').mockResolvedValueOnce(mockBlob)
+
+    const res = await trainerApplicationApi.downloadDocument('app-1', 'doc-1')
+
+    expect(apiBlobSpy).toHaveBeenCalledWith('/admin/trainer-applications/app-1/documents/doc-1/download')
+    expect(res).toBe(mockBlob)
+    apiBlobSpy.mockRestore()
+  })
 })

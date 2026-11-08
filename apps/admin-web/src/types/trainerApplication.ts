@@ -34,3 +34,25 @@ export interface DecideTrainerApplicationRequest {
   rejectionReason?: string
   reviewNotes?: string
 }
+
+export interface AdminTrainerDocumentResponse {
+  id: string
+  originalFilename: string
+  contentType: string
+  sizeBytes: number
+  scanStatus: string
+  downloadUrl: string
+  createdAt: string
+}
+
+export interface AdminTrainerCertificateResponse {
+  id: string
+  name: string
+  issuer: string | null
+  credentialNumber: string | null
+  issuedOn: string | null
+  expiresOn: string | null
+  verificationStatus: string
+  documentMediaId: string | null
+  createdAt: string
+}

@@ -67,3 +67,12 @@ export interface SubmitTrainerApplicationRequest {
   applicantNote?: string;
 }
 
+export interface TrainerDocumentUploadResponse {
+  id: string;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
+  scanStatus: string;
+  createdAt: string;
+}
+

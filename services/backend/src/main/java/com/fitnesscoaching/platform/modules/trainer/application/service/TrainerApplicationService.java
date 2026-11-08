@@ -37,7 +37,10 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class TrainerApplicationService implements SubmitTrainerApplicationUseCase, GetCurrentTrainerApplicationUseCase {
+public class TrainerApplicationService implements
+        SubmitTrainerApplicationUseCase,
+        GetCurrentTrainerApplicationUseCase,
+        com.fitnesscoaching.platform.modules.trainer.application.port.in.UploadTrainerVerificationDocumentUseCase {
 
     private final TrainerProfilePort trainerProfilePort;
     private final TrainerApplicationPort trainerApplicationPort;
@@ -46,6 +49,7 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
     private final UserAccountStatusQuery userAccountStatusQuery;
     private final UserRoleQuery userRoleQuery;
     private final AuditService auditService;
+    private final TrainerDocumentStorageService documentStorageService;
     private final Clock clock;
 
     public TrainerApplicationService(
@@ -56,6 +60,7 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
             UserAccountStatusQuery userAccountStatusQuery,
             UserRoleQuery userRoleQuery,
             AuditService auditService,
+            TrainerDocumentStorageService documentStorageService,
             Clock clock
     ) {
         this.trainerProfilePort = trainerProfilePort;
@@ -65,6 +70,7 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
         this.userAccountStatusQuery = userAccountStatusQuery;
         this.userRoleQuery = userRoleQuery;
         this.auditService = auditService;
+        this.documentStorageService = documentStorageService;
         this.clock = clock;
     }
 
@@ -108,7 +114,7 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
         }
 
         if (!command.documentMediaIds().isEmpty()) {
-            boolean validDocs = mediaQueryPort.allMediaExistAndOwnedBy(command.documentMediaIds(), trainerId);
+            boolean validDocs = mediaQueryPort.allMediaExistOwnedAndClean(command.documentMediaIds(), trainerId);
             if (!validDocs) {
                 throw new ApplicationValidationException(
                         "One or more document media files do not exist or are not authorized",
@@ -178,6 +184,54 @@ public class TrainerApplicationService implements SubmitTrainerApplicationUseCas
 
         return trainerApplicationPort.findCurrentByTrainerId(trainerId)
                 .orElseThrow(() -> new TrainerApplicationNotFoundException("No trainer application found for user: " + trainerId));
+    }
+
+    @Override
+    public com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo uploadDocument(
+            UUID trainerId,
+            String filename,
+            String declaredContentType,
+            byte[] bytes
+    ) {
+        if (trainerId == null) {
+            throw new ApplicationValidationException("Trainer ID cannot be null");
+        }
+        verifyActiveAccount(trainerId);
+
+        if (!userRoleQuery.hasActiveRole(trainerId, "TRAINER")) {
+            throw new TrainerCapabilityUnavailableException("Trainer capability is not active for user: " + trainerId);
+        }
+
+        String validatedType = documentStorageService.validateAndDetectContentType(bytes, declaredContentType, filename);
+        String scanStatus = documentStorageService.scanAndVerifyClean(bytes);
+
+        UUID mediaId = UUID.randomUUID();
+        String objectKey = "verification-docs/" + trainerId + "/" + mediaId + "/" + filename;
+        documentStorageService.storeFile(objectKey, bytes, validatedType);
+        String checksum = documentStorageService.computeSha256(bytes);
+        Instant now = Instant.now(clock);
+
+        trainerApplicationPort.saveMediaFile(
+                mediaId,
+                trainerId,
+                "verification-docs",
+                objectKey,
+                filename,
+                validatedType,
+                bytes.length,
+                checksum,
+                scanStatus,
+                now
+        );
+
+        return new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo(
+                mediaId,
+                filename,
+                validatedType,
+                bytes.length,
+                scanStatus,
+                now
+        );
     }
 
     private void verifyActiveAccount(UUID userId) {

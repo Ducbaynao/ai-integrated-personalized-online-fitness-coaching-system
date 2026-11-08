@@ -13,12 +13,14 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/features/auth/AuthContext';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 import { ApiError } from '@/types/auth';
 import {
   TrainerApplicationResponse,
+  TrainerDocumentUploadResponse,
   TrainerProfileResponse,
   UpdateTrainerProfileRequest,
 } from '@/types/trainer';
@@ -59,6 +61,47 @@ export function TrainerProfileScreen() {
   const [isSubmittingApp, setIsSubmittingApp] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [appSuccess, setAppSuccess] = useState<string | null>(null);
+  const [uploadedDocs, setUploadedDocs] = useState<TrainerDocumentUploadResponse[]>([]);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [docUploadError, setDocUploadError] = useState<string | null>(null);
+
+  const handlePickAndUploadDocument = async () => {
+    if (isUploadingDoc) return;
+    setDocUploadError(null);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/png', 'image/jpeg'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        setDocUploadError('File size exceeds the 10 MB limit.');
+        return;
+      }
+
+      setIsUploadingDoc(true);
+      const mime = asset.mimeType || (asset.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const uploaded = await trainerApplicationApi.uploadDocument(asset.uri, asset.name, mime);
+      setUploadedDocs((prev) => [...prev, uploaded]);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDocUploadError(err.message || 'Failed to upload document.');
+      } else {
+        setDocUploadError('Failed to select or upload document.');
+      }
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleRemoveDocument = (docId: string) => {
+    setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
+  };
 
   const populateForm = useCallback((data: TrainerProfileResponse) => {
     setEditSlug(data.publicSlug ?? '');
@@ -137,16 +180,18 @@ export function TrainerProfileScreen() {
   }, [populateForm]);
 
   const handleSubmitApplication = async () => {
-    if (isSubmittingApp) return;
+    if (isSubmittingApp || isUploadingDoc) return;
     setIsSubmittingApp(true);
     setAppError(null);
     setAppSuccess(null);
     try {
       const res = await trainerApplicationApi.submitApplication({
         applicantNote: applicantNote.trim() || undefined,
+        documentMediaIds: uploadedDocs.length > 0 ? uploadedDocs.map((d) => d.id) : undefined,
       });
       setApplication(res);
       setApplicantNote('');
+      setUploadedDocs([]);
       const isResubmit = profile?.verificationStatus === 'REJECTED';
       setAppSuccess(
         isResubmit
@@ -640,17 +685,86 @@ export function TrainerProfileScreen() {
                   maxLength={2000}
                 />
               </View>
+
+              <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Verification Documents (PDF, PNG, JPEG)
+                </Text>
+                <Pressable
+                  testID="trainer-document-upload-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Attach verification document"
+                  disabled={isUploadingDoc || isSubmittingApp}
+                  onPress={handlePickAndUploadDocument}
+                  style={[
+                    styles.uploadDocButton,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      opacity: isUploadingDoc ? 0.6 : 1,
+                    },
+                  ]}>
+                  {isUploadingDoc ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
+                      + Attach Document (Max 10MB)
+                    </Text>
+                  )}
+                </Pressable>
+
+                {docUploadError && (
+                  <Text testID="trainer-document-upload-error" style={[styles.errorText, { color: themeColors.dangerText }]}>
+                    {docUploadError}
+                  </Text>
+                )}
+
+                {uploadedDocs.length > 0 && (
+                  <View testID="trainer-uploaded-docs-list" style={styles.uploadedDocsList}>
+                    {uploadedDocs.map((doc) => (
+                      <View
+                        key={doc.id}
+                        testID={`uploaded-doc-item-${doc.id}`}
+                        style={[
+                          styles.uploadedDocItem,
+                          { borderColor: themeColors.border, backgroundColor: themeColors.surface },
+                        ]}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                          <Text
+                            style={[styles.uploadedDocName, { color: themeColors.textPrimary }]}
+                            numberOfLines={1}>
+                            {doc.originalFilename}
+                          </Text>
+                          <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
+                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                          </Text>
+                        </View>
+                        <Pressable
+                          testID={`remove-doc-${doc.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          disabled={isSubmittingApp}
+                          onPress={() => handleRemoveDocument(doc.id)}
+                          style={styles.removeDocButton}>
+                          <Text style={[styles.removeDocText, { color: themeColors.dangerText }]}>✕</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               <Pressable
                 testID="trainer-application-submit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Submit verification application"
-                disabled={isSubmittingApp}
+                disabled={isSubmittingApp || isUploadingDoc}
                 onPress={handleSubmitApplication}
                 style={[
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isSubmittingApp ? 0.7 : 1,
+                    opacity: isSubmittingApp || isUploadingDoc ? 0.7 : 1,
                     marginTop: spacing.sm,
                   },
                 ]}>
@@ -745,17 +859,86 @@ export function TrainerProfileScreen() {
                   maxLength={2000}
                 />
               </View>
+
+              <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Updated Verification Documents (PDF, PNG, JPEG)
+                </Text>
+                <Pressable
+                  testID="trainer-document-resubmit-upload-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Attach updated verification document"
+                  disabled={isUploadingDoc || isSubmittingApp}
+                  onPress={handlePickAndUploadDocument}
+                  style={[
+                    styles.uploadDocButton,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      opacity: isUploadingDoc ? 0.6 : 1,
+                    },
+                  ]}>
+                  {isUploadingDoc ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
+                      + Attach Document (Max 10MB)
+                    </Text>
+                  )}
+                </Pressable>
+
+                {docUploadError && (
+                  <Text testID="trainer-document-upload-error" style={[styles.errorText, { color: themeColors.dangerText }]}>
+                    {docUploadError}
+                  </Text>
+                )}
+
+                {uploadedDocs.length > 0 && (
+                  <View testID="trainer-resubmit-uploaded-docs-list" style={styles.uploadedDocsList}>
+                    {uploadedDocs.map((doc) => (
+                      <View
+                        key={doc.id}
+                        testID={`uploaded-doc-item-${doc.id}`}
+                        style={[
+                          styles.uploadedDocItem,
+                          { borderColor: themeColors.border, backgroundColor: themeColors.surface },
+                        ]}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                          <Text
+                            style={[styles.uploadedDocName, { color: themeColors.textPrimary }]}
+                            numberOfLines={1}>
+                            {doc.originalFilename}
+                          </Text>
+                          <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
+                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                          </Text>
+                        </View>
+                        <Pressable
+                          testID={`remove-doc-${doc.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          disabled={isSubmittingApp}
+                          onPress={() => handleRemoveDocument(doc.id)}
+                          style={styles.removeDocButton}>
+                          <Text style={[styles.removeDocText, { color: themeColors.dangerText }]}>✕</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               <Pressable
                 testID="trainer-application-resubmit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Resubmit verification application"
-                disabled={isSubmittingApp}
+                disabled={isSubmittingApp || isUploadingDoc}
                 onPress={handleSubmitApplication}
                 style={[
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isSubmittingApp ? 0.7 : 1,
+                    opacity: isSubmittingApp || isUploadingDoc ? 0.7 : 1,
                     marginTop: spacing.sm,
                   },
                 ]}>
@@ -1221,5 +1404,49 @@ const styles = StyleSheet.create({
   rejectionReasonText: {
     ...typography.bodySmall,
     lineHeight: 20,
+  },
+  uploadDocButton: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: layout.minimumTouchTarget,
+  },
+  uploadDocButtonText: {
+    ...typography.label,
+  },
+  uploadedDocsList: {
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+  },
+  uploadedDocItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  uploadedDocName: {
+    ...typography.bodySmall,
+    fontWeight: '500',
+  },
+  uploadedDocStatus: {
+    ...typography.caption,
+  },
+  removeDocButton: {
+    padding: spacing.xs,
+    minHeight: layout.minimumTouchTarget,
+    minWidth: layout.minimumTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeDocText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

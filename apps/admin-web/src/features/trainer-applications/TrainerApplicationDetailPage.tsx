@@ -5,7 +5,10 @@ import { StatePanel } from '../../components/StatePanel.tsx'
 import { ConfirmationDialog } from '../../components/ConfirmationDialog.tsx'
 import { trainerApplicationApi } from '../../services/trainerApplicationApi.ts'
 import { ApiError } from '../../services/apiClient.ts'
-import type { TrainerVerificationStatus } from '../../types/trainerApplication.ts'
+import type {
+  AdminTrainerDocumentResponse,
+  TrainerVerificationStatus,
+} from '../../types/trainerApplication.ts'
 
 export function TrainerApplicationDetailPage() {
   const { applicationId } = useParams<{ applicationId: string }>()
@@ -17,6 +20,7 @@ export function TrainerApplicationDetailPage() {
   const [rejectionReason, setRejectionReason] = useState('')
   const [rejectionError, setRejectionError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [alertMessage, setAlertMessage] = useState<{ text: string; tone: 'success' | 'danger' } | null>(null)
 
   const { data: application, isLoading, isError, error } = useQuery({
@@ -25,6 +29,47 @@ export function TrainerApplicationDetailPage() {
     enabled: Boolean(applicationId),
     retry: false,
   })
+
+  const { data: documents = [], isLoading: isLoadingDocs } = useQuery({
+    queryKey: ['admin-trainer-application-documents', applicationId],
+    queryFn: () => trainerApplicationApi.getApplicationDocuments(applicationId!),
+    enabled: Boolean(applicationId),
+    retry: false,
+  })
+
+  const { data: certificates = [], isLoading: isLoadingCerts } = useQuery({
+    queryKey: ['admin-trainer-application-certificates', applicationId],
+    queryFn: () => trainerApplicationApi.getApplicationCertificates(applicationId!),
+    enabled: Boolean(applicationId),
+    retry: false,
+  })
+
+  const handleDownloadDocument = async (doc: AdminTrainerDocumentResponse) => {
+    if (!applicationId || downloadingId) return
+    setDownloadingId(doc.id)
+    try {
+      const blob = await trainerApplicationApi.downloadDocument(applicationId, doc.id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.originalFilename || `trainer-doc-${doc.id}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      const msg = err instanceof ApiError ? `Lỗi tải tài liệu: ${err.errorCode}` : 'Không thể tải tài liệu.'
+      setAlertMessage({ text: msg, tone: 'danger' })
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
 
   const getStatusBadgeClass = (status: TrainerVerificationStatus) => {
     switch (status) {
@@ -273,12 +318,50 @@ export function TrainerApplicationDetailPage() {
             Bằng cấp và Chứng chỉ đính kèm
           </h2>
           <div className="content-block">
-            <p className="field-hint">
-              Số chứng chỉ: {application.certificateIds.length} | Tài liệu đính kèm:{' '}
-              {application.documentMediaIds.length}
-            </p>
-            {application.certificateIds.length > 0 ? (
-              <ul className="item-list">
+            <h3 className="section-subtitle">
+              Chứng chỉ chuyên môn ({certificates.length || application.certificateIds.length})
+            </h3>
+            {isLoadingCerts ? (
+              <p className="text-muted">Đang tải danh sách chứng chỉ…</p>
+            ) : certificates.length > 0 ? (
+              <div className="table-scroll" style={{ marginBottom: '1.25rem' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tên chứng chỉ</th>
+                      <th>Đơn vị cấp</th>
+                      <th>Số hiệu</th>
+                      <th>Thời hạn</th>
+                      <th>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {certificates.map((cert) => (
+                      <tr key={cert.id}>
+                        <td className="font-medium">{cert.name}</td>
+                        <td>{cert.issuer || 'Chưa cung cấp'}</td>
+                        <td>
+                          {cert.credentialNumber ? (
+                            <code className="code-inline">{cert.credentialNumber}</code>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>
+                          {cert.issuedOn ? new Date(cert.issuedOn).toLocaleDateString('vi-VN') : '—'}
+                          {' → '}
+                          {cert.expiresOn ? new Date(cert.expiresOn).toLocaleDateString('vi-VN') : 'Vô thời hạn'}
+                        </td>
+                        <td>
+                          <span className="badge badge-neutral">{cert.verificationStatus}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : application.certificateIds.length > 0 ? (
+              <ul className="item-list" style={{ marginBottom: '1.25rem' }}>
                 {application.certificateIds.map((certId) => (
                   <li key={certId}>
                     Mã chứng chỉ: <code className="code-inline">{certId}</code>
@@ -286,20 +369,67 @@ export function TrainerApplicationDetailPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-muted">Không có chứng chỉ đính kèm riêng.</p>
+              <p className="text-muted" style={{ marginBottom: '1.25rem' }}>
+                Không có chứng chỉ đính kèm riêng.
+              </p>
             )}
 
-            {application.documentMediaIds.length > 0 && (
-              <div style={{ marginTop: '1rem' }}>
-                <h3 className="section-subtitle">Tệp tài liệu (Media IDs đã quét sạch):</h3>
-                <ul className="item-list">
-                  {application.documentMediaIds.map((mediaId) => (
-                    <li key={mediaId}>
-                      Tệp media: <code className="code-inline">{mediaId}</code>
-                    </li>
-                  ))}
-                </ul>
+            <h3 className="section-subtitle">
+              Tài liệu xác thực ({documents.length || application.documentMediaIds.length})
+            </h3>
+            {isLoadingDocs ? (
+              <p className="text-muted">Đang tải danh sách tài liệu…</p>
+            ) : documents.length > 0 ? (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tên tệp</th>
+                      <th>Định dạng</th>
+                      <th>Dung lượng</th>
+                      <th>Trạng thái quét</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documents.map((doc) => (
+                      <tr key={doc.id}>
+                        <td className="font-medium">{doc.originalFilename}</td>
+                        <td>
+                          <code className="code-inline">{doc.contentType}</code>
+                        </td>
+                        <td>{formatFileSize(doc.sizeBytes)}</td>
+                        <td>
+                          <span className={`badge ${doc.scanStatus === 'CLEAN' ? 'badge-success' : 'badge-warning'}`}>
+                            {doc.scanStatus === 'CLEAN' ? 'Đã quét sạch (CLEAN)' : doc.scanStatus}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="button-secondary button-small"
+                            onClick={() => handleDownloadDocument(doc)}
+                            disabled={downloadingId === doc.id}
+                            aria-label={`Tải xuống ${doc.originalFilename}`}
+                          >
+                            {downloadingId === doc.id ? 'Đang tải…' : 'Tải xuống'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            ) : application.documentMediaIds.length > 0 ? (
+              <ul className="item-list">
+                {application.documentMediaIds.map((mediaId) => (
+                  <li key={mediaId}>
+                    Tệp media: <code className="code-inline">{mediaId}</code>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted">Không có tài liệu đính kèm.</p>
             )}
           </div>
         </section>

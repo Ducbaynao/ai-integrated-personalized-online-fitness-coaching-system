@@ -171,6 +171,50 @@ export async function apiRequest<T>(
   return (await response.json()) as T
 }
 
+export async function apiBlobRequest(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<Blob> {
+  const { authenticated = true, retryAfterRefresh = true, headers, ...requestInit } = options
+  const requestHeaders = new Headers(headers)
+  const session = readSession()
+
+  if (authenticated && session) {
+    requestHeaders.set('Authorization', `Bearer ${session.accessToken}`)
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...requestInit,
+      headers: requestHeaders,
+    })
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR')
+  }
+
+  if (response.status === 401 && authenticated && retryAfterRefresh) {
+    const accessToken = await refreshAccessToken()
+    requestHeaders.set('Authorization', `Bearer ${accessToken}`)
+    return apiBlobRequest(path, {
+      ...requestInit,
+      headers: requestHeaders,
+      authenticated,
+      retryAfterRefresh: false,
+    })
+  }
+
+  if (!response.ok) {
+    const error = await readError(response)
+    if (response.status === 401 && authenticated) {
+      expireSession()
+    }
+    throw error
+  }
+
+  return await response.blob()
+}
+
 export function isRetryableApiError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 0 || error.status >= 500)
 }

@@ -69,6 +69,9 @@ class TrainerApplicationControllerUnitTest {
     private GetCurrentTrainerApplicationUseCase getCurrentTrainerApplicationUseCase;
 
     @MockitoBean
+    private com.fitnesscoaching.platform.modules.trainer.application.port.in.UploadTrainerVerificationDocumentUseCase uploadDocumentUseCase;
+
+    @MockitoBean
     private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -328,5 +331,35 @@ class TrainerApplicationControllerUnitTest {
                         .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("ACCOUNT_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/trainer-applications/documents: returns 201 with document metadata when upload succeeds")
+    void uploadDocument_success_returns201() throws Exception {
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "cert.pdf",
+                "application/pdf",
+                "%PDF-1.4 test certificate".getBytes()
+        );
+
+        UUID docId = UUID.randomUUID();
+        when(uploadDocumentUseCase.uploadDocument(any(), any(), any(), any()))
+                .thenReturn(new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo(
+                        docId,
+                        "cert.pdf",
+                        "application/pdf",
+                        file.getSize(),
+                        "CLEAN",
+                        FIXED_TIME
+                ));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/trainer-applications/documents")
+                        .file(file)
+                        .with(jwt().jwt(j -> j.subject(USER_ID.toString())).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_TRAINER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", is(docId.toString())))
+                .andExpect(jsonPath("$.originalFilename", is("cert.pdf")))
+                .andExpect(jsonPath("$.scanStatus", is("CLEAN")));
     }
 }

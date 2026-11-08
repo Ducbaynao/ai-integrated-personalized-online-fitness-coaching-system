@@ -71,6 +71,9 @@ class TrainerApplicationServiceUnitTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private TrainerDocumentStorageService documentStorageService;
+
     private final Instant fixedNow = Instant.parse("2026-09-22T08:00:00Z");
     private final Clock clock = Clock.fixed(fixedNow, ZoneOffset.UTC);
 
@@ -90,6 +93,7 @@ class TrainerApplicationServiceUnitTest {
                 userAccountStatusQuery,
                 userRoleQuery,
                 auditService,
+                documentStorageService,
                 clock
         );
     }
@@ -119,7 +123,7 @@ class TrainerApplicationServiceUnitTest {
         when(trainerProfilePort.findByUserId(TRAINER_ID)).thenReturn(Optional.of(createTestProfile(TrainerVerificationStatus.NOT_SUBMITTED, true)));
         when(trainerApplicationPort.hasActiveApplication(TRAINER_ID)).thenReturn(false);
         when(trainerCertificatePort.allCertificatesExistAndBelongToTrainer(List.of(CERT_ID_1), TRAINER_ID)).thenReturn(true);
-        when(mediaQueryPort.allMediaExistAndOwnedBy(List.of(MEDIA_ID_1), TRAINER_ID)).thenReturn(true);
+        when(mediaQueryPort.allMediaExistOwnedAndClean(List.of(MEDIA_ID_1), TRAINER_ID)).thenReturn(true);
         when(trainerApplicationPort.save(any(TrainerApplication.class))).thenAnswer(inv -> inv.getArgument(0));
 
         SubmitTrainerApplicationCommand command = new SubmitTrainerApplicationCommand(
@@ -369,7 +373,7 @@ class TrainerApplicationServiceUnitTest {
         when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
         when(trainerProfilePort.findByUserId(TRAINER_ID)).thenReturn(Optional.of(createTestProfile(TrainerVerificationStatus.NOT_SUBMITTED, true)));
         when(trainerApplicationPort.hasActiveApplication(TRAINER_ID)).thenReturn(false);
-        when(mediaQueryPort.allMediaExistAndOwnedBy(List.of(MEDIA_ID_1), TRAINER_ID)).thenReturn(false);
+        when(mediaQueryPort.allMediaExistOwnedAndClean(List.of(MEDIA_ID_1), TRAINER_ID)).thenReturn(false);
 
         SubmitTrainerApplicationCommand command = new SubmitTrainerApplicationCommand(
                 TRAINER_ID,

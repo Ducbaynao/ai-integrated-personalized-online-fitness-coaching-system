@@ -60,6 +60,9 @@ class AdminTrainerVerificationServiceUnitTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private TrainerDocumentStorageService documentStorageService;
+
     private final Instant fixedNow = Instant.parse("2026-09-23T10:00:00Z");
     private final Clock clock = Clock.fixed(fixedNow, ZoneOffset.UTC);
 
@@ -77,6 +80,7 @@ class AdminTrainerVerificationServiceUnitTest {
                 userAccountStatusQuery,
                 userRoleQuery,
                 auditService,
+                documentStorageService,
                 clock
         );
     }

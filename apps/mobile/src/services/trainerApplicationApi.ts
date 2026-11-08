@@ -2,6 +2,7 @@ import { request } from '@/services/apiClient';
 import {
   SubmitTrainerApplicationRequest,
   TrainerApplicationResponse,
+  TrainerDocumentUploadResponse,
 } from '@/types/trainer';
 
 export const trainerApplicationApi = {
@@ -14,6 +15,29 @@ export const trainerApplicationApi = {
       method: 'POST',
       requiresAuth: true,
       body: data,
+    });
+  },
+
+  /**
+   * Upload a verification document (PDF, PNG, JPEG).
+   * Path: /trainer-applications/documents (API base URL includes /api/v1).
+   */
+  async uploadDocument(
+    fileUri: string,
+    filename: string,
+    mimeType: string,
+  ): Promise<TrainerDocumentUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: filename,
+      type: mimeType,
+    } as any);
+
+    return request<TrainerDocumentUploadResponse>('/trainer-applications/documents', {
+      method: 'POST',
+      requiresAuth: true,
+      body: formData,
     });
   },
 
