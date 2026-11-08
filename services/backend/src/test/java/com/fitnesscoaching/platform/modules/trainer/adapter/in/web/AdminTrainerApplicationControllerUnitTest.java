@@ -403,8 +403,35 @@ class AdminTrainerApplicationControllerUnitTest {
         mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
                         .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
-                .andExpect(status().isOk())
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents/{mediaId}/download: returns 404 when document not found in storage")
+    void downloadDocument_notFound_returns404() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(downloadDocumentUseCase.downloadApplicationDocument(ADMIN_ID, APP_ID, docId))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.TrainerDocumentNotFoundException("Document file not found"));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode", is("TRAINER_DOCUMENT_NOT_FOUND")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications/{id}/documents/{mediaId}/download: returns 503 when storage unavailable")
+    void downloadDocument_storageUnavailable_returns503() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(downloadDocumentUseCase.downloadApplicationDocument(ADMIN_ID, APP_ID, docId))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.StorageUnavailableException("Storage unreachable"));
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications/" + APP_ID + "/documents/" + docId + "/download")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode", is("STORAGE_UNAVAILABLE")));
     }
 
     @Test

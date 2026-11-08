@@ -893,6 +893,29 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), ex.getFieldErrors() != null ? ex.getFieldErrors() : Collections.emptyList()));
     }
 
+    @ExceptionHandler(StorageUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleStorageUnavailable(StorageUnavailableException ex) {
+        log.error("Storage unavailable: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse.of(
+                "STORAGE_UNAVAILABLE", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(ScannerUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleScannerUnavailable(ScannerUnavailableException ex) {
+        log.error("Antivirus scanner unavailable: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse.of(
+                "SCANNER_UNAVAILABLE", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(TrainerDocumentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTrainerDocumentNotFound(TrainerDocumentNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "TRAINER_DOCUMENT_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled exception caught in controller advice", ex);

@@ -3,6 +3,8 @@ package com.fitnesscoaching.platform.modules.trainer.application.service;
 import com.fitnesscoaching.platform.common.exception.AccountUnavailableException;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
+import com.fitnesscoaching.platform.common.exception.ScannerUnavailableException;
+import com.fitnesscoaching.platform.common.exception.StorageUnavailableException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationAlreadyActiveException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationNotFoundException;
 import com.fitnesscoaching.platform.common.exception.TrainerCapabilityUnavailableException;
@@ -20,6 +22,7 @@ import com.fitnesscoaching.platform.modules.trainer.domain.CoachingEligibility;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerActivityStatus;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerApplication;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
+import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
@@ -42,7 +45,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -593,5 +598,91 @@ class TrainerApplicationServiceUnitTest {
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> app.documentMediaIds().add(UUID.randomUUID()))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    // ==========================================
+    // uploadDocument tests
+    // ==========================================
+
+    @Test
+    @DisplayName("uploadDocument: success flow validates, scans, stores, and saves media metadata")
+    void uploadDocument_success() {
+        byte[] bytes = "%PDF-1.4 sample".getBytes();
+        when(userAccountStatusQuery.getAccountStatus(TRAINER_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
+        when(documentStorageService.validateAndDetectContentType(bytes, "application/pdf", "cert.pdf"))
+                .thenReturn("application/pdf");
+        when(documentStorageService.scanAndVerifyClean(bytes)).thenReturn("CLEAN");
+        when(documentStorageService.computeSha256(bytes)).thenReturn("hash123");
+
+        TrainerVerificationDocumentInfo doc = service.uploadDocument(TRAINER_ID, "cert.pdf", "application/pdf", bytes);
+
+        assertThat(doc).isNotNull();
+        assertThat(doc.originalFilename()).isEqualTo("cert.pdf");
+        assertThat(doc.contentType()).isEqualTo("application/pdf");
+        assertThat(doc.scanStatus()).isEqualTo("CLEAN");
+
+        verify(documentStorageService).storeFile(any(), eq(bytes), eq("application/pdf"));
+        verify(trainerApplicationPort).saveMediaFile(
+                eq(doc.id()), eq(TRAINER_ID), eq("verification-docs"), any(), eq("cert.pdf"),
+                eq("application/pdf"), eq((long) bytes.length), eq("hash123"), eq("CLEAN"), any());
+    }
+
+    @Test
+    @DisplayName("uploadDocument: scanner failure aborts flow and does not store file or save metadata")
+    void uploadDocument_scannerFailure_aborts() {
+        byte[] bytes = "%PDF-1.4 sample".getBytes();
+        when(userAccountStatusQuery.getAccountStatus(TRAINER_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
+        when(documentStorageService.validateAndDetectContentType(bytes, "application/pdf", "cert.pdf"))
+                .thenReturn("application/pdf");
+        when(documentStorageService.scanAndVerifyClean(bytes))
+                .thenThrow(new ScannerUnavailableException("Scanner down"));
+
+        assertThatThrownBy(() -> service.uploadDocument(TRAINER_ID, "cert.pdf", "application/pdf", bytes))
+                .isInstanceOf(ScannerUnavailableException.class);
+
+        verify(documentStorageService, never()).storeFile(any(), any(), any());
+        verify(trainerApplicationPort, never()).saveMediaFile(any(), any(), any(), any(), any(), any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("uploadDocument: storage failure aborts flow and does not save metadata")
+    void uploadDocument_storageFailure_aborts() {
+        byte[] bytes = "%PDF-1.4 sample".getBytes();
+        when(userAccountStatusQuery.getAccountStatus(TRAINER_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
+        when(documentStorageService.validateAndDetectContentType(bytes, "application/pdf", "cert.pdf"))
+                .thenReturn("application/pdf");
+        when(documentStorageService.scanAndVerifyClean(bytes)).thenReturn("CLEAN");
+        doThrow(new StorageUnavailableException("Storage down"))
+                .when(documentStorageService).storeFile(any(), eq(bytes), eq("application/pdf"));
+
+        assertThatThrownBy(() -> service.uploadDocument(TRAINER_ID, "cert.pdf", "application/pdf", bytes))
+                .isInstanceOf(StorageUnavailableException.class);
+
+        verify(trainerApplicationPort, never()).saveMediaFile(any(), any(), any(), any(), any(), any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("uploadDocument: DB save failure cleans up orphaned S3 object")
+    void uploadDocument_dbFailure_cleansUpS3Object() {
+        byte[] bytes = "%PDF-1.4 sample".getBytes();
+        when(userAccountStatusQuery.getAccountStatus(TRAINER_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(TRAINER_ID, "TRAINER")).thenReturn(true);
+        when(documentStorageService.validateAndDetectContentType(bytes, "application/pdf", "cert.pdf"))
+                .thenReturn("application/pdf");
+        when(documentStorageService.scanAndVerifyClean(bytes)).thenReturn("CLEAN");
+        when(documentStorageService.computeSha256(bytes)).thenReturn("hash123");
+        doThrow(new RuntimeException("DB connection error"))
+                .when(trainerApplicationPort).saveMediaFile(any(), any(), any(), any(), any(), any(), anyLong(), any(), any(), any());
+
+        assertThatThrownBy(() -> service.uploadDocument(TRAINER_ID, "cert.pdf", "application/pdf", bytes))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("DB connection error");
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(documentStorageService).deleteFile(keyCaptor.capture());
+        assertThat(keyCaptor.getValue()).startsWith("verification-docs/" + TRAINER_ID + "/");
     }
 }

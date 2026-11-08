@@ -116,10 +116,10 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
   - Contracts Validation: `npm run validate:contracts` (0 errors) confirming OpenAPI parity for student-scoped goal and proposal endpoints.
 
 - **Priority 1 Verification Evidence**:
-  - Backend Unit: `TrainerApplicationServiceUnitTest` (23 tests PASS), `AdminTrainerVerificationServiceUnitTest` (17 tests PASS), `TrainerApplicationControllerUnitTest` (21 tests PASS), `AdminTrainerApplicationControllerUnitTest` (14 tests PASS), `MediaPersistenceAdapterUnitTest` (4 tests PASS).
+  - Backend Unit: `TrainerDocumentStorageServiceTest` (20 tests PASS), `TrainerApplicationServiceUnitTest` (27 tests PASS), `AdminTrainerVerificationServiceUnitTest` (22 tests PASS), `TrainerApplicationControllerUnitTest` (19 tests PASS), `AdminTrainerApplicationControllerUnitTest` (20 tests PASS), `MediaPersistenceAdapterUnitTest` (4 tests PASS). Total 112 unit tests PASS across Trainer verification and media modules.
   - Backend Integration: `TrainerApplicationIntegrationTest` (17 tests PASS) covering submit → reject with reason → resubmit → approve → search discovery invariant (`/api/v1/coaching/trainers`).
   - Backend Admin Integration: `AdminTrainerApplicationIntegrationTest` (26 tests PASS) covering admin queue, pagination, RBAC, audit logging, and concurrency conflict (409).
-  - Backend Document Storage & Scan Status: `TrainerDocumentStorageService` supports magic byte detection, ClamAV `zINSTREAM` stream protocol, S3/mock storage; document download endpoint audited with `ADMIN_TRAINER_DOCUMENT_ACCESSED`.
+  - Backend Document Storage & Scan Status: `TrainerDocumentStorageService` is strictly fail-closed without in-memory RAM fallback. ClamAV `zINSTREAM` stream protocol enforces HTTP 503 `SCANNER_UNAVAILABLE` when host is missing or unreachable; S3 operations enforce HTTP 503 `STORAGE_UNAVAILABLE` and HTTP 404 `TRAINER_DOCUMENT_NOT_FOUND`; database failure during upload triggers immediate S3 orphan deletion; document download endpoint audited with `ADMIN_TRAINER_DOCUMENT_ACCESSED`.
   - Mobile Jest: `trainerApplicationApi.test.ts` (3 tests PASS) & `TrainerProfileScreen.test.tsx` (14 tests PASS) covering document picker, upload success/failure, removal, application submission with `documentMediaIds`, pending review, rejection reason display, resubmit application, and verified banner.
   - Admin Web Vitest: `trainerApplicationApi.test.ts` (6 tests PASS) & `TrainerApplicationPages.test.tsx` (7 tests PASS) covering queue filters, detail page, certificate table, documents table with format & clean badge, document download trigger, approval with confirmation notes, rejection requiring non-blank reason, and disabled actions on decided applications.
   - Typecheck & Build: `typecheck:mobile` (0 errors), `build:admin` (0 errors), `validate:ux-docs` (0 errors), `validate:contracts` (0 errors).
@@ -128,6 +128,9 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
   - `media_files` table requires `scan_status = 'CLEAN'`.
   - Distinguishes `allMediaExistAndOwnedBy` (ownership check without scan status) and `allMediaExistOwnedAndClean` (enforcing `scan_status = 'CLEAN'`).
   - Files with `PENDING`, `REJECTED`, or `FAILED` scan statuses are rejected when submitting verification documents.
+  - Fail-closed storage: No RAM/ConcurrentHashMap fallback. Missing S3 configuration, unreachability, or S3 error throws `StorageUnavailableException` (HTTP 503 `STORAGE_UNAVAILABLE`). Missing object on download throws `TrainerDocumentNotFoundException` (HTTP 404 `TRAINER_DOCUMENT_NOT_FOUND`).
+  - Fail-closed scanner: Missing ClamAV configuration, connection failure, socket timeout, or unexpected protocol reply throws `ScannerUnavailableException` (HTTP 503 `SCANNER_UNAVAILABLE`). Malware detection throws `ApplicationValidationException` with `MALWARE_DETECTED` (HTTP 400).
+  - Clean orphan rollback: If S3 upload succeeds but persisting media record to database fails, S3 object is immediately deleted via `deleteFile`.
 
 - **AI Test Lockdown**:
   - Transport-level guard intercepting HTTP client egress preventing injected clients from calling live OpenAI.
@@ -147,6 +150,8 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
 | **F-04** | MediaQueryPort semantics | Clarified `allMediaExistAndOwnedBy` (existence & ownership) vs `allMediaExistOwnedAndClean` (enforcing `scan_status = 'CLEAN'`). | `MediaPersistenceAdapterUnitTest` (4 tests PASS). |
 | **F-05** | Disentangle blockers for Goals vs Trainer Verification | Clarified that Goals does NOT depend on the ClamAV scanner daemon; only Trainer Verification requires live scanner daemon / real media storage. Both still await manual UI acceptance testing on physical device / AVD. | Documented below in Section 7 & 8. |
 | **F-NEW-01** | Documentation endpoint alias misstatement | Đính chính sai sót trong báo cáo tự rà soát trước đó về "alias POST theo studentId": code và contract chỉ hỗ trợ POST theo goalId, không có alias POST theo studentId. Không sửa code/contract. | Tài liệu đã đồng bộ hoàn toàn với controller và OpenAPI. |
+| **FINDING-STORAGE-01** | In-memory RAM storage fallback risk of data loss after restart | Đã xóa bỏ hoàn toàn `localCache` (ConcurrentHashMap) và việc nuốt lỗi S3; thêm `StorageUnavailableException` (HTTP 503 `STORAGE_UNAVAILABLE`) khi thiếu cấu hình S3 hoặc lỗi kết nối; thêm `TrainerDocumentNotFoundException` (HTTP 404 `TRAINER_DOCUMENT_NOT_FOUND`) khi không tìm thấy tệp trên S3; bổ sung cơ chế xóa tệp S3 mồ côi (`deleteFile`) khi lưu database thất bại. | `TrainerDocumentStorageServiceTest` (20 tests PASS), `TrainerApplicationServiceUnitTest` (27 tests PASS), `AdminTrainerVerificationServiceUnitTest` (22 tests PASS), `AdminTrainerApplicationIntegrationTest` (26 tests PASS). |
+| **FINDING-SCANNER-01** | ClamAV scanner silent clean on unconfigured host | Đã xóa logic trả về "CLEAN" khi thiếu host clamd; chuyển sang fail-closed: nếu `CHAT_CLAMD_INTERNAL_HOST` để trống, socket timeout, connection refused hoặc lỗi giao thức thì ném `ScannerUnavailableException` (HTTP 503 `SCANNER_UNAVAILABLE`). Phát hiện malware ném `ApplicationValidationException` với mã `MALWARE_DETECTED` (HTTP 400). Định dạng không hợp lệ (như chuỗi EICAR trần) bị từ chối ở bước kiểm tra magic bytes (HTTP 400). | `TrainerDocumentStorageServiceTest` (20 tests PASS bao gồm kiểm thử timeout, connection refused, malware detection, protocol error, magic byte validation). |
 
 ---
 
@@ -230,24 +235,33 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 ### 8.3 Health check & Xác nhận dịch vụ sẵn sàng
 
 - **Backend Actuator Health:** `curl -s http://localhost:8080/actuator/health` -> Phản hồi `{"status":"UP"}`. Endpoint quản lý cấu hình tại `management.endpoints.web.exposure.include: health,info`.
-- **S3-compatible Storage (MinIO local):** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200. (Lớp lưu trữ `TrainerDocumentStorageService` có fallback cache bộ nhớ `localCache` khi MinIO chưa khởi chạy).
+- **S3-compatible Storage (MinIO local) & Cơ chế Fail-Closed:** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200.
+  - Cơ chế fail-closed của storage: `TrainerDocumentStorageService` không sử dụng cache RAM / fallback in-memory. Nếu thiếu cấu hình S3 hoặc MinIO tắt/lỗi, backend ném `StorageUnavailableException` và trả về **HTTP 503 Service Unavailable** với mã lỗi `STORAGE_UNAVAILABLE`. Khi tải tài liệu, nếu không tìm thấy tệp trên S3, backend ném `TrainerDocumentNotFoundException` và trả về **HTTP 404 Not Found** với mã lỗi `TRAINER_DOCUMENT_NOT_FOUND`.
+  - Dọn dẹp tệp mồ côi (Orphan Cleanup): Nếu upload S3 thành công nhưng lưu metadata vào database gặp lỗi, backend tự động gọi `deleteFile` để dọn dẹp tệp trên S3.
 - **ClamAV daemon & Cơ chế Fail-Closed:**
   - Kiểm tra kết nối TCP tới daemon: Mở socket TCP tới `localhost:3310` gửi `PING\0`, nhận phản hồi `PONG`.
-  - Cơ chế fail-closed của backend: Khi `CHAT_CLAMD_INTERNAL_HOST` được cấu hình nhưng daemon ClamAV tắt hoặc không kết nối được, `TrainerDocumentStorageService.java#L122` ném `ApplicationValidationException` ("Antivirus scanner is currently unavailable"). `GlobalExceptionHandler.java#L794-L804` bắt exception này và trả về **HTTP 400 Bad Request** với thân JSON:
+  - Cơ chế fail-closed của scanner: Nếu `CHAT_CLAMD_INTERNAL_HOST` để trống, socket timeout, connection refused hoặc lỗi giao thức, `TrainerDocumentStorageService` ném `ScannerUnavailableException`. `GlobalExceptionHandler` bắt exception này và trả về **HTTP 503 Service Unavailable** với thân JSON:
+    ```json
+    {
+      "errorCode": "SCANNER_UNAVAILABLE",
+      "message": "Antivirus scanner is currently unavailable"
+    }
+    ```
+  - Khi phát hiện malware (`FOUND`), backend ném `ApplicationValidationException` trả về **HTTP 400 Bad Request** với thân JSON:
     ```json
     {
       "errorCode": "VALIDATION_FAILED",
-      "message": "Antivirus scanner is currently unavailable",
+      "message": "Uploaded file is infected with malware",
       "fieldErrors": [
         {
           "field": "file",
-          "code": "SCANNER_UNAVAILABLE",
-          "message": "Antivirus scanner is currently unavailable"
+          "code": "MALWARE_DETECTED",
+          "message": "Uploaded file contains malware"
         }
       ]
     }
     ```
-    Tệp nhị phân không được lưu vào storage và hồ sơ không được tạo. (Lưu ý: HTTP 503 chỉ trả về trong module chat qua `ClamdAttachmentScanner`, còn upload tài liệu xác thực trả về HTTP 400 `VALIDATION_FAILED` kèm field error `SCANNER_UNAVAILABLE`).
+  - Tệp có chuỗi EICAR dạng văn bản thuần bị từ chối ngay ở bước xác thực magic bytes với HTTP 400 `VALIDATION_FAILED` (mã lỗi `InvalidType`). Chỉ các tệp PDF/PNG/JPEG hợp lệ mới được đưa qua stream ClamAV.
 
 ### 8.4 Chuẩn bị tài khoản kiểm thử (Roles & Capabilities)
 

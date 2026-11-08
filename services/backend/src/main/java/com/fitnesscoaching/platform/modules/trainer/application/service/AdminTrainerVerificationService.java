@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.common.exception.FieldErrorDto;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationAlreadyDecidedException;
 import com.fitnesscoaching.platform.common.exception.TrainerApplicationNotFoundException;
+import com.fitnesscoaching.platform.common.exception.TrainerDocumentNotFoundException;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
@@ -301,7 +302,7 @@ public class AdminTrainerVerificationService implements
 
         com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentContent doc = trainerApplicationPort
                 .findDocumentContent(applicationId, mediaId)
-                .orElseThrow(() -> new TrainerApplicationNotFoundException("Document not found for application: " + mediaId));
+                .orElseThrow(() -> new TrainerDocumentNotFoundException("Document not found for application: " + mediaId));
 
         if (!"CLEAN".equals(doc.scanStatus())) {
             throw new ApplicationValidationException("Media file is not clean: " + doc.scanStatus());

@@ -25,6 +25,8 @@ import com.fitnesscoaching.platform.modules.trainer.domain.TrainerProfile;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,8 @@ public class TrainerApplicationService implements
         SubmitTrainerApplicationUseCase,
         GetCurrentTrainerApplicationUseCase,
         com.fitnesscoaching.platform.modules.trainer.application.port.in.UploadTrainerVerificationDocumentUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(TrainerApplicationService.class);
 
     private final TrainerProfilePort trainerProfilePort;
     private final TrainerApplicationPort trainerApplicationPort;
@@ -211,18 +215,29 @@ public class TrainerApplicationService implements
         String checksum = documentStorageService.computeSha256(bytes);
         Instant now = Instant.now(clock);
 
-        trainerApplicationPort.saveMediaFile(
-                mediaId,
-                trainerId,
-                "verification-docs",
-                objectKey,
-                filename,
-                validatedType,
-                bytes.length,
-                checksum,
-                scanStatus,
-                now
-        );
+        try {
+            trainerApplicationPort.saveMediaFile(
+                    mediaId,
+                    trainerId,
+                    "verification-docs",
+                    objectKey,
+                    filename,
+                    validatedType,
+                    bytes.length,
+                    checksum,
+                    scanStatus,
+                    now
+            );
+        } catch (Exception dbEx) {
+            log.error("Failed to persist media metadata for mediaId {}, cleaning up orphaned S3 object {}: {}",
+                    mediaId, objectKey, dbEx.getMessage());
+            try {
+                documentStorageService.deleteFile(objectKey);
+            } catch (Exception cleanupEx) {
+                log.warn("Failed to delete orphaned S3 object {}: {}", objectKey, cleanupEx.getMessage());
+            }
+            throw dbEx;
+        }
 
         return new com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationDocumentInfo(
                 mediaId,

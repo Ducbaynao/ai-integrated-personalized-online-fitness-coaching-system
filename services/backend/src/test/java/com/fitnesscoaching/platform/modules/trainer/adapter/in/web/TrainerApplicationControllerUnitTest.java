@@ -362,4 +362,36 @@ class TrainerApplicationControllerUnitTest {
                 .andExpect(jsonPath("$.originalFilename", is("cert.pdf")))
                 .andExpect(jsonPath("$.scanStatus", is("CLEAN")));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/trainer-applications/documents: returns 503 when scanner is unavailable")
+    void uploadDocument_scannerUnavailable_returns503() throws Exception {
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "cert.pdf", "application/pdf", "%PDF-1.4 test".getBytes());
+
+        when(uploadDocumentUseCase.uploadDocument(any(), any(), any(), any()))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.ScannerUnavailableException("Scanner down"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/trainer-applications/documents")
+                        .file(file)
+                        .with(jwt().jwt(j -> j.subject(USER_ID.toString())).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_TRAINER"))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode", is("SCANNER_UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/trainer-applications/documents: returns 503 when storage is unavailable")
+    void uploadDocument_storageUnavailable_returns503() throws Exception {
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "cert.pdf", "application/pdf", "%PDF-1.4 test".getBytes());
+
+        when(uploadDocumentUseCase.uploadDocument(any(), any(), any(), any()))
+                .thenThrow(new com.fitnesscoaching.platform.common.exception.StorageUnavailableException("Storage down"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/trainer-applications/documents")
+                        .file(file)
+                        .with(jwt().jwt(j -> j.subject(USER_ID.toString())).authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_TRAINER"))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode", is("STORAGE_UNAVAILABLE")));
+    }
 }

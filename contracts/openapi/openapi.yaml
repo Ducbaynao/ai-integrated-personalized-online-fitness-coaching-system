@@ -2251,6 +2251,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: Service Unavailable - Storage or antivirus scanner is currently unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /admin/trainer-applications:
     get:
@@ -2451,6 +2456,11 @@ paths:
         '403': { $ref: '#/components/responses/AccountUnavailable' }
         '404':
           description: Document or application not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: Service Unavailable - Object storage is currently unavailable.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }

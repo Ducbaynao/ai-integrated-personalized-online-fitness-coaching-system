@@ -34,18 +34,19 @@ This PR closes the Phase 1 core functional gaps assigned to Person A, following 
 ### B. Backend Platform (`services/backend`)
 - **Media & Document Verification:**
   - `MediaQueryPort.java` & `MediaPersistenceAdapter.java`: Added `allMediaExistOwnedAndClean(...)` requiring `scan_status = 'CLEAN'`, while separating general `allMediaExistAndOwnedBy(...)` without scan constraints. Added unit tests in `MediaPersistenceAdapterUnitTest.java`.
-  - `TrainerDocumentStorageService.java`: Implemented verification document upload, file signature magic byte validation (PDF, PNG, JPEG), ClamAV `zINSTREAM` scanning, and document content storage.
+  - `TrainerDocumentStorageService.java`: Implemented fail-closed verification document upload without in-memory RAM fallback; file signature magic byte validation (PDF, PNG, JPEG); ClamAV `zINSTREAM` stream scanning throwing `ScannerUnavailableException` (HTTP 503 `SCANNER_UNAVAILABLE`) if unconfigured or unreachable, or `ApplicationValidationException(MALWARE_DETECTED)` (HTTP 400) if infected; S3 storage operations throwing `StorageUnavailableException` (HTTP 503 `STORAGE_UNAVAILABLE`) if unconfigured or failed, and `TrainerDocumentNotFoundException` (HTTP 404 `TRAINER_DOCUMENT_NOT_FOUND`) if object not found; S3 orphan cleanup on database persistence failure.
   - Endpoints added:
     - `POST /api/v1/trainer-applications/documents` (multipart document upload for trainers)
     - `GET /api/v1/admin/trainer-applications/{applicationId}/documents` (admin document list)
     - `GET /api/v1/admin/trainer-applications/{applicationId}/documents/{mediaId}/download` (admin document download with `ADMIN_TRAINER_DOCUMENT_ACCESSED` audit)
     - `GET /api/v1/admin/trainer-applications/{applicationId}/certificates` (admin certificate list)
 - **Trainer Applications:**
-  - `TrainerApplicationService.java`: Enforced required rejection reasons, concurrency protection on admin decisions, verified status updates on trainer profile, and audit event publishing.
+  - `TrainerApplicationService.java`: Enforced required rejection reasons, concurrency protection on admin decisions, verified status updates on trainer profile, S3 orphan cleanup on DB failure, and audit event publishing.
   - `AdminTrainerApplicationIntegrationTest.java`: 26 tests verifying admin queue, filtering, approve/reject flows, audit logging, and 409 conflict handling.
   - `TrainerApplicationIntegrationTest.java`: 17 tests verifying complete lifecycle including discovery filtering.
-  - `TrainerApplicationServiceUnitTest.java`: 23 unit tests for application transitions.
-  - `AdminTrainerVerificationServiceUnitTest.java`: 17 unit tests for admin verification logic.
+  - `TrainerDocumentStorageServiceTest.java`: 20 unit tests verifying fail-closed storage, fail-closed scanner, mock socket ClamAV stream protocol, magic byte validation, and EICAR handling.
+  - `TrainerApplicationServiceUnitTest.java`: 27 unit tests for application transitions and upload error cleanup.
+  - `AdminTrainerVerificationServiceUnitTest.java`: 22 unit tests for admin verification and download logic.
 - **Fitness Goals & Proposals:**
   - `GetStudentCurrentGoalForTrainerUseCase.java` & `GetStudentGoalProposalsForTrainerUseCase.java`: Ports for trainer retrieval of scoped student goals and proposals.
   - `FitnessGoalProposalService.java`: Implemented trainer query methods enforcing `GoalTrainerAuthorityPort.verifyTrainerCanViewProposal` (validates relationship, active `HUMAN_COACH` period, and `FITNESS_GOAL:VIEW` permission).
@@ -209,24 +210,33 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 ### 7.3 Health check & Xác nhận dịch vụ sẵn sàng
 
 - **Backend Actuator Health:** `curl -s http://localhost:8080/actuator/health` -> Phản hồi `{"status":"UP"}`. Endpoint quản lý cấu hình tại `management.endpoints.web.exposure.include: health,info`.
-- **S3-compatible Storage (MinIO local):** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200. (Lớp lưu trữ `TrainerDocumentStorageService` có fallback cache bộ nhớ `localCache` khi MinIO chưa khởi chạy).
+- **S3-compatible Storage (MinIO local) & Cơ chế Fail-Closed:** `curl -s http://localhost:9000/minio/health/live` -> HTTP 200.
+  - Cơ chế fail-closed của storage: `TrainerDocumentStorageService` không sử dụng cache RAM / fallback in-memory. Nếu thiếu cấu hình S3 hoặc MinIO tắt/lỗi, backend ném `StorageUnavailableException` và trả về **HTTP 503 Service Unavailable** với mã lỗi `STORAGE_UNAVAILABLE`. Khi tải tài liệu, nếu không tìm thấy tệp trên S3, backend ném `TrainerDocumentNotFoundException` và trả về **HTTP 404 Not Found** với mã lỗi `TRAINER_DOCUMENT_NOT_FOUND`.
+  - Dọn dẹp tệp mồ côi (Orphan Cleanup): Nếu upload S3 thành công nhưng lưu metadata vào database gặp lỗi, backend tự động gọi `deleteFile` để dọn dẹp tệp trên S3.
 - **ClamAV daemon & Cơ chế Fail-Closed:**
   - Kiểm tra kết nối TCP tới daemon: Mở socket TCP tới `localhost:3310` gửi `PING\0`, nhận phản hồi `PONG`.
-  - Cơ chế fail-closed của backend: Khi `CHAT_CLAMD_INTERNAL_HOST` được cấu hình nhưng daemon ClamAV tắt hoặc không kết nối được, `TrainerDocumentStorageService.java#L122` ném `ApplicationValidationException` ("Antivirus scanner is currently unavailable"). `GlobalExceptionHandler.java#L794-L804` bắt exception này và trả về **HTTP 400 Bad Request** với thân JSON:
+  - Cơ chế fail-closed của scanner: Nếu `CHAT_CLAMD_INTERNAL_HOST` để trống, socket timeout, connection refused hoặc lỗi giao thức, `TrainerDocumentStorageService` ném `ScannerUnavailableException`. `GlobalExceptionHandler` bắt exception này và trả về **HTTP 503 Service Unavailable** với thân JSON:
+    ```json
+    {
+      "errorCode": "SCANNER_UNAVAILABLE",
+      "message": "Antivirus scanner is currently unavailable"
+    }
+    ```
+  - Khi phát hiện malware (`FOUND`), backend ném `ApplicationValidationException` trả về **HTTP 400 Bad Request** với thân JSON:
     ```json
     {
       "errorCode": "VALIDATION_FAILED",
-      "message": "Antivirus scanner is currently unavailable",
+      "message": "Uploaded file is infected with malware",
       "fieldErrors": [
         {
           "field": "file",
-          "code": "SCANNER_UNAVAILABLE",
-          "message": "Antivirus scanner is currently unavailable"
+          "code": "MALWARE_DETECTED",
+          "message": "Uploaded file contains malware"
         }
       ]
     }
     ```
-    Tệp nhị phân không được lưu vào storage và hồ sơ không được tạo. (Lưu ý: HTTP 503 chỉ trả về trong module chat qua `ClamdAttachmentScanner`, còn upload tài liệu xác thực trả về HTTP 400 `VALIDATION_FAILED` kèm field error `SCANNER_UNAVAILABLE`).
+  - Tệp có chuỗi EICAR dạng văn bản thuần bị từ chối ngay ở bước xác thực magic bytes với HTTP 400 `VALIDATION_FAILED` (mã lỗi `InvalidType`). Chỉ các tệp PDF/PNG/JPEG hợp lệ mới được đưa qua stream ClamAV.
 
 ### 7.4 Chuẩn bị tài khoản kiểm thử (Roles & Capabilities)
 
