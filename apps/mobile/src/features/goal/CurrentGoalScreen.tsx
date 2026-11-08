@@ -23,6 +23,9 @@ import { GoalTargetsTab } from '@/features/goal/components/GoalTargetsTab';
 import { GoalHistoryTab } from '@/features/goal/components/GoalHistoryTab';
 import { GoalProposalsTab } from '@/features/goal/components/GoalProposalsTab';
 import { PauseResumeGoalModal } from '@/features/goal/components/PauseResumeGoalModal';
+import { CreateGoalModal } from '@/features/goal/components/CreateGoalModal';
+import { CreateGoalVersionModal } from '@/features/goal/components/CreateGoalVersionModal';
+import { CreateGoalTransitionModal } from '@/features/goal/components/CreateGoalTransitionModal';
 import { GoalScreenSkeleton } from '@/features/goal/components/GoalScreenSkeleton';
 
 export function isGoalActionAllowed(
@@ -71,6 +74,13 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalAction, setModalAction] = useState<'pause' | 'resume'>('pause');
   const [isModalSubmitting, setIsModalSubmitting] = useState(false);
+
+  // Goal creation, version adjustment, and transition modal states
+  const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
+  const [createVersionModalVisible, setCreateVersionModalVisible] = useState(false);
+  const [createTransitionModalVisible, setCreateTransitionModalVisible] = useState(false);
+  const [isCreateGoalSubmitting, setIsCreateGoalSubmitting] = useState(false);
+  const [conflictBanner, setConflictBanner] = useState<string | null>(null);
 
   // Reconciliation state for out-of-band / stale mutation sync
   const [reconciliationState, setReconciliationState] =
@@ -396,6 +406,129 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     }
   };
 
+  const handleCreateGoal = async (payload: {
+    title: string;
+    goalTypeCode: string;
+    durationDays?: number;
+    notes?: string;
+  }) => {
+    if (isCreateGoalSubmitting) return;
+    setIsCreateGoalSubmitting(true);
+    setConflictBanner(null);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await fitnessGoalApi.createGoal({
+        title: payload.title,
+        startDate: today,
+        durationDays: payload.durationDays,
+        activateImmediately: true,
+        objectives: [
+          {
+            goalTypeCode: payload.goalTypeCode,
+            priority: 'PRIMARY',
+            notes: payload.notes,
+          },
+        ],
+      });
+      setCreateGoalModalVisible(false);
+      await loadGoal({ showLoading: true });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 409) {
+        setConflictBanner(
+          err.errorResponse?.message ||
+            'You already have an active fitness goal. Only one active goal is permitted.'
+        );
+      } else {
+        Alert.alert('Creation Failed', err?.message || 'Unable to create fitness goal.');
+      }
+      throw err;
+    } finally {
+      setIsCreateGoalSubmitting(false);
+    }
+  };
+
+  const handleCreateVersion = async (payload: {
+    title?: string;
+    changeReason: string;
+    changeSummary?: string;
+    durationDays?: number;
+    goalTypeCode: string;
+  }) => {
+    if (!goal || isCreateGoalSubmitting) return;
+    setIsCreateGoalSubmitting(true);
+    setConflictBanner(null);
+    try {
+      await fitnessGoalApi.createGoalVersion(goal.id, {
+        title: payload.title,
+        changeReason: payload.changeReason,
+        changeSummary: payload.changeSummary,
+        durationDays: payload.durationDays,
+        objectives: [
+          {
+            goalTypeCode: payload.goalTypeCode,
+            priority: 'PRIMARY',
+          },
+        ],
+      });
+      setCreateVersionModalVisible(false);
+      await loadGoal({ showLoading: true });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 409) {
+        setConflictBanner(
+          err.errorResponse?.message ||
+            'Goal version conflict occurred. Another change was made. Please reload.'
+        );
+      } else {
+        Alert.alert('Version Adjustment Failed', err?.message || 'Unable to adjust goal.');
+      }
+      throw err;
+    } finally {
+      setIsCreateGoalSubmitting(false);
+    }
+  };
+
+  const handleCreateTransition = async (payload: {
+    transitionReason: string;
+    notes?: string;
+    title: string;
+    goalTypeCode: string;
+    durationDays?: number;
+  }) => {
+    if (!goal || isCreateGoalSubmitting) return;
+    setIsCreateGoalSubmitting(true);
+    setConflictBanner(null);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await fitnessGoalApi.createGoalTransition(goal.id, {
+        transitionReason: payload.transitionReason,
+        notes: payload.notes,
+        title: payload.title,
+        startDate: today,
+        durationDays: payload.durationDays,
+        objectives: [
+          {
+            goalTypeCode: payload.goalTypeCode,
+            priority: 'PRIMARY',
+          },
+        ],
+      });
+      setCreateTransitionModalVisible(false);
+      await loadGoal({ showLoading: true });
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 409) {
+        setConflictBanner(
+          err.errorResponse?.message ||
+            'Transition conflict occurred. The goal state has changed. Please reload.'
+        );
+      } else {
+        Alert.alert('Transition Failed', err?.message || 'Unable to transition goal journey.');
+      }
+      throw err;
+    } finally {
+      setIsCreateGoalSubmitting(false);
+    }
+  };
+
   const renderTabContent = () => {
     if (!isGoalMatchingRoute || !goal) {
       if (activeTab === 'proposals') {
@@ -415,13 +548,25 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             You currently do not have an active or paused fitness goal. When you or your coach
             establish a fitness goal, it will appear here.
           </Text>
+
+          <Pressable
+            testID="create-first-goal-button"
+            accessibilityRole="button"
+            accessibilityLabel="Create New Fitness Goal"
+            style={[styles.primaryActionButton, { backgroundColor: themeColors.primary, marginBottom: spacing.sm }]}
+            onPress={() => setCreateGoalModalVisible(true)}>
+            <Text style={styles.primaryActionText}>Create Fitness Goal</Text>
+          </Pressable>
+
           <Pressable
             testID="view-proposals-empty-button"
             accessibilityRole="button"
             accessibilityLabel="Check Pending Proposals"
-            style={[styles.primaryActionButton, { backgroundColor: themeColors.primary }]}
+            style={[styles.secondaryActionButton, { borderColor: themeColors.border }]}
             onPress={() => setActiveTab('proposals')}>
-            <Text style={styles.primaryActionText}>Check Goal Proposals</Text>
+            <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
+              Check Goal Proposals
+            </Text>
           </Pressable>
         </View>
       );
@@ -507,7 +652,49 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         {/* Loaded Content */}
         {!isLoading && !error && (
           <>
-            {/* Quick Actions (Pause / Resume) if Goal Exists and not reconciling */}
+            {/* Conflict Banner */}
+            {conflictBanner && (
+              <View
+                testID="goal-conflict-banner"
+                style={[
+                  styles.reconciliationCard,
+                  {
+                    backgroundColor: themeColors.warningSurface,
+                    borderColor: themeColors.warningText,
+                    marginBottom: spacing.md,
+                  },
+                ]}>
+                <View style={styles.reconciliationCardContent}>
+                  <Text
+                    style={[
+                      styles.reconciliationCardTitle,
+                      { color: themeColors.warningText },
+                    ]}>
+                    Goal Version Conflict
+                  </Text>
+                  <Text
+                    style={[
+                      styles.reconciliationCardSubtitle,
+                      { color: themeColors.textSecondary },
+                    ]}>
+                    {conflictBanner}
+                  </Text>
+                </View>
+                <Pressable
+                  testID="reload-goal-conflict-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Reload goal"
+                  style={[styles.retryActionButton, { backgroundColor: themeColors.primary }]}
+                  onPress={() => {
+                    setConflictBanner(null);
+                    loadGoal({ showLoading: true });
+                  }}>
+                  <Text style={styles.retryActionText}>Reload</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* Quick Actions (Pause / Resume / Adjust / Transition) if Goal Exists and not reconciling */}
             {isGoalMatchingRoute && goal && !isReconcilingThisRoute && (
               <View style={styles.actionRow}>
                 {isGoalActionAllowed('pause', goal.status) && (
@@ -547,6 +734,44 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                     onPress={handleOpenResume}>
                     <Text style={styles.resumeActionText}>▶ Resume Goal</Text>
                   </Pressable>
+                )}
+
+                {goal.status === 'ACTIVE' && (
+                  <>
+                    <Pressable
+                      testID="adjust-goal-version-button"
+                      accessibilityRole="button"
+                      accessibilityLabel="Adjust Goal"
+                      style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        {
+                          borderColor: themeColors.border,
+                          backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
+                        },
+                      ]}
+                      onPress={() => setCreateVersionModalVisible(true)}>
+                      <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
+                        ✎ Adjust Goal
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      testID="transition-goal-button"
+                      accessibilityRole="button"
+                      accessibilityLabel="Transition Journey"
+                      style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        {
+                          borderColor: themeColors.border,
+                          backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
+                        },
+                      ]}
+                      onPress={() => setCreateTransitionModalVisible(true)}>
+                      <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
+                        ↻ Transition
+                      </Text>
+                    </Pressable>
+                  </>
                 )}
               </View>
             )}
@@ -659,6 +884,38 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             onSubmit={handleModalSubmit}
           />
       )}
+
+      {/* Create First Goal Modal */}
+      <CreateGoalModal
+        visible={createGoalModalVisible}
+        isSubmitting={isCreateGoalSubmitting}
+        isDark={isDark}
+        onClose={() => setCreateGoalModalVisible(false)}
+        onSubmit={handleCreateGoal}
+      />
+
+      {/* Adjust Goal Version Modal */}
+      {goal && (
+        <CreateGoalVersionModal
+          visible={createVersionModalVisible}
+          currentTitle={goal.title}
+          isSubmitting={isCreateGoalSubmitting}
+          isDark={isDark}
+          onClose={() => setCreateVersionModalVisible(false)}
+          onSubmit={handleCreateVersion}
+        />
+      )}
+
+      {/* Transition Goal Modal */}
+      {goal && (
+        <CreateGoalTransitionModal
+          visible={createTransitionModalVisible}
+          isSubmitting={isCreateGoalSubmitting}
+          isDark={isDark}
+          onClose={() => setCreateTransitionModalVisible(false)}
+          onSubmit={handleCreateTransition}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -726,6 +983,20 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  secondaryActionButton: {
+    minHeight: layout.minimumTouchTarget,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  secondaryActionText: {
+    ...typography.label,
+    fontWeight: '700',
   },
   pauseActionButton: {
     minHeight: layout.minimumTouchTarget,

@@ -2836,6 +2836,70 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /students/{studentId}/fitness-goals/current:
+    get:
+      tags: [Fitness Goal Proposal]
+      operationId: getStudentCurrentGoalForTrainer
+      summary: Retrieve student's current manageable fitness goal for an authorized Trainer
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current fitness goal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitnessGoalResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404': { $ref: '#/components/responses/FitnessGoalNotFound' }
+
+  /students/{studentId}/fitness-goal-proposals:
+    get:
+      tags: [Fitness Goal Proposal]
+      operationId: getStudentProposalsForTrainer
+      summary: List fitness goal proposals for a student by an authorized Trainer
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: fitnessGoalId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProposalStatus'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated goal proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProposalPageResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
   /fitness-goal-proposals/me:
     get:
       tags: [Fitness Goal Proposal]

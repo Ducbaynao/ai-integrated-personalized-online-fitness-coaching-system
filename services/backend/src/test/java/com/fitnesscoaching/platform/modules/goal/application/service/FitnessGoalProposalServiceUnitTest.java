@@ -680,4 +680,68 @@ class FitnessGoalProposalServiceUnitTest {
                         "GOAL_PROPOSAL_ACCEPTED"
                 );
     }
+
+    @Test
+    @DisplayName("getStudentCurrentGoalForTrainer: returns current manageable goal when authorized")
+    void getStudentCurrentGoalForTrainer_success() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+
+        FitnessGoal activeGoal = new FitnessGoal(
+                goalId, studentId, "Hypertrophy Phase", GoalStatus.ACTIVE, studentId,
+                Instant.now(), null, null, null, null, Instant.now(), Instant.now(), null
+        );
+
+        doNothing().when(trainerAuthorityPort).verifyTrainerCanViewProposal(trainerId, studentId);
+        when(goalPort.findCurrentManageableByStudentId(studentId)).thenReturn(Optional.of(activeGoal));
+
+        FitnessGoal result = service.getStudentCurrentGoalForTrainer(trainerId, studentId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(goalId);
+        assertThat(result.title()).isEqualTo("Hypertrophy Phase");
+        verify(trainerAuthorityPort).verifyTrainerCanViewProposal(trainerId, studentId);
+        verify(goalPort).findCurrentManageableByStudentId(studentId);
+    }
+
+    @Test
+    @DisplayName("getStudentCurrentGoalForTrainer: throws FitnessGoalNotFoundException when no active goal")
+    void getStudentCurrentGoalForTrainer_notFound() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        doNothing().when(trainerAuthorityPort).verifyTrainerCanViewProposal(trainerId, studentId);
+        when(goalPort.findCurrentManageableByStudentId(studentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getStudentCurrentGoalForTrainer(trainerId, studentId))
+                .isInstanceOf(FitnessGoalNotFoundException.class)
+                .hasMessageContaining("No active or paused fitness goal found");
+    }
+
+    @Test
+    @DisplayName("getStudentProposalsForTrainer: returns paginated proposals for trainer")
+    void getStudentProposalsForTrainer_success() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID goalId = UUID.randomUUID();
+        UUID proposalId = UUID.randomUUID();
+
+        GoalProposal prop = new GoalProposal(
+                proposalId, studentId, goalId, UUID.randomUUID(), ProposalSource.TRAINER,
+                trainerId, "New Title", LocalDate.now(), LocalDate.now().plusDays(45), 45,
+                "Reason", ProposalStatus.PENDING, null, null, null, null, Instant.now(), Instant.now(),
+                List.of(), List.of(), null
+        );
+
+        doNothing().when(trainerAuthorityPort).verifyTrainerCanViewProposal(trainerId, studentId);
+        when(proposalPort.countByStudentId(studentId, goalId, ProposalStatus.PENDING)).thenReturn(1L);
+        when(proposalPort.findByStudentId(studentId, goalId, ProposalStatus.PENDING, 20, 0)).thenReturn(List.of(prop));
+
+        GoalProposalPage page = service.getStudentProposalsForTrainer(trainerId, studentId, goalId, ProposalStatus.PENDING, 0, 20);
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.totalItems()).isEqualTo(1L);
+        verify(trainerAuthorityPort).verifyTrainerCanViewProposal(trainerId, studentId);
+    }
 }
