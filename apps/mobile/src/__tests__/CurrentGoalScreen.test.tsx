@@ -58,6 +58,11 @@ jest.mock('@/services/fitnessGoalApi', () => ({
     getMyGoalProposals: jest.fn().mockResolvedValue({ items: [], totalPages: 1 }),
     pauseGoal: jest.fn(),
     resumeGoal: jest.fn(),
+    createGoal: jest.fn(),
+    activateGoal: jest.fn(),
+    createGoalVersion: jest.fn(),
+    createGoalTransition: jest.fn(),
+    createGoalProposal: jest.fn(),
   },
 }));
 
@@ -1757,6 +1762,211 @@ describe('CurrentGoalScreen', () => {
       expect(root.findAllByProps({ testID: 'pause-resume-confirm-button' }).length).toBe(0);
       expect(root.findByProps({ testID: 'paused-status-banner' })).toBeDefined();
       expect(root.findByProps({ testID: 'resume-goal-button' })).toBeDefined();
+    });
+  });
+
+  describe('Goal Creation, Version Adjustment, and Journey Transition', () => {
+    it('allows student to open create first goal modal and submit new goal', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockRejectedValueOnce(
+        new ApiError(404, 'No goal found', {
+          errorCode: 'GOAL_NOT_FOUND',
+          message: 'No goal found',
+          timestamp: '2026-11-08T00:00:00Z',
+          requestId: 'req-404',
+          fieldErrors: [],
+        })
+      );
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      const createFirstGoalBtn = root.findByProps({ testID: 'create-first-goal-button' });
+      expect(createFirstGoalBtn).toBeDefined();
+
+      // Open create modal
+      await renderer.act(async () => {
+        createFirstGoalBtn.props.onPress();
+      });
+
+      expect(root.findByProps({ testID: 'create-goal-modal' })).toBeDefined();
+
+      // Fill in title
+      renderer.act(() => {
+        root.findByProps({ testID: 'create-goal-title-input' }).props.onChangeText('12-Week Hypertrophy');
+      });
+
+      // Submit
+      const createdGoal: FitnessGoal = {
+        ...activeGoal,
+        id: 'new-goal-101',
+        title: '12-Week Hypertrophy',
+        status: 'DRAFT',
+      };
+      const activatedGoal: FitnessGoal = {
+        ...createdGoal,
+        status: 'ACTIVE',
+      };
+      (fitnessGoalApi.createGoal as jest.Mock).mockResolvedValueOnce(createdGoal);
+      (fitnessGoalApi.activateGoal as jest.Mock).mockResolvedValueOnce(activatedGoal);
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activatedGoal);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'create-goal-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: '12-Week Hypertrophy',
+          activateImmediately: true,
+          objectives: expect.arrayContaining([
+            expect.objectContaining({
+              goalTypeCode: 'FAT_LOSS',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('allows student to open adjust version modal and submit with mandatory reason', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      const adjustBtn = root.findByProps({ testID: 'adjust-goal-version-button' });
+      expect(adjustBtn).toBeDefined();
+
+      await renderer.act(async () => {
+        adjustBtn.props.onPress();
+      });
+
+      expect(root.findByProps({ testID: 'create-goal-version-modal' })).toBeDefined();
+
+      // Enter change reason (required)
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Recovering from mild knee strain');
+      });
+
+      (fitnessGoalApi.createGoalVersion as jest.Mock).mockResolvedValueOnce({
+        id: 'ver-2',
+        versionNumber: 2,
+        title: 'Adjusted Version',
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledWith(
+        'goal-123',
+        expect.objectContaining({
+          changeReason: 'Recovering from mild knee strain',
+        })
+      );
+    });
+
+    it('allows student to transition journey with mandatory transition reason', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      const transitionBtn = root.findByProps({ testID: 'transition-goal-button' });
+      expect(transitionBtn).toBeDefined();
+
+      await renderer.act(async () => {
+        transitionBtn.props.onPress();
+      });
+
+      expect(root.findByProps({ testID: 'create-goal-transition-modal' })).toBeDefined();
+
+      // Enter title and transition reason (both required)
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-transition-title-input' }).props.onChangeText('Strength Maintenance Phase');
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-transition-reason-input' }).props.onChangeText('Target weight achieved, moving to strength maintenance');
+      });
+
+      (fitnessGoalApi.createGoalTransition as jest.Mock).mockResolvedValueOnce({
+        id: 'trans-1',
+        transitionReason: 'Target weight achieved, moving to strength maintenance',
+      });
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-transition-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoalTransition).toHaveBeenCalledWith(
+        'goal-123',
+        expect.objectContaining({
+          title: 'Strength Maintenance Phase',
+          transitionReason: 'Target weight achieved, moving to strength maintenance',
+          objectives: expect.arrayContaining([
+            expect.objectContaining({
+              goalTypeCode: 'MUSCLE_GAIN',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('displays conflict banner when version adjustment encounters 409 conflict, and recovers on reload', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      const adjustBtn = root.findByProps({ testID: 'adjust-goal-version-button' });
+      await renderer.act(async () => {
+        adjustBtn.props.onPress();
+      });
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Another adjustment');
+      });
+
+      // Mock 409 conflict error
+      (fitnessGoalApi.createGoalVersion as jest.Mock).mockRejectedValueOnce(
+        new ApiError(409, 'Goal was modified concurrently by trainer proposal', {
+          errorCode: 'GOAL_VERSION_CONFLICT',
+          message: 'Goal was modified concurrently by trainer proposal',
+          timestamp: '2026-11-08T00:00:00Z',
+          requestId: 'req-409',
+          fieldErrors: [],
+        })
+      );
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      // Conflict banner must now be displayed
+      const conflictBanner = root.findByProps({ testID: 'goal-conflict-banner' });
+      expect(conflictBanner).toBeDefined();
+
+      // Press reload on conflict banner
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'reload-goal-conflict-button' }).props.onPress();
+      });
+
+      // Conflict banner should be dismissed after reload
+      expect(root.findAllByProps({ testID: 'goal-conflict-banner' }).length).toBe(0);
     });
   });
 });

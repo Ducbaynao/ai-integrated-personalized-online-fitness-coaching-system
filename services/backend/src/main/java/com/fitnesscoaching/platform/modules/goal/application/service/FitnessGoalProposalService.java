@@ -27,7 +27,9 @@ public class FitnessGoalProposalService implements
         CreateGoalProposalUseCase,
         GetStudentGoalProposalsUseCase,
         GetGoalProposalDetailUseCase,
-        DecideGoalProposalUseCase {
+        DecideGoalProposalUseCase,
+        GetStudentCurrentGoalForTrainerUseCase,
+        GetStudentGoalProposalsForTrainerUseCase {
 
     private final GoalProposalPort proposalPort;
     private final GoalStudentAuthorityPort studentAuthorityPort;
@@ -542,6 +544,52 @@ public class FitnessGoalProposalService implements
         }
 
         throw new InvalidGoalProposalDecisionException("Unsupported decision: " + command.decision());
+    }
+
+    @Override
+    // Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction in PostgreSQL.
+    @Transactional
+    public FitnessGoal getStudentCurrentGoalForTrainer(UUID trainerId, UUID studentId) {
+        if (trainerId == null) {
+            throw new ApplicationValidationException("Trainer ID cannot be null");
+        }
+        if (studentId == null) {
+            throw new ApplicationValidationException("Student ID cannot be null");
+        }
+        trainerAuthorityPort.verifyTrainerCanViewProposal(trainerId, studentId);
+        return goalPort.findCurrentManageableByStudentId(studentId)
+                .orElseThrow(() -> new FitnessGoalNotFoundException("No active or paused fitness goal found for student: " + studentId));
+    }
+
+    @Override
+    // Trainer reads use Coaching authority's FOR SHARE boundary, which requires a read-write transaction in PostgreSQL.
+    @Transactional
+    public GoalProposalPage getStudentProposalsForTrainer(
+            UUID trainerId,
+            UUID studentId,
+            UUID fitnessGoalId,
+            ProposalStatus status,
+            int page,
+            int size
+    ) {
+        if (trainerId == null) {
+            throw new ApplicationValidationException("Trainer ID cannot be null");
+        }
+        if (studentId == null) {
+            throw new ApplicationValidationException("Student ID cannot be null");
+        }
+        if (page < 0) {
+            throw new ApplicationValidationException("Page index must not be negative");
+        }
+        if (size < 1 || size > 100) {
+            throw new ApplicationValidationException("Page size must be between 1 and 100");
+        }
+        trainerAuthorityPort.verifyTrainerCanViewProposal(trainerId, studentId);
+        long offset = (long) page * size;
+        long total = proposalPort.countByStudentId(studentId, fitnessGoalId, status);
+        List<GoalProposal> items = proposalPort.findByStudentId(studentId, fitnessGoalId, status, size, offset);
+        int totalPages = size == 0 ? 0 : (int) Math.ceil((double) total / size);
+        return new GoalProposalPage(items, page, size, total, totalPages);
     }
 
     private static String escapeJson(String input) {

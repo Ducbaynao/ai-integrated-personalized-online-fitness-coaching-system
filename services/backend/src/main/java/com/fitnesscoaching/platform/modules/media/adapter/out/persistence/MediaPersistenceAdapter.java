@@ -38,4 +38,27 @@ public class MediaPersistenceAdapter implements MediaQueryPort {
         Integer count = namedParameterJdbcTemplate.queryForObject(sql, params, Integer.class);
         return count != null && count == (int) mediaIds.stream().distinct().count();
     }
+
+    @Override
+    public boolean allMediaExistOwnedAndClean(List<UUID> mediaIds, UUID ownerUserId) {
+        if (mediaIds == null || mediaIds.isEmpty()) {
+            return true;
+        }
+
+        String sql = """
+                SELECT count(DISTINCT id)
+                FROM fitness.media_files
+                WHERE id IN (:mediaIds)
+                  AND owner_user_id = :ownerUserId
+                  AND deleted_at IS NULL
+                  AND scan_status = 'CLEAN'
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("mediaIds", mediaIds)
+                .addValue("ownerUserId", ownerUserId);
+
+        Integer count = namedParameterJdbcTemplate.queryForObject(sql, params, Integer.class);
+        return count != null && count == (int) mediaIds.stream().distinct().count();
+    }
 }

@@ -184,3 +184,70 @@ export interface DecideGoalProposalRequest {
   decision: ProposalDecision;
   decisionNote?: string | null;
 }
+
+export interface CreateGoalObjectiveRequest {
+  goalTypeId?: number;
+  goalTypeCode?: string;
+  priority: ObjectivePriority;
+  sortOrder?: number;
+  notes?: string | null;
+}
+
+export interface CreateGoalTargetRequest {
+  metricDefinitionId?: number;
+  metricCode?: string;
+  exerciseVariationId?: string | null;
+  startValue?: number | null;
+  targetValue?: number | null;
+  targetMinValue?: number | null;
+  targetMaxValue?: number | null;
+  unitId?: number;
+  unitCode?: string;
+  targetRepetitions?: number | null;
+  targetDate?: string | null;
+  notes?: string | null;
+}
+
+export interface CreateFitnessGoalRequest {
+  title: string;
+  startDate: string;
+  targetDate?: string | null;
+  durationDays?: number | null;
+  activateImmediately?: boolean;
+  objectives: CreateGoalObjectiveRequest[];
+  targets?: CreateGoalTargetRequest[];
+}
+
+export interface CreateGoalVersionRequest {
+  title?: string | null;
+  startDate?: string | null;
+  targetDate?: string | null;
+  durationDays?: number | null;
+  changeReason: string;
+  changeSummary?: string | null;
+  objectives: CreateGoalObjectiveRequest[];
+  targets?: CreateGoalTargetRequest[];
+}
+
+export interface CreateGoalTransitionRequest {
+  transitionReason: string;
+  notes?: string | null;
+  title: string;
+  startDate: string;
+  targetDate?: string | null;
+  durationDays?: number | null;
+  objectives: CreateGoalObjectiveRequest[];
+  targets?: CreateGoalTargetRequest[];
+}
+
+export interface CreateGoalProposalRequest {
+  proposedTitle?: string | null;
+  proposedStartDate?: string | null;
+  proposedTargetDate?: string | null;
+  proposedDurationDays?: number | null;
+  reason: string;
+  baseGoalVersionId?: string | null;
+  objectives: CreateGoalObjectiveRequest[];
+  targets?: CreateGoalTargetRequest[];
+}
+

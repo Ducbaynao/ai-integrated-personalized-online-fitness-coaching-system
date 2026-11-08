@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -188,16 +189,20 @@ class TrainerApplicationIntegrationTest {
     }
 
     private UUID createMediaFile(UUID ownerId, String filename) {
+        return createMediaFile(ownerId, filename, "CLEAN");
+    }
+
+    private UUID createMediaFile(UUID ownerId, String filename, String scanStatus) {
         UUID mediaId = UUID.randomUUID();
         jdbcTemplate.update("""
                 INSERT INTO fitness.media_files (
                     id, owner_user_id, storage_provider, bucket_name, object_key,
-                    original_filename, content_type, size_bytes, media_purpose
+                    original_filename, content_type, size_bytes, media_purpose, scan_status
                 ) VALUES (
                     ?, ?, 'S3', 'test-bucket', ?,
-                    ?, 'application/pdf', 1024, 'VERIFICATION_DOCUMENT'
+                    ?, 'application/pdf', 1024, 'VERIFICATION_DOCUMENT', ?
                 )
-                """, mediaId, ownerId, "keys/" + mediaId, filename);
+                """, mediaId, ownerId, "keys/" + mediaId, filename, scanStatus);
         return mediaId;
     }
 
@@ -517,8 +522,8 @@ class TrainerApplicationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Trainer profile with REJECTED verification status cannot submit new application (409)")
-    void submitApplication_rejectedProfile_returns409() throws Exception {
+    @DisplayName("Trainer profile with REJECTED verification status can resubmit new application (201)")
+    void submitApplication_rejectedProfile_resubmissionSuccess() throws Exception {
         UUID trainerId = createActiveUser("rejected@example.com");
         assignRole(trainerId, "TRAINER");
         createTrainerProfile(trainerId, "trainer-rejected", TrainerVerificationStatus.REJECTED, true);
@@ -527,9 +532,134 @@ class TrainerApplicationIntegrationTest {
         mockMvc.perform(post("/api/v1/trainer-applications")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode", is("INVALID_LIFECYCLE_TRANSITION")));
+                        .content("{\"applicantNote\":\"Resubmitting with updated details.\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status", is("PENDING")))
+                .andExpect(jsonPath("$.trainerId", is(trainerId.toString())));
+
+        String profileStatus = jdbcTemplate.queryForObject(
+                "SELECT verification_status::text FROM fitness.trainer_profiles WHERE user_id = ?",
+                String.class, trainerId);
+        assertThat(profileStatus).isEqualTo("PENDING");
+
+        List<Map<String, Object>> history = jdbcTemplate.queryForList(
+                "SELECT * FROM fitness.trainer_application_status_history WHERE changed_by = ? ORDER BY changed_at DESC",
+                trainerId);
+        assertThat(history).isNotEmpty();
+        assertThat(history.get(0).get("to_status")).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("Document with PENDING or REJECTED malware scan status cannot be submitted (400)")
+    void submitApplication_uncleanMedia_returns400() throws Exception {
+        UUID trainerId = createActiveUser("scanner-test@example.com");
+        assignRole(trainerId, "TRAINER");
+        createTrainerProfile(trainerId, "trainer-scanner", TrainerVerificationStatus.NOT_SUBMITTED);
+        String token = generateToken(trainerId, "scanner-test@example.com", List.of("TRAINER"));
+
+        UUID pendingMedia = createMediaFile(trainerId, "pending_scan.pdf", "PENDING");
+        UUID infectedMedia = createMediaFile(trainerId, "infected.pdf", "REJECTED");
+
+        // 1. Pending scan media is rejected
+        mockMvc.perform(post("/api/v1/trainer-applications")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"documentMediaIds\":[\"%s\"]}", pendingMedia)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+
+        // 2. Infected media is rejected
+        mockMvc.perform(post("/api/v1/trainer-applications")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"documentMediaIds\":[\"%s\"]}", infectedMedia)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
+
+    @Test
+    @DisplayName("End-to-End Verification Lifecycle: Submit -> Reject with Reason -> Resubmit -> Approve -> Search Discoverability")
+    void fullVerificationLifecycle_submitRejectResubmitApprove_andSearch() throws Exception {
+        // Step 1: Trainer registers and submits application
+        UUID trainerId = createActiveUser("e2e-coach@example.com");
+        jdbcTemplate.update("UPDATE fitness.users SET display_name = 'E2E Coach' WHERE id = ?", trainerId);
+        assignRole(trainerId, "TRAINER");
+        createTrainerProfile(trainerId, "e2e-coach", TrainerVerificationStatus.NOT_SUBMITTED, true);
+        String trainerToken = generateToken(trainerId, "e2e-coach@example.com", List.of("TRAINER"));
+
+        MvcResult submitResult = mockMvc.perform(post("/api/v1/trainer-applications")
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applicantNote\":\"First attempt application\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status", is("PENDING")))
+                .andReturn();
+
+        String app1IdStr = new ObjectMapper().readTree(submitResult.getResponse().getContentAsString()).get("id").asText();
+        UUID app1Id = UUID.fromString(app1IdStr);
+
+        // Step 2: Admin rejects the application with mandatory rejectionReason
+        UUID adminId = createActiveUser("admin-e2e@example.com");
+        assignRole(adminId, "ADMIN");
+        String adminToken = generateToken(adminId, "admin-e2e@example.com", List.of("ADMIN"));
+
+        mockMvc.perform(post("/api/v1/admin/trainer-applications/" + app1Id + "/decisions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"REJECT\",\"rejectionReason\":\"Certificates are illegible. Please re-upload.\",\"reviewNotes\":\"Needs higher resolution\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("REJECTED")))
+                .andExpect(jsonPath("$.rejectionReason", is("Certificates are illegible. Please re-upload.")));
+
+        // Step 3: Trainer checks current application: sees REJECTED with rejectionReason, but reviewNotes is concealed!
+        mockMvc.perform(get("/api/v1/trainer-applications/me/current")
+                        .header("Authorization", "Bearer " + trainerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("REJECTED")))
+                .andExpect(jsonPath("$.rejectionReason", is("Certificates are illegible. Please re-upload.")))
+                .andExpect(jsonPath("$.reviewNotes").doesNotExist());
+
+        // Step 4: Trainer resubmits application
+        MvcResult resubmitResult = mockMvc.perform(post("/api/v1/trainer-applications")
+                        .header("Authorization", "Bearer " + trainerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applicantNote\":\"Re-uploaded clear high-res certificates.\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status", is("PENDING")))
+                .andReturn();
+
+        UUID app2Id = UUID.fromString(new ObjectMapper().readTree(resubmitResult.getResponse().getContentAsString()).get("id").asText());
+
+        // Verify unverified trainer does NOT appear in public coaching discovery
+        UUID studentId = createActiveUser("student-seeker@example.com");
+        assignRole(studentId, "STUDENT");
+        createStudentProfile(studentId);
+        String studentToken = generateToken(studentId, "student-seeker@example.com", List.of("STUDENT"));
+
+        mockMvc.perform(get("/api/v1/coaching/trainers")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .param("query", "E2E Coach"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(0)));
+
+        // Step 5: Admin approves the resubmitted application
+        mockMvc.perform(post("/api/v1/admin/trainer-applications/" + app2Id + "/decisions")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"APPROVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("VERIFIED")));
+
+        // Step 6: Trainer is now VERIFIED; set acceptingStudents = true and active
+        jdbcTemplate.update("UPDATE fitness.trainer_profiles SET is_accepting_students = true, is_active = true WHERE user_id = ?", trainerId);
+
+        // Verify discoverable in coaching trainers directory
+        mockMvc.perform(get("/api/v1/coaching/trainers")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .param("query", "E2E Coach"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].trainerId", is(trainerId.toString())));
     }
 
     @Test

@@ -202,6 +202,165 @@ describe('fitnessGoalApi', () => {
     });
   });
 
+  describe('createGoal and activateGoal', () => {
+    it('sends POST /fitness-goals with creation payload', async () => {
+      const payload = {
+        title: 'Fat Loss Phase',
+        startDate: '2026-11-08',
+        durationDays: 60,
+        objectives: [
+          {
+            goalTypeCode: 'FAT_LOSS',
+            priority: 'PRIMARY' as const,
+            notes: 'Initial program',
+          },
+        ],
+      };
+      const mockGoal = { id: 'goal-1', status: 'ACTIVE', title: 'Fat Loss Phase' };
+      (request as jest.Mock).mockResolvedValueOnce(mockGoal);
+
+      const result = await fitnessGoalApi.createGoal(payload);
+
+      expect(request).toHaveBeenCalledWith('/fitness-goals', {
+        method: 'POST',
+        requiresAuth: true,
+        body: payload,
+      });
+      expect(result).toEqual(mockGoal);
+    });
+
+    it('sends POST /fitness-goals/{goalId}/activate', async () => {
+      const mockGoal = { id: 'goal-1', status: 'ACTIVE' };
+      (request as jest.Mock).mockResolvedValueOnce(mockGoal);
+
+      const result = await fitnessGoalApi.activateGoal('goal-1');
+
+      expect(request).toHaveBeenCalledWith('/fitness-goals/goal-1/activate', {
+        method: 'POST',
+        requiresAuth: true,
+      });
+      expect(result).toEqual(mockGoal);
+    });
+  });
+
+  describe('createGoalVersion', () => {
+    it('sends POST /fitness-goals/{goalId}/versions with version request payload', async () => {
+      const payload = {
+        title: 'Adjusted Fat Loss',
+        durationDays: 45,
+        changeReason: 'Plateau observed',
+        changeSummary: 'Reduced carbs and adjusted target weight',
+        objectives: [
+          {
+            goalTypeCode: 'FAT_LOSS',
+            priority: 'PRIMARY' as const,
+          },
+        ],
+      };
+      const mockVersion = { id: 'ver-2', versionNumber: 2, title: 'Adjusted Fat Loss' };
+      (request as jest.Mock).mockResolvedValueOnce(mockVersion);
+
+      const result = await fitnessGoalApi.createGoalVersion('goal-1', payload);
+
+      expect(request).toHaveBeenCalledWith('/fitness-goals/goal-1/versions', {
+        method: 'POST',
+        requiresAuth: true,
+        body: payload,
+      });
+      expect(result).toEqual(mockVersion);
+    });
+  });
+
+  describe('createGoalTransition', () => {
+    it('sends POST /fitness-goals/{goalId}/transitions with transition request payload', async () => {
+      const payload = {
+        title: 'Muscle Gain Hypertrophy',
+        startDate: '2026-11-08',
+        durationDays: 90,
+        transitionReason: 'Completed fat loss phase successfully',
+        objectives: [
+          {
+            goalTypeCode: 'MUSCLE_GAIN',
+            priority: 'PRIMARY' as const,
+          },
+        ],
+      };
+      const mockTransition = { id: 'trans-1', transitionReason: payload.transitionReason };
+      (request as jest.Mock).mockResolvedValueOnce(mockTransition);
+
+      const result = await fitnessGoalApi.createGoalTransition('goal-1', payload);
+
+      expect(request).toHaveBeenCalledWith('/fitness-goals/goal-1/transitions', {
+        method: 'POST',
+        requiresAuth: true,
+        body: payload,
+      });
+      expect(result).toEqual(mockTransition);
+    });
+  });
+
+  describe('createGoalProposal', () => {
+    it('sends POST /fitness-goals/{goalId}/proposals with proposal request payload', async () => {
+      const payload = {
+        reason: 'Coach recommending timeline extension',
+        proposedDurationDays: 75,
+        objectives: [
+          {
+            goalTypeCode: 'MUSCLE_GAIN',
+            priority: 'PRIMARY' as const,
+          },
+        ],
+      };
+      const mockProposal = { id: 'prop-1', reason: payload.reason, status: 'PENDING' };
+      (request as jest.Mock).mockResolvedValueOnce(mockProposal);
+
+      const result = await fitnessGoalApi.createGoalProposal('goal-1', payload);
+
+      expect(request).toHaveBeenCalledWith('/fitness-goals/goal-1/proposals', {
+        method: 'POST',
+        requiresAuth: true,
+        body: payload,
+      });
+      expect(result).toEqual(mockProposal);
+    });
+  });
+
+  describe('Trainer goal queries', () => {
+    it('sends GET /students/{studentId}/fitness-goals/current for trainer read', async () => {
+      const mockGoal = { id: 'goal-99', title: 'Student Muscle Goal', status: 'ACTIVE' };
+      (request as jest.Mock).mockResolvedValueOnce(mockGoal);
+
+      const result = await fitnessGoalApi.getStudentCurrentGoalForTrainer('student-123');
+
+      expect(request).toHaveBeenCalledWith('/students/student-123/fitness-goals/current', {
+        method: 'GET',
+        requiresAuth: true,
+      });
+      expect(result).toEqual(mockGoal);
+    });
+
+    it('sends GET /students/{studentId}/fitness-goal-proposals with filters for trainer read', async () => {
+      const mockPage = { items: [], totalItems: 0, page: 0, size: 20, totalPages: 0 };
+      (request as jest.Mock).mockResolvedValueOnce(mockPage);
+
+      const result = await fitnessGoalApi.getStudentGoalProposalsForTrainer('student-123', {
+        fitnessGoalId: 'goal-99',
+        status: 'PENDING',
+        page: 0,
+        size: 20,
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        '/students/student-123/fitness-goal-proposals?status=PENDING&fitnessGoalId=goal-99&page=0&size=20',
+        {
+          method: 'GET',
+          requiresAuth: true,
+        }
+      );
+      expect(result).toEqual(mockPage);
+    });
+  });
+
   describe('TypeScript type coverage', () => {
     it('includes ARCHIVED in GoalLifecycleStatus and AI_ASSISTANCE in ProposalSource', () => {
       const archivedStatus: GoalLifecycleStatus = 'ARCHIVED';

@@ -13,10 +13,14 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/features/auth/AuthContext';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
+import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 import { ApiError } from '@/types/auth';
 import {
+  TrainerApplicationResponse,
+  TrainerDocumentUploadResponse,
   TrainerProfileResponse,
   UpdateTrainerProfileRequest,
 } from '@/types/trainer';
@@ -51,11 +55,68 @@ export function TrainerProfileScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Application state
+  const [application, setApplication] = useState<TrainerApplicationResponse | null>(null);
+  const [applicantNote, setApplicantNote] = useState('');
+  const [isSubmittingApp, setIsSubmittingApp] = useState(false);
+  const [appError, setAppError] = useState<string | null>(null);
+  const [appSuccess, setAppSuccess] = useState<string | null>(null);
+  const [uploadedDocs, setUploadedDocs] = useState<TrainerDocumentUploadResponse[]>([]);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [docUploadError, setDocUploadError] = useState<string | null>(null);
+
+  const handlePickAndUploadDocument = async () => {
+    if (isUploadingDoc) return;
+    setDocUploadError(null);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/png', 'image/jpeg'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        setDocUploadError('File size exceeds the 10 MB limit.');
+        return;
+      }
+
+      setIsUploadingDoc(true);
+      const mime = asset.mimeType || (asset.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const uploaded = await trainerApplicationApi.uploadDocument(asset.uri, asset.name, mime);
+      setUploadedDocs((prev) => [...prev, uploaded]);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDocUploadError(err.message || 'Failed to upload document.');
+      } else {
+        setDocUploadError('Failed to select or upload document.');
+      }
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleRemoveDocument = (docId: string) => {
+    setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
+  };
+
   const populateForm = useCallback((data: TrainerProfileResponse) => {
     setEditSlug(data.publicSlug ?? '');
     setEditBio(data.bio ?? '');
     setEditYears(data.yearsExperience != null ? data.yearsExperience.toString() : '');
     setEditAccepting(Boolean(data.acceptingStudents));
+  }, []);
+
+  const fetchApplication = useCallback(async () => {
+    try {
+      const app = await trainerApplicationApi.getCurrentApplication();
+      setApplication(app);
+    } catch {
+      setApplication(null);
+    }
   }, []);
 
   const fetchProfile = useCallback(async () => {
@@ -65,6 +126,9 @@ export function TrainerProfileScreen() {
       const data = await trainerProfileApi.getMyTrainerProfile();
       setProfile(data);
       populateForm(data);
+      if (data.verificationStatus !== 'NOT_SUBMITTED') {
+        await fetchApplication();
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setLoadError(err.message || 'Failed to load Trainer Profile.');
@@ -74,7 +138,7 @@ export function TrainerProfileScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [populateForm]);
+  }, [populateForm, fetchApplication]);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,6 +148,18 @@ export function TrainerProfileScreen() {
         if (isMounted) {
           setProfile(data);
           populateForm(data);
+          if (data.verificationStatus !== 'NOT_SUBMITTED') {
+            try {
+              const app = await trainerApplicationApi.getCurrentApplication();
+              if (isMounted) {
+                setApplication(app);
+              }
+            } catch {
+              if (isMounted) {
+                setApplication(null);
+              }
+            }
+          }
           setIsLoading(false);
         }
       } catch (err) {
@@ -102,6 +178,38 @@ export function TrainerProfileScreen() {
       isMounted = false;
     };
   }, [populateForm]);
+
+  const handleSubmitApplication = async () => {
+    if (isSubmittingApp || isUploadingDoc) return;
+    setIsSubmittingApp(true);
+    setAppError(null);
+    setAppSuccess(null);
+    try {
+      const res = await trainerApplicationApi.submitApplication({
+        applicantNote: applicantNote.trim() || undefined,
+        documentMediaIds: uploadedDocs.length > 0 ? uploadedDocs.map((d) => d.id) : undefined,
+      });
+      setApplication(res);
+      setApplicantNote('');
+      setUploadedDocs([]);
+      const isResubmit = profile?.verificationStatus === 'REJECTED';
+      setAppSuccess(
+        isResubmit
+          ? 'Application resubmitted successfully. It is now pending review.'
+          : 'Application submitted successfully. It is now pending review.'
+      );
+      const updatedProfile = await trainerProfileApi.getMyTrainerProfile();
+      setProfile(updatedProfile);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAppError(err.message || 'Failed to submit application.');
+      } else {
+        setAppError('Network error. Unable to submit application.');
+      }
+    } finally {
+      setIsSubmittingApp(false);
+    }
+  };
 
   const startEditing = () => {
     if (profile) {
@@ -496,6 +604,375 @@ export function TrainerProfileScreen() {
                 : ''}
             </Text>
           </View>
+        </View>
+
+        {/* Verification Application Card */}
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: themeColors.surface,
+              borderColor: themeColors.border,
+            },
+          ]}>
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+            Verification Application
+          </Text>
+
+          {appSuccess && (
+            <View
+              testID="trainer-application-success-banner"
+              accessibilityRole="alert"
+              style={[
+                styles.banner,
+                {
+                  backgroundColor: themeColors.successSurface,
+                  borderColor: themeColors.successText,
+                  marginBottom: spacing.sm,
+                },
+              ]}>
+              <Text style={[styles.bannerText, { color: themeColors.successText }]}>
+                {appSuccess}
+              </Text>
+            </View>
+          )}
+
+          {appError && (
+            <View
+              testID="trainer-application-error-banner"
+              accessibilityRole="alert"
+              style={[
+                styles.banner,
+                {
+                  backgroundColor: themeColors.dangerSurface,
+                  borderColor: themeColors.dangerText,
+                  marginBottom: spacing.sm,
+                },
+              ]}>
+              <Text style={[styles.bannerText, { color: themeColors.dangerText }]}>
+                {appError}
+              </Text>
+            </View>
+          )}
+
+          {profile?.verificationStatus === 'NOT_SUBMITTED' && (
+            <View testID="trainer-application-not-submitted-card" style={styles.appStateContainer}>
+              <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
+                You have not submitted a verification application yet. Submit your application and
+                qualifications to become eligible to coach students.
+              </Text>
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Application Notes / Qualifications
+                </Text>
+                <TextInput
+                  testID="trainer-application-note-input"
+                  accessibilityLabel="Application notes or qualifications"
+                  style={[
+                    styles.textArea,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      color: themeColors.textPrimary,
+                    },
+                  ]}
+                  value={applicantNote}
+                  onChangeText={setApplicantNote}
+                  placeholder="Enter details about your coaching credentials, experience, or certifications..."
+                  placeholderTextColor={themeColors.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={2000}
+                />
+              </View>
+
+              <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Verification Documents (PDF, PNG, JPEG)
+                </Text>
+                <Pressable
+                  testID="trainer-document-upload-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Attach verification document"
+                  disabled={isUploadingDoc || isSubmittingApp}
+                  onPress={handlePickAndUploadDocument}
+                  style={[
+                    styles.uploadDocButton,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      opacity: isUploadingDoc ? 0.6 : 1,
+                    },
+                  ]}>
+                  {isUploadingDoc ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
+                      + Attach Document (Max 10MB)
+                    </Text>
+                  )}
+                </Pressable>
+
+                {docUploadError && (
+                  <Text testID="trainer-document-upload-error" style={[styles.errorText, { color: themeColors.dangerText }]}>
+                    {docUploadError}
+                  </Text>
+                )}
+
+                {uploadedDocs.length > 0 && (
+                  <View testID="trainer-uploaded-docs-list" style={styles.uploadedDocsList}>
+                    {uploadedDocs.map((doc) => (
+                      <View
+                        key={doc.id}
+                        testID={`uploaded-doc-item-${doc.id}`}
+                        style={[
+                          styles.uploadedDocItem,
+                          { borderColor: themeColors.border, backgroundColor: themeColors.surface },
+                        ]}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                          <Text
+                            style={[styles.uploadedDocName, { color: themeColors.textPrimary }]}
+                            numberOfLines={1}>
+                            {doc.originalFilename}
+                          </Text>
+                          <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
+                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                          </Text>
+                        </View>
+                        <Pressable
+                          testID={`remove-doc-${doc.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          disabled={isSubmittingApp}
+                          onPress={() => handleRemoveDocument(doc.id)}
+                          style={styles.removeDocButton}>
+                          <Text style={[styles.removeDocText, { color: themeColors.dangerText }]}>✕</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <Pressable
+                testID="trainer-application-submit-button"
+                accessibilityRole="button"
+                accessibilityLabel="Submit verification application"
+                disabled={isSubmittingApp || isUploadingDoc}
+                onPress={handleSubmitApplication}
+                style={[
+                  styles.primaryButton,
+                  {
+                    backgroundColor: themeColors.primary,
+                    opacity: isSubmittingApp || isUploadingDoc ? 0.7 : 1,
+                    marginTop: spacing.sm,
+                  },
+                ]}>
+                {isSubmittingApp ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Submit Application</Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+
+          {profile?.verificationStatus === 'PENDING' && (
+            <View testID="trainer-application-pending-banner" style={styles.appStateContainer}>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: themeColors.warningSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
+                ]}>
+                <Text style={[styles.badgeText, { color: themeColors.warningText }]}>
+                  APPLICATION UNDER REVIEW
+                </Text>
+              </View>
+              <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
+                Your verification application is currently under review by platform administrators.
+                You will be notified once a decision has been made.
+              </Text>
+              {application?.submittedAt && (
+                <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
+                  Submitted: {new Date(application.submittedAt).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {profile?.verificationStatus === 'REJECTED' && (
+            <View testID="trainer-application-rejected-card" style={styles.appStateContainer}>
+              <View
+                testID="trainer-application-rejected-banner"
+                style={[
+                  styles.badge,
+                  { backgroundColor: themeColors.dangerSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
+                ]}>
+                <Text style={[styles.badgeText, { color: themeColors.dangerText }]}>
+                  APPLICATION REJECTED
+                </Text>
+              </View>
+              <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
+                Your previous application was rejected. Please review the reason below and resubmit
+                with updated information.
+              </Text>
+
+              <View
+                style={[
+                  styles.rejectionReasonBox,
+                  {
+                    backgroundColor: themeColors.dangerSurface,
+                    borderColor: themeColors.dangerText,
+                  },
+                ]}>
+                <Text style={[styles.rejectionReasonLabel, { color: themeColors.dangerText }]}>
+                  Rejection Reason:
+                </Text>
+                <Text
+                  testID="trainer-application-rejection-reason"
+                  style={[styles.rejectionReasonText, { color: themeColors.textPrimary }]}>
+                  {application?.rejectionReason ?? 'Credentials did not satisfy platform requirements.'}
+                </Text>
+              </View>
+
+              <View style={[styles.fieldGroup, { marginTop: spacing.md }]}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Updated Application Notes / Corrections
+                </Text>
+                <TextInput
+                  testID="trainer-application-resubmit-note-input"
+                  accessibilityLabel="Updated application notes or corrections"
+                  style={[
+                    styles.textArea,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      color: themeColors.textPrimary,
+                    },
+                  ]}
+                  value={applicantNote}
+                  onChangeText={setApplicantNote}
+                  placeholder="Explain how you addressed the rejection reasons..."
+                  placeholderTextColor={themeColors.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={2000}
+                />
+              </View>
+
+              <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
+                <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
+                  Updated Verification Documents (PDF, PNG, JPEG)
+                </Text>
+                <Pressable
+                  testID="trainer-document-resubmit-upload-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Attach updated verification document"
+                  disabled={isUploadingDoc || isSubmittingApp}
+                  onPress={handlePickAndUploadDocument}
+                  style={[
+                    styles.uploadDocButton,
+                    {
+                      borderColor: themeColors.border,
+                      backgroundColor: themeColors.canvas,
+                      opacity: isUploadingDoc ? 0.6 : 1,
+                    },
+                  ]}>
+                  {isUploadingDoc ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
+                      + Attach Document (Max 10MB)
+                    </Text>
+                  )}
+                </Pressable>
+
+                {docUploadError && (
+                  <Text testID="trainer-document-upload-error" style={[styles.errorText, { color: themeColors.dangerText }]}>
+                    {docUploadError}
+                  </Text>
+                )}
+
+                {uploadedDocs.length > 0 && (
+                  <View testID="trainer-resubmit-uploaded-docs-list" style={styles.uploadedDocsList}>
+                    {uploadedDocs.map((doc) => (
+                      <View
+                        key={doc.id}
+                        testID={`uploaded-doc-item-${doc.id}`}
+                        style={[
+                          styles.uploadedDocItem,
+                          { borderColor: themeColors.border, backgroundColor: themeColors.surface },
+                        ]}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                          <Text
+                            style={[styles.uploadedDocName, { color: themeColors.textPrimary }]}
+                            numberOfLines={1}>
+                            {doc.originalFilename}
+                          </Text>
+                          <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
+                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                          </Text>
+                        </View>
+                        <Pressable
+                          testID={`remove-doc-${doc.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          disabled={isSubmittingApp}
+                          onPress={() => handleRemoveDocument(doc.id)}
+                          style={styles.removeDocButton}>
+                          <Text style={[styles.removeDocText, { color: themeColors.dangerText }]}>✕</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <Pressable
+                testID="trainer-application-resubmit-button"
+                accessibilityRole="button"
+                accessibilityLabel="Resubmit verification application"
+                disabled={isSubmittingApp || isUploadingDoc}
+                onPress={handleSubmitApplication}
+                style={[
+                  styles.primaryButton,
+                  {
+                    backgroundColor: themeColors.primary,
+                    opacity: isSubmittingApp || isUploadingDoc ? 0.7 : 1,
+                    marginTop: spacing.sm,
+                  },
+                ]}>
+                {isSubmittingApp ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Resubmit Application</Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+
+          {profile?.verificationStatus === 'VERIFIED' && (
+            <View testID="trainer-application-verified-banner" style={styles.appStateContainer}>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: themeColors.successSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
+                ]}>
+                <Text style={[styles.badgeText, { color: themeColors.successText }]}>
+                  VERIFIED TRAINER
+                </Text>
+              </View>
+              <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
+                Your verification application has been approved. You are authorized to coach
+                students when accepting students is enabled.
+              </Text>
+              {profile?.verifiedAt && (
+                <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
+                  Verified on: {new Date(profile.verifiedAt).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Profile Information / Edit Form */}
@@ -901,5 +1378,75 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     ...typography.label,
     color: semanticColors.textOnPrimary,
+  },
+  appStateContainer: {
+    gap: spacing.xs,
+  },
+  appStateDescription: {
+    ...typography.bodySmall,
+    lineHeight: 20,
+    marginBottom: spacing.xs,
+  },
+  timestampText: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  rejectionReasonBox: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.xs,
+  },
+  rejectionReasonLabel: {
+    ...typography.label,
+    marginBottom: 4,
+  },
+  rejectionReasonText: {
+    ...typography.bodySmall,
+    lineHeight: 20,
+  },
+  uploadDocButton: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: layout.minimumTouchTarget,
+  },
+  uploadDocButtonText: {
+    ...typography.label,
+  },
+  uploadedDocsList: {
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+  },
+  uploadedDocItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  uploadedDocName: {
+    ...typography.bodySmall,
+    fontWeight: '500',
+  },
+  uploadedDocStatus: {
+    ...typography.caption,
+  },
+  removeDocButton: {
+    padding: spacing.xs,
+    minHeight: layout.minimumTouchTarget,
+    minWidth: layout.minimumTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeDocText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
