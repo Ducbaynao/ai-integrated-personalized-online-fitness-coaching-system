@@ -527,3 +527,27 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
 - Sau khi sửa safe area, người dùng xác nhận: “tôi đã kiểm thử chức năng nhật kí số đo cơ thể và xác nhận nó đã hoàn thành”. Ghi nhận Nhật ký số đo cơ thể đã được người dùng kiểm thử và chấp nhận về chức năng.
 - Xác nhận này cập nhật trạng thái chờ kiểm thử Nhật ký số đo ở mục trước. Người dùng chưa cung cấp danh sách ca kiểm thử chi tiết; không suy diễn rằng mọi nhánh correction/concurrency, phân quyền Trainer hoặc môi trường production đã được nghiệm thu UI.
 - Bản sửa vẫn thuộc working tree của `feat/phase1-a07-measurement-progress`, chưa có commit nghiệm thu mới. Review/CI trên commit cuối cùng và quyết định merge được theo dõi riêng.
+
+### Khắc phục lỗi CI Backend PR #150 — 09/11/2026
+
+- **Job CI thất bại:** [Backend Job 128972470315](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/42559465862/job/128972470315) trên Run 42559465862 (PR #150). Head PR là `1c6b693`; CI chạy merge ref `bf51ff9`, ghép head này với main `863bd89`. Job thất bại tại `./mvnw -B test`: 1.813 test, 1 failure, 0 error, 5 skipped. GitHub hiện ghi nhận PR open, chưa merge; lần chạy mới nhất được connector trả về vẫn là run thất bại này.
+- **Triệu chứng & Lỗi cốt lõi:** Lệnh `./mvnw -B test` thất bại với duy nhất 1 lỗi trên 1813 tests:
+  ```text
+  [ERROR] FitnessGoalProposalIntegrationTest.revalidationOnAccept_inactiveCatalogItems_failsWith400:1081 Status expected:<400> but was:<200>
+  ```
+- **Nguyên nhân gốc:**
+  - Test giả định ID tự sinh `1` luôn đại diện cho `WEIGHT`. V56 seed catalog bằng `INSERT ... SELECT ... JOIN` không cam kết thứ tự cấp ID; ID tự sinh không phải định danh nghiệp vụ cố định. Không cần ép thứ tự migration để đáp ứng giả định của test.
+  - Trong `FitnessGoalProposalIntegrationTest`, test case `revalidationOnAccept_inactiveCatalogItems_failsWith400` truyền cứng `metricDefinitionId = 1` nhưng lại gọi `UPDATE fitness.metric_definitions SET is_active = false WHERE code = 'WEIGHT'`. Vì ID 1 là `STRENGTH_LOAD` vẫn còn `is_active = true`, bước revalidation khi chấp thuận đề xuất mục tiêu không bị chặn với HTTP 400 mà thành công với HTTP 200.
+- **Bản sửa tối thiểu & bảo toàn kiến trúc:**
+  1. Giữ nguyên V56 đã commit và đã áp dụng ở database A07 local. Theo xác nhận của người dùng trong phiên này, đã bỏ riêng thay đổi sẵn có ép thứ tự seed; không sửa checksum/Flyway history, không reset database hoặc chạy migration vào database dùng chung.
+  2. Trong `FitnessGoalProposalIntegrationTest.java`: Giữ helper `weightMetricId()` truy vấn động `SELECT id FROM fitness.metric_definitions WHERE code = 'WEIGHT'` (pattern `kgUnitId()` có sẵn). Mở rộng bản sửa sẵn có từ 3 chỗ sang toàn bộ 19 target fixture dùng ID `1` trong cùng class, tránh các ca kiểm thử khác âm thầm dùng nhầm metric.
+  3. Đã tái hiện trước sửa trên bản sao Backend cô lập tại `D:\Projects\pr150-ci-verification`, dùng test và V56 của HEAD đã commit: một test chạy, một failure đúng assertion 400/200, BUILD FAILURE. Giữ toàn bộ working tree gốc trong lúc tái hiện.
+- **Kết quả kiểm chứng chạy lại trong phiên này:** Chạy `mvn '-Dtest=FitnessGoalProposalIntegrationTest,MeasurementApiIntegrationTest,MeasurementProgressIntegrationTest,ProgressEngineIntegrationTest' test` trong bản sao Backend cô lập `D:\Projects\pr150-ci-verification`, sau khi chép test đã sửa và giữ V56 gốc; PostgreSQL 18/pgvector qua Testcontainers. Tổng **100 test, 0 failure, 0 error, 0 skipped; BUILD SUCCESS, exit code 0**. Log trước/sau sửa nằm tại `baseline.log` và `fixed.log` trong thư mục này.
+  - `FitnessGoalProposalIntegrationTest`: **46/46 tests PASS** (gồm ca kiểm thử bị lỗi trước đó đã chuyển xanh).
+  - `MeasurementApiIntegrationTest`: **22/22 tests PASS**.
+  - `MeasurementProgressIntegrationTest`: **15/15 tests PASS**.
+  - `ProgressEngineIntegrationTest`: **17/17 tests PASS**.
+  - `Contracts & OpenAPI`: kết quả **Valid, 21/21 tests PASS** là bằng chứng sẵn có trước phiên này, không chạy lại vì bản sửa cuối chỉ đổi test và tài liệu.
+  - `git diff --check`: **0 issues**.
+- **Bảo toàn xác nhận người dùng:** Giữ nguyên vẹn xác nhận kiểm thử chức năng của người dùng đối với Dashboard tiến độ và Nhật ký số đo cơ thể trên Android emulator. Chỉ kiểm chứng lại các bài test bị ảnh hưởng trực tiếp bởi thay đổi danh mục và revalidation đề xuất mục tiêu.
+- **Giới hạn:** Không chạy lại toàn bộ 1.813 test Backend hoặc merge ref trên GitHub sau sửa. Local HEAD vẫn là `1c6b693`; main `863bd89` chưa có trong Git object local. Đã dùng GitHub compare xác nhận phần main tiến thêm chỉ thay AppointmentHttpIntegrationTest, appointmentScreens.test.tsx và tài liệu B06, không thay code runtime/migration. Không tự fetch/pull/merge. CI cần chạy lại sau khi người dùng commit/push bản sửa; chưa kết luận GitHub CI xanh.
