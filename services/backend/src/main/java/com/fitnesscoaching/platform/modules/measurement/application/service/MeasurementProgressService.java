@@ -61,6 +61,34 @@ public class MeasurementProgressService implements MeasurementProgressQuery {
     }
 
     @Override
+    public Optional<Instant> getEarliestObservationTime(UUID actorId, UUID studentId) {
+        if (actorId == null || studentId == null) {
+            return Optional.empty();
+        }
+        MeasurementAccessPolicy.MeasurementAccessDecision access;
+        try {
+            access = accessPolicy.evaluateAccess(actorId, studentId);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+        var result = jdbc.queryForObject("""
+                SELECT MIN(m.measured_at)
+                FROM fitness.measurements m
+                WHERE m.student_id = :studentId
+                  AND m.validation_status != 'SUPERSEDED'::fitness.measurement_validation_status
+                  AND m.erased_at IS NULL
+                """, Map.of("studentId", studentId), Timestamp.class);
+        if (result == null) {
+            return Optional.empty();
+        }
+        Instant earliest = result.toInstant();
+        if (!access.isSelf() && access.historyFrom() != null && earliest.isBefore(access.historyFrom())) {
+            earliest = access.historyFrom();
+        }
+        return Optional.of(earliest);
+    }
+
+    @Override
     public MeasurementProgressSnapshot query(
             UUID actorId,
             UUID studentId,

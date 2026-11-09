@@ -68,6 +68,12 @@ tags:
       Progress summarization, signal explanation, and review support grounded in verified Progress Engine facts.
       Spring Boot validates authority, builds minimal context, invokes FastAPI summarization, and returns an INFORMATION projection.
       Supports readback with real-time authority revalidation and source watermark freshness detection.
+  - name: Measurements
+    description: Student and Trainer manual measurements, canonical metrics catalog, and correction history.
+  - name: Progress Photos
+    description: Student progress photos upload, list, download, and soft deletion.
+  - name: Progress Dashboard
+    description: Deterministic multi-dimensional progress tracking (Current Goal and Lifetime) independent from AI.
 
 paths:
   /review-timezone/me:
@@ -4587,6 +4593,289 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /metrics:
+    get:
+      tags: [Measurements]
+      operationId: getMetricDefinitions
+      summary: List all active metric definitions with canonical units and bounds
+      responses:
+        '200':
+          description: Metric definitions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetricDefinitionResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /measurements:
+    get:
+      tags: [Measurements]
+      operationId: getMeasurementsHistory
+      summary: Query paginated measurement time series with optional metric, date range, and sorting
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: metricCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200':
+          description: Paginated measurements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+    post:
+      tags: [Measurements]
+      operationId: recordMeasurement
+      summary: Record a new body measurement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordMeasurementRequest' }
+      responses:
+        '201':
+          description: Measurement recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+  /measurements/{id}:
+    get:
+      tags: [Measurements]
+      operationId: getMeasurementById
+      summary: Fetch single measurement by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Measurement details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /measurements/{id}/correction:
+    post:
+      tags: [Measurements]
+      operationId: correctMeasurement
+      summary: Correct an erroneous measurement preserving history and audit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CorrectMeasurementRequest' }
+      responses:
+        '200':
+          description: Corrected measurement created and old superseded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+        '409':
+          description: Measurement already corrected and superseded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /measurements/progress-photos:
+    get:
+      tags: [Progress Photos]
+      operationId: listProgressPhotos
+      summary: Query paginated progress photo metadata
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: fromDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: viewType
+          in: query
+          required: false
+          schema: { type: string, enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER] }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated progress photos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressPhotoPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+    post:
+      tags: [Progress Photos]
+      operationId: uploadProgressPhoto
+      summary: Upload a new progress photo with antivirus scan and validation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                viewType:
+                  type: string
+                  enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER]
+                weightAtTime:
+                  type: number
+                weightUnitCode:
+                  type: string
+                takenAt:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressPhotoResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '503':
+          description: Antivirus scanner or object storage unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /measurements/progress-photos/{id}:
+    delete:
+      tags: [Progress Photos]
+      operationId: deleteProgressPhoto
+      summary: Soft-delete progress photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Photo deleted
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /measurements/progress-photos/{id}/file:
+    get:
+      tags: [Progress Photos]
+      operationId: downloadProgressPhotoFile
+      summary: Stream authorized progress photo binary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Photo binary stream
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /progress/summary:
+    get:
+      tags: [Progress Dashboard]
+      operationId: getProgressDashboardSummary
+      summary: Get deterministic workout and measurement progress snapshot
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [CURRENT_GOAL, LIFETIME]
+            default: CURRENT_GOAL
+        - name: fromDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Composite progress snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressDashboardSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
   /admin/content/knowledge/import:
     post:
       tags: [Admin Content Knowledge]
@@ -5489,6 +5778,16 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     AIForbidden:
       description: User lacks capability or account access for AI general knowledge inquiries
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MeasurementForbidden:
+      description: Actor lacks student ownership or active trainer coaching scope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MeasurementNotFound:
+      description: Measurement, metric, or progress photo not found
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -10483,6 +10782,153 @@ components:
           type: boolean
         currentWatermark:
           type: string
+
+    MetricDefinitionResponse:
+      type: object
+      required: [id, code, displayName, valueType, defaultUnitId, defaultUnitCode, defaultUnitSymbol, defaultDimension]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        displayName: { type: string }
+        description: { type: string, nullable: true }
+        valueType: { type: string, enum: [NUMERIC, TEXT, BOOLEAN] }
+        defaultUnitId: { type: integer, nullable: true }
+        defaultUnitCode: { type: string, nullable: true }
+        defaultUnitSymbol: { type: string, nullable: true }
+        defaultDimension: { type: string, nullable: true }
+        validMin: { type: number, nullable: true }
+        validMax: { type: number, nullable: true }
+        displayPrecision: { type: integer, nullable: true }
+        isActive: { type: boolean }
+
+    RecordMeasurementRequest:
+      type: object
+      required: [metricCode, measuredAt]
+      properties:
+        studentId: { type: string, format: uuid, nullable: true }
+        metricCode: { type: string }
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitCode: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time }
+        methodCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    CorrectMeasurementRequest:
+      type: object
+      required: [reason]
+      properties:
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitCode: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time, nullable: true }
+        notes: { type: string, nullable: true }
+        reason: { type: string }
+
+    MeasurementResponse:
+      type: object
+      required: [id, studentId, metricDefinitionId, metricCode, metricDisplayName, measuredAt, enteredBy, validationStatus, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        metricDefinitionId: { type: integer }
+        metricCode: { type: string }
+        metricDisplayName: { type: string }
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitId: { type: integer, nullable: true }
+        unitCode: { type: string, nullable: true }
+        unitSymbol: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time }
+        sourceCode: { type: string, nullable: true }
+        sourceName: { type: string, nullable: true }
+        sourceKind: { type: string, nullable: true }
+        methodCode: { type: string, nullable: true }
+        methodName: { type: string, nullable: true }
+        enteredBy: { type: string, format: uuid }
+        confidenceScore: { type: number, nullable: true }
+        qualityScore: { type: number, nullable: true }
+        validationStatus: { type: string, enum: [PENDING, VALID, SUSPECT, REJECTED, SUPERSEDED] }
+        supersededById: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    MeasurementPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasMore]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/MeasurementResponse' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        hasMore: { type: boolean }
+
+    ProgressPhotoResponse:
+      type: object
+      required: [id, studentId, mediaFileId, takenAt, viewType, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        mediaFileId: { type: string, format: uuid }
+        takenAt: { type: string, format: date }
+        viewType: { type: string, enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER] }
+        weightAtTime: { type: number, nullable: true }
+        weightUnitCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    ProgressPhotoPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasMore]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ProgressPhotoResponse' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        hasMore: { type: boolean }
+
+    ProgressDashboardSummaryResponse:
+      type: object
+      required: [studentId, scope, windowStart, windowEnd, referenceTime, asOf, workout, measurement, continuity, historicalLimits, compositeWatermark]
+      properties:
+        studentId: { type: string, format: uuid }
+        scope: { type: string, enum: [CURRENT_GOAL, LIFETIME] }
+        windowStart: { type: string, format: date-time }
+        windowEnd: { type: string, format: date-time }
+        referenceTime: { type: string, format: date-time }
+        asOf: { type: string, format: date-time }
+        goal:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+            status: { type: string }
+            startDate: { type: string, format: date }
+            targetDate: { type: string, format: date }
+            durationDays: { type: integer }
+            targets:
+              type: array
+              items:
+                type: object
+                properties:
+                  metricCode: { type: string }
+                  targetNumericValue: { type: number }
+                  unitCode: { type: string }
+        workout: { type: object, additionalProperties: true }
+        measurement: { type: object, additionalProperties: true }
+        continuity: { type: object, additionalProperties: true }
+        historicalLimits: { type: object, additionalProperties: true }
+        compositeWatermark: { type: string }
 
 security:
   - bearerAuth: []
