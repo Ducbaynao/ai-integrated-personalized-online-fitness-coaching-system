@@ -1,10 +1,13 @@
 package com.fitnesscoaching.platform.modules.user.application.port.in;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface UserRoleQuery {
 
     boolean hasActiveRole(UUID userId, String roleCode);
+
+    List<String> getActiveRoles(UUID userId);
 
     /**
      * Lock account then TRAINER role rows for a coaching decision in the caller's transaction.

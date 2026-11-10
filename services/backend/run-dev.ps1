@@ -57,4 +57,9 @@ if (-not (Test-Path $mvnw)) {
     $mvnw = ".\mvnw.cmd"
 }
 
-& $mvnw spring-boot:run
+Push-Location $ScriptDir
+try {
+    & $mvnw spring-boot:run
+} finally {
+    Pop-Location
+}

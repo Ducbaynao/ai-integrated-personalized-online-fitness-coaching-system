@@ -49,7 +49,7 @@ access token if an operator changes the database status back to `ACTIVE` before 
 - **Idempotent Revocation**: Atomically revokes the presented active refresh token belonging to the authenticated User by setting `revoked_at` and `revoke_reason = 'LOGOUT'`. Successful revocation returns HTTP `204 No Content`.
 - **Safe Ownership & Non-Enumeration**: If the presented refresh token does not exist, belongs to another user, is already revoked, or is expired, the endpoint returns HTTP `204 No Content`. The server never revokes another user's token and never reveals whether an unknown or cross-user token exists. When a presented token belongs to another user, a security event (`LOGOUT_TOKEN_OWNER_MISMATCH`, severity `MEDIUM`) is recorded for the authenticated caller without exposing cross-user identifiers or token details.
 - **Repeated & Concurrent Idempotency**: Subsequent or concurrent logout requests for the same token return HTTP `204 No Content`. Only the first successful revocation mutates the database row and emits the `SESSION_REVOKED` audit record and `SESSION_LOGOUT` security event; subsequent calls perform 0 row updates and omit duplicate audit entries.
-- **Targeted Scope & Session Isolation**: The logout operation itself revokes strictly the presented session (the single refresh token passed in `LogoutRequest`). Other sessions and devices belonging to the user remain active immediately after logout. Multi-device logout and Admin force-revocation remain deferred.
+- **Targeted Scope & Session Isolation**: The logout operation itself revokes strictly the presented session (the single refresh token passed in `LogoutRequest`). Other sessions and devices belonging to the user remain active immediately after self-service single-session logout. Multi-device user self-service logout remains deferred, whereas administrative multi-session force-revocation is implemented in Milestone M8 / A05 (see below).
 - **Replay Protection vs. Immediate Session State**: Refresh tokens revoked via logout cannot be refreshed. If an adversary or faulty client later attempts to use that already-revoked token at `POST /auth/token-refreshes`, that subsequent request triggers the existing M1B token-reuse policy: all remaining active refresh tokens for that user are revoked with reason `REUSE_DETECTED`, and a critical security event `REFRESH_TOKEN_REUSE` is recorded. In normal operation where the revoked token is discarded, other sessions remain active indefinitely until their own expiration or logout.
 - **Stateless Access Token Lifecycle**: Access tokens are signed HS256 JWTs without a server-side token blacklist. Logout of one session does not revoke its already-issued access token before expiry, but every new authenticated request also requires the account to remain `ACTIVE`. Clients clear locally stored access and refresh tokens after HTTP `204 No Content`.
 
@@ -160,6 +160,56 @@ Milestone M1J implements administrative review, approval, and rejection of train
 - Admin verification sets profile verification status only. It **never** creates coaching relationships and **never** directly grants coaching authority.
 - `canCoach` remains derived from the canonical coaching eligibility policy: even an approved trainer cannot coach if their profile is inactive, their activity status is not `ACTIVE`, or their account is suspended.
 - Administrative review notes (`reviewNotes`) are strictly confidential and never exposed to trainers via self-service endpoints (`GET /trainer-applications/me/current`).
+
+## Admin Account Governance and Session Invalidation (M8 / A05)
+
+Milestone M8 / A05 implements administrative account lifecycle governance, role management, and strict immediate session invalidation.
+
+### Endpoints
+- `GET /api/v1/admin/users`:
+  - Lists users across all roles and account statuses with deterministic sorting (`created_at DESC, id DESC`).
+  - Search filter `search` matches against `email`, `display_name`, and `phone_number`.
+  - Filter `status` accepts `ACTIVE`, `SUSPENDED`, `DISABLED`, `PENDING_VERIFICATION`.
+  - Filter `role` accepts `STUDENT`, `TRAINER`, `ADMIN`.
+  - Pagination (`page`, `size`) with `items`, `page`, `size`, `totalItems`, `totalPages`.
+- `GET /api/v1/admin/users/{userId}`:
+  - Retrieves full administrative detail for an account, including identity, roles, capabilities, profiles, and immutable status history.
+- `POST /api/v1/admin/users/{userId}/suspend`:
+  - Suspends an `ACTIVE` account (`SUSPENDED`). Requires non-blank `reason` and step-up password.
+  - Automatically revokes all active refresh tokens and records an immediate session revocation event.
+- `POST /api/v1/admin/users/{userId}/restore`:
+  - Restores a `SUSPENDED` account back to `ACTIVE`. Requires non-blank `reason` and step-up password.
+  - Records a fresh session revocation event (`RESTORE_FRESH_LOGIN_REQUIRED`); tokens issued prior to suspend cannot resurrect, forcing a clean login.
+- `POST /api/v1/admin/users/{userId}/disable`:
+  - Permanently disables an account (`DISABLED`). Requires non-blank `reason` and step-up password.
+  - Revokes all active refresh tokens and records a session revocation event. Disabled accounts cannot log in or refresh.
+- `POST /api/v1/admin/users/{userId}/force-logout`:
+  - Immediately terminates all active sessions for a target user.
+  - Requires non-blank `reason`, step-up password, and `SESSION_REVOKE` permission.
+  - Invalidates all refresh tokens and access tokens issued up to that moment, while keeping account status `ACTIVE` so the user may perform a fresh login.
+- `POST /api/v1/admin/users/{userId}/roles`:
+  - Grants or revokes platform roles (`action: GRANT` or `REVOKE`, `role: STUDENT | TRAINER | ADMIN`).
+  - Revoking the `ADMIN` role revokes all active refresh tokens, logs a session revocation event, and immediately cuts off administrative privileges across all endpoints.
+
+### Immediate Access Token Revocation and Authority Invariants
+1. **Zero-Blacklist PostgreSQL Session Cutoff**:
+   - Access tokens are signed JWTs carrying an exact millisecond timestamp claim `iat_epoch_ms`.
+   - Every bearer authentication request checks `ActiveAccountJwtValidator` against PostgreSQL `fitness.users` and `fitness.session_revocation_events`.
+   - Any token whose issued timestamp is earlier than or equal to the latest session revocation event (`token_issued_at_ms <= revoked_at_ms`) is rejected with HTTP `401 Unauthorized` (`UNAUTHORIZED`).
+   - Legacy tokens lacking the `iat_epoch_ms` claim fall back safely to `token.getIssuedAt()` and are fail-safely rejected if issued in the same second or millisecond as a revocation event.
+2. **Dynamic Granted Authority Resolution**:
+   - Granted authorities (`ROLE_ADMIN`, `ROLE_TRAINER`, `ROLE_STUDENT`) are resolved directly from the system of record (`fitness.user_roles WHERE revoked_at IS NULL`) by `jwtAuthenticationConverter`.
+   - If an account's `ADMIN` role is revoked, subsequent API requests are instantly denied (`403 Forbidden` / `401 Unauthorized`) even if the client presents an unexpired JWT claiming `roles: ["ADMIN"]`.
+3. **Restoration Safety**:
+   - Transitioning an account from `SUSPENDED` back to `ACTIVE` logs a session revocation event (`RESTORE_FRESH_LOGIN_REQUIRED`). No stale token issued prior to the suspension can resurrect or authenticate.
+4. **Concurrency and Serialization**:
+   - Administrative actions acquire PostgreSQL row locks (`SELECT id FROM fitness.users WHERE id = :userId FOR NO KEY UPDATE`), preventing race conditions with concurrent refresh token rotation (`SELECT ... FOR SHARE`) or concurrent logins within the tested transactional boundaries.
+   - Admin role revocation and suspension/disable checks acquire row locks on `fitness.user_roles WHERE role = 'ADMIN' FOR UPDATE` to serialize concurrent operations affecting administrator quotas.
+5. **Governance Safety Rules**:
+   - **Self-action guard**: An administrator cannot suspend, disable, or force-logout their own account, nor revoke their own ADMIN role (`400 SELF_ACTION_NOT_ALLOWED`).
+   - **Last admin guard**: An administrator acting on another administrator account cannot revoke the `ADMIN` role or suspend/disable that user if they are the last active administrator on the platform (`409 LAST_ADMIN_PROTECTED`).
+   - **Mandatory step-up authentication**: Sensitive administrative state mutations require verified reauthentication (`stepUpPassword` payload field, `X-Admin-Step-Up-Password` header, or a valid `stepUpAuthenticationId`), returning `403 STEP_UP_REQUIRED` if missing or unverified. Direct verification at `POST /api/v1/admin/auth/step-up` returns `401 INVALID_CREDENTIALS` if the password is incorrect.
+   - **Audit and security events**: Every administrative action emits structured immutable audit logs (`audit_logs`) and security events (`security_events`). Failing to persist audit logs rolls back the entire transaction.
 
 ## Student Fitness Goal behavior (GOAL-01)
 

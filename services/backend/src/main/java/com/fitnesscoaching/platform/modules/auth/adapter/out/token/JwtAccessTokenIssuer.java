@@ -50,6 +50,7 @@ public class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .id(UUID.randomUUID().toString())
                 .claim("email", email)
                 .claim("roles", roles != null ? roles : List.of())
+                .claim("iat_epoch_ms", issuedAt.toEpochMilli())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String value = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

@@ -1287,14 +1287,14 @@ class AuthSessionIntegrationTest {
 
         Map<String, Object> session = login(email, password, "Admin Browser");
         Map<String, Object> loginUser = (Map<String, Object>) session.get("user");
-        assertThat(loginUser.get("permissions")).isEqualTo(List.of("CATALOG_MANAGE"));
+        assertThat(loginUser.get("permissions")).isEqualTo(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"));
 
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token-refreshes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new RefreshTokenRequest((String) session.get("refreshToken"), "Admin Browser"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.permissions", is(List.of("CATALOG_MANAGE"))))
+                .andExpect(jsonPath("$.user.permissions", is(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))))
                 .andReturn();
 
         Map<String, Object> refreshed = objectMapper.readValue(
@@ -1302,7 +1302,7 @@ class AuthSessionIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + refreshed.get("accessToken")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE"))));
+                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))));
     }
 
     @TestConfiguration

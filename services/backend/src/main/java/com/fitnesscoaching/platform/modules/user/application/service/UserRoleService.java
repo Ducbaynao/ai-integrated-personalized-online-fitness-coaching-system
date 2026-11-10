@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +41,69 @@ public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAcco
         String statusStr = results.get(0);
         return Optional.ofNullable(statusStr != null ? AccountStatus.valueOf(statusStr) : null);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isAccountSessionValid(UUID userId, Instant tokenIssuedAt) {
+        if (userId == null) {
+            return false;
+        }
+        List<AccountSessionValidationRow> rows = jdbcTemplate.query(
+                """
+                SELECT u.status,
+                       (SELECT MAX(sre.occurred_at)
+                        FROM fitness.session_revocation_events sre
+                        WHERE sre.target_user_id = u.id AND sre.revocation_scope = 'ALL_SESSIONS') AS last_revoked_at
+                FROM fitness.users u
+                WHERE u.id = ?
+                """,
+                (rs, rowNum) -> new AccountSessionValidationRow(
+                        rs.getString("status"),
+                        rs.getTimestamp("last_revoked_at")
+                ),
+                userId
+        );
+
+        if (rows.isEmpty()) {
+            return false;
+        }
+
+        AccountSessionValidationRow row = rows.get(0);
+        if (!"ACTIVE".equals(row.status())) {
+            return false;
+        }
+
+        if (row.lastRevokedAt() != null && tokenIssuedAt != null) {
+            long tokenMs = tokenIssuedAt.toEpochMilli();
+            long revokedMs = row.lastRevokedAt().getTime();
+            if (tokenMs <= revokedMs) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getActiveRoles(UUID userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return jdbcTemplate.query(
+                """
+                SELECT r.code
+                FROM fitness.user_roles ur
+                JOIN fitness.roles r ON r.id = ur.role_id
+                WHERE ur.user_id = ? AND ur.revoked_at IS NULL
+                ORDER BY r.code ASC
+                """,
+                (rs, rowNum) -> rs.getString("code"),
+                userId
+        );
+    }
+
+    private record AccountSessionValidationRow(String status, Timestamp lastRevokedAt) {}
 
     @Override
     @Transactional(readOnly = true)

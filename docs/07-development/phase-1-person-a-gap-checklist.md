@@ -28,7 +28,7 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
 | **PRI-01** | **Trainer Verification (M1/M8)** | Complete lifecycle: Upload Documents (PDF/PNG/JPEG, max 10MB) → Submit → Admin Review (View Certificates & Documents, Download Scanned Clean Files) → Admin Reject with Reason → View Rejection Reason → Resubmit → Admin Approve → Discoverable in Search. | Mobile `TrainerProfileScreen` (Upload & Remove docs), Admin `TrainerApplicationListPage` & `DetailPage` (Document/Cert Tables & Download action) | `POST/GET /api/v1/trainer-applications`, `POST /api/v1/trainer-applications/documents`, `GET/POST /api/v1/admin/trainer-applications`, `GET .../documents`, `GET .../certificates`, `GET .../download` | `ADMIN` role, `TRAINER` capability, immutable audit, reason required on reject | Backend: 449 tests PASS; Mobile: 17 tests PASS; Admin Web: 117 tests PASS; redocly OpenAPI valid | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device & Scanner Pending Infrastructure)** |
 | **PRI-02** | **Fitness Goals (M2)** | Create first goal, edit via Goal Version, transition journeys via Goal Transition, proposal accept/reject with conflict handling, trainer proposal creation for scoped student. Note: Independent from virus scanner. | Mobile `CurrentGoalScreen`, `GoalProposalDetailScreen`, `CreateGoalModal`, `CreateGoalVersionModal`, `CreateGoalTransitionModal`, `TrainerStudentGoalScreen`, `CreateGoalProposalModal`, route `(app)/coaching/[relationshipId]/goal` | `POST /api/v1/fitness-goals`, `POST /fitness-goals/{id}/versions`, `POST /fitness-goals/{id}/transitions`, `POST /fitness-goal-proposals/{id}/decisions`, `GET /api/v1/students/{studentId}/fitness-goals/current`, `GET /api/v1/students/{studentId}/fitness-goal-proposals`, `POST /api/v1/fitness-goals/{goalId}/proposals` | Student ownership, Trainer coaching scope, `FITNESS_GOAL` data sharing check, version conflict 409 | Backend: 130 integration tests + 34 unit tests PASS; Mobile: 91 tests PASS (`CurrentGoalScreen`, `fitnessGoalApi`, `GoalProposalDetailScreen`, `TrainerStudentGoalScreen`); Typecheck: 0 errors | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device Pending Infrastructure)** |
 | **PRI-03** | **Measurements & Progress (A07/M5)** | Metric definitions, canonical units, measurements recording & lifecycle correction, progress photos with stream AV scan, deterministic Progress Summary (Current Goal & Lifetime) without AI dependency. | Mobile ST-09 Progress Dashboard, ST-10 Measurements, Add/Correct/Upload modals, route `(app)/coaching/[relationshipId]/progress` | `POST/GET /api/v1/measurements`, `POST .../correction`, `POST/GET /api/v1/measurements/progress-photos`, `GET .../file`, `GET /api/v1/progress/summary`, V56 migration | Student ownership, Trainer coaching scope (`MEASUREMENT` & `PROGRESS_REPORT` sharing), AV scan status, audit trail | Backend: 22 integration tests in `MeasurementApiIntegrationTest` + 17 in `ProgressEngineIntegrationTest` + 15 in `MeasurementProgressIntegrationTest` + 28 in `WorkoutProgressAggregationIntegrationTest` + 15 in AI F04 tests PASS (97 backend tests); Mobile: 49 tests PASS (22 new + 27 regression); Contracts: 21 tests PASS, redocly valid; Typecheck: 0 errors; Lint: 0 errors | **AUTOMATED TESTED & SUBAGENT REVIEWED (Independent sub-agent review complete; Human peer review, physical device UI acceptance, and live ClamAV/S3 operational verification pending)** |
-| **PRI-04** | **Account Admin Governance (A05/M8)** | User directory, suspend, restore, disable, force logout (token revocation), step-up auth, reason requirement. | Admin AD-02 Users & Roles, Action Dialog | `/api/v1/admin/users/*`, `fitness.admin_action_policies`, `user_account_status_history` | Step-up verification, `USER_SUSPEND`/`USER_DISABLE`, immutable audit | Admin backend & UI tests | **PENDING PRI-01** |
+| **PRI-04** | **Account Admin Governance (A05/M8)** | User directory, suspend, restore, disable, force logout (strict token revocation), role management, step-up auth, reason requirement, last admin protection under concurrency. | Admin AD-02 Users & Roles (`UsersListPage`, `UserDetailPage`), `AdminActionDialog`, `DashboardPage` | `/api/v1/admin/users/*`, `/api/v1/admin/auth/step-up`, `/api/v1/admin/dashboard/summary`, `V57` migration | Step-up verification, `USER_SUSPEND`/`USER_DISABLE`/`USER_ROLE_MANAGE`/`SESSION_REVOKE`, immutable audit | Backend: 27 integration tests in `AdminAccountAdministrationIntegrationTest` PASS; Regression: 58 tests in `AuthSessionIntegrationTest` & unit tests PASS, 27 tests in `CurrentUserIntegrationTest` & `ContentManagementIntegrationTest` PASS, 14 tests in `AccountErasureHttpIntegrationTest` PASS; Admin Web: 136 tests PASS, Typecheck 0 errors, Lint 0 errors; Contracts: 21 tests PASS, redocly valid | **IMPLEMENTED & AUTOMATED TESTED (Strict session invalidation, database-backed authority derivation, and component tests verified; Manual browser UI acceptance on live environment pending)** |
 | **PRI-05** | **Support, Moderation & Audit (M8)** | Case management, governed data correction with before/after, scoped audit query, private data access controls. | Admin Moderation & Support views | `/api/v1/admin/support-cases`, `/api/v1/admin/data-corrections`, `fitness.audit_logs` | Governed correction permission, time-bound access, read-only audit | Audit integrity checks | **PENDING PRI-01** |
 
 ---
@@ -551,3 +551,167 @@ Khớp chính xác với cấu hình `services/backend/src/main/resources/applic
   - `git diff --check`: **0 issues**.
 - **Bảo toàn xác nhận người dùng:** Giữ nguyên vẹn xác nhận kiểm thử chức năng của người dùng đối với Dashboard tiến độ và Nhật ký số đo cơ thể trên Android emulator. Chỉ kiểm chứng lại các bài test bị ảnh hưởng trực tiếp bởi thay đổi danh mục và revalidation đề xuất mục tiêu.
 - **Giới hạn:** Không chạy lại toàn bộ 1.813 test Backend hoặc merge ref trên GitHub sau sửa. Local HEAD vẫn là `1c6b693`; main `863bd89` chưa có trong Git object local. Đã dùng GitHub compare xác nhận phần main tiến thêm chỉ thay AppointmentHttpIntegrationTest, appointmentScreens.test.tsx và tài liệu B06, không thay code runtime/migration. Không tự fetch/pull/merge. CI cần chạy lại sau khi người dùng commit/push bản sửa; chưa kết luận GitHub CI xanh.
+
+---
+
+## 9. Báo cáo kiểm chứng và hồ sơ bàn giao A05/M8 — Quản trị tài khoản (Account Administration)
+
+### 9.1 Tổng quan phạm vi và kiến trúc triển khai
+
+Milestone **A05/M8** bao gồm toàn bộ chức năng quản trị tài khoản người dùng, phân quyền RBAC quản trị, xác thực nâng cao Step-Up Authentication, vòng đời tài khoản (Suspend, Restore, Disable), thu hồi phiên đăng nhập (Force Logout), quản lý phân quyền vai trò (Role Management), bảo vệ quản trị viên cuối cùng (Last Admin Protection), và ghi nhận nhật ký kiểm toán bất biến (Audit Logging).
+
+#### Thành phần Backend (Spring Boot 4.1.1, Java 21, Maven):
+- **Controller:**
+  - `AdminUserController`: `/api/v1/admin/users` (list, detail, suspend, restore, disable, force-logout, roles). Được bảo vệ bởi `@PreAuthorize("hasRole('ADMIN')")`.
+  - `AdminAuthController`: `/api/v1/admin/auth/step-up` (cấp phiên Step-Up 15 phút sau khi xác thực mật khẩu quản trị viên).
+  - `AdminDashboardController`: `/api/v1/admin/dashboard/summary` (tổng hợp số liệu người dùng, phân bố trạng thái tài khoản, hồ sơ HLV chờ duyệt).
+- **Application Services & Domain Ports:**
+  - `AdminUserLifecycleService`: Điều phối các tác vụ vòng đời tài khoản với `@Transactional`, kiểm tra quyền hạn hiệu lực (`USER_SUSPEND`, `USER_DISABLE`, `USER_ROLE_MANAGE`, `SESSION_REVOKE`), kiểm tra Step-Up bắt buộc, bảo vệ self-action (không cho phép tự suspend, disable, thu hồi quyền admin, hoặc force logout bản thân qua endpoint admin), bảo vệ Last Admin Protection, và gọi `AuditService` ghi nhận `fitness.audit_logs`.
+  - `AdminStepUpService`: Kiểm tra mật khẩu quản trị viên hiện hành, lưu bản ghi `fitness.step_up_authentications` với TTL 15 phút, xác thực `action_code` và người dùng hợp lệ.
+  - `AdminUserQueryService` & `AdminDashboardService`: Truy vấn danh sách và chi tiết người dùng, thống kê bảng điều khiển.
+- **Persistence Adapter:**
+  - `AdminUserPersistenceAdapter`: Thao tác trực tiếp với PostgreSQL qua `NamedParameterJdbcTemplate`, hỗ trợ phân trang, tìm kiếm theo tên/email/phone, lọc theo role và trạng thái tài khoản.
+  - `countActiveAdmins()`: Thực hiện khóa bi quan hàng `'ADMIN'` trong bảng `fitness.roles` (`SELECT id FROM fitness.roles WHERE code = 'ADMIN' FOR UPDATE`) trước khi đếm, đảm bảo tuần tự hóa tuyệt đối dưới tác động đồng thời (concurrency safety) và chống race condition khi hai admin cùng lúc thao tác vô hiệu hóa/hạ quyền nhau.
+- **Database Migration V57:**
+  - File: `services/backend/src/main/resources/db/migration/V57__admin_account_governance_permissions.sql`.
+  - Cấp 4 quyền hạn quản trị: `USER_SUSPEND`, `USER_DISABLE`, `USER_ROLE_MANAGE`, `SESSION_REVOKE`.
+  - Gán quyền cho vai trò `ADMIN` với `ON CONFLICT DO NOTHING`.
+  - Đăng ký chính sách `RESTORE_ACCOUNT` trong `admin_action_policies`.
+
+#### Thành phần Admin Web (React 19, TypeScript, Vite):
+- `UsersListPage`: Danh sách tài khoản người dùng, bảng phân trang, tìm kiếm theo từ khóa (email, tên, số điện thoại), bộ lọc trạng thái (`ACTIVE`, `SUSPENDED`, `DISABLED`, `PENDING_VERIFICATION`), bộ lọc vai trò (`STUDENT`, `TRAINER`, `ADMIN`), nút reset bộ lọc, chỉ báo trạng thái hồ sơ HLV.
+- `UserDetailPage`: Chi tiết người dùng, thông tin cá nhân, hồ sơ Student, hồ sơ Trainer, lịch sử chuyển đổi trạng thái tài khoản (`AccountStatusHistory`), phân quyền hiện tại, và các nút tác vụ (Khóa tài khoản, Khôi phục, Vô hiệu hóa vĩnh viễn, Buộc đăng xuất, Phân/hủy vai trò).
+- `AdminActionDialog`: Modal xác thực tác vụ nhạy cảm, yêu cầu nhập lý do hành động (tối thiểu 5 ký tự không tính khoảng trắng) và mật khẩu Step-Up của Admin. Hỗ trợ phím Escape, bẫy focus, giải phóng bộ nhớ khi đóng.
+- `userAdminApi`: Client dịch vụ tích hợp OpenAPI typesafe với cơ chế xử lý lỗi chuẩn hóa.
+- `DashboardPage`: Hiển thị số liệu tổng quan người dùng theo trạng thái và cảnh báo cần xử lý.
+
+### 9.2 Ma trận phân quyền & Xác thực nâng cao (Step-Up)
+
+| Endpoint | Quyền hạn yêu cầu | Step-Up bắt buộc | Mã hành động Step-Up | Hành vi khi vi phạm |
+|---|---|---|---|---|
+| `GET /api/v1/admin/users` | `ROLE_ADMIN` | Không | N/A | HTTP 403 Forbidden |
+| `GET /api/v1/admin/users/{id}` | `ROLE_ADMIN` | Không | N/A | HTTP 403 Forbidden (hoặc 404 nếu không tìm thấy user) |
+| `POST /api/v1/admin/users/{id}/suspend` | `USER_SUSPEND` | Có (Mật khẩu hoặc Token) | `SUSPEND_ACCOUNT` | HTTP 400 (Self-action / Reason), 401 (Wrong password), 403 (No perm / expired step-up), 409 (Already suspended / Last admin) |
+| `POST /api/v1/admin/users/{id}/restore` | `USER_SUSPEND` | Có (Mật khẩu hoặc Token) | `RESTORE_ACCOUNT` | HTTP 400 (Reason < 5 chars), 401 (Wrong password), 403 (No perm), 409 (Already active / Disabled non-restorable) |
+| `POST /api/v1/admin/users/{id}/disable` | `USER_DISABLE` | Có (Mật khẩu hoặc Token) | `DISABLE_ACCOUNT` | HTTP 400 (Self-action / Reason), 401 (Wrong password), 403 (No perm), 409 (Already disabled / Last admin) |
+| `POST /api/v1/admin/users/{id}/force-logout` | `SESSION_REVOKE` | Có (Mật khẩu hoặc Token) | `FORCE_LOGOUT` | HTTP 400 (Self-action / Reason), 401 (Wrong password), 403 (No perm) |
+| `POST /api/v1/admin/users/{id}/roles` | `USER_ROLE_MANAGE` | Có (Mật khẩu hoặc Token) | `CHANGE_USER_ROLE` | HTTP 400 (Self-action revoking ADMIN / Invalid role), 401 (Wrong password), 403 (No perm), 409 (Last admin) |
+| `POST /api/v1/admin/auth/step-up` | `ROLE_ADMIN` | N/A (Endpoint cấp step-up) | Đăng ký theo actionCode | HTTP 401 (Sai mật khẩu) |
+| `GET /api/v1/admin/dashboard/summary` | `ROLE_ADMIN` | Không | N/A | HTTP 403 Forbidden |
+
+### 9.3 Quy tắc vòng đời tài khoản & Bảo vệ hệ thống
+1. **Bảo vệ tự thao tác (Self-Action Guard):**
+   - Quản trị viên không được tự khóa (`suspend`), tự vô hiệu hóa (`disable`), tự hủy vai trò `ADMIN` của chính mình, hoặc tự buộc đăng xuất (`force-logout`) qua endpoint quản trị. Các vi phạm bị chặn ngay với HTTP 400 `SELF_ACTION_NOT_ALLOWED`.
+2. **Bảo vệ Quản trị viên cuối cùng (Last Admin Protection):**
+   - Khi hệ thống chỉ còn 1 quản trị viên `ACTIVE`, cấm mọi thao tác khóa, vô hiệu hóa hoặc thu hồi quyền admin đối với tài khoản này. Hệ thống trả về HTTP 409 `LAST_ADMIN_PROTECTED`.
+   - Cơ chế khóa bi quan `SELECT id FROM fitness.roles WHERE code = 'ADMIN' FOR UPDATE` tuần tự hóa các giao dịch cạnh tranh, ngăn chặn hoàn toàn race condition khi 2 admin đồng thời thao tác trên nhau.
+3. **Tài khoản vô hiệu hóa không được khôi phục (Permanently Disabled):**
+   - Tài khoản ở trạng thái `DISABLED` không thể khôi phục qua quy trình quản trị thông thường (`POST /restore` trả về HTTP 409 `INVALID_LIFECYCLE_TRANSITION`).
+4. **Khôi phục không kích hoạt lại phiên cũ (No Session Resurrection):**
+   - Khi tài khoản được chuyển từ `SUSPENDED` sang `ACTIVE`, các refresh token đã bị thu hồi trong quá khứ vẫn giữ nguyên `revoked_at` và không thể sử dụng lại. Người dùng buộc phải đăng nhập lại để nhận cặp token mới.
+5. **Toàn vẹn giao dịch & Nhật ký kiểm toán (Transactional Audit Integrity):**
+   - Mọi thao tác quản trị được bọc trong `@Transactional`. Nếu bước ghi nhật ký kiểm toán vào `fitness.audit_logs` gặp lỗi, toàn bộ giao dịch (thay đổi trạng thái người dùng, thu hồi token, ghi lịch sử) đều bị rollback tự động, giữ vững trạng thái cơ sở dữ liệu.
+   - Mật khẩu và token không bao giờ được ghi vào log kiểm toán hoặc trả về client.
+
+### 9.4 Phân tích hiệu lực phiên & Độ trễ thu hồi Token (Token Cutoff Analysis)
+- **Cơ chế thu hồi phiên nghiêm ngặt (Strict Session Revocation Architecture):**
+  - Tái sử dụng bảng bất biến `fitness.session_revocation_events` (đã có index `idx_session_revocation_target_time(target_user_id, occurred_at DESC)` từ migration V16) để lưu dấu mốc thu hồi phiên phạm vi `ALL_SESSIONS`.
+  - Token JWT được bổ sung claim thời gian phát hành chính xác tới mili-giây: `iat_epoch_ms`.
+  - `ActiveAccountJwtValidator` kết hợp với `UserRoleService.isAccountSessionValid` thực thi một câu truy vấn tối ưu duy nhất tới PostgreSQL trên mỗi request mang Bearer token:
+    1. Kiểm tra trạng thái tài khoản: `status == 'ACTIVE'`.
+    2. So khớp mốc thu hồi: Nếu có sự kiện thu hồi `last_revoked_at` và `tokenIssuedAt <= lastRevokedAt`, token bị từ chối ngay lập tức (**HTTP 401 Unauthorized**).
+    3. Ngăn ngừa triệt để lỗi làm tròn giây (second truncation): Việc đối chiếu mili-giây đảm bảo các token cấp mới sau sự kiện thu hồi luôn được chấp nhận, trong khi mọi token phát hành tại hoặc trước thời điểm thu hồi đều bị chặn hoàn toàn.
+- **Force Logout (Buộc đăng xuất toàn bộ phiên):**
+  - Thu hồi toàn bộ refresh token trong bảng `fitness.refresh_tokens` (`revoked_at = now()`, reason `'ADMIN_FORCE_LOGOUT'`).
+  - Ghi nhận sự kiện `session_revocation_events` với `occurred_at = now()`.
+  - Toàn bộ access token hiện hữu bị từ chối ngay lập tức (**HTTP 401 Unauthorized**) trên mọi endpoint.
+  - Người dùng được phép đăng nhập lại bình thường; token cấp mới sau mốc thu hồi hoạt động hoàn hảo.
+- **Suspend & Restore Account (Đình chỉ và Khôi phục):**
+  - Khi `suspend`: Trạng thái chuyển sang `SUSPENDED`, refresh token bị thu hồi, ghi nhận `session_revocation_events`. Access token bị từ chối 401 ngay lập tức.
+  - Khi `restore`: Trạng thái chuyển lại `ACTIVE`. Đồng thời ghi nhận một mốc `session_revocation_events` mới tại thời điểm khôi phục.
+  - **Không bao giờ hồi sinh phiên cũ (No Session Resurrection):** Mọi access token và refresh token được cấp trước thời điểm suspend hoặc restore đều bị từ chối vĩnh viễn (HTTP 401). Người dùng bắt buộc phải đăng nhập lại để nhận phiên làm việc mới.
+- **Thu hồi vai trò ADMIN (Revoke ADMIN Role):**
+  - Bảng `fitness.user_roles` cập nhật `revoked_at = now()`.
+  - Toàn bộ refresh token của tài khoản bị thu hồi (`revoked_at = now()`, reason `'ADMIN_ROLE_REVOKED'`).
+  - Ghi nhận `session_revocation_events` làm toàn bộ access token cũ chứa claim `ADMIN` bị vô hiệu hóa ngay lập tức (**HTTP 401 Unauthorized**).
+  - `SecurityConfig` cấu hình `jwtAuthenticationConverter` truy vấn trực tiếp vai trò hoạt động từ `UserRoleQuery.getActiveRoles(userId)` (PostgreSQL system of record). Vì vậy, ngay cả khi người dùng đăng nhập lại hoặc sử dụng bất kỳ token nào không có quyền `ADMIN` trong DB, toàn bộ endpoint quản trị (kể cả endpoint chỉ có `@PreAuthorize("hasRole('ADMIN')")`) đều từ chối với **HTTP 403 Forbidden**.
+  - Các endpoint thông thường (như `/users/me`) vẫn cho phép người dùng truy cập với vai trò hợp lệ còn lại.
+
+### 9.5 Bằng chứng kiểm thử tự động (100% Pass)
+
+1. **Backend Integration Tests:**
+   - Lệnh: `.\services\backend\mvnw.cmd -f services/backend/pom.xml test -Dtest=AdminAccountAdministrationIntegrationTest`
+   - Môi trường: PostgreSQL 18/pgvector Testcontainers độc lập, Flyway migrate 57 migrations.
+   - Kết quả: **29/29 tests PASS (0 failures, 0 errors, 0 skipped, BUILD SUCCESS)**:
+     - `testListUsersFilters`: Tìm kiếm, phân trang, lọc theo status, lọc theo role, kiểm tra 403 với non-admin.
+     - `testGetUserDetail`: Trả về chi tiết người dùng, hồ sơ Student, hồ sơ Trainer, lịch sử trạng thái; 404 khi không tồn tại.
+     - `testSuspendUserSuccess`: Khóa tài khoản ACTIVE -> SUSPENDED, thu hồi refresh token, ghi nhận `session_revocation_events`, `admin_actions` và `audit_logs`.
+     - `testCannotSuspendSelf`: Chặn tự khóa bản thân (HTTP 400 `SELF_ACTION_NOT_ALLOWED`).
+     - `testCannotSuspendLastAdmin`: Chặn khóa quản trị viên cuối cùng (HTTP 409 `LAST_ADMIN_PROTECTED`).
+     - `testSuspendAlreadySuspendedReturns409`: Chặn khóa tài khoản đã bị khóa (HTTP 409 `INVALID_LIFECYCLE_TRANSITION`).
+     - `testRestoreUserSuccess`: Khôi phục tài khoản SUSPENDED -> ACTIVE, không tái kích hoạt phiên cũ, ghi audit.
+     - `testRestoreInvalidStatusReturns409`: Chặn khôi phục tài khoản đang ACTIVE hoặc DISABLED (HTTP 409).
+     - `testDisableUserSuccess`: Vô hiệu hóa vĩnh viễn tài khoản sang DISABLED, thu hồi toàn bộ token.
+     - `testForceLogoutSuccess`: Thu hồi toàn bộ refresh token của người dùng mà không đổi trạng thái tài khoản.
+     - `testChangeUserRole`: Gán và thu hồi vai trò người dùng (ASSIGN / REVOKE).
+     - `testStepUpEndpoint`: Cấp phiên Step-Up 15 phút khi mật khẩu đúng; từ chối HTTP 401 khi sai mật khẩu.
+     - `testStepUpExpiredFails`: Từ chối xác thực khi Step-Up authentication ID đã hết hạn (HTTP 403).
+     - `testStepUpWithWrongActionFails`: Từ chối Step-Up cấp cho hành động khác (HTTP 403).
+     - `testDashboardSummary`: Thống kê tổng số người dùng, phân bố trạng thái (`ACTIVE`, `SUSPENDED`, `DISABLED`).
+     - `testCannotForceLogoutSelf`: Chặn admin tự buộc đăng xuất bản thân qua endpoint admin (HTTP 400).
+     - `testCannotDisableSelf`: Chặn admin tự vô hiệu hóa bản thân (HTTP 400).
+     - `testCannotRevokeOwnAdminRole`: Chặn admin tự hủy vai trò ADMIN của mình (HTTP 400).
+     - `testWhitespaceOnlyReasonRejected`: Chặn lý do chỉ chứa khoảng trắng hoặc < 5 ký tự (HTTP 400 `VALIDATION_FAILED`).
+     - `testAuditFailureRollsBackStatusChange`: Kiểm tra rollback giao dịch khi ghi audit thất bại, bảo toàn dữ liệu database.
+     - `testRevokedRefreshTokenCannotRefresh`: Xác minh sau khi Force Logout, access token bị từ chối 401 và refresh token bị từ chối 401.
+     - `testSuspendAccountTokenAndLoginImpact`: Xác minh ngay sau khi suspend, access token bị từ chối 401 qua ActiveAccountJwtValidator và đăng nhập mới bị từ chối 403 ACCOUNT_UNAVAILABLE.
+     - `testDisableAccountTokenAndLoginImpactAndCannotRestore`: Xác minh disable từ chối access token 401, refresh token 401, đăng nhập 403, và không thể restore (409).
+     - `testConcurrentLastAdminProtection`: Kiểm tra tuần tự hóa đồng thời khi 2 luồng cùng khóa 2 admin cuối cùng: đúng 1 thành công (HTTP 200), 1 bị từ chối (HTTP 409), đúng 1 admin còn ACTIVE trong database.
+     - `testForceLogoutAccessAndRefreshTokenInvalidationAndFreshLogin`: Kiểm chứng vòng đời đầy đủ của Force Logout: access token cũ thất bại (401), refresh token cũ thất bại (401), đăng nhập mới thành công và nhận cặp token mới hoạt động trơn tru.
+     - `testSuspendThenRestoreTokensCannotResurrect`: Kiểm chứng Suspend rồi Restore trước khi token cũ hết hạn: access token cũ vẫn bị từ chối (401), refresh token cũ thất bại (401), đăng nhập mới thành công.
+     - `testRevokeAdminRoleBlocksAllAdminEndpointsAndRevokesSessions`: Kiểm chứng thu hồi role ADMIN: access token cũ bị chặn ngay lập tức (401) trên cả API đọc và API nhạy cảm; đăng nhập mới nhận token không có quyền ADMIN bị chặn với 403 Forbidden; API người dùng thông thường vẫn hoạt động; admin hợp lệ khác không bị ảnh hưởng.
+     - `testSameMillisecondAndLegacyTokenRevocationBehavior`: Kiểm chứng biên độ mili-giây và tương thích ngược: Token cấp cùng mili-giây với thời điểm thu hồi hoặc token legacy không có claim `iat_epoch_ms` bị từ chối dứt khoát với 401 Unauthorized (fail-safe); token mới cấp sau thời điểm thu hồi (+1ms) mang `iat_epoch_ms` được chấp nhận 200 OK.
+     - `testConcurrentRefreshDuringForceLogout`: Kiểm chứng an toàn đồng thời giữa xoay vòng refresh token và Force Logout: phiên cũ bị khóa dòng `SELECT id FROM fitness.users WHERE id = :userId FOR NO KEY UPDATE` và thu hồi dứt điểm, không thể sinh phiên mới bất hợp pháp.
+
+2. **Backend Regression Tests:**
+   - `AdminAccountAdministrationIntegrationTest`: **29/29 tests PASS** (Toàn bộ kịch bản lifecycle, session invalidation, authority cutoff, edge cases và concurrency trên PostgreSQL Testcontainers).
+   - `AuthSessionIntegrationTest`: **26/26 tests PASS** (Cập nhật assertion phân quyền hiệu lực của role `ADMIN` khớp với V57).
+   - `CurrentUserIntegrationTest` & `ContentManagementIntegrationTest`: **27/27 tests PASS** (Bảo toàn kiểm tra phân quyền động).
+   - `AccountErasureHttpIntegrationTest`: **14/14 tests PASS** (Bảo toàn quy trình xóa tài khoản GDPR).
+
+3. **Admin Web Frontend Tests & Quality Checks:**
+   - Vitest: `npm --prefix apps/admin-web test -- --run` -> **19 test files, 136/136 tests PASS** (Bao gồm 7 tests mới trong `UserPages.test.tsx` và 9 tests trong `userAdminApi.test.ts`).
+   - TypeScript Typecheck: `npm --prefix apps/admin-web run typecheck` -> **0 errors (Exit code 0)**.
+   - Linter: `npm --prefix apps/admin-web run lint` -> **0 warnings, 0 errors**.
+   - Production Build: `npm --prefix apps/admin-web run build` -> **Build thành công (Vite v8.3.0)**.
+
+4. **Hợp đồng & Định dạng:**
+   - OpenAPI Validation: `redocly lint contracts/openapi/openapi.yaml` -> **Valid**.
+   - Contract & Schema Tests: `npm run validate:contracts && npm run test:contracts` -> **21/21 tests PASS**.
+   - Format & Whitespace Check: `git diff --check` -> **0 issues**.
+
+### 9.6 Kết quả Nghiệm thu Trình duyệt Thực tế & Hồ sơ Bàn giao
+
+Môi trường kiểm thử tự động (Vitest JSDOM và Spring Boot Testcontainers) đã kiểm chứng 29/29 kịch bản tích hợp, hợp đồng API, và các ràng buộc khóa dòng PostgreSQL trong phạm vi các ca kiểm thử đã thiết lập.
+
+**Ghi nhận Xác nhận Nghiệm thu của Người dùng (2026-11-10):**
+Người dùng đã trực tiếp đăng nhập bằng tài khoản Quản trị viên hợp lệ và thực hiện kiểm thử trên giao diện Admin Web thực tế (`http://localhost:5173`), xác nhận các chức năng đã kiểm tra hoạt động tốt trên môi trường thực tế.
+
+> [!NOTE]
+> Phân định phạm vi: Xác nhận nghiệm thu này ghi nhận kết quả kiểm thử chức năng trực quan của người dùng trên môi trường local dev; việc này tách biệt với quy trình human code review chính thức trên PR và các bước kiểm chứng staging/production sau này.
+
+| STT | Kịch bản nghiệm thu | Mức độ kiểm thử tự động (Vitest / Testcontainers) | Kết quả Nghiệm thu Thực tế | Ghi chú kiểm chứng |
+|---|---|---|---|---|
+| 1 | **Đăng nhập Admin** | ĐÃ ĐẠT (MockMvc & JSDOM) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Đăng nhập tài khoản role `ADMIN` tại `/login`, chuyển hướng thành công vào Dashboard. |
+| 2 | **Dashboard & Đường dẫn việc cần xử lý** | ĐÃ ĐẠT (`DashboardPage.test.tsx`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Thẻ thống kê người dùng (Active, Suspended, Disabled) tải đủ số liệu và liên kết điều hướng sang `/users` hoạt động tốt. |
+| 3 | **Danh sách người dùng** | ĐÃ ĐẠT (`UserPages.test.tsx`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Tìm kiếm từ khóa, kết hợp lọc Status + Role, phân trang, và "Đặt lại bộ lọc" hoạt động chính xác. |
+| 4 | **Chi tiết người dùng & Lịch sử trạng thái** | ĐÃ ĐẠT (`UserPages.test.tsx`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Vào `/users/:id`, hiển thị Overview, Profiles (Student/Trainer), Bảng lịch sử thay đổi trạng thái kèm tên Admin & lý do. |
+| 5 | **Tạm đình chỉ (Suspend) & Khôi phục (Restore)** | ĐÃ ĐẠT (Integration tests) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Suspend trên user `ACTIVE` cập nhật trạng thái `SUSPENDED` và thêm bản ghi lịch sử. Restore khôi phục về `ACTIVE`; phiên token cũ cấp trước suspend không tái sinh. |
+| 6 | **Force Logout với phiên thứ hai** | ĐÃ ĐẠT (`testForceLogoutAccessAndRefreshTokenInvalidationAndFreshLogin`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Buộc đăng xuất thu hồi tức thì toàn bộ refresh token và vô hiệu hóa access token cũ (401), yêu cầu đăng nhập mới. |
+| 7 | **Vô hiệu hóa (Disable) tài khoản test** | ĐÃ ĐẠT (`testDisableUserSuccess`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Hộp thoại cảnh báo mức cao, chuyển trạng thái `DISABLED`, vô hiệu hóa các thao tác tiếp theo, không thể khôi phục. |
+| 8 | **Gán (Assign) & Thu hồi (Revoke) Role** | ĐÃ ĐẠT (`testChangeUserRole`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Gán và thu hồi vai trò người dùng hoạt động chính xác, cắt quyền quản trị ngay lập tức khi thu hồi role `ADMIN`. |
+| 9 | **Step-Up đúng / sai mật khẩu & lý do không hợp lệ** | ĐÃ ĐẠT (`testStepUpEndpoint`, `testWhitespaceOnlyReasonRejected`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Sai mật khẩu báo lỗi 401 trên modal; lý do rỗng/<5 ký tự vô hiệu hóa nút xác nhận; mật khẩu đúng thực thi thành công. |
+| 10 | **Self-Action Guard (Chặn tự tác động chính mình)** | ĐÃ ĐẠT (`testCannotSuspendSelf`, `testCannotForceLogoutSelf`, `testCannotDisableSelf`, `testCannotRevokeOwnAdminRole`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Khi xem chính tài khoản admin đang đăng nhập: các nút thao tác nguy hiểm bị ẩn/vô hiệu hóa; backend chặn với HTTP 400 `SELF_ACTION_NOT_ALLOWED`. |
+| 11 | **Last-Admin Guard (Chặn triệt tiêu Quản trị viên cuối cùng)** | ĐÃ ĐẠT (`testCannotSuspendLastAdmin`, `testConcurrentLastAdminProtection`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Thao tác lên admin duy nhất còn lại bị backend chặn trả về HTTP 409 `LAST_ADMIN_PROTECTED`. |
+| 12 | **Truy cập bằng tài khoản thiếu quyền** | ĐÃ ĐẠT (Controller 403 test) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Tài khoản `TRAINER` / `STUDENT` bị chặn truy cập API quản trị (403 `ACCESS_DENIED`) và ẩn các mục menu quản trị. |
+| 13 | **Thông báo phản hồi & Chặn gửi lặp** | ĐÃ ĐẠT (`AdminActionDialog.test.tsx`) | **ĐÃ XÁC NHẬN BỞI NGƯỜI DÙNG** | Nút chuyển sang trạng thái "Đang xử lý..." kèm spinner ngăn chặn gửi lặp đúp; hoàn thành hiển thị thông báo thành công. |
