@@ -67,6 +67,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         RequestIdFilter.class
 })
 class TrainerProfileControllerUnitTest {
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery;
+
 
     @Autowired
     private MockMvc mockMvc;

@@ -14,6 +14,8 @@ import { AiOperationsPage } from './features/ai/AiOperationsPage.tsx'
 import { AiRunDetailPage } from './features/ai/AiRunDetailPage.tsx'
 import { TrainerApplicationListPage } from './features/trainer-applications/TrainerApplicationListPage.tsx'
 import { TrainerApplicationDetailPage } from './features/trainer-applications/TrainerApplicationDetailPage.tsx'
+import { UserListPage } from './features/users/UserListPage.tsx'
+import { UserDetailPage } from './features/users/UserDetailPage.tsx'
 
 function App() {
   return (
@@ -113,6 +115,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <TrainerApplicationDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute>
+                <UserListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users/:userId"
+            element={
+              <ProtectedRoute>
+                <UserDetailPage />
               </ProtectedRoute>
             }
           />

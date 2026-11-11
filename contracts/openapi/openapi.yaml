@@ -2500,6 +2500,238 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /admin/users:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminUsers
+      summary: List, search, and filter user accounts for administration
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search pattern for email, display name, or phone number
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by account status (ACTIVE, SUSPENDED, DISABLED, PENDING_VERIFICATION)
+        - name: role
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by role code (STUDENT, TRAINER, ADMIN, CONTENT_ADMIN)
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Page of user summaries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /admin/users/{userId}:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminUserDetail
+      summary: Get full user account detail including profiles, roles, and status history
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Detailed user account information
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/users/{userId}/suspend:
+    post:
+      tags: [Admin User Governance]
+      operationId: suspendUser
+      summary: Suspend user account with mandatory reason and step-up authentication
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User suspended successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition or last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/restore:
+    post:
+      tags: [Admin User Governance]
+      operationId: restoreUser
+      summary: Restore suspended user account to active state
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User restored successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/disable:
+    post:
+      tags: [Admin User Governance]
+      operationId: disableUser
+      summary: Disable user account permanently with mandatory reason and step-up authentication
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User disabled successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition or last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/force-logout:
+    post:
+      tags: [Admin User Governance]
+      operationId: forceLogoutUser
+      summary: Force logout user by immediately revoking all active access tokens and refresh tokens
+      description: Atomically revokes all active refresh tokens and records an ALL_SESSIONS revocation event. All existing access tokens are immediately rejected on subsequent requests (HTTP 401). Fresh logins remain permitted. Requires SESSION_REVOKE permission and step-up authentication.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User sessions revoked successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForceLogoutResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/roles:
+    post:
+      tags: [Admin User Governance]
+      operationId: changeUserRole
+      summary: Assign or revoke user role with audit and step-up authentication
+      description: Assigns or revokes a system role. When revoking the ADMIN role, last admin protection and self-action rules are enforced; all active sessions (access tokens and refresh tokens) of the target user are immediately revoked, blocking admin endpoints across the platform. Requires USER_ROLE_MANAGE permission and step-up authentication.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeUserRoleRequest' }
+      responses:
+        '200':
+          description: User roles updated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/auth/step-up:
+    post:
+      tags: [Admin User Governance]
+      operationId: issueAdminStepUp
+      summary: Verify administrator password and issue step-up authorization token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpRequest' }
+      responses:
+        '200':
+          description: Step-up verified and issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StepUpResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { description: Invalid password, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /admin/dashboard/summary:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminDashboardSummary
+      summary: Retrieve action required counts and platform user status summary
+      responses:
+        '200':
+          description: Administrative dashboard summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminDashboardSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
   /fitness-goals:
     get:
       tags: [Fitness Goal]
@@ -8693,6 +8925,151 @@ components:
         size: { type: integer, minimum: 1 }
         totalItems: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+
+    AdminUserSummaryResponse:
+      type: object
+      required: [id, email, displayName, status, roles, hasStudentProfile, hasTrainerProfile, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        phoneNumber: { type: [string, 'null'] }
+        status: { type: string, enum: [PENDING_VERIFICATION, ACTIVE, SUSPENDED, DISABLED, DELETION_PENDING, DELETED] }
+        roles:
+          type: array
+          items: { type: string }
+        hasStudentProfile: { type: boolean }
+        hasTrainerProfile: { type: boolean }
+        trainerVerificationStatus: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+
+    AdminUserPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUserSummaryResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    StudentProfileDto:
+      type: object
+      required: [onboardingCompleted]
+      properties:
+        dateOfBirth: { type: [string, 'null'], format: date }
+        gender: { type: [string, 'null'] }
+        trainingExperienceLevel: { type: [string, 'null'] }
+        trainingExperienceMonths: { type: [number, 'null'] }
+        availableDaysPerWeek: { type: [integer, 'null'] }
+        preferredSessionMinutes: { type: [integer, 'null'] }
+        onboardingCompleted: { type: boolean }
+
+    TrainerProfileDto:
+      type: object
+      required: [verificationStatus, activityStatus, isAcceptingStudents, isActive]
+      properties:
+        publicSlug: { type: [string, 'null'] }
+        bio: { type: [string, 'null'] }
+        yearsExperience: { type: [number, 'null'] }
+        verificationStatus: { type: string }
+        activityStatus: { type: string }
+        verifiedAt: { type: [string, 'null'], format: date-time }
+        verifiedBy: { type: [string, 'null'], format: uuid }
+        isAcceptingStudents: { type: boolean }
+        isActive: { type: boolean }
+
+    AccountStatusHistoryDto:
+      type: object
+      required: [id, toStatus, reason, changedAt]
+      properties:
+        id: { type: string, format: uuid }
+        fromStatus: { type: [string, 'null'] }
+        toStatus: { type: string }
+        changedBy: { type: [string, 'null'], format: uuid }
+        changedByName: { type: [string, 'null'] }
+        reason: { type: string }
+        changedAt: { type: string, format: date-time }
+
+    AdminUserDetailResponse:
+      type: object
+      required: [id, email, displayName, status, roles, permissions, statusHistory, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        phoneNumber: { type: [string, 'null'] }
+        status: { type: string }
+        preferredLocale: { type: string }
+        timezone: { type: string }
+        emailVerifiedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        studentProfile: { $ref: '#/components/schemas/StudentProfileDto' }
+        trainerProfile: { $ref: '#/components/schemas/TrainerProfileDto' }
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/AccountStatusHistoryDto' }
+
+    AdminUserActionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 2000 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ChangeUserRoleRequest:
+      type: object
+      required: [roleCode, action, reason]
+      properties:
+        roleCode: { type: string }
+        action: { type: string, enum: [ASSIGN, REVOKE] }
+        reason: { type: string, minLength: 5, maxLength: 2000 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ForceLogoutResponse:
+      type: object
+      required: [revokedSessionCount, message]
+      properties:
+        revokedSessionCount: { type: integer }
+        message: { type: string }
+
+    StepUpRequest:
+      type: object
+      required: [actionCode, password]
+      properties:
+        actionCode: { type: string }
+        password: { type: string }
+
+    StepUpResponse:
+      type: object
+      required: [stepUpAuthenticationId, expiresAt]
+      properties:
+        stepUpAuthenticationId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    AdminDashboardSummaryResponse:
+      type: object
+      required: [pendingTrainerApplications, totalUsers, activeUsers, suspendedUsers, disabledUsers, pendingVerificationUsers]
+      properties:
+        pendingTrainerApplications: { type: integer }
+        totalUsers: { type: integer }
+        activeUsers: { type: integer }
+        suspendedUsers: { type: integer }
+        disabledUsers: { type: integer }
+        pendingVerificationUsers: { type: integer }
 
     TrainerDocumentUploadResponse:
       type: object

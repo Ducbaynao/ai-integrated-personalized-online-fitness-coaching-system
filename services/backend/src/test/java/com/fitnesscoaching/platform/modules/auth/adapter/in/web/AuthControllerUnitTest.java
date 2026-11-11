@@ -80,6 +80,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         com.fitnesscoaching.platform.common.config.JacksonConfig.class
 })
 class AuthControllerUnitTest {
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery;
+
 
     @Autowired
     private MockMvc mockMvc;

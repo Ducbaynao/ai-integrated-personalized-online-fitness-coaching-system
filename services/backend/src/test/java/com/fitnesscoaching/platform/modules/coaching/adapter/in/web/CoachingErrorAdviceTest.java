@@ -42,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         ClockConfig.class, GlobalExceptionHandler.class, CoachingErrorAdvice.class,
         RequestIdFilter.class, JacksonConfig.class})
 class CoachingErrorAdviceTest {
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery;
+
     private static final String REQUEST_ID = "coaching-integrity-test";
     private static final String SQL_DETAIL = "SECRET SQL detail uq_coaching_current_student";
 

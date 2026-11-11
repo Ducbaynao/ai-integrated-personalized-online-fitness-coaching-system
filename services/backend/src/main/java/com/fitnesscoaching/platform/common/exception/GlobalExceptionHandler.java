@@ -916,6 +916,34 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), Collections.emptyList()));
     }
 
+    @ExceptionHandler(TargetUserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTargetUserNotFound(TargetUserNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "USER_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(SelfActionNotAllowedException.class)
+    public ResponseEntity<ErrorResponse> handleSelfActionNotAllowed(SelfActionNotAllowedException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(
+                "SELF_ACTION_NOT_ALLOWED", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(LastAdminProtectionException.class)
+    public ResponseEntity<ErrorResponse> handleLastAdminProtection(LastAdminProtectionException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.of(
+                "LAST_ADMIN_PROTECTED", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(StepUpRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleStepUpRequired(StepUpRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.of(
+                "STEP_UP_REQUIRED", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled exception caught in controller advice", ex);
