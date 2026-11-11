@@ -16,6 +16,13 @@ import { TrainerApplicationListPage } from './features/trainer-applications/Trai
 import { TrainerApplicationDetailPage } from './features/trainer-applications/TrainerApplicationDetailPage.tsx'
 import { UserListPage } from './features/users/UserListPage.tsx'
 import { UserDetailPage } from './features/users/UserDetailPage.tsx'
+import { SupportCaseListPage } from './features/support/SupportCaseListPage.tsx'
+import { SupportCaseDetailPage } from './features/support/SupportCaseDetailPage.tsx'
+import { ModerationCaseListPage } from './features/moderation/ModerationCaseListPage.tsx'
+import { ModerationCaseDetailPage } from './features/moderation/ModerationCaseDetailPage.tsx'
+import { PrivilegedAccessPage } from './features/privileged-access/PrivilegedAccessPage.tsx'
+import { DataCorrectionListPage } from './features/data-correction/DataCorrectionListPage.tsx'
+import { AuditLogListPage } from './features/audit/AuditLogListPage.tsx'
 
 function App() {
   return (
@@ -131,6 +138,62 @@ function App() {
             element={
               <ProtectedRoute>
                 <UserDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="support-cases"
+            element={
+              <ProtectedRoute>
+                <SupportCaseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="support-cases/:caseId"
+            element={
+              <ProtectedRoute>
+                <SupportCaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="moderation-cases"
+            element={
+              <ProtectedRoute>
+                <ModerationCaseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="moderation-cases/:caseId"
+            element={
+              <ProtectedRoute>
+                <ModerationCaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="privileged-access"
+            element={
+              <ProtectedRoute>
+                <PrivilegedAccessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="data-corrections"
+            element={
+              <ProtectedRoute>
+                <DataCorrectionListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogListPage />
               </ProtectedRoute>
             }
           />

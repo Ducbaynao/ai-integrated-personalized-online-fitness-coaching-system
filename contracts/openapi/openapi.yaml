@@ -2732,6 +2732,516 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/AccountUnavailable' }
 
+  /admin/support-cases:
+    get:
+      tags: [Admin Support]
+      operationId: searchSupportCases
+      summary: Search and list support cases with filtering and pagination
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priority
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Support case page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCasePageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Support]
+      operationId: createSupportCase
+      summary: Create a new support case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSupportCaseRequest' }
+      responses:
+        '201':
+          description: Support case created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}:
+    get:
+      tags: [Admin Support]
+      operationId: getSupportCaseDetail
+      summary: Get support case detail including event history
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Support case detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/status:
+    post:
+      tags: [Admin Support]
+      operationId: updateSupportCaseStatus
+      summary: Update support case status
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSupportCaseStatusRequest' }
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/assign:
+    post:
+      tags: [Admin Support]
+      operationId: assignSupportCase
+      summary: Assign support case to an administrator
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignSupportCaseRequest' }
+      responses:
+        '200':
+          description: Case assigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/notes:
+    post:
+      tags: [Admin Support]
+      operationId: addSupportCaseNote
+      summary: Add internal note to support case
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddSupportCaseNoteRequest' }
+      responses:
+        '200':
+          description: Note added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases:
+    get:
+      tags: [Admin Moderation]
+      operationId: searchModerationCases
+      summary: Search and list moderation cases
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priority
+          in: query
+          schema: { type: string }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Moderation case page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCasePageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Moderation]
+      operationId: createModerationCase
+      summary: Create a moderation case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateModerationCaseRequest' }
+      responses:
+        '201':
+          description: Moderation case created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}:
+    get:
+      tags: [Admin Moderation]
+      operationId: getModerationCaseDetail
+      summary: Get moderation case detail and action history
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Moderation case detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}/status:
+    post:
+      tags: [Admin Moderation]
+      operationId: updateModerationStatus
+      summary: Update moderation case status
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateModerationStatusRequest' }
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}/actions:
+    post:
+      tags: [Admin Moderation]
+      operationId: performModerationAction
+      summary: Perform an append-only moderation action
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PerformModerationActionRequest' }
+      responses:
+        '201':
+          description: Moderation action recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationActionResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: searchPrivilegedAccessRequests
+      summary: Search privileged data access requests
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: targetUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Privileged access request page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Privileged Access]
+      operationId: requestPrivilegedAccess
+      summary: Request and activate privileged data access with step-up verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestPrivilegedAccessDto' }
+      responses:
+        '201':
+          description: Privileged access request created and active
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/active:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: getActivePrivilegedAccess
+      summary: Get active privileged access for current administrator and optional target user
+      parameters:
+        - name: targetUserId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Active privileged access
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '204':
+          description: No active privileged access session
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/{requestId}:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: getPrivilegedAccessDetail
+      summary: Get privileged access request detail
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Privileged access detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Privileged access not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/{requestId}/revoke:
+    post:
+      tags: [Admin Privileged Access]
+      operationId: revokePrivilegedAccess
+      summary: Revoke active privileged data access session
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevokePrivilegedAccessDto' }
+      responses:
+        '200':
+          description: Privileged access revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Privileged access not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/data-corrections:
+    get:
+      tags: [Admin Data Correction]
+      operationId: searchDataCorrections
+      summary: Search and list governed data correction actions
+      parameters:
+        - name: supportCaseId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Data correction page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Data Correction]
+      operationId: executeDataCorrection
+      summary: Execute governed data correction with step-up authentication and privileged access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExecuteDataCorrectionRequest' }
+      responses:
+        '201':
+          description: Data correction executed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/data-corrections/{correctionId}:
+    get:
+      tags: [Admin Data Correction]
+      operationId: getDataCorrectionDetail
+      summary: Get data correction detail
+      parameters:
+        - name: correctionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Data correction detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Data correction not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin Audit]
+      operationId: searchAuditLogs
+      summary: Search and query audit logs with secret redaction
+      parameters:
+        - name: actorUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: actorRole
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: targetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Audit log page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/audit-logs/{id}:
+    get:
+      tags: [Admin Audit]
+      operationId: getAuditLogDetail
+      summary: Get audit log entry detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Audit log detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogEntryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Audit log not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
   /fitness-goals:
     get:
       tags: [Fitness Goal]
@@ -9070,6 +9580,303 @@ components:
         suspendedUsers: { type: integer }
         disabledUsers: { type: integer }
         pendingVerificationUsers: { type: integer }
+
+    # Support
+    CreateSupportCaseRequest:
+      type: object
+      required: [requesterId, subject, description]
+      properties:
+        requesterId: { type: string, format: uuid }
+        subject: { type: string, minLength: 3, maxLength: 255 }
+        description: { type: string, minLength: 3, maxLength: 4000 }
+        priority: { type: string, default: MEDIUM }
+        category: { type: string }
+
+    UpdateSupportCaseStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: string }
+
+    AssignSupportCaseRequest:
+      type: object
+      required: [assignedToAdminId]
+      properties:
+        assignedToAdminId: { type: string, format: uuid }
+
+    AddSupportCaseNoteRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 2000 }
+
+    SupportCaseSummaryResponse:
+      type: object
+      required: [id, caseNumber, requesterId, requesterName, subject, status, priority, openedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        caseNumber: { type: string }
+        requesterId: { type: string, format: uuid }
+        requesterName: { type: string }
+        assignedToAdminId: { type: [string, 'null'], format: uuid }
+        assignedToAdminName: { type: [string, 'null'] }
+        subject: { type: string }
+        category: { type: [string, 'null'] }
+        status: { type: string }
+        priority: { type: string }
+        openedAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        closedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SupportCaseEventResponse:
+      type: object
+      required: [id, eventType, notes, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventType: { type: string }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorName: { type: [string, 'null'] }
+        notes: { type: string }
+        payloadJson: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
+    SupportCaseDetailResponse:
+      type: object
+      required: [summary, events]
+      properties:
+        summary: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/SupportCaseEventResponse' }
+
+    SupportCasePageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Moderation
+    CreateModerationCaseRequest:
+      type: object
+      required: [targetType, targetId, reason]
+      properties:
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        reason: { type: string }
+        priority: { type: string, default: MEDIUM }
+        notes: { type: string }
+
+    UpdateModerationStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        notes: { type: string }
+
+    PerformModerationActionRequest:
+      type: object
+      required: [actionType, reason]
+      properties:
+        actionType: { type: string }
+        targetUserId: { type: string, format: uuid }
+        reason: { type: string }
+        metadata: { type: object }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ModerationCaseSummaryResponse:
+      type: object
+      required: [id, targetType, targetId, status, priority, openedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        targetDisplayName: { type: [string, 'null'] }
+        assignedToAdminId: { type: [string, 'null'], format: uuid }
+        assignedToAdminName: { type: [string, 'null'] }
+        status: { type: string }
+        priority: { type: string }
+        createdReason: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        openedAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ModerationActionResponse:
+      type: object
+      required: [id, actionType, reason, performedAt]
+      properties:
+        id: { type: string, format: uuid }
+        actionType: { type: string }
+        targetUserId: { type: [string, 'null'], format: uuid }
+        targetUserName: { type: [string, 'null'] }
+        performedByAdminId: { type: [string, 'null'], format: uuid }
+        performedByAdminName: { type: [string, 'null'] }
+        reason: { type: string }
+        metadataJson: { type: [string, 'null'] }
+        performedAt: { type: string, format: date-time }
+
+    ModerationCaseDetailResponse:
+      type: object
+      required: [summary, actions]
+      properties:
+        summary: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/ModerationActionResponse' }
+
+    ModerationCasePageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Privileged Access
+    RequestPrivilegedAccessDto:
+      type: object
+      required: [targetUserId, purpose, accessScope, reason]
+      properties:
+        targetUserId: { type: string, format: uuid }
+        purpose: { type: string }
+        accessScope: { type: string }
+        reason: { type: string }
+        relatedSupportCaseId: { type: string, format: uuid }
+        durationMinutes: { type: integer, default: 60 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    RevokePrivilegedAccessDto:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string }
+
+    PrivilegedAccessResponse:
+      type: object
+      required: [id, targetUserId, purpose, reason, status, requestedAt, currentlyActive]
+      properties:
+        id: { type: string, format: uuid }
+        requestedByAdminId: { type: [string, 'null'], format: uuid }
+        requestedByAdminName: { type: [string, 'null'] }
+        approvedByAdminId: { type: [string, 'null'], format: uuid }
+        approvedByAdminName: { type: [string, 'null'] }
+        targetUserId: { type: string, format: uuid }
+        targetUserName: { type: [string, 'null'] }
+        purpose: { type: string }
+        accessScopeJson: { type: [string, 'null'] }
+        reason: { type: string }
+        relatedSupportCaseId: { type: [string, 'null'], format: uuid }
+        supportCaseNumber: { type: [string, 'null'] }
+        status: { type: string }
+        requestedAt: { type: string, format: date-time }
+        approvedAt: { type: [string, 'null'], format: date-time }
+        openedAt: { type: [string, 'null'], format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        currentlyActive: { type: boolean }
+
+    PrivilegedAccessPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Data Correction
+    ExecuteDataCorrectionRequest:
+      type: object
+      required: [supportCaseId, targetType, targetId, reason, proposedData, privilegedAccessRequestId]
+      properties:
+        supportCaseId: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        reason: { type: string }
+        proposedData: { type: object }
+        privilegedAccessRequestId: { type: string, format: uuid }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    DataCorrectionResponse:
+      type: object
+      required: [id, supportCaseId, targetType, targetId, beforeDataJson, proposedDataJson, appliedDataJson, validationResultJson, requestedBy, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        supportCaseId: { type: string, format: uuid }
+        caseNumber: { type: [string, 'null'] }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        beforeDataJson: { type: string }
+        proposedDataJson: { type: string }
+        appliedDataJson: { type: string }
+        validationResultJson: { type: string }
+        requestedBy: { type: string, format: uuid }
+        requestedByName: { type: [string, 'null'] }
+        appliedBy: { type: [string, 'null'], format: uuid }
+        appliedByName: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        appliedAt: { type: [string, 'null'], format: date-time }
+
+    DataCorrectionPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Audit Logs
+    AuditLogEntryResponse:
+      type: object
+      required: [id, actorRole, action, targetType, targetId, occurredAt]
+      properties:
+        id: { type: string }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorRole: { type: string }
+        actorName: { type: [string, 'null'] }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        beforeDataJson: { type: [string, 'null'] }
+        afterDataJson: { type: [string, 'null'] }
+        metadataJson: { type: [string, 'null'] }
+        ipAddress: { type: [string, 'null'] }
+        userAgent: { type: [string, 'null'] }
+        occurredAt: { type: string, format: date-time }
+
+    AuditLogPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AuditLogEntryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
 
     TrainerDocumentUploadResponse:
       type: object
