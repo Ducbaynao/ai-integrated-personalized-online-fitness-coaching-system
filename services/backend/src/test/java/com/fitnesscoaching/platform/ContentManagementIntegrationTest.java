@@ -837,7 +837,11 @@ class ContentManagementIntegrationTest {
                 (rs, rowNum) -> rs.getString("code"),
                 dualAdminId
         );
-        assertThat(permsAfter).containsExactly("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND");
+        assertThat(permsAfter).containsExactly(
+                "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
+                "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
+                "USER_ROLE_MANAGE", "USER_SUSPEND"
+        );
 
         // API request with revoked CONTENT_ADMIN must be immediately rejected (HTTP 403)
         String dummyBundle = """
