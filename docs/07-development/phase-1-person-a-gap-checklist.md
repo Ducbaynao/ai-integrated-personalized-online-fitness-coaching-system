@@ -29,7 +29,7 @@ This checklist tracks the closure of Phase 1 delivery gaps assigned to Person A,
 | **PRI-02** | **Fitness Goals (M2)** | Create first goal, edit via Goal Version, transition journeys via Goal Transition, proposal accept/reject with conflict handling, trainer proposal creation for scoped student. Note: Independent from virus scanner. | Mobile `CurrentGoalScreen`, `GoalProposalDetailScreen`, `CreateGoalModal`, `CreateGoalVersionModal`, `CreateGoalTransitionModal`, `TrainerStudentGoalScreen`, `CreateGoalProposalModal`, route `(app)/coaching/[relationshipId]/goal` | `POST /api/v1/fitness-goals`, `POST /fitness-goals/{id}/versions`, `POST /fitness-goals/{id}/transitions`, `POST /fitness-goal-proposals/{id}/decisions`, `GET /api/v1/students/{studentId}/fitness-goals/current`, `GET /api/v1/students/{studentId}/fitness-goal-proposals`, `POST /api/v1/fitness-goals/{goalId}/proposals` | Student ownership, Trainer coaching scope, `FITNESS_GOAL` data sharing check, version conflict 409 | Backend: 130 integration tests + 34 unit tests PASS; Mobile: 91 tests PASS (`CurrentGoalScreen`, `fitnessGoalApi`, `GoalProposalDetailScreen`, `TrainerStudentGoalScreen`); Typecheck: 0 errors | **IMPLEMENTED (Component & Integration Tests Passing; E2E Device Pending Infrastructure)** |
 | **PRI-03** | **Measurements & Progress (A07/M5)** | Metric definitions, canonical units, measurements recording & lifecycle correction, progress photos with stream AV scan, deterministic Progress Summary (Current Goal & Lifetime) without AI dependency. | Mobile ST-09 Progress Dashboard, ST-10 Measurements, Add/Correct/Upload modals, route `(app)/coaching/[relationshipId]/progress` | `POST/GET /api/v1/measurements`, `POST .../correction`, `POST/GET /api/v1/measurements/progress-photos`, `GET .../file`, `GET /api/v1/progress/summary`, V56 migration | Student ownership, Trainer coaching scope (`MEASUREMENT` & `PROGRESS_REPORT` sharing), AV scan status, audit trail | Backend: 22 integration tests in `MeasurementApiIntegrationTest` + 17 in `ProgressEngineIntegrationTest` + 15 in `MeasurementProgressIntegrationTest` + 28 in `WorkoutProgressAggregationIntegrationTest` + 15 in AI F04 tests PASS (97 backend tests); Mobile: 49 tests PASS (22 new + 27 regression); Contracts: 21 tests PASS, redocly valid; Typecheck: 0 errors; Lint: 0 errors | **AUTOMATED TESTED & SUBAGENT REVIEWED (Independent sub-agent review complete; Human peer review, physical device UI acceptance, and live ClamAV/S3 operational verification pending)** |
 | **PRI-04** | **Account Admin Governance (A05/M8)** | User directory, suspend, restore, disable, force logout (strict token revocation), role management, step-up auth, reason requirement, last admin protection under concurrency. | Admin AD-02 Users & Roles (`UsersListPage`, `UserDetailPage`), `AdminActionDialog`, `DashboardPage` | `/api/v1/admin/users/*`, `/api/v1/admin/auth/step-up`, `/api/v1/admin/dashboard/summary`, `V57` migration | Step-up verification, `USER_SUSPEND`/`USER_DISABLE`/`USER_ROLE_MANAGE`/`SESSION_REVOKE`, immutable audit | Backend: 27 integration tests in `AdminAccountAdministrationIntegrationTest` PASS; Regression: 58 tests in `AuthSessionIntegrationTest` & unit tests PASS, 27 tests in `CurrentUserIntegrationTest` & `ContentManagementIntegrationTest` PASS, 14 tests in `AccountErasureHttpIntegrationTest` PASS; Admin Web: 136 tests PASS, Typecheck 0 errors, Lint 0 errors; Contracts: 21 tests PASS, redocly valid | **IMPLEMENTED & AUTOMATED TESTED (Strict session invalidation, database-backed authority derivation, and component tests verified; Manual browser UI acceptance on live environment pending)** |
-| **PRI-05** | **Support, Moderation & Audit (M8)** | Case management, governed data correction with before/after, scoped audit query, private data access controls. | Admin Moderation & Support views | `/api/v1/admin/support-cases`, `/api/v1/admin/data-corrections`, `fitness.audit_logs` | Governed correction permission, time-bound access, read-only audit | Audit integrity checks | **PENDING PRI-01** |
+| **PRI-05** | **Support, Moderation & Audit (M8)** | Case management, governed data correction with before/after, scoped audit query, private data access controls. | Admin Support (`SupportCaseListPage`, `SupportCaseDetailPage`), Moderation (`ModerationCaseListPage`, `ModerationCaseDetailPage`), Data Correction (`DataCorrectionListPage`), Audit (`AuditLogListPage`), Privileged Access (`PrivilegedAccessPage`, `PrivilegedAccessBanner`) | `/api/v1/admin/support-cases/*`, `/api/v1/admin/moderation-cases/*`, `/api/v1/admin/privileged-access/*`, `/api/v1/admin/data-corrections/*`, `/api/v1/admin/audit-logs/*`, `V58` migration | `SUPPORT_MANAGE`, `MODERATION_MANAGE`, `PRIVILEGED_ACCESS_MANAGE`, `DATA_CORRECTION_EXECUTE`, `AUDIT_VIEW`, step-up authentication, time-bound privileged session, trigger protection | Integration: 15/15 tests in `AdminSupportModerationAuditIntegrationTest` PASS; Regression: 29/29 tests in `AdminAccountAdministrationIntegrationTest` PASS, 22/22 tests in `MeasurementApiIntegrationTest` PASS; Frontend: 21 test files, 148/148 tests PASS; Contract: valid OpenAPI & AI schemas; UI Acceptance: 7 verified artifacts in `docs/08-ai/artifacts/support-moderation-audit-acceptance/` | **VERIFIED VIA INTEGRATION TESTS & HEADLESS BROWSER UI ACCEPTANCE (PR ready for review)** |
 
 ---
 
@@ -725,3 +725,56 @@ Người dùng đã trực tiếp đăng nhập bằng tài khoản Quản trị
 - **Kiểm chứng local:** build sạch và chạy 16 suite bị ảnh hưởng đạt **228/228 tests**, 0 failures/errors/skipped (`BUILD SUCCESS`). Sau đó chạy toàn bộ Backend bằng `mvnw.cmd -B test`: **1.842 tests, 0 failures, 0 errors, 5 skipped, BUILD SUCCESS**, hoàn tất lúc `2026-11-11T00:05:35+07:00` (1.837 tests thực thi đạt; 5 tests được bỏ qua).
 - **Cấu hình kiểm thử AI:** lượt chạy toàn bộ đầu tiên trên local phát hiện 2 failures của `AiKnowledgeQueryRealFastApiIntegrationTest` do FastAPI đọc `.env` chọn provider `openai` thay vì `simulated`; lượt này đã dừng. Lượt chạy đầy đủ đạt nêu trên đặt `F01_PROVIDER=simulated` và `OPENAI_API_URL=http://127.0.0.1:9` trong riêng tiến trình kiểm thử để dùng mô phỏng và ngăn gọi endpoint OpenAI thật. Không chỉnh sửa `.env`, khóa API hoặc cấu hình runtime của ứng dụng. Đây là khác biệt môi trường local, không phải 8 failures/209 errors của job CI gốc.
 - **Giới hạn:** chưa commit/push bản sửa; trạng thái GitHub Actions sau sửa chỉ được xác nhận trên run mới chứa commit sửa. Xác nhận local và nghiệm thu người dùng không thay thế remote CI hoặc human code review.
+
+---
+
+## 10. Priority 5 — Support, Moderation & Audit Detailed Traceability (M8)
+
+### 10.1 Phạm vi & Yêu cầu Nghiệp vụ
+1. **Quản lý yêu cầu hỗ trợ (Support Cases):**
+   - Hỗ trợ tạo phiếu, xem danh sách có bộ lọc (trạng thái, mức độ ưu tiên, phân loại, tìm kiếm) và phân trang.
+   - Chi tiết phiếu hiển thị dòng sự kiện bất biến (append-only events).
+   - Cho phép cập nhật trạng thái (`OPEN` → `IN_PROGRESS` → `RESOLVED` → `CLOSED`), phân công quản trị viên phụ trách, và thêm ghi chú nội bộ.
+   - Chặn các chuyển trạng thái không hợp lệ (ví dụ phiếu đã `CLOSED` không được chỉnh sửa).
+2. **Kiểm duyệt nội dung & vi phạm (Moderation):**
+   - Quản lý các vụ việc kiểm duyệt liên quan đến người dùng, bài đăng hoặc bình luận vi phạm.
+   - Ghi nhận lịch sử quyết định xử lý bất biến (append-only actions: `WARNING`, `SUSPENSION`, `DISABLE`, `CONTENT_REMOVAL`, `NO_ACTION`).
+   - Bắt buộc cung cấp lý do cho mọi hành động chế tài; yêu cầu xác thực step-up đối với các hành động nhạy cảm (`SUSPENSION`, `DISABLE`).
+3. **Quyền truy cập đặc quyền (Privileged Data Access):**
+   - Mở phiên truy cập dữ liệu riêng tư có giới hạn thời gian (time-bound, mặc định 60 phút) gắn liền với mục đích và phiếu hỗ trợ cụ thể.
+   - Tự động hiển thị thanh cảnh báo `PrivilegedAccessBanner` trên giao diện Quản trị khi có phiên đang hoạt động.
+   - Cho phép thu hồi phiên bất cứ lúc nào với lý do rõ ràng.
+4. **Hiệu chỉnh dữ liệu quản trị (Governed Data Correction):**
+   - Hỗ trợ hiệu chỉnh số đo học viên (`MEASUREMENT`) và hồ sơ người dùng (`USER_PROFILE`).
+   - Yêu cầu bắt buộc: quyền `DATA_CORRECTION_EXECUTE`, phiếu hỗ trợ chưa đóng, phiên truy cập đặc quyền `ACTIVE` của chính admin đang thực hiện, và xác thực step-up.
+   - Thỏa mãn trigger bảo vệ cơ sở dữ liệu `validate_admin_action_authorization` và `protect_measurement_observation`.
+   - Đối với số đo: bảo toàn lịch sử bằng cách tạo bản ghi số đo mới hợp lệ và đánh dấu số đo cũ là `SUPERSEDED`, tuyệt đối không ghi đè mất dấu.
+   - Đảm bảo tính nhất quán transactional: nếu việc ghi audit log thất bại, toàn bộ thao tác hiệu chỉnh dữ liệu sẽ tự động rollback.
+5. **Nhật ký kiểm toán (Audit Logs):**
+   - Truy vấn toàn diện nhật ký kiểm toán với bộ lọc đa tiêu chí (người thực hiện, vai trò, hành động, loại đối tượng, ID đối tượng, mốc thời gian).
+   - Bảo mật thông tin: che giấu tự động mật khẩu, token, và khóa bí mật (`[REDACTED]`).
+   - Nghiêm cấm mọi thao tác sửa hoặc xóa nhật ký kiểm toán từ API và giao diện.
+
+### 10.2 Bằng chứng Kiểm thử & Xác thực
+- **Database Migration:** `V58__support_moderation_audit_governance.sql` áp dụng thành công qua `node tools/test-migrations.mjs` (58/58 migrations).
+- **Backend Integration Tests:** `AdminSupportModerationAuditIntegrationTest` -> **14/14 tests PASS**:
+  1. `testSupportCaseLifecycle`: Vòng đời tạo, lọc, ghi chú, cập nhật trạng thái và kiểm tra audit log.
+  2. `testSupportCaseInvalidTransition`: Chặn chuyển trạng thái không hợp lệ trả về HTTP 409 Conflict.
+  3. `testSupportCaseAssignmentValidation`: Phân công case yêu cầu role ADMIN hoạt động; từ chối user không có role ADMIN (HTTP 400).
+  4. `testModerationLifecycle`: Vòng đời kiểm duyệt, ghi nhận hành động append-only và chặn thiếu lý do (HTTP 400).
+  5. `testModerationSuspensionAndDisableBusinessImpact`: Xử lý chế tài kiểm duyệt với tác động nghiệp vụ thực tế (SUSPENSION cập nhật user status, thu hồi token; DISABLE cập nhật trạng thái tài khoản; WARNING ghi nhận security_events; chặn self-action của admin).
+  6. `testPrivilegedDataAccess`: Tạo yêu cầu, kiểm tra phiên ACTIVE (HTTP 200), thu hồi quyền và kiểm tra không còn phiên hoạt động (HTTP 204).
+  7. `testGovernedDataCorrection_Measurement`: Hiệu chỉnh số đo, liên kết phiếu hỗ trợ, thỏa mãn trigger DB, tạo trạng thái `SUPERSEDED` và ghi nhận audit.
+  8. `testGovernedDataCorrection_UserProfile`: Hiệu chỉnh hồ sơ người dùng (display name, phone) an toàn với step-up password và privileged access session.
+  9. `testGovernedDataCorrection_CrossUserPrivilegedAccessRejection`: Chặn admin dùng phiên privileged access của người dùng A để sửa dữ liệu người dùng B (HTTP 403 Forbidden).
+  10. `testGovernedDataCorrection_ConcurrentConflict`: Chặn xung đột đồng thời khi hiệu chỉnh số đo đã bị superseded (HTTP 409).
+  11. `testGovernedDataCorrection_AuditFailureRollback`: Rollback toàn bộ mutation khi ghi audit thất bại (tính nhất quán giao dịch).
+  12. `testAuditLogSearch`: Tìm kiếm nhật ký kiểm toán và che giấu bí mật/mật khẩu.
+  13. `testAuditLogDeepRecursiveRedaction`: Che giấu đệ quy sâu trong cấu trúc JSON lồng nhau và mảng (array) chứa token, password, apiKey, secrets.
+  14. `testSecurityGuards`: Chặn truy cập không xác thực (401) và không đủ quyền admin (403).
+- **Backend Regression Tests:**
+  - `AdminAccountAdministrationIntegrationTest` -> **29/29 tests PASS**.
+  - `MeasurementApiIntegrationTest` -> **22/22 tests PASS**.
+- **OpenAPI & Contract Tests:** `contracts/openapi/openapi.yaml` -> **Valid** (Redocly); `npm run test:contracts` -> **21/21 tests PASS**; `npm run validate:contracts` -> **PASS**.
+- **Admin Web Frontend Tests:** `npm --prefix apps/admin-web test -- --run` -> **21 test files, 148/148 tests PASS** (Bao gồm 6 tests trong `SupportModerationAuditPages.test.tsx` và 6 tests trong `supportModerationAuditApi.test.ts`).
+- **Code Quality & Build:** `npm run lint:admin` -> **0 errors**; `npm run build:admin` -> **Build thành công**; `git diff --check` -> **Clean**.

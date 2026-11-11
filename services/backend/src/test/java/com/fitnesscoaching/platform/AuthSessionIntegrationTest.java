@@ -1287,14 +1287,19 @@ class AuthSessionIntegrationTest {
 
         Map<String, Object> session = login(email, password, "Admin Browser");
         Map<String, Object> loginUser = (Map<String, Object>) session.get("user");
-        assertThat(loginUser.get("permissions")).isEqualTo(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"));
+        List<String> expectedAdminPermissions = List.of(
+                "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
+                "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
+                "USER_ROLE_MANAGE", "USER_SUSPEND"
+        );
+        assertThat(loginUser.get("permissions")).isEqualTo(expectedAdminPermissions);
 
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token-refreshes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new RefreshTokenRequest((String) session.get("refreshToken"), "Admin Browser"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.permissions", is(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))))
+                .andExpect(jsonPath("$.user.permissions", is(expectedAdminPermissions)))
                 .andReturn();
 
         Map<String, Object> refreshed = objectMapper.readValue(
@@ -1302,7 +1307,7 @@ class AuthSessionIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + refreshed.get("accessToken")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))));
+                .andExpect(jsonPath("$.permissions", is(expectedAdminPermissions)));
     }
 
     @TestConfiguration

@@ -250,7 +250,11 @@ class CurrentUserIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("AUDIT_VIEW_TEST", "CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))));
+                .andExpect(jsonPath("$.permissions", is(List.of(
+                        "AUDIT_VIEW", "AUDIT_VIEW_TEST", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE",
+                        "MODERATION_MANAGE", "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE",
+                        "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
+                ))));
     }
 
     @Test
@@ -276,6 +280,11 @@ class CurrentUserIntegrationTest {
             grantPermission("ADMIN", "USER_DISABLE");
             grantPermission("ADMIN", "USER_ROLE_MANAGE");
             grantPermission("ADMIN", "SESSION_REVOKE");
+            grantPermission("ADMIN", "SUPPORT_MANAGE");
+            grantPermission("ADMIN", "MODERATION_MANAGE");
+            grantPermission("ADMIN", "AUDIT_VIEW");
+            grantPermission("ADMIN", "PRIVILEGED_ACCESS_MANAGE");
+            grantPermission("ADMIN", "DATA_CORRECTION_EXECUTE");
         }
     }
 
@@ -331,7 +340,11 @@ class CurrentUserIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE", "SESSION_REVOKE", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"))));
+                .andExpect(jsonPath("$.permissions", is(List.of(
+                        "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
+                        "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
+                        "USER_ROLE_MANAGE", "USER_SUSPEND"
+                ))));
 
         revokeRole(userId, "ADMIN");
 

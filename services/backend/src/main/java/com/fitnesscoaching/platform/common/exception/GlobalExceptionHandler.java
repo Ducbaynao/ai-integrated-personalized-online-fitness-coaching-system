@@ -944,6 +944,27 @@ public class GlobalExceptionHandler {
                 RequestIdHolder.get(), Collections.emptyList()));
     }
 
+    @ExceptionHandler(SupportCaseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSupportCaseNotFound(SupportCaseNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "SUPPORT_CASE_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(ModerationCaseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleModerationCaseNotFound(ModerationCaseNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "MODERATION_CASE_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
+    @ExceptionHandler(PrivilegedAccessNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePrivilegedAccessNotFound(PrivilegedAccessNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(
+                "PRIVILEGED_ACCESS_NOT_FOUND", ex.getMessage(), Instant.now(clock),
+                RequestIdHolder.get(), Collections.emptyList()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled exception caught in controller advice", ex);
