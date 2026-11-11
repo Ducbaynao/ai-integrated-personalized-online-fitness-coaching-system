@@ -43,6 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         ClockConfig.class, GlobalExceptionHandler.class, WorkoutPlanErrorAdvice.class,
         RequestIdFilter.class, JacksonConfig.class})
 class WorkoutPlanControllerTest {
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery;
+
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @MockitoBean WorkoutPlanQueryUseCase queries;
