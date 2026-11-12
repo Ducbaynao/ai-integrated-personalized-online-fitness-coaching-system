@@ -7,7 +7,8 @@ param(
     [string]$DbUser = "fitness_app",
     [string]$TargetS3Endpoint = "http://localhost:9000",
     [string]$TargetS3Bucket = "fitness-media-restore-test",
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +18,12 @@ $manifestPath = Join-Path $BackupDir "manifest.json"
 
 if (-not (Test-Path $manifestPath)) {
     throw "Manifest file not found: $manifestPath"
+}
+
+# Target Protection Guard:
+# Prevent inadvertent destructive restoration onto the primary system of record.
+if ($TargetDbName -eq "digital_fitness" -and -not $Force) {
+    throw "SAFETY ABORT: Target database is the primary system of record ('$TargetDbName'). Overwriting requires explicit -Force authorization."
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -70,14 +77,19 @@ $dbExists = docker exec $ContainerName psql -U $DbUser -d postgres -t -A -c "SEL
 if ($dbExists -ne "1") {
     Write-Host "  Creating isolated target database '$TargetDbName'..." -ForegroundColor Gray
     docker exec $ContainerName psql -U $DbUser -d postgres -c "CREATE DATABASE $TargetDbName OWNER $DbUser;"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create database $TargetDbName" }
 } else {
     Write-Host "  Cleaning existing target database '$TargetDbName'..." -ForegroundColor Gray
     docker exec $ContainerName psql -U $DbUser -d postgres -c "DROP DATABASE $TargetDbName;"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to drop database $TargetDbName" }
     docker exec $ContainerName psql -U $DbUser -d postgres -c "CREATE DATABASE $TargetDbName OWNER $DbUser;"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create database $TargetDbName" }
 }
 
 # Copy dump into container and restore
 docker cp $dumpFile "${ContainerName}:/tmp/restore_target.dump"
+if ($LASTEXITCODE -ne 0) { throw "docker cp dump file failed" }
+
 Write-Host "  Running pg_restore into '$TargetDbName'..." -ForegroundColor Gray
 
 # Disable NativeCommandError on stderr diagnostics from pg_restore
@@ -123,11 +135,17 @@ try {
             $targetUri = "$TargetS3Endpoint/$TargetS3Bucket/$($obj.key)"
 
             # Upload using curl
-            & curl.exe -s -X PUT --upload-file $sourcePath $targetUri | Out-Null
+            & curl.exe -s -f -X PUT --upload-file "$sourcePath" "$targetUri"
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to upload object $($obj.key) to $targetUri"
+            }
 
             # Download back to temp file and verify SHA256 parity
             $tempVerifyFile = Join-Path $tempVerifyDir "verify.tmp"
-            & curl.exe -s $targetUri -o $tempVerifyFile
+            & curl.exe -s -f "$targetUri" -o "$tempVerifyFile"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tempVerifyFile)) {
+                throw "Failed to download restored object $($obj.key) from $targetUri"
+            }
 
             $downloadHash = (Get-FileHash -Path $tempVerifyFile -Algorithm SHA256).Hash.ToLowerInvariant()
             Remove-Item -Path $tempVerifyFile -Force -ErrorAction SilentlyContinue

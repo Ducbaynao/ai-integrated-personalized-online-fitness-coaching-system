@@ -42,9 +42,16 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:always}
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when_authorized}
+      roles: ${MANAGEMENT_HEALTH_ROLES:ADMIN}
+      show-components: ${MANAGEMENT_HEALTH_SHOW_COMPONENTS:always}
       probes:
         enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
 
 auth:
   jwt:

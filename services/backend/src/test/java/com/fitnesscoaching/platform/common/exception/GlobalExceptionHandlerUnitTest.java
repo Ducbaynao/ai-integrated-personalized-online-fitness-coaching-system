@@ -7,7 +7,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -211,19 +210,6 @@ class GlobalExceptionHandlerUnitTest {
     }
 
     @Test
-    @DisplayName("IllegalArgumentException maps to 400 VALIDATION_FAILED")
-    void handleIllegalArgumentException_mapsTo400ValidationFailed() {
-        IllegalArgumentException ex = new IllegalArgumentException("Unknown status code: INVALID");
-
-        ResponseEntity<ErrorResponse> response = handler.handleIllegalArgument(ex);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().errorCode()).isEqualTo("VALIDATION_FAILED");
-        assertThat(response.getBody().message()).isEqualTo("Unknown status code: INVALID");
-    }
-
-    @Test
     @DisplayName("HttpRequestMethodNotSupportedException maps to 405 METHOD_NOT_ALLOWED")
     void handleHttpRequestMethodNotSupported_mapsTo405() {
         HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("POST");
@@ -271,17 +257,5 @@ class GlobalExceptionHandlerUnitTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().errorCode()).isEqualTo("NOT_FOUND");
         assertThat(response.getBody().message()).contains("api/v1/unknown");
-    }
-
-    @Test
-    @DisplayName("EmptyResultDataAccessException maps to 404 NOT_FOUND")
-    void handleEmptyResultDataAccessException_mapsTo404() {
-        EmptyResultDataAccessException ex = new EmptyResultDataAccessException("No record found", 1);
-
-        ResponseEntity<ErrorResponse> response = handler.handleEmptyResultDataAccess(ex);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().errorCode()).isEqualTo("NOT_FOUND");
     }
 }

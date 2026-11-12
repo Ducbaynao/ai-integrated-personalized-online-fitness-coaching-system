@@ -1,6 +1,6 @@
 # Database and Storage Backup and Recovery
 
-This document defines the backup policy, recovery procedures, operational scripts, and drill verification records for the Digital Fitness platform.
+This document defines the backup policy, recovery procedures, operational scripts, consistency model, and drill verification records for the Digital Fitness platform.
 
 ---
 
@@ -14,12 +14,21 @@ This document defines the backup policy, recovery procedures, operational script
 
 ---
 
-## 2. Operational Tooling
+## 2. Consistency & Ordering Model
+
+In a distributed architecture with relational state in PostgreSQL and binary media in S3:
+1. **Consistency Isolation:** `pg_dump` runs with transaction snapshot isolation, capturing an immutable point-in-time state of all relational tables and sequences.
+2. **Storage-First Backup Ordering:** S3 media objects are synchronized and checksummed *before* capturing the final PostgreSQL transaction snapshot. Any binary upload committed in the database snapshot is guaranteed to have its corresponding file already stored and checksummed in the backup archive, preventing dangling media pointers.
+3. **Target Protection Guard:** `tools/restore-system.ps1` includes an automated destination guard. Destructive operations (`DROP DATABASE`) targeting the primary database of record (`digital_fitness`) are strictly blocked unless an explicit `-Force` authorization switch is provided.
+
+---
+
+## 3. Operational Tooling
 
 Automated, deterministic operational scripts are located in `tools/`:
 
 ### A. Backup Script (`tools/backup-system.ps1`)
-Dumps PostgreSQL database in PostgreSQL custom archive format (`-F c -b -v`), extracts schema structure SQL, syncs all objects from S3 media bucket, computes SHA-256 checksums, and outputs a signed manifest.
+Dumps PostgreSQL database in PostgreSQL custom archive format (`-F c -b -v`), extracts schema structure SQL, syncs all objects from S3 media bucket, computes SHA-256 checksums, and outputs a signed manifest. If any step fails, the partial directory is cleanly purged to prevent corrupt backups.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/backup-system.ps1 `
@@ -35,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File tools/backup-system.ps1 `
 - `schema_structure.sql`: Plaintext DDL schema definitions for human inspection.
 - `storage/<key>`: Mirrored directory tree of S3 object files.
 - `manifest.json`: Metadata manifest containing:
-  - Timestamp & target environments
+  - Timestamp, consistency model (`storage-first-snapshot`)
   - Applied Flyway schema version
   - SHA-256 checksum of `database.dump`
   - List of all storage objects with file sizes and SHA-256 checksums.
@@ -59,7 +68,7 @@ powershell -ExecutionPolicy Bypass -File tools/restore-system.ps1 `
 
 ---
 
-## 3. Security, Encryption & Retention
+## 4. Security, Encryption & Retention
 
 1. **At-Rest Encryption:** Backups stored in production cloud environments must be encrypted with AES-256 using managed KMS keys before transmission or persistence.
 2. **Access Control:** Backup files and S3 buckets contain sensitive student and trainer verification media and must be restricted to platform operational roles with audit logging enabled.
@@ -67,28 +76,24 @@ powershell -ExecutionPolicy Bypass -File tools/restore-system.ps1 `
    - Hourly transaction log / WAL archives: Retained for 7 days.
    - Daily full snapshots: Retained for 30 days.
    - Monthly long-term snapshots: Retained for 12 months for compliance.
-4. **Git Safety:** Real database dumps, sensitive media files, and production backups must never be committed to Git. All directories under `database/backup/backups/` are gitignored.
+4. **Git Safety:** Real database dumps, sensitive media files, and production backups must never be committed to Git. All directories under `database/backup/backups/` and `*.dump` are gitignored.
 
 ---
 
-## 4. Restore Drill Verification Record (2026-11-12)
+## 5. Restore Drill Verification Records
 
-A full backup and restore drill was executed on 2026-11-12 in an isolated test environment.
+### A. Initial Restore Drill (V58 Baseline)
+- **Date:** 2026-11-12
+- **Environment:** PostgreSQL 18.6 (Debian) + Adobe S3Mock (`local-s3`, port 9000).
+- **Outcome:** 268 tables restored, V58 schema parity, round-trip SHA-256 file match.
 
-### Test Environment
-- **Database Engine:** PostgreSQL 18.6 (Debian) with pgvector extension (`digital-fitness-postgres`, port 5433).
-- **Object Storage:** Adobe S3Mock (`local-s3`, port 9000).
-- **Tooling:** `tools/backup-system.ps1`, `tools/restore-system.ps1`.
-
-### Execution Summary
-1. **Backup Phase:**
-   - Database dumped: 268 tables in `fitness` schema, Flyway version V58.
-   - Object storage dumped: `verification-docs/trainer_101/cert.pdf` (54 bytes, SHA-256: `fc3258b9904960bee6193e6db3560bcc78349531e8214b6587677c7cfaf43909`).
-   - Manifest generated and validated.
-2. **Verification & Restore Phase:**
-   - Restored into isolated database `digital_fitness_restore_test`.
-   - Verified Flyway schema version: V58 matches backup.
-   - Verified schema table count: 268 tables verified.
-   - Restored into bucket `fitness-media-restore-test`.
-   - Re-downloaded restored file from bucket and verified SHA-256 hash match (`fc3258b9904960bee6193e6db3560bcc78349531e8214b6587677c7cfaf43909`).
-3. **Outcome:** PASSED with 100% data parity and zero corruption.
+### B. Forward Upgrade Restore Drill (V59 Schema & Sequence Verification)
+- **Date:** 2026-11-12
+- **Environment:** Isolated Testcontainers PostgreSQL 18.6 container with pgvector (`digital_fitness_v59_drill`) + live S3 (`http://localhost:9000`).
+- **Seeded Data:** Representative student user, legacy support case (`SUP-880000`), and V59 sequence-generated case via `support_case_number_seq`.
+- **Restore Target:** `digital_fitness_v59_restored` and `fitness-media-v59-restored`.
+- **Verified Invariants Post-Restore:**
+  - Flyway version: **V59** (100% parity).
+  - Representative records: User and both support cases intact.
+  - Sequence continuity: `nextval('fitness.support_case_number_seq')` operates normally after restore without collision.
+  - S3 Object integrity: Byte-for-byte SHA-256 match.

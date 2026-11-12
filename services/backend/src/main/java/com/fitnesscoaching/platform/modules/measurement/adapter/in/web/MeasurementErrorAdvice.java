@@ -120,8 +120,7 @@ public class MeasurementErrorAdvice {
             org.springframework.web.bind.MissingServletRequestParameterException.class,
             org.springframework.web.multipart.support.MissingServletRequestPartException.class,
             jakarta.validation.ConstraintViolationException.class,
-            java.time.DateTimeException.class,
-            IllegalArgumentException.class
+            java.time.DateTimeException.class
     })
     public ResponseEntity<ErrorResponse> handleValidation(Exception ex) {
         ErrorResponse response = ErrorResponse.of(

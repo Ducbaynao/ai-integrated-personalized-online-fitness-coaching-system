@@ -53,7 +53,8 @@ class InputErrorHandlingIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("management.endpoint.health.show-details", () -> "always");
+        registry.add("management.endpoint.health.show-details", () -> "when_authorized");
+        registry.add("management.endpoint.health.show-components", () -> "always");
         registry.add("ai.service.mode", () -> "simulated");
         registry.add("ai.embedding.provider", () -> "simulated");
     }
@@ -139,12 +140,26 @@ class InputErrorHandlingIntegrationTest {
     }
 
     @Test
-    @DisplayName("Actuator health endpoint returns 200 with database, storage, and scanner components")
-    void actuatorHealth_returns200WithComponents() throws Exception {
+    @DisplayName("Actuator health endpoint returns 200 with component statuses and protects sensitive details from unauthenticated caller")
+    void actuatorHealth_unauthenticated_returns200WithComponentsWithoutSensitiveDetails() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.status", notNullValue()))
                 .andExpect(jsonPath("$.components.storage", notNullValue()))
-                .andExpect(jsonPath("$.components.scanner", notNullValue()));
+                .andExpect(jsonPath("$.components.scanner", notNullValue()))
+                .andExpect(jsonPath("$.components.db.details").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Actuator health endpoint with ROLE_ADMIN returns 200 with full component details")
+    void actuatorHealth_adminAuthorized_returns200WithFullDetails() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        mockMvc.perform(get("/actuator/health")
+                        .with(jwt().jwt(j -> j.subject(adminId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(jsonPath("$.status", notNullValue()))
+                .andExpect(jsonPath("$.components.storage.details", notNullValue()))
+                .andExpect(jsonPath("$.components.db.details", notNullValue()));
     }
 }

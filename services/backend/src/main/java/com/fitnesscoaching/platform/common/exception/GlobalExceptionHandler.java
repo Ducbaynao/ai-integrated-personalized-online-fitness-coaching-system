@@ -7,7 +7,6 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -214,18 +213,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        ErrorResponse response = ErrorResponse.of(
-                "VALIDATION_FAILED",
-                ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Invalid argument provided",
-                Instant.now(clock),
-                RequestIdHolder.get(),
-                Collections.emptyList()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         ErrorResponse response = ErrorResponse.of(
@@ -267,18 +254,6 @@ public class GlobalExceptionHandler {
         ErrorResponse response = ErrorResponse.of(
                 "NOT_FOUND",
                 "Resource not found: " + ex.getResourcePath(),
-                Instant.now(clock),
-                RequestIdHolder.get(),
-                Collections.emptyList()
-        );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-    }
-
-    @ExceptionHandler(EmptyResultDataAccessException.class)
-    public ResponseEntity<ErrorResponse> handleEmptyResultDataAccess(EmptyResultDataAccessException ex) {
-        ErrorResponse response = ErrorResponse.of(
-                "NOT_FOUND",
-                "Requested resource was not found",
                 Instant.now(clock),
                 RequestIdHolder.get(),
                 Collections.emptyList()

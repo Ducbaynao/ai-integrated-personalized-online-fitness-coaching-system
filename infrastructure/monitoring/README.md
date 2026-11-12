@@ -1,18 +1,18 @@
 # Infrastructure Health & Monitoring
 
-This document details the minimal health check indicators, liveness/readiness probes, metrics endpoints, and failure detection signals for the Digital Fitness platform.
+This document details the minimal health check indicators, liveness/readiness probes, metrics endpoints, security controls, and failure detection signals for the Digital Fitness platform.
 
 ---
 
-## 1. Spring Boot Actuator Endpoints
+## 1. Spring Boot Actuator Endpoints & Security Controls
 
 The backend exposes health and operational probes under `/actuator`:
 
-| Endpoint | Purpose | Access Rule | Details |
+| Endpoint | Purpose | Access Rule | Information Exposure |
 | :--- | :--- | :--- | :--- |
-| `/actuator/health` | Overall aggregate health | Public / Load Balancer | Aggregates DB, S3 Storage, Antivirus Scanner, and Disk. |
-| `/actuator/health/liveness` | Kubernetes Liveness Probe | Public | Indicates whether the JVM is alive and processing requests. |
-| `/actuator/health/readiness` | Kubernetes Readiness Probe | Public | Indicates whether the service is ready to accept user traffic. |
+| `/actuator/health` | Overall aggregate health | Public / Load Balancer | Returns component status (`UP`/`DOWN`) via `show-components: always`. Sensitive internal details (disk paths, IPs) are hidden unless authenticated as `ROLE_ADMIN` (`show-details: when_authorized`). |
+| `/actuator/health/liveness` | Kubernetes Liveness Probe | Public | Scoped exclusively to `livenessState`. Prevents container restart cascades when external dependencies (S3, ClamAV) have transient latency. |
+| `/actuator/health/readiness` | Kubernetes Readiness Probe | Public | Scoped to `readinessState,db`. Verifies relational persistence is connected before routing user traffic. |
 | `/actuator/info` | Application metadata | Public / Operations | Build version, environment, and commit details. |
 | `/actuator/metrics` | Micrometer metrics | Operations / Prometheus | JVM memory, thread pool, HTTP latency, and custom metrics. |
 
@@ -25,9 +25,16 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when_authorized}
+      roles: ${MANAGEMENT_HEALTH_ROLES:ADMIN}
+      show-components: ${MANAGEMENT_HEALTH_SHOW_COMPONENTS:always}
       probes:
         enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
 ```
 
 ---
@@ -43,7 +50,7 @@ management:
 
 ### B. Object Storage Health (`storage`)
 - **Implementation:** `com.fitnesscoaching.platform.common.health.StorageHealthIndicator`
-- **Probe Logic:** Performs lightweight `headBucket` check on target S3 bucket using configured credentials and endpoint.
+- **Probe Logic:** Performs lightweight `headBucket` check on target S3 bucket with strict timeouts (`apiCallTimeout: 3s`, `apiCallAttemptTimeout: 2s`).
 - **Status Mapping:**
   - `UP`: S3 endpoint reachable, bucket exists and credentials have read/write access.
   - `DOWN`: S3 service down, network timeout, bucket missing (404), or access denied (403).
@@ -51,7 +58,7 @@ management:
 
 ### C. Antivirus Scanner Health (`scanner`)
 - **Implementation:** `com.fitnesscoaching.platform.common.health.ScannerHealthIndicator`
-- **Probe Logic:** Opens a direct TCP socket to ClamAV daemon (`clamd`), transmits `zPING\0`, and expects `PONG\0` within 3000ms.
+- **Probe Logic:** Opens a direct TCP socket to ClamAV daemon (`clamd`), transmits `zPING\0`, and expects `PONG\0` within 2000ms connect timeout and 3000ms read timeout.
 - **Status Mapping:**
   - `UP`: ClamAV daemon responding with `PONG`.
   - `DOWN`: ClamAV daemon down, port closed, or connection timed out.
@@ -72,5 +79,6 @@ In accordance with platform security invariants:
 
 Health indicator functionality is covered by regression unit and integration tests:
 - `com.fitnesscoaching.platform.common.health.StorageAndScannerHealthIndicatorUnitTest` (4/4 PASS)
-- `com.fitnesscoaching.platform.InputErrorHandlingIntegrationTest` (Health endpoint component assertions PASS)
+- `com.fitnesscoaching.platform.InputErrorHandlingIntegrationTest` (Health component & authorization detail assertions PASS)
 - `com.fitnesscoaching.platform.modules.trainer.application.service.LiveStorageAndScannerHardeningIntegrationTest` (Fail-closed live socket & S3 assertions PASS)
+- `com.fitnesscoaching.platform.LiveProcessRestartStorageIntegrationTest` (Process restart live byte parity PASS)
