@@ -287,7 +287,7 @@ public class DataCorrectionService implements DataCorrectionUseCase {
         supportCasePersistence.insertEvent(
                 UUID.randomUUID(), request.supportCaseId(), "DATA_CORRECTION_APPLIED", adminUserId,
                 "Data correction executed on " + targetType + " ID: " + request.targetId() + ". Reason: " + request.reason().trim(),
-                "{\"correctionId\":\"" + correctionId + "\",\"targetType\":\"" + targetType + "\"}", now
+                toJson(Map.of("correctionId", correctionId.toString(), "targetType", targetType)), now
         );
 
         auditService.recordAudit(AuditRecord.builder()
@@ -298,7 +298,7 @@ public class DataCorrectionService implements DataCorrectionUseCase {
                 .targetId(request.targetId())
                 .beforeDataJson(beforeDataJson)
                 .afterDataJson(appliedDataJson)
-                .metadataJson("{\"supportCaseId\":\"" + request.supportCaseId() + "\",\"correctionId\":\"" + correctionId + "\"}")
+                .metadataJson(toJson(Map.of("supportCaseId", request.supportCaseId().toString(), "correctionId", correctionId.toString())))
                 .occurredAt(now)
                 .build());
 

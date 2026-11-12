@@ -166,9 +166,11 @@ public class ModerationService implements ModerationUseCase {
                 .action("MODERATION_CASE_STATUS_CHANGED")
                 .targetType("MODERATION_CASE")
                 .targetId(caseId)
-                .beforeDataJson("{\"status\":\"" + current.status() + "\"}")
-                .afterDataJson("{\"status\":\"" + newStatus + "\"}")
-                .metadataJson(toJson(Map.of("resolution", resolution != null ? resolution : "")))
+                .beforeDataJson(toJson(Map.of("status", current.status())))
+                .afterDataJson(toJson(Map.of("status", newStatus)))
+                .metadataJson(resolution != null && !resolution.isBlank()
+                        ? toJson(Map.of("resolution", resolution))
+                        : "{}")
                 .occurredAt(now)
                 .build());
 
@@ -224,7 +226,7 @@ public class ModerationService implements ModerationUseCase {
             if (targetUserId != null) {
                 persistence.insertSecurityEvent(
                         targetUserId, "USER_MODERATION_WARNING", "MEDIUM",
-                        "{\"caseId\":\"" + caseId + "\",\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}",
+                        toJson(Map.of("caseId", caseId.toString(), "reason", request.reason().trim())),
                         now
                 );
             }
@@ -249,7 +251,7 @@ public class ModerationService implements ModerationUseCase {
                 .action("MODERATION_ACTION_PERFORMED")
                 .targetType("MODERATION_CASE")
                 .targetId(caseId)
-                .afterDataJson("{\"actionType\":\"" + actionType + "\",\"actionId\":\"" + actionId + "\"}")
+                .afterDataJson(toJson(Map.of("actionType", actionType, "actionId", actionId.toString())))
                 .metadataJson(toJson(Map.of("reason", request.reason().trim())))
                 .occurredAt(now)
                 .build());

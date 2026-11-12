@@ -31,6 +31,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -1489,41 +1494,196 @@ class AdminSupportModerationAuditIntegrationTest {
     }
 
     @Test
-    @DisplayName("P2.C Collision-Free Support Cases: Support case numbers are sequence-backed and collision-free")
+    @DisplayName("P2.C Collision-Free Support Cases: Support case numbers are sequence-backed and collision-free under concurrent multi-threaded load")
     void testSupportCase_ConcurrentCreationNoCollision() throws Exception {
         UUID adminId = createAdmin("seq_admin@fitcoach.vn");
         UUID requesterId = createUser("seq_user@fitcoach.vn", "Vũ Sequence");
 
+        int concurrency = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch endGate = new CountDownLatch(concurrency);
         Set<String> generatedCaseNumbers = Collections.synchronizedSet(new java.util.HashSet<>());
-        int count = 10;
+        AtomicInteger successCount = new AtomicInteger(0);
+        List<Throwable> errors = Collections.synchronizedList(new java.util.ArrayList<>());
 
-        for (int i = 0; i < count; i++) {
-            String createJson = """
-                    {
-                        "requesterId": "%s",
-                        "subject": "Case tuần tự số %d",
-                        "description": "Mô tả trường hợp kiểm thử sequence",
-                        "priority": "LOW"
-                    }
-                    """.formatted(requesterId, i);
+        for (int i = 0; i < concurrency; i++) {
+            final int index = i;
+            executor.submit(() -> {
+                try {
+                    startGate.await();
+                    String createJson = """
+                            {
+                                "requesterId": "%s",
+                                "subject": "Case đồng thời số %d",
+                                "description": "Mô tả trường hợp kiểm thử concurrent sequence",
+                                "priority": "LOW"
+                            }
+                            """.formatted(requesterId, index);
 
-            MvcResult res = mockMvc.perform(post("/api/v1/admin/support-cases")
-                            .with(adminJwt(adminId))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(createJson))
-                    .andExpect(status().isCreated())
-                    .andReturn();
+                    MvcResult res = mockMvc.perform(post("/api/v1/admin/support-cases")
+                                    .with(adminJwt(adminId))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(createJson))
+                            .andExpect(status().isCreated())
+                            .andReturn();
 
-            String caseNumber = objectMapper.readTree(res.getResponse().getContentAsString())
-                    .get("caseNumber").asText();
+                    String caseNumber = objectMapper.readTree(res.getResponse().getContentAsString())
+                            .get("caseNumber").asText();
 
-            assertThat(caseNumber).startsWith("SUP-");
-            boolean added = generatedCaseNumbers.add(caseNumber);
-            assertThat(added)
-                    .withFailMessage("Collision detected for case number: %s", caseNumber)
-                    .isTrue();
+                    assertThat(caseNumber).startsWith("SUP-");
+                    boolean added = generatedCaseNumbers.add(caseNumber);
+                    assertThat(added)
+                            .withFailMessage("Collision detected for case number: %s", caseNumber)
+                            .isTrue();
+
+                    successCount.incrementAndGet();
+                } catch (Throwable t) {
+                    errors.add(t);
+                } finally {
+                    endGate.countDown();
+                }
+            });
         }
 
-        assertThat(generatedCaseNumbers).hasSize(count);
+        startGate.countDown();
+        boolean completed = endGate.await(15, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(completed).isTrue();
+        assertThat(errors).isEmpty();
+        assertThat(successCount.get()).isEqualTo(concurrency);
+        assertThat(generatedCaseNumbers).hasSize(concurrency);
+    }
+
+    @Test
+    @DisplayName("P2.C Legacy Data Upgrade: Sequence automatically advances past existing legacy case numbers")
+    void testSupportCase_SequenceAdvancementAfterLegacyDataUpgrade() throws Exception {
+        UUID adminId = createAdmin("legacy_seq_admin@fitcoach.vn");
+        UUID requesterId = createUser("legacy_seq_user@fitcoach.vn", "Trần Legacy");
+
+        // 1. Simulate legacy V58 case data with high numeric suffix (e.g. SUP-950000)
+        UUID legacyCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-950000', ?, 'Phiếu hỗ trợ legacy trước V59', 'Mô tả legacy', 'LOW'::fitness.severity_level, 'OPEN', now(), now())
+                """, legacyCaseId, requesterId);
+
+        // 2. Execute V59 sequence synchronization logic on existing data
+        jdbcTemplate.execute("""
+                DO $$
+                DECLARE
+                    max_val bigint;
+                BEGIN
+                    SELECT COALESCE(MAX(NULLIF(regexp_replace(case_number, '^SUP-', ''), '')::bigint), 100000)
+                    INTO max_val
+                    FROM fitness.support_cases
+                    WHERE case_number ~ '^SUP-[0-9]+$';
+
+                    IF max_val >= 100001 THEN
+                        PERFORM setval('fitness.support_case_number_seq', max_val);
+                    END IF;
+                END $$;
+                """);
+
+        // 3. Create a new support case and verify case number strictly exceeds the legacy max value
+        String createJson = """
+                {
+                    "requesterId": "%s",
+                    "subject": "Case mới sau nâng cấp V59",
+                    "description": "Kiểm tra mã mới vượt mã legacy",
+                    "priority": "HIGH"
+                }
+                """.formatted(requesterId);
+
+        MvcResult res = mockMvc.perform(post("/api/v1/admin/support-cases")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String newCaseNumber = objectMapper.readTree(res.getResponse().getContentAsString())
+                .get("caseNumber").asText();
+
+        assertThat(newCaseNumber).startsWith("SUP-");
+        long newSuffix = Long.parseLong(newCaseNumber.substring(4));
+        assertThat(newSuffix).isGreaterThanOrEqualTo(950001L);
+    }
+
+    @Test
+    @DisplayName("P2.B JSON Metadata: Moderation warning with special characters in reason stores valid JSON in security_events")
+    void testModerationWarning_SpecialCharactersInReasonProducesValidJson() throws Exception {
+        UUID adminId = createAdmin("warn_json_admin@fitcoach.vn");
+        UUID targetUserId = createUser("warn_json_user@fitcoach.vn", "Lê Văn Warning");
+
+        // 1. Create moderation case
+        UUID caseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.moderation_cases (id, subject_user_id, status, priority, opened_at, updated_at)
+                VALUES (?, ?, 'OPEN', 'MEDIUM'::fitness.severity_level, now(), now())
+                """, caseId, targetUserId);
+
+        // 2. Perform WARNING action with complex multiline, quotes, backslashes, and Vietnamese characters
+        String specialReason = "Cảnh báo vi phạm nội dung:\nĐường dẫn: C:\\rules\\policy.txt\n\"Nghiêm cấm hành vi gian lận\"\nTiếng Việt: Có dấu đầy đủ 100%";
+        String actionJson = """
+                {
+                    "actionType": "WARNING",
+                    "targetUserId": "%s",
+                    "reason": %s
+                }
+                """.formatted(targetUserId, objectMapper.writeValueAsString(specialReason));
+
+        mockMvc.perform(post("/api/v1/admin/moderation-cases/" + caseId + "/actions")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(actionJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.actionType").value("WARNING"));
+
+        // 3. Verify security event was stored with valid JSON
+        List<String> eventDetails = jdbcTemplate.query(
+                "SELECT details::text FROM fitness.security_events WHERE user_id = ? AND event_type = 'USER_MODERATION_WARNING' ORDER BY occurred_at DESC LIMIT 1",
+                (rs, rowNum) -> rs.getString(1),
+                targetUserId
+        );
+
+        assertThat(eventDetails).isNotEmpty();
+        var rootNode = objectMapper.readTree(eventDetails.get(0));
+        assertThat(rootNode.get("caseId").asText()).isEqualTo(caseId.toString());
+        assertThat(rootNode.get("reason").asText()).isEqualTo(specialReason);
+    }
+
+    @Test
+    @DisplayName("P1.A Privileged Access: Revocation requires non-blank reason")
+    void testPrivilegedAccessRevocationValidation() throws Exception {
+        UUID adminId = createAdmin("revoke_val_admin@fitcoach.vn");
+        UUID studentId = createStudent("revoke_val_student@fitcoach.vn", "Học viên Revoke");
+
+        UUID privId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'DATA_CORRECTION', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Hỗ trợ kiểm tra số đo',
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, privId, adminId, adminId, studentId);
+
+        // Revoke with empty reason -> 400 Bad Request
+        String emptyReasonJson = """
+                {
+                    "reason": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access/" + privId + "/revoke")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emptyReasonJson))
+                .andExpect(status().isBadRequest());
     }
 }

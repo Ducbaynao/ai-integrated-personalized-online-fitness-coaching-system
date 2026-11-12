@@ -201,6 +201,10 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase, Privile
     public PrivilegedAccessModel revokePrivilegedAccess(UUID adminUserId, UUID requestId, RevokePrivilegedAccessDto request) {
         verifyAdminAccess(adminUserId, "PRIVILEGED_ACCESS_MANAGE");
 
+        if (request == null || request.reason() == null || request.reason().isBlank()) {
+            throw new ApplicationValidationException("Revocation reason is required");
+        }
+
         PrivilegedAccessModel current = persistence.findById(requestId)
                 .orElseThrow(() -> new PrivilegedAccessNotFoundException("Privileged access request not found: " + requestId));
 
