@@ -25,3 +25,14 @@ ai:
     provider: simulated
     openai:
       base-url: https://api.openai.com
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
