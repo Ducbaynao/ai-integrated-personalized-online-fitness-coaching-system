@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$curlCommand = if ($env:OS -eq "Windows_NT") { "curl.exe" } else { "curl" }
 
 $BackupDir = [System.IO.Path]::GetFullPath($BackupDir)
 $manifestPath = Join-Path $BackupDir "manifest.json"
@@ -122,10 +123,10 @@ if ($restoredFlyway -ne $manifest.database.flyway_version) {
 Write-Host "[3/4] Restoring storage objects to '$TargetS3Bucket' on $TargetS3Endpoint..." -ForegroundColor Yellow
 
 # Ensure bucket exists
-& curl.exe -s -X PUT "$TargetS3Endpoint/$TargetS3Bucket" | Out-Null
+& $curlCommand -s -X PUT "$TargetS3Endpoint/$TargetS3Bucket" | Out-Null
 
 $restoredObjectCount = 0
-$tempVerifyDir = Join-Path $env:TEMP ("df_verify_" + [System.Guid]::NewGuid().ToString("N"))
+$tempVerifyDir = Join-Path ([System.IO.Path]::GetTempPath()) ("df_verify_" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempVerifyDir -Force | Out-Null
 
 try {
@@ -135,14 +136,14 @@ try {
             $targetUri = "$TargetS3Endpoint/$TargetS3Bucket/$($obj.key)"
 
             # Upload using curl
-            & curl.exe -s -f -X PUT --upload-file "$sourcePath" "$targetUri"
+            & $curlCommand -s -f -X PUT --upload-file "$sourcePath" "$targetUri"
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to upload object $($obj.key) to $targetUri"
             }
 
             # Download back to temp file and verify SHA256 parity
             $tempVerifyFile = Join-Path $tempVerifyDir "verify.tmp"
-            & curl.exe -s -f "$targetUri" -o "$tempVerifyFile"
+            & $curlCommand -s -f "$targetUri" -o "$tempVerifyFile"
             if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tempVerifyFile)) {
                 throw "Failed to download restored object $($obj.key) from $targetUri"
             }

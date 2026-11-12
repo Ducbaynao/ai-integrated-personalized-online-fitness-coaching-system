@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$curlCommand = if ($env:OS -eq "Windows_NT") { "curl.exe" } else { "curl" }
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
@@ -65,7 +66,7 @@ try {
                 }
 
                 $objectUrl = "$S3Endpoint/$S3Bucket/$key"
-                & curl.exe -s -f "$objectUrl" -o "$targetFile"
+                & $curlCommand -s -f "$objectUrl" -o "$targetFile"
                 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $targetFile)) {
                     throw "Failed to download object '$key' from $objectUrl (exit code $LASTEXITCODE)"
                 }

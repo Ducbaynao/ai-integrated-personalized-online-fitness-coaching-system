@@ -1,9 +1,12 @@
 package com.fitnesscoaching.platform;
 
 import com.fitnesscoaching.platform.modules.support.adapter.out.persistence.SupportCasePersistenceAdapter;
+import com.fitnesscoaching.platform.modules.trainer.application.service.TrainerDocumentStorageService;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -14,16 +17,21 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
 class V59BackupRestoreDrillIntegrationTest {
+
+    @Container
+    private static final GenericContainer<?> s3 = new GenericContainer<>(
+            "adobe/s3mock@sha256:ab01a6946750f451ca215a47e91030695b260e4003b8a5a6201d25029b8fca92")
+            .withEnv("COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS", "fitness-media")
+            .withExposedPorts(9090)
+            .waitingFor(Wait.forHttp("/favicon.ico").forPort(9090));
+
 
     @Container
     private static final PostgreSQLContainer<?> postgres =
@@ -90,12 +98,20 @@ class V59BackupRestoreDrillIntegrationTest {
         String containerName = postgres.getContainerId();
         String tempBackupDir = new File(System.getProperty("java.io.tmpdir"), "v59_drill_backup_" + UUID.randomUUID()).getAbsolutePath();
 
+        String powerShell = System.getProperty("os.name").startsWith("Windows") ? "powershell.exe" : "pwsh";
+        String s3Endpoint = "http://" + s3.getHost() + ":" + s3.getMappedPort(9090);
+        String objectKey = "verification-docs/" + UUID.randomUUID() + "/cert.pdf";
+        byte[] media = "%PDF-1.4 V59 restore drill".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        TrainerDocumentStorageService sourceStorage = new TrainerDocumentStorageService(
+                s3Endpoint, "fitness-media", "test", "test", "", 3310);
+        sourceStorage.storeFile(objectKey, media, "application/pdf");
+
         ProcessBuilder backupPb = new ProcessBuilder(
-                "powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "tools/backup-system.ps1",
+                powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/backup-system.ps1",
                 "-ContainerName", containerName,
                 "-DbName", "digital_fitness_v59_drill",
                 "-DbUser", "fitness_app",
-                "-S3Endpoint", "http://localhost:9000",
+                "-S3Endpoint", s3Endpoint,
                 "-S3Bucket", "fitness-media",
                 "-OutputDir", tempBackupDir
         );
@@ -118,12 +134,12 @@ class V59BackupRestoreDrillIntegrationTest {
 
         // Step 5: Run restore-system.ps1 into isolated restore DB
         ProcessBuilder restorePb = new ProcessBuilder(
-                "powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "tools/restore-system.ps1",
+                powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/restore-system.ps1",
                 "-BackupDir", tempBackupDir,
                 "-ContainerName", containerName,
                 "-TargetDbName", "digital_fitness_v59_restored",
                 "-DbUser", "fitness_app",
-                "-TargetS3Endpoint", "http://localhost:9000",
+                "-TargetS3Endpoint", s3Endpoint,
                 "-TargetS3Bucket", "fitness-media-v59-restored"
         );
         restorePb.directory(new File("../..").getCanonicalFile());
@@ -167,6 +183,10 @@ class V59BackupRestoreDrillIntegrationTest {
         Long restoredNextSeq = restoredJdbc.queryForObject(
                 "SELECT nextval('fitness.support_case_number_seq')", Long.class);
         assertThat(restoredNextSeq).isGreaterThanOrEqualTo(currentSeqVal);
+
+        TrainerDocumentStorageService restoredStorage = new TrainerDocumentStorageService(
+                s3Endpoint, "fitness-media-v59-restored", "test", "test", "", 3310);
+        assertThat(restoredStorage.loadFile(objectKey)).isEqualTo(media);
 
         // Cleanup temp backup dir
         try {

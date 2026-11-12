@@ -8,7 +8,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -17,14 +22,28 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Testcontainers
 class LiveStorageAndScannerHardeningIntegrationTest {
 
-    private static final String S3_ENDPOINT = "http://localhost:9000";
+    @Container
+    private static final GenericContainer<?> s3 = new GenericContainer<>(
+            "adobe/s3mock@sha256:ab01a6946750f451ca215a47e91030695b260e4003b8a5a6201d25029b8fca92")
+            .withEnv("COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS", "fitness-media")
+            .withExposedPorts(9090)
+            .waitingFor(Wait.forHttp("/favicon.ico").forPort(9090));
+
+    @Container
+    private static final GenericContainer<?> clamd = new GenericContainer<>(
+            "clamav/clamav@sha256:3bba6dd5ac6663d55b80f86a3126e146612d93b593cc2617188d13f637d91260")
+            .withExposedPorts(3310)
+            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(4)));
+
+    private String s3Endpoint;
+    private String clamdHost;
+    private int clamdPort;
     private static final String S3_BUCKET = "fitness-media";
     private static final String S3_ACCESS_KEY = "test";
     private static final String S3_SECRET_KEY = "test";
-    private static final String CLAMAV_HOST = "localhost";
-    private static final int CLAMAV_PORT = 3310;
 
     private static final byte[] EICAR_TEST_VIRUS =
             "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -35,13 +54,16 @@ class LiveStorageAndScannerHardeningIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        s3Endpoint = "http://" + s3.getHost() + ":" + s3.getMappedPort(9090);
+        clamdHost = clamd.getHost();
+        clamdPort = clamd.getMappedPort(3310);
         storageService = new TrainerDocumentStorageService(
-                S3_ENDPOINT,
+                s3Endpoint,
                 S3_BUCKET,
                 S3_ACCESS_KEY,
                 S3_SECRET_KEY,
-                CLAMAV_HOST,
-                CLAMAV_PORT
+                clamdHost,
+                clamdPort
         );
         testObjectKey = "test-verification/docs/" + UUID.randomUUID() + "/cert.pdf";
     }
@@ -82,7 +104,7 @@ class LiveStorageAndScannerHardeningIntegrationTest {
     @DisplayName("Scanner Fail-Closed: Unreachable ClamAV host throws ScannerUnavailableException (503)")
     void scannerFailClosed_unreachableHost_throwsScannerUnavailableException() {
         TrainerDocumentStorageService brokenScannerStorage = new TrainerDocumentStorageService(
-                S3_ENDPOINT,
+                s3Endpoint,
                 S3_BUCKET,
                 S3_ACCESS_KEY,
                 S3_SECRET_KEY,
@@ -139,12 +161,12 @@ class LiveStorageAndScannerHardeningIntegrationTest {
 
         // Step 2: Simulate backend restart by creating a completely fresh service instance
         TrainerDocumentStorageService restartedStorageService = new TrainerDocumentStorageService(
-                S3_ENDPOINT,
+                s3Endpoint,
                 S3_BUCKET,
                 S3_ACCESS_KEY,
                 S3_SECRET_KEY,
-                CLAMAV_HOST,
-                CLAMAV_PORT
+                clamdHost,
+                clamdPort
         );
 
         // Step 3: Load from the new service instance
@@ -163,8 +185,8 @@ class LiveStorageAndScannerHardeningIntegrationTest {
                 S3_BUCKET,
                 S3_ACCESS_KEY,
                 S3_SECRET_KEY,
-                CLAMAV_HOST,
-                CLAMAV_PORT
+                clamdHost,
+                clamdPort
         );
 
         byte[] cleanPdf = "%PDF-1.4 sample content".getBytes(StandardCharsets.US_ASCII);

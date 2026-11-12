@@ -3,6 +3,10 @@ package com.fitnesscoaching.platform;
 import com.fitnesscoaching.platform.modules.trainer.application.service.TrainerDocumentStorageService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
@@ -13,9 +17,16 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Testcontainers
 class LiveProcessRestartStorageIntegrationTest {
 
-    private static final String S3_ENDPOINT = "http://localhost:9000";
+    @Container
+    private static final GenericContainer<?> s3 = new GenericContainer<>(
+            "adobe/s3mock@sha256:ab01a6946750f451ca215a47e91030695b260e4003b8a5a6201d25029b8fca92")
+            .withEnv("COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS", "fitness-media")
+            .withExposedPorts(9090)
+            .waitingFor(Wait.forHttp("/favicon.ico").forPort(9090));
+
     private static final String S3_BUCKET = "fitness-media";
     private static final String S3_KEY = "test";
     private static final String S3_SECRET = "test";
@@ -30,15 +41,17 @@ class LiveProcessRestartStorageIntegrationTest {
                 "Unique token: " + UUID.randomUUID())
                 .getBytes(StandardCharsets.US_ASCII);
 
+        String s3Endpoint = "http://" + s3.getHost() + ":" + s3.getMappedPort(9090);
         String originalHash = sha256(payload);
         String objectKey = "verification-docs/restart-drill/" + UUID.randomUUID() + "/live-cert.pdf";
 
         // Phase 1: Boot First Real Spring Context
-        ConfigurableApplicationContext firstContext = SpringApplication.run(
+        try (ConfigurableApplicationContext firstContext = SpringApplication.run(
                 FitnessCoachingBackendApplication.class,
                 "--server.port=0",
                 "--spring.profiles.active=test",
-                "--chat.attachments.s3.endpoint=" + S3_ENDPOINT,
+                "--app.scheduling.enabled=false",
+                "--chat.attachments.s3.endpoint=" + s3Endpoint,
                 "--chat.attachments.s3.bucket=" + S3_BUCKET,
                 "--chat.attachments.s3.access-key=" + S3_KEY,
                 "--chat.attachments.s3.secret-key=" + S3_SECRET,
@@ -46,25 +59,21 @@ class LiveProcessRestartStorageIntegrationTest {
                 "--chat.attachments.clamd.port=" + CLAMAV_PORT,
                 "--ai.service.mode=simulated",
                 "--ai.embedding.provider=simulated"
-        );
+        )) {
+            TrainerDocumentStorageService firstStorage = firstContext.getBean(TrainerDocumentStorageService.class);
+            firstStorage.storeFile(objectKey, payload, "application/pdf");
 
-        TrainerDocumentStorageService firstStorage = firstContext.getBean(TrainerDocumentStorageService.class);
-        firstStorage.storeFile(objectKey, payload, "application/pdf");
-
-        // Verify initial load
-        byte[] firstRead = firstStorage.loadFile(objectKey);
-        assertThat(sha256(firstRead)).isEqualTo(originalHash);
-
-        // Phase 2: Terminate First Backend Process/Context
-        firstContext.close();
-        assertThat(firstContext.isActive()).isFalse();
+            byte[] firstRead = firstStorage.loadFile(objectKey);
+            assertThat(sha256(firstRead)).isEqualTo(originalHash);
+        }
 
         // Phase 3: Boot Second Real Spring Context (Fresh process simulation)
         ConfigurableApplicationContext restartedContext = SpringApplication.run(
                 FitnessCoachingBackendApplication.class,
                 "--server.port=0",
                 "--spring.profiles.active=test",
-                "--chat.attachments.s3.endpoint=" + S3_ENDPOINT,
+                "--app.scheduling.enabled=false",
+                "--chat.attachments.s3.endpoint=" + s3Endpoint,
                 "--chat.attachments.s3.bucket=" + S3_BUCKET,
                 "--chat.attachments.s3.access-key=" + S3_KEY,
                 "--chat.attachments.s3.secret-key=" + S3_SECRET,
