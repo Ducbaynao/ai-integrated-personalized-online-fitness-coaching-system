@@ -172,15 +172,36 @@ public class DataCorrectionPersistenceAdapter {
     }
 
     public Optional<Short> findUnitIdByCode(String code) {
+        return findUnitInfoByCode(code).map(m -> (Short) m.get("id"));
+    }
+
+    public Optional<Map<String, Object>> findUnitInfoByCode(String code) {
         if (code == null || code.isBlank()) {
             return Optional.empty();
         }
         String sql = """
-                SELECT id FROM fitness.measurement_units
+                SELECT id, code, symbol, dimension FROM fitness.measurement_units
                 WHERE UPPER(code) = UPPER(:code) OR UPPER(symbol) = UPPER(:code)
                 LIMIT 1
                 """;
-        List<Short> list = jdbc.query(sql, new MapSqlParameterSource("code", code.trim()), (rs, rowNum) -> rs.getShort("id"));
+        List<Map<String, Object>> list = jdbc.query(sql, new MapSqlParameterSource("code", code.trim()),
+                (rs, rowNum) -> Map.of(
+                        "id", rs.getShort("id"),
+                        "code", rs.getString("code"),
+                        "dimension", rs.getString("dimension") != null ? rs.getString("dimension") : ""
+                ));
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    public Optional<String> findMetricDefaultUnitDimension(int metricDefId) {
+        String sql = """
+                SELECT u.dimension
+                FROM fitness.metric_definitions m
+                JOIN fitness.measurement_units u ON u.id = m.default_unit_id
+                WHERE m.id = :defId
+                """;
+        List<String> list = jdbc.query(sql, new MapSqlParameterSource("defId", metricDefId),
+                (rs, rowNum) -> rs.getString("dimension") != null ? rs.getString("dimension") : "");
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 

@@ -132,6 +132,16 @@ public class SupportCasePersistenceAdapter {
         );
     }
 
+    public String nextCaseNumber() {
+        try {
+            Long nextVal = jdbc.getJdbcTemplate().queryForObject(
+                    "SELECT nextval('fitness.support_case_number_seq')", Long.class);
+            return String.format("SUP-%06d", nextVal != null ? nextVal : System.currentTimeMillis() % 1000000);
+        } catch (Exception ex) {
+            return "SUP-" + (System.currentTimeMillis() % 10000000);
+        }
+    }
+
     public UUID insertSupportCase(UUID id, String caseNumber, UUID requesterId, String subject,
                                   String description, String priority, String status, Instant now) {
         String sql = """

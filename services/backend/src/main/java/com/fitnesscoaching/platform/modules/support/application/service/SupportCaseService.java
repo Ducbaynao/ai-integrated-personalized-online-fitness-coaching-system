@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.support.application.service;
 
+import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
 import com.fitnesscoaching.platform.common.exception.SupportCaseNotFoundException;
@@ -26,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -42,6 +45,7 @@ public class SupportCaseService implements SupportCaseUseCase {
     private final UserRoleQuery userRoleQuery;
     private final UserPermissionQuery userPermissionQuery;
     private final AuditService auditService;
+    private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public SupportCaseService(
@@ -50,6 +54,7 @@ public class SupportCaseService implements SupportCaseUseCase {
             UserRoleQuery userRoleQuery,
             UserPermissionQuery userPermissionQuery,
             AuditService auditService,
+            ObjectMapper objectMapper,
             Clock clock
     ) {
         this.persistence = persistence;
@@ -57,6 +62,7 @@ public class SupportCaseService implements SupportCaseUseCase {
         this.userRoleQuery = userRoleQuery;
         this.userPermissionQuery = userPermissionQuery;
         this.auditService = auditService;
+        this.objectMapper = objectMapper;
         this.clock = clock;
     }
 
@@ -107,7 +113,7 @@ public class SupportCaseService implements SupportCaseUseCase {
         }
 
         UUID caseId = UUID.randomUUID();
-        String caseNumber = "SUP-" + System.currentTimeMillis() % 10000000;
+        String caseNumber = persistence.nextCaseNumber();
         Instant now = Instant.now(clock);
 
         persistence.insertSupportCase(caseId, caseNumber, request.requesterId(), request.subject().trim(),
@@ -122,8 +128,8 @@ public class SupportCaseService implements SupportCaseUseCase {
                 .action("SUPPORT_CASE_CREATED")
                 .targetType("SUPPORT_CASE")
                 .targetId(caseId)
-                .afterDataJson("{\"caseNumber\":\"" + caseNumber + "\",\"priority\":\"" + priority + "\"}")
-                .metadataJson("{\"caseNumber\":\"" + caseNumber + "\"}")
+                .afterDataJson(toJson(Map.of("caseNumber", caseNumber, "priority", priority)))
+                .metadataJson(toJson(Map.of("caseNumber", caseNumber)))
                 .occurredAt(now)
                 .build());
 
@@ -157,7 +163,7 @@ public class SupportCaseService implements SupportCaseUseCase {
                 : "Status changed from " + current.status() + " to " + newStatus;
 
         persistence.insertEvent(UUID.randomUUID(), caseId, "STATUS_CHANGED", adminUserId, note,
-                "{\"fromStatus\":\"" + current.status() + "\",\"toStatus\":\"" + newStatus + "\"}", now);
+                toJson(Map.of("fromStatus", current.status(), "toStatus", newStatus)), now);
 
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(adminUserId)
@@ -165,9 +171,9 @@ public class SupportCaseService implements SupportCaseUseCase {
                 .action("SUPPORT_CASE_STATUS_CHANGED")
                 .targetType("SUPPORT_CASE")
                 .targetId(caseId)
-                .beforeDataJson("{\"status\":\"" + current.status() + "\"}")
-                .afterDataJson("{\"status\":\"" + newStatus + "\"}")
-                .metadataJson("{\"note\":\"" + note.replace("\"", "\\\"") + "\"}")
+                .beforeDataJson(toJson(Map.of("status", current.status())))
+                .afterDataJson(toJson(Map.of("status", newStatus)))
+                .metadataJson(toJson(Map.of("note", note)))
                 .occurredAt(now)
                 .build());
 
@@ -202,7 +208,7 @@ public class SupportCaseService implements SupportCaseUseCase {
 
         persistence.insertEvent(UUID.randomUUID(), caseId, "CASE_ASSIGNED", adminUserId,
                 "Case assigned to user " + assignedTo,
-                "{\"assignedTo\":\"" + assignedTo + "\"}", now);
+                toJson(Map.of("assignedTo", assignedTo.toString())), now);
 
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(adminUserId)
@@ -210,8 +216,8 @@ public class SupportCaseService implements SupportCaseUseCase {
                 .action("SUPPORT_CASE_ASSIGNED")
                 .targetType("SUPPORT_CASE")
                 .targetId(caseId)
-                .beforeDataJson("{\"assignedTo\":" + (current.assignedTo() != null ? "\"" + current.assignedTo() + "\"" : "null") + "}")
-                .afterDataJson("{\"assignedTo\":\"" + assignedTo + "\"}")
+                .beforeDataJson(toJson(Collections.singletonMap("assignedTo", current.assignedTo() != null ? current.assignedTo().toString() : null)))
+                .afterDataJson(toJson(Map.of("assignedTo", assignedTo.toString())))
                 .occurredAt(now)
                 .build());
 
@@ -239,11 +245,19 @@ public class SupportCaseService implements SupportCaseUseCase {
                 .action("SUPPORT_CASE_NOTE_ADDED")
                 .targetType("SUPPORT_CASE")
                 .targetId(caseId)
-                .metadataJson("{\"note\":\"" + request.note().trim().replace("\"", "\\\"") + "\"}")
+                .metadataJson(toJson(Map.of("note", request.note().trim())))
                 .occurredAt(now)
                 .build());
 
         return getSupportCaseDetail(adminUserId, caseId);
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     private void verifyAdminAccess(UUID adminUserId, String permissionCode) {

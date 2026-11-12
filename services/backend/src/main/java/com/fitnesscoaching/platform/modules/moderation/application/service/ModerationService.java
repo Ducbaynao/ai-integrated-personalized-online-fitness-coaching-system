@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -167,7 +168,7 @@ public class ModerationService implements ModerationUseCase {
                 .targetId(caseId)
                 .beforeDataJson("{\"status\":\"" + current.status() + "\"}")
                 .afterDataJson("{\"status\":\"" + newStatus + "\"}")
-                .metadataJson("{\"resolution\":\"" + (resolution != null ? resolution.replace("\"", "\\\"") : "") + "\"}")
+                .metadataJson(toJson(Map.of("resolution", resolution != null ? resolution : "")))
                 .occurredAt(now)
                 .build());
 
@@ -249,7 +250,7 @@ public class ModerationService implements ModerationUseCase {
                 .targetType("MODERATION_CASE")
                 .targetId(caseId)
                 .afterDataJson("{\"actionType\":\"" + actionType + "\",\"actionId\":\"" + actionId + "\"}")
-                .metadataJson("{\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}")
+                .metadataJson(toJson(Map.of("reason", request.reason().trim())))
                 .occurredAt(now)
                 .build());
 
@@ -274,6 +275,14 @@ public class ModerationService implements ModerationUseCase {
         List<String> permissions = userPermissionQuery.getEffectivePermissions(adminUserId);
         if (!permissions.contains(permissionCode)) {
             throw new AccessDeniedException("Missing permission: " + permissionCode);
+        }
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            return "{}";
         }
     }
 }

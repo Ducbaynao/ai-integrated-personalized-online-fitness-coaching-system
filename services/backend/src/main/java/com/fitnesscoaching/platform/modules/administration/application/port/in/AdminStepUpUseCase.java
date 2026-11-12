@@ -7,4 +7,6 @@ import java.util.UUID;
 public interface AdminStepUpUseCase {
 
     StepUpResult verifyAndIssueStepUp(UUID adminUserId, String actionCode, String password);
+
+    UUID resolveOrVerifyStepUp(UUID adminUserId, String actionCode, String password, UUID providedStepUpId);
 }
