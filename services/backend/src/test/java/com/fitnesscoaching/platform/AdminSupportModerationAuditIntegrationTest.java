@@ -1686,4 +1686,317 @@ class AdminSupportModerationAuditIntegrationTest {
                         .content(emptyReasonJson))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("P1.B Scope Enforcement: Malformed scopes, invalid types and unrecognized fields are strictly rejected")
+    void testGovernedDataCorrection_ScopeMalformedAndTypeValidation() throws Exception {
+        UUID adminId = createAdmin("scope_type_admin@fitcoach.vn");
+        UUID studentId = createStudent("scope_type_student@fitcoach.vn", "Nguyễn Scope Type");
+        UUID measurementId = createMeasurement(studentId, "WEIGHT", 75.0, "KG");
+
+        UUID supportCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-SCOPE-TYPE', ?, 'Sửa cân nặng', 'Mô tả', 'MEDIUM'::fitness.severity_level, 'OPEN', now(), now())
+                """, supportCaseId, studentId);
+
+        String[] invalidScopes = new String[]{
+                "{\"domains\":\"USER_PROFILE\"}",              // domains is string, not array
+                "{\"targetTypes\":\"USER_PROFILE\"}",          // targetTypes is string, not array
+                "{\"domains\":[123, 456]}",                    // elements are non-strings
+                "{\"targetType\":[\"MEASUREMENT\"]}",          // targetType is array, not string
+                "{\"unknownField\":\"someValue\"}",            // unrecognized field
+                "[1, 2, 3]",                                   // array, not object
+                "\"MEASUREMENT\"",                             // string primitive, not object
+                "{\"domains\":[]}"                             // empty domains list -> allows nothing
+        };
+
+        for (String invalidScope : invalidScopes) {
+            UUID privId = UUID.randomUUID();
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.privileged_data_access_requests (
+                        id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                        purpose, access_scope, reason, related_support_case_id,
+                        status, requested_at, approved_at, opened_at, expires_at
+                    ) VALUES (
+                        ?, ?, ?, ?, 'DATA_CORRECTION', ?::jsonb,
+                        'Test scope validation', ?,
+                        'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                    )
+                    """, privId, adminId, adminId, studentId, invalidScope, supportCaseId);
+
+            String correctionJson = """
+                    {
+                        "supportCaseId": "%s",
+                        "targetType": "MEASUREMENT",
+                        "targetId": "%s",
+                        "reason": "Thử sửa với scope không hợp lệ",
+                        "proposedData": {"value": 72.0, "unit": "kg"},
+                        "privilegedAccessRequestId": "%s",
+                        "stepUpPassword": "%s"
+                    }
+                    """.formatted(supportCaseId, measurementId, privId, DEFAULT_PASSWORD);
+
+            mockMvc.perform(post("/api/v1/admin/data-corrections")
+                            .with(adminJwt(adminId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(correctionJson))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+        }
+
+        // Verify that wildcard {"domains":["*"]} is accepted and executes successfully
+        UUID wildcardPrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'DATA_CORRECTION', '{"domains":["*"]}'::jsonb,
+                    'Wildcard scope', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, wildcardPrivId, adminId, adminId, studentId, supportCaseId);
+
+        String validCorrectionJson = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Sửa cân nặng với wildcard scope",
+                    "proposedData": {"value": 73.0, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, wildcardPrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCorrectionJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetType").value("MEASUREMENT"));
+    }
+
+    @Test
+    @DisplayName("P1.B Resource Guard: Session with targetUserId and resource A rejects modifying resource B of the same user")
+    void testGovernedDataCorrection_SessionWithUserAndResourceEnforcement() throws Exception {
+        UUID adminId = createAdmin("res_enforce_admin@fitcoach.vn");
+        UUID studentId = createStudent("res_enforce_student@fitcoach.vn", "Bùi Resource Enforce");
+        UUID measA = createMeasurement(studentId, "HEIGHT", 175.0, "CM");
+        UUID measB = createMeasurement(studentId, "WEIGHT", 70.0, "KG");
+
+        UUID supportCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-RES-ENFORCE', ?, 'Sửa số đo cụ thể', 'Mô tả', 'MEDIUM'::fitness.severity_level, 'OPEN', now(), now())
+                """, supportCaseId, studentId);
+
+        // Privileged session specifies BOTH targetUserId AND targetResource (MEASUREMENT measA)
+        UUID privId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    target_resource_type, target_resource_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    'MEASUREMENT', ?,
+                    'DATA_CORRECTION', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Chỉ cấp quyền sửa chiều cao measA', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, privId, adminId, adminId, studentId, measA, supportCaseId);
+
+        // 1. Attempt to correct measB of the same student -> MUST BE REJECTED with 403 ACCESS_DENIED
+        String modifyMeasBJson = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Thử sửa measB dù session chỉ khóa cho measA",
+                    "proposedData": {"value": 72.0, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measB, privId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(modifyMeasBJson))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // Verify data integrity: measB has NOT been superseded, and no correction action exists for measB
+        Integer measBCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.measurements WHERE id = ? AND superseded_by_id IS NOT NULL",
+                Integer.class, measB);
+        assertThat(measBCount).isEqualTo(0);
+
+        Integer correctionCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.data_correction_actions WHERE target_id = ?",
+                Integer.class, measB);
+        assertThat(correctionCount).isEqualTo(0);
+
+        // 2. Correcting measA with the same session -> MUST SUCCEED with 201 Created
+        String modifyMeasAJson = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Sửa đúng chiều cao measA đã được cấp quyền",
+                    "proposedData": {"value": 176.0, "unit": "cm"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measA, privId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(modifyMeasAJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetType").value("MEASUREMENT"))
+                .andExpect(jsonPath("$.targetId").value(measA.toString()));
+
+        // Verify measA is superseded
+        Integer measACount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.measurements WHERE id = ? AND superseded_by_id IS NOT NULL",
+                Integer.class, measA);
+        assertThat(measACount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("P1.B Resource Guard: USER_PROFILE resource enforcement rejects mismatched user and accepts valid USER/USER_PROFILE types")
+    void testGovernedDataCorrection_UserProfileResourceEnforcement() throws Exception {
+        UUID adminId = createAdmin("prof_res_admin@fitcoach.vn");
+        UUID user1Id = createUser("prof_u1@fitcoach.vn", "Người dùng 1");
+        UUID user2Id = createUser("prof_u2@fitcoach.vn", "Người dùng 2");
+
+        UUID supportCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-PROF-RES', ?, 'Sửa hồ sơ', 'Mô tả', 'MEDIUM'::fitness.severity_level, 'OPEN', now(), now())
+                """, supportCaseId, user1Id);
+
+        // Session specifies targetUserId = user1Id AND resource = USER_PROFILE with ID user2Id (mismatched)
+        UUID mismatchedPrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    target_resource_type, target_resource_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    'USER_PROFILE', ?,
+                    'DATA_CORRECTION', '{"domains":["USER_PROFILE"]}'::jsonb,
+                    'Khóa theo user2Id', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, mismatchedPrivId, adminId, adminId, user1Id, user2Id, supportCaseId);
+
+        String modifyUser1Json = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "USER_PROFILE",
+                    "targetId": "%s",
+                    "reason": "Thử sửa user1 khi session khóa resource user2",
+                    "proposedData": {"displayName": "Tên Mới 1"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, user1Id, mismatchedPrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(modifyUser1Json))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // Session specifies targetUserId = user1Id AND resource = USER with ID user1Id -> MUST SUCCEED
+        UUID validPrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    target_resource_type, target_resource_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    'USER', ?,
+                    'DATA_CORRECTION', '{"domains":["USER_PROFILE"]}'::jsonb,
+                    'Khóa theo user1Id với resource type USER', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, validPrivId, adminId, adminId, user1Id, user1Id, supportCaseId);
+
+        String validUser1Json = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "USER_PROFILE",
+                    "targetId": "%s",
+                    "reason": "Sửa hồ sơ user1 hợp lệ",
+                    "proposedData": {"displayName": "Tên Mới Hợp Lệ"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, user1Id, validPrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUser1Json))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetType").value("USER_PROFILE"))
+                .andExpect(jsonPath("$.targetId").value(user1Id.toString()));
+    }
+
+    @Test
+    @DisplayName("P1.A Privileged Access: Scope validation and resource pair validation at request time")
+    void testPrivilegedAccess_ScopeAndResourceValidationAtRequest() throws Exception {
+        UUID adminId = createAdmin("req_val_admin@fitcoach.vn");
+        UUID studentId = createStudent("req_val_student@fitcoach.vn", "Học viên Scope Req");
+
+        // 1. Request with string domains -> 400 Bad Request
+        String invalidScopeJson = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "accessScope": "{\\"domains\\":\\"USER_PROFILE\\"}",
+                    "reason": "Test malformed scope",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(studentId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidScopeJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        // 2. Request with targetResourceType but no targetResourceId -> 400 Bad Request
+        String incompleteResourceJson = """
+                {
+                    "targetUserId": "%s",
+                    "targetResourceType": "MEASUREMENT",
+                    "purpose": "DATA_CORRECTION",
+                    "accessScope": "{\\"domains\\":[\\"MEASUREMENT\\"]}",
+                    "reason": "Incomplete resource pair",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(studentId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(incompleteResourceJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+    }
 }

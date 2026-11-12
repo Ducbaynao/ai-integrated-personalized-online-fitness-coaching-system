@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.support.correction.application.service;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
@@ -142,16 +143,23 @@ public class DataCorrectionService implements DataCorrectionUseCase {
 
             UUID studentId = (UUID) existing.get("student_id");
 
-            if (privAccess.targetUserId() != null) {
-                if (!privAccess.targetUserId().equals(studentId)) {
-                    throw new AccessDeniedException("Privileged access session target user does not match the measurement student");
-                }
-            } else if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
+            if (privAccess.targetUserId() == null && privAccess.targetResourceType() == null && privAccess.targetResourceId() == null) {
+                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this measurement");
+            }
+
+            if (privAccess.targetUserId() != null && !privAccess.targetUserId().equals(studentId)) {
+                throw new AccessDeniedException("Privileged access session target user does not match the measurement student");
+            }
+
+            if ((privAccess.targetResourceType() != null && privAccess.targetResourceId() == null)
+                    || (privAccess.targetResourceType() == null && privAccess.targetResourceId() != null)) {
+                throw new AccessDeniedException("Privileged access session has incomplete target resource specification");
+            }
+
+            if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
                 if (!"MEASUREMENT".equalsIgnoreCase(privAccess.targetResourceType()) || !privAccess.targetResourceId().equals(request.targetId())) {
                     throw new AccessDeniedException("Privileged access session target resource does not match this measurement");
                 }
-            } else {
-                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this measurement");
             }
 
             if (supportCase.requesterId() != null && !supportCase.requesterId().equals(studentId)) {
@@ -221,17 +229,25 @@ public class DataCorrectionService implements DataCorrectionUseCase {
         } else if ("USER_PROFILE".equals(targetType)) {
             UUID targetUserId = request.targetId();
 
-            if (privAccess.targetUserId() != null) {
-                if (!privAccess.targetUserId().equals(targetUserId)) {
-                    throw new AccessDeniedException("Privileged access session target user does not match the target user profile");
-                }
-            } else if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
-                if ((!"USER_PROFILE".equalsIgnoreCase(privAccess.targetResourceType()) && !"USER".equalsIgnoreCase(privAccess.targetResourceType()))
-                        || !privAccess.targetResourceId().equals(targetUserId)) {
+            if (privAccess.targetUserId() == null && privAccess.targetResourceType() == null && privAccess.targetResourceId() == null) {
+                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this user profile");
+            }
+
+            if (privAccess.targetUserId() != null && !privAccess.targetUserId().equals(targetUserId)) {
+                throw new AccessDeniedException("Privileged access session target user does not match the target user profile");
+            }
+
+            if ((privAccess.targetResourceType() != null && privAccess.targetResourceId() == null)
+                    || (privAccess.targetResourceType() == null && privAccess.targetResourceId() != null)) {
+                throw new AccessDeniedException("Privileged access session has incomplete target resource specification");
+            }
+
+            if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
+                boolean validResourceType = "USER_PROFILE".equalsIgnoreCase(privAccess.targetResourceType())
+                        || "USER".equalsIgnoreCase(privAccess.targetResourceType());
+                if (!validResourceType || !privAccess.targetResourceId().equals(targetUserId)) {
                     throw new AccessDeniedException("Privileged access session target resource does not match this user profile");
                 }
-            } else {
-                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this user profile");
             }
 
             if (supportCase.requesterId() != null && !supportCase.requesterId().equals(targetUserId)) {
@@ -307,46 +323,85 @@ public class DataCorrectionService implements DataCorrectionUseCase {
     }
 
     private void verifyAccessScope(String accessScopeJson, String targetType) {
-        if (accessScopeJson == null || accessScopeJson.isBlank() || "{}".equals(accessScopeJson.trim())) {
+        if (accessScopeJson == null || accessScopeJson.isBlank()) {
             return;
         }
+
+        JsonNode rootNode;
         try {
-            var node = objectMapper.readTree(accessScopeJson);
-            if (node.has("domains") && node.get("domains").isArray()) {
-                boolean matched = false;
-                for (var el : node.get("domains")) {
-                    String domain = el.asText().trim();
-                    if ("*".equals(domain) || "ALL".equalsIgnoreCase(domain) || targetType.equalsIgnoreCase(domain)) {
-                        matched = true;
-                        break;
-                    }
+            rootNode = objectMapper.readTree(accessScopeJson);
+        } catch (Exception e) {
+            throw new AccessDeniedException("Invalid accessScope: malformed JSON");
+        }
+
+        if (rootNode == null || rootNode.isNull()) {
+            return;
+        }
+
+        if (!rootNode.isObject()) {
+            throw new AccessDeniedException("Invalid accessScope: must be a JSON object");
+        }
+
+        if (rootNode.isEmpty()) {
+            return;
+        }
+
+        Set<String> recognizedFields = Set.of("domains", "targetTypes", "targetType");
+        for (String fieldName : rootNode.propertyNames()) {
+            if (!recognizedFields.contains(fieldName)) {
+                throw new AccessDeniedException("Invalid accessScope: unrecognized field '" + fieldName + "'");
+            }
+        }
+
+        if (rootNode.has("domains")) {
+            JsonNode domainsNode = rootNode.get("domains");
+            if (!domainsNode.isArray()) {
+                throw new AccessDeniedException("Invalid accessScope: 'domains' must be an array of strings");
+            }
+            boolean matched = false;
+            for (JsonNode el : domainsNode) {
+                if (!el.isTextual()) {
+                    throw new AccessDeniedException("Invalid accessScope: elements in 'domains' must be strings");
                 }
-                if (!matched) {
-                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access domain scope");
+                String domain = el.asText().trim();
+                if ("*".equals(domain) || "ALL".equalsIgnoreCase(domain) || targetType.equalsIgnoreCase(domain)) {
+                    matched = true;
                 }
             }
-            if (node.has("targetTypes") && node.get("targetTypes").isArray()) {
-                boolean matched = false;
-                for (var el : node.get("targetTypes")) {
-                    String tt = el.asText().trim();
-                    if ("*".equals(tt) || "ALL".equalsIgnoreCase(tt) || targetType.equalsIgnoreCase(tt)) {
-                        matched = true;
-                        break;
-                    }
+            if (!matched) {
+                throw new AccessDeniedException("Target type " + targetType + " is outside privileged access domain scope");
+            }
+        }
+
+        if (rootNode.has("targetTypes")) {
+            JsonNode targetTypesNode = rootNode.get("targetTypes");
+            if (!targetTypesNode.isArray()) {
+                throw new AccessDeniedException("Invalid accessScope: 'targetTypes' must be an array of strings");
+            }
+            boolean matched = false;
+            for (JsonNode el : targetTypesNode) {
+                if (!el.isTextual()) {
+                    throw new AccessDeniedException("Invalid accessScope: elements in 'targetTypes' must be strings");
                 }
-                if (!matched) {
-                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target types scope");
+                String tt = el.asText().trim();
+                if ("*".equals(tt) || "ALL".equalsIgnoreCase(tt) || targetType.equalsIgnoreCase(tt)) {
+                    matched = true;
                 }
             }
-            if (node.has("targetType") && node.get("targetType").isTextual()) {
-                String tt = node.get("targetType").asText().trim();
-                if (!"*".equals(tt) && !"ALL".equalsIgnoreCase(tt) && !targetType.equalsIgnoreCase(tt)) {
-                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target type scope");
-                }
+            if (!matched) {
+                throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target types scope");
             }
-        } catch (AccessDeniedException ade) {
-            throw ade;
-        } catch (Exception ignored) {
+        }
+
+        if (rootNode.has("targetType")) {
+            JsonNode targetTypeNode = rootNode.get("targetType");
+            if (!targetTypeNode.isTextual()) {
+                throw new AccessDeniedException("Invalid accessScope: 'targetType' must be a string");
+            }
+            String tt = targetTypeNode.asText().trim();
+            if (!"*".equals(tt) && !"ALL".equalsIgnoreCase(tt) && !targetType.equalsIgnoreCase(tt)) {
+                throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target type scope");
+            }
         }
     }
 
