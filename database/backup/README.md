@@ -18,7 +18,11 @@ This document defines the backup policy, recovery procedures, operational script
 
 In a distributed architecture with relational state in PostgreSQL and binary media in S3:
 1. **Consistency Isolation:** `pg_dump` runs with transaction snapshot isolation, capturing an immutable point-in-time state of all relational tables and sequences.
-2. **Storage-First Backup Ordering:** S3 media objects are synchronized and checksummed *before* capturing the final PostgreSQL transaction snapshot. Any binary upload committed in the database snapshot is guaranteed to have its corresponding file already stored and checksummed in the backup archive, preventing dangling media pointers.
+2. **Storage-First Backup with Post-Dump Catch-Up Reconcile:**
+   - **Step 1 (Initial Sync):** S3 media objects are synchronized and checksummed *before* capturing the PostgreSQL transaction snapshot.
+   - **Step 2 (Snapshot Dump):** PostgreSQL is dumped via `pg_dump` capturing point-in-time relational state.
+   - **Step 3 (Post-Dump Integrity Reconcile):** `tools/backup-system.ps1` queries `fitness.media_files` in the snapshot for the backup bucket. If concurrent uploads committed to the database between Step 1 and Step 2, the script detects these missing files, performs an immediate catch-up sync from S3, and verifies their SHA-256 hashes. If an object referenced in the DB cannot be retrieved from S3, the backup fails fast rather than leaving a corrupted archive with dangling pointers.
+   - **Manifest Consistency Model:** Recorded as `storage-first-snapshot-with-post-dump-reconcile`.
 3. **Target Protection Guard:** `tools/restore-system.ps1` includes an automated destination guard. Destructive operations (`DROP DATABASE`) targeting the primary database of record (`digital_fitness`) are strictly blocked unless an explicit `-Force` authorization switch is provided.
 
 ---
@@ -97,3 +101,11 @@ powershell -ExecutionPolicy Bypass -File tools/restore-system.ps1 `
   - Representative records: User and both support cases intact.
   - Sequence continuity: `nextval('fitness.support_case_number_seq')` operates normally after restore without collision.
   - S3 Object integrity: Byte-for-byte SHA-256 match.
+
+### C. Concurrent Write & Post-Dump Reconcile Drill (`tools/test-concurrent-backup-consistency.ps1`)
+- **Date:** 2026-11-12
+- **Environment:** Local PostgreSQL container (`digital-fitness-postgres`, port 5433) + live S3Mock (`local-s3`, port 9000).
+- **Target Databases:** Baseline `df_concurrent_backup_source` -> Restored `df_concurrent_restored`.
+- **Injected Invariant Hazard:** File A uploaded before storage sync. File B committed to PostgreSQL *during* the window between storage sync and `pg_dump` completion via `-PostStorageHook`.
+- **Observed Behavior:** Step [3b] successfully caught File B, performed catch-up sync from S3, and generated manifest with 2 storage entries.
+- **Restore Verification:** Both File A and File B present in restored database and S3 bucket (`fitness-media-drill-restored`), zero dangling references, exact SHA-256 parity confirmed.

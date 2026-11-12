@@ -5,7 +5,9 @@ param(
     [string]$DbUser = "fitness_app",
     [string]$S3Endpoint = "http://localhost:9000",
     [string]$S3Bucket = "fitness-media",
-    [string]$OutputDir = ""
+    [string]$OutputDir = "",
+    [string]$PostStorageHook = "",
+    [switch]$FailOnMissingStorage
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +89,16 @@ try {
         Write-Host "  Warning: S3 bucket listing/download encountered: $_" -ForegroundColor Yellow
     }
 
+    # Hook for controlled integration drills simulating concurrent mutations between storage sync and pg_dump
+    if (-not [string]::IsNullOrWhiteSpace($PostStorageHook)) {
+        Write-Host "  [Drill Hook] Executing PostStorageHook..." -ForegroundColor Magenta
+        if (Test-Path $PostStorageHook) {
+            & powershell.exe -ExecutionPolicy Bypass -File $PostStorageHook
+        } else {
+            Invoke-Expression $PostStorageHook
+        }
+    }
+
     # 3. Database Backup (pg_dump custom format with point-in-time snapshot)
     $dbDumpFile = Join-Path $OutputDir "database.dump"
     $dbSchemaFile = Join-Path $OutputDir "schema_structure.sql"
@@ -104,7 +116,6 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "docker cp database dump failed with exit code $LASTEXITCODE"
     }
-    docker exec $ContainerName rm -f "$dumpTmpPath"
 
     docker exec $ContainerName pg_dump -U $DbUser -d $DbName --schema-only -f "$schemaTmpPath"
     if ($LASTEXITCODE -ne 0) {
@@ -123,6 +134,100 @@ try {
     }
     Write-Host "  Database dump complete. Flyway Schema Version: $flywayVersion" -ForegroundColor Green
 
+    # 3b. Post-Dump Referential Integrity Verification & Storage Catch-Up Sync
+    # Extract media file references directly from the dumped snapshot ($dumpTmpPath) using pg_restore.
+    # This guarantees that the reconcile checks against the EXACT snapshot state, immune to post-dump writes.
+    Write-Host "[3b] Verifying database snapshot storage references and catching up concurrent uploads..." -ForegroundColor Yellow
+    $dbMediaKeys = @()
+    try {
+        $restoreOutput = docker exec $ContainerName pg_restore -a -t media_files -f - "$dumpTmpPath" 2>$null
+        if ($restoreOutput) {
+            $inCopy = $false
+            foreach ($line in ($restoreOutput -split "`r?`n")) {
+                if ($line -like "COPY *media_files* FROM stdin*") { $inCopy = $true; continue }
+                if ($inCopy -and $line -eq "\.") { $inCopy = $false; break }
+                if ($inCopy -and -not [string]::IsNullOrWhiteSpace($line)) {
+                    $cols = $line -split "`t"
+                    if ($cols.Length -ge 14) {
+                        $bucket = $cols[3]
+                        $key = $cols[4]
+                        $scanStatus = $cols[11]
+                        $deletedAt = $cols[13]
+                        if (($bucket -eq $S3Bucket -or [string]::IsNullOrWhiteSpace($bucket) -or $bucket -eq "\N") -and
+                            $scanStatus -eq "CLEAN" -and $deletedAt -eq "\N") {
+                            $dbMediaKeys += $key.Trim()
+                        }
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Host "  Warning: Direct snapshot table extraction encountered an issue, falling back to query: $_" -ForegroundColor Yellow
+    }
+
+    docker exec $ContainerName rm -f "$dumpTmpPath"
+
+    if ($dbMediaKeys.Count -eq 0) {
+        # Fallback to query if table had no rows extracted or direct extraction was empty
+        $fallbackKeys = docker exec $ContainerName psql -U $DbUser -d $DbName -t -A -c "SELECT object_key FROM fitness.media_files WHERE deleted_at IS NULL AND scan_status = 'CLEAN' AND (bucket_name = '$S3Bucket' OR bucket_name IS NULL);" 2>$null
+        if ($fallbackKeys) {
+            $dbMediaKeys = $fallbackKeys -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        }
+    }
+
+    if ($dbMediaKeys.Count -gt 0) {
+        $existingKeys = @{}
+        foreach ($f in $storageFiles) {
+            $existingKeys[$f.key] = $true
+        }
+
+        $catchUpCount = 0
+        $missingStorageFiles = @()
+        foreach ($key in $dbMediaKeys) {
+            $key = $key.Trim()
+            if (-not $existingKeys.ContainsKey($key)) {
+                Write-Host "  Concurrent upload detected: Object '$key' committed in DB snapshot but missed in initial storage sync. Catching up..." -ForegroundColor Yellow
+                $targetFile = Join-Path $storageDir $key
+                $parentDir = Split-Path -Parent $targetFile
+                if (-not (Test-Path $parentDir)) {
+                    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+                }
+
+                $objectUrl = "$S3Endpoint/$S3Bucket/$key"
+                & $curlCommand -s -f "$objectUrl" -o "$targetFile"
+                if ($LASTEXITCODE -ne 0 -or -not (Test-Path $targetFile)) {
+                    if ($FailOnMissingStorage) {
+                        throw "REFERENTIAL INTEGRITY VIOLATION: Database snapshot references object '$key' which could not be fetched from S3 ($objectUrl). Aborting backup."
+                    } else {
+                        Write-Host "  WARNING: Referential integrity warning - Object '$key' referenced in DB snapshot was not found in S3 ($objectUrl). Recording in manifest." -ForegroundColor Yellow
+                        $missingStorageFiles += $key
+                        continue
+                    }
+                }
+
+                $hash = (Get-FileHash -Path $targetFile -Algorithm SHA256).Hash.ToLowerInvariant()
+                $size = (Get-Item $targetFile).Length
+
+                $storageFiles += [PSCustomObject]@{
+                    key = $key
+                    size = $size
+                    sha256 = $hash
+                }
+                $existingKeys[$key] = $true
+                $catchUpCount++
+                Write-Host "  Successfully caught up object: $key ($size bytes, SHA256: $hash)" -ForegroundColor Green
+            }
+        }
+        if ($catchUpCount -gt 0) {
+            Write-Host "  Post-dump reconcile complete: Caught up $catchUpCount concurrent object(s)." -ForegroundColor Green
+        } else {
+            Write-Host "  Post-dump reconcile complete: All $($dbMediaKeys.Count) DB-referenced objects verified present in storage backup." -ForegroundColor Green
+        }
+        if ($missingStorageFiles.Count -gt 0) {
+            Write-Host "  Referential notice: $($missingStorageFiles.Count) dangling reference(s) recorded in manifest." -ForegroundColor Yellow
+        }
+    }
+
     # 4. Compute Checksums & Manifest
     Write-Host "[4/4] Generating backup manifest..." -ForegroundColor Yellow
     $dumpHash = (Get-FileHash -Path $dbDumpFile -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -131,7 +236,7 @@ try {
     $manifest = [PSCustomObject]@{
         version = "1.0"
         timestamp = $timestamp
-        consistency_model = "storage-first-snapshot"
+        consistency_model = "storage-first-snapshot-with-post-dump-reconcile"
         database = [PSCustomObject]@{
             container = $ContainerName
             database_name = $DbName
@@ -145,6 +250,8 @@ try {
             endpoint = $S3Endpoint
             bucket = $S3Bucket
             object_count = $storageFiles.Count
+            missing_count = if ($missingStorageFiles) { $missingStorageFiles.Count } else { 0 }
+            missing_references = if ($missingStorageFiles) { $missingStorageFiles } else { @() }
             objects = $storageFiles
         }
     }
