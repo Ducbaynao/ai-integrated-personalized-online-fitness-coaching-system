@@ -116,7 +116,11 @@ public class MeasurementErrorAdvice {
     @ExceptionHandler({
             MethodArgumentNotValidException.class,
             HttpMessageNotReadableException.class,
-            MethodArgumentTypeMismatchException.class
+            MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+            jakarta.validation.ConstraintViolationException.class,
+            java.time.DateTimeException.class
     })
     public ResponseEntity<ErrorResponse> handleValidation(Exception ex) {
         ErrorResponse response = ErrorResponse.of(

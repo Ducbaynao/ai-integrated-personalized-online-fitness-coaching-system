@@ -2,6 +2,8 @@ package com.fitnesscoaching.platform.common.exception;
 
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -9,14 +11,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -107,6 +117,148 @@ public class GlobalExceptionHandler {
                 fieldErrors
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+        String name = ex.getParameterName();
+        String message = "Parameter '" + name + "' is required";
+        List<FieldErrorDto> fieldErrors = List.of(new FieldErrorDto(
+                name,
+                "NotNull",
+                message
+        ));
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                message,
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                fieldErrors
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestPart(MissingServletRequestPartException ex) {
+        String name = ex.getRequestPartName();
+        String message = "Required part '" + name + "' is not present";
+        List<FieldErrorDto> fieldErrors = List.of(new FieldErrorDto(
+                name,
+                "NotNull",
+                message
+        ));
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                message,
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                fieldErrors
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestHeader(MissingRequestHeaderException ex) {
+        String name = ex.getHeaderName();
+        String message = "Required header '" + name + "' is not present";
+        List<FieldErrorDto> fieldErrors = List.of(new FieldErrorDto(
+                name,
+                "NotNull",
+                message
+        ));
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                message,
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                fieldErrors
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        List<FieldErrorDto> fieldErrors = new ArrayList<>();
+        for (ConstraintViolation<?> violation : ex.getConstraintViolations()) {
+            String propertyPath = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "parameter";
+            String fieldName = propertyPath.contains(".") ? propertyPath.substring(propertyPath.lastIndexOf('.') + 1) : propertyPath;
+            String code = violation.getConstraintDescriptor() != null && violation.getConstraintDescriptor().getAnnotation() != null
+                    ? violation.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName()
+                    : "ConstraintViolation";
+            fieldErrors.add(new FieldErrorDto(
+                    fieldName,
+                    code,
+                    violation.getMessage()
+            ));
+        }
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                "Request validation constraints violated",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                fieldErrors
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(DateTimeException.class)
+    public ResponseEntity<ErrorResponse> handleDateTimeException(DateTimeException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "VALIDATION_FAILED",
+                "Invalid date, time or timezone format: " + ex.getMessage(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "METHOD_NOT_ALLOWED",
+                "HTTP method '" + ex.getMethod() + "' is not supported for this endpoint",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "UNSUPPORTED_MEDIA_TYPE",
+                "Media type '" + ex.getContentType() + "' is not supported",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "NOT_ACCEPTABLE",
+                "Acceptable representation cannot be produced",
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        ErrorResponse response = ErrorResponse.of(
+                "NOT_FOUND",
+                "Resource not found: " + ex.getResourcePath(),
+                Instant.now(clock),
+                RequestIdHolder.get(),
+                Collections.emptyList()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
