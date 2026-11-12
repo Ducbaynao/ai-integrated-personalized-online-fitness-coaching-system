@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.administration.privileged.application.service;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.PrivilegedAccessNotFoundException;
@@ -125,6 +126,11 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase, Privile
             throw new ApplicationValidationException("Must specify target user ID or target resource type and ID");
         }
 
+        if ((request.targetResourceType() != null && request.targetResourceId() == null)
+                || (request.targetResourceType() == null && request.targetResourceId() != null)) {
+            throw new ApplicationValidationException("Target resource type and target resource ID must be specified together");
+        }
+
         if (request.targetUserId() != null) {
             userAccountStatusQuery.getAccountStatus(request.targetUserId())
                     .orElseThrow(() -> new TargetUserNotFoundException("Target user not found: " + request.targetUserId()));
@@ -161,15 +167,17 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase, Privile
         if (request.accessScope() != null) {
             if (request.accessScope() instanceof String str) {
                 if (!str.isBlank()) {
-                    accessScopeJson = str;
+                    accessScopeJson = str.trim();
                 }
             } else {
                 try {
                     accessScopeJson = objectMapper.writeValueAsString(request.accessScope());
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    throw new ApplicationValidationException("Invalid accessScope: cannot serialize to JSON");
                 }
             }
         }
+        validateAccessScope(accessScopeJson);
 
         persistence.insertRequest(
                 requestId, adminUserId, adminUserId, request.targetUserId(),
@@ -238,6 +246,69 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase, Privile
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
             return "{}";
+        }
+    }
+
+    private void validateAccessScope(String accessScopeJson) {
+        if (accessScopeJson == null || accessScopeJson.isBlank()) {
+            return;
+        }
+
+        JsonNode rootNode;
+        try {
+            rootNode = objectMapper.readTree(accessScopeJson);
+        } catch (Exception e) {
+            throw new ApplicationValidationException("Invalid accessScope: malformed JSON");
+        }
+
+        if (rootNode == null || rootNode.isNull()) {
+            return;
+        }
+
+        if (!rootNode.isObject()) {
+            throw new ApplicationValidationException("Invalid accessScope: must be a JSON object");
+        }
+
+        if (rootNode.isEmpty()) {
+            return;
+        }
+
+        Set<String> recognizedFields = Set.of("domains", "targetTypes", "targetType");
+        for (String fieldName : rootNode.propertyNames()) {
+            if (!recognizedFields.contains(fieldName)) {
+                throw new ApplicationValidationException("Invalid accessScope: unrecognized field '" + fieldName + "'");
+            }
+        }
+
+        if (rootNode.has("domains")) {
+            JsonNode domainsNode = rootNode.get("domains");
+            if (!domainsNode.isArray()) {
+                throw new ApplicationValidationException("Invalid accessScope: 'domains' must be an array of strings");
+            }
+            for (JsonNode el : domainsNode) {
+                if (!el.isTextual()) {
+                    throw new ApplicationValidationException("Invalid accessScope: elements in 'domains' must be strings");
+                }
+            }
+        }
+
+        if (rootNode.has("targetTypes")) {
+            JsonNode targetTypesNode = rootNode.get("targetTypes");
+            if (!targetTypesNode.isArray()) {
+                throw new ApplicationValidationException("Invalid accessScope: 'targetTypes' must be an array of strings");
+            }
+            for (JsonNode el : targetTypesNode) {
+                if (!el.isTextual()) {
+                    throw new ApplicationValidationException("Invalid accessScope: elements in 'targetTypes' must be strings");
+                }
+            }
+        }
+
+        if (rootNode.has("targetType")) {
+            JsonNode targetTypeNode = rootNode.get("targetType");
+            if (!targetTypeNode.isTextual()) {
+                throw new ApplicationValidationException("Invalid accessScope: 'targetType' must be a string");
+            }
         }
     }
 
