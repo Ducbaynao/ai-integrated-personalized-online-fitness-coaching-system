@@ -4,12 +4,13 @@ import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.ApplicationValidationException;
 import com.fitnesscoaching.platform.common.exception.PrivilegedAccessNotFoundException;
 import com.fitnesscoaching.platform.common.exception.TargetUserNotFoundException;
-import com.fitnesscoaching.platform.modules.administration.application.service.AdminStepUpService;
+import com.fitnesscoaching.platform.modules.administration.application.port.in.AdminStepUpUseCase;
 import com.fitnesscoaching.platform.modules.administration.privileged.adapter.in.web.dto.RequestPrivilegedAccessDto;
 import com.fitnesscoaching.platform.modules.administration.privileged.adapter.in.web.dto.RevokePrivilegedAccessDto;
 import com.fitnesscoaching.platform.modules.administration.privileged.adapter.out.persistence.PrivilegedAccessPersistenceAdapter;
 import com.fitnesscoaching.platform.modules.administration.privileged.application.model.PrivilegedAccessModel;
 import com.fitnesscoaching.platform.modules.administration.privileged.application.model.PrivilegedAccessPage;
+import com.fitnesscoaching.platform.modules.administration.privileged.application.port.in.PrivilegedAccessQuery;
 import com.fitnesscoaching.platform.modules.administration.privileged.application.port.in.PrivilegedAccessUseCase;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
@@ -25,12 +26,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 @Service
 @Transactional
-public class PrivilegedAccessService implements PrivilegedAccessUseCase {
+public class PrivilegedAccessService implements PrivilegedAccessUseCase, PrivilegedAccessQuery {
 
     private static final Set<String> VALID_PURPOSES = Set.of(
             "SUPPORT", "MODERATION", "SECURITY", "LEGAL_COMPLIANCE", "DATA_CORRECTION"
@@ -41,7 +44,7 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
     private final UserRoleQuery userRoleQuery;
     private final UserPermissionQuery userPermissionQuery;
     private final AuditService auditService;
-    private final AdminStepUpService adminStepUpService;
+    private final AdminStepUpUseCase adminStepUpService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -51,7 +54,7 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
             UserRoleQuery userRoleQuery,
             UserPermissionQuery userPermissionQuery,
             AuditService auditService,
-            AdminStepUpService adminStepUpService,
+            AdminStepUpUseCase adminStepUpService,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -97,6 +100,15 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<PrivilegedAccessModel> findById(UUID requestId) {
+        if (requestId == null) {
+            return Optional.empty();
+        }
+        return persistence.findById(requestId);
+    }
+
+    @Override
     public PrivilegedAccessModel requestPrivilegedAccess(UUID adminUserId, RequestPrivilegedAccessDto request) {
         verifyAdminAccess(adminUserId, "PRIVILEGED_ACCESS_MANAGE");
 
@@ -126,8 +138,19 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
         }
         int durationMinutes = request.durationMinutes() != null ? request.durationMinutes() : 30;
 
-        if (request.stepUpPassword() != null && !request.stepUpPassword().isBlank()) {
-            adminStepUpService.resolveOrVerifyStepUp(adminUserId, "PRIVILEGED_DATA_ACCESS", request.stepUpPassword(), request.stepUpAuthenticationId());
+        UUID stepUpId;
+        try {
+            stepUpId = adminStepUpService.resolveOrVerifyStepUp(
+                    adminUserId, "PRIVILEGED_ACCESS_REQUEST",
+                    request.stepUpPassword(), request.stepUpAuthenticationId());
+        } catch (AccessDeniedException ex) {
+            if (request.stepUpAuthenticationId() != null && (request.stepUpPassword() == null || request.stepUpPassword().isBlank())) {
+                stepUpId = adminStepUpService.resolveOrVerifyStepUp(
+                        adminUserId, "PRIVILEGED_DATA_ACCESS",
+                        null, request.stepUpAuthenticationId());
+            } else {
+                throw ex;
+            }
         }
 
         UUID requestId = UUID.randomUUID();
@@ -157,7 +180,7 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
 
         persistence.insertEvent(UUID.randomUUID(), requestId, adminUserId, "OPENED",
                 request.targetResourceType(), request.targetResourceId(),
-                "{\"durationMinutes\":" + durationMinutes + "}", now);
+                toJson(Map.of("durationMinutes", durationMinutes, "stepUpAuthenticationId", stepUpId.toString())), now);
 
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(adminUserId)
@@ -165,8 +188,8 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
                 .action("PRIVILEGED_DATA_ACCESS_OPENED")
                 .targetType("PRIVILEGED_ACCESS")
                 .targetId(requestId)
-                .afterDataJson("{\"purpose\":\"" + purpose + "\",\"durationMinutes\":" + durationMinutes + "}")
-                .metadataJson("{\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}")
+                .afterDataJson(toJson(Map.of("purpose", purpose, "durationMinutes", durationMinutes)))
+                .metadataJson(toJson(Map.of("reason", request.reason().trim(), "stepUpAuthenticationId", stepUpId.toString())))
                 .occurredAt(now)
                 .build());
 
@@ -177,6 +200,10 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
     @Override
     public PrivilegedAccessModel revokePrivilegedAccess(UUID adminUserId, UUID requestId, RevokePrivilegedAccessDto request) {
         verifyAdminAccess(adminUserId, "PRIVILEGED_ACCESS_MANAGE");
+
+        if (request == null || request.reason() == null || request.reason().isBlank()) {
+            throw new ApplicationValidationException("Revocation reason is required");
+        }
 
         PrivilegedAccessModel current = persistence.findById(requestId)
                 .orElseThrow(() -> new PrivilegedAccessNotFoundException("Privileged access request not found: " + requestId));
@@ -190,7 +217,7 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
 
         persistence.insertEvent(UUID.randomUUID(), requestId, adminUserId, "REVOKED",
                 current.targetResourceType(), current.targetResourceId(),
-                "{\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}", now);
+                toJson(Map.of("reason", request.reason().trim())), now);
 
         auditService.recordAudit(AuditRecord.builder()
                 .actorUserId(adminUserId)
@@ -198,12 +225,20 @@ public class PrivilegedAccessService implements PrivilegedAccessUseCase {
                 .action("PRIVILEGED_DATA_ACCESS_REVOKED")
                 .targetType("PRIVILEGED_ACCESS")
                 .targetId(requestId)
-                .metadataJson("{\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}")
+                .metadataJson(toJson(Map.of("reason", request.reason().trim())))
                 .occurredAt(now)
                 .build());
 
         return persistence.findById(requestId)
                 .orElseThrow(() -> new PrivilegedAccessNotFoundException("Privileged access request not found: " + requestId));
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     private void verifyAdminAccess(UUID adminUserId, String permissionCode) {

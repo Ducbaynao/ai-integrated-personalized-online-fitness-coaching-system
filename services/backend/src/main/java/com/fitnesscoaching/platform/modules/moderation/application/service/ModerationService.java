@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -165,9 +166,11 @@ public class ModerationService implements ModerationUseCase {
                 .action("MODERATION_CASE_STATUS_CHANGED")
                 .targetType("MODERATION_CASE")
                 .targetId(caseId)
-                .beforeDataJson("{\"status\":\"" + current.status() + "\"}")
-                .afterDataJson("{\"status\":\"" + newStatus + "\"}")
-                .metadataJson("{\"resolution\":\"" + (resolution != null ? resolution.replace("\"", "\\\"") : "") + "\"}")
+                .beforeDataJson(toJson(Map.of("status", current.status())))
+                .afterDataJson(toJson(Map.of("status", newStatus)))
+                .metadataJson(resolution != null && !resolution.isBlank()
+                        ? toJson(Map.of("resolution", resolution))
+                        : "{}")
                 .occurredAt(now)
                 .build());
 
@@ -223,7 +226,7 @@ public class ModerationService implements ModerationUseCase {
             if (targetUserId != null) {
                 persistence.insertSecurityEvent(
                         targetUserId, "USER_MODERATION_WARNING", "MEDIUM",
-                        "{\"caseId\":\"" + caseId + "\",\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}",
+                        toJson(Map.of("caseId", caseId.toString(), "reason", request.reason().trim())),
                         now
                 );
             }
@@ -248,8 +251,8 @@ public class ModerationService implements ModerationUseCase {
                 .action("MODERATION_ACTION_PERFORMED")
                 .targetType("MODERATION_CASE")
                 .targetId(caseId)
-                .afterDataJson("{\"actionType\":\"" + actionType + "\",\"actionId\":\"" + actionId + "\"}")
-                .metadataJson("{\"reason\":\"" + request.reason().trim().replace("\"", "\\\"") + "\"}")
+                .afterDataJson(toJson(Map.of("actionType", actionType, "actionId", actionId.toString())))
+                .metadataJson(toJson(Map.of("reason", request.reason().trim())))
                 .occurredAt(now)
                 .build());
 
@@ -274,6 +277,14 @@ public class ModerationService implements ModerationUseCase {
         List<String> permissions = userPermissionQuery.getEffectivePermissions(adminUserId);
         if (!permissions.contains(permissionCode)) {
             throw new AccessDeniedException("Missing permission: " + permissionCode);
+        }
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            return "{}";
         }
     }
 }

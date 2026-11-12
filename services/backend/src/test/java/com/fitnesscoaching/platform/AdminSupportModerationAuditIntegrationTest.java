@@ -26,9 +26,16 @@ import org.testcontainers.utility.DockerImageName;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -378,9 +385,10 @@ class AdminSupportModerationAuditIntegrationTest {
                     "purpose": "DATA_CORRECTION",
                     "reason": "Xử lý hiệu chỉnh sai lệch số đo học viên yêu cầu qua ticket SUP-101",
                     "durationMinutes": 60,
-                    "accessScope": {"domains": ["MEASUREMENT"]}
+                    "accessScope": {"domains": ["MEASUREMENT"]},
+                    "stepUpPassword": "%s"
                 }
-                """.formatted(targetUserId);
+                """.formatted(targetUserId, DEFAULT_PASSWORD);
 
         MvcResult res = mockMvc.perform(post("/api/v1/admin/privileged-access")
                         .with(adminJwt(adminId))
@@ -1079,5 +1087,603 @@ class AdminSupportModerationAuditIntegrationTest {
                         .content(correctionWithExpired))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("P1.A Step-Up Enforcement: Privileged access requires valid step-up password or token, rejecting missing, invalid, or cross-admin credentials")
+    void testPrivilegedAccessStepUpEnforcement() throws Exception {
+        UUID adminId = createAdmin("stepup_admin@fitcoach.vn");
+        UUID otherAdminId = createAdmin("other_admin@fitcoach.vn");
+        UUID targetUserId = createUser("stepup_target@fitcoach.vn", "Nguyễn Step Up");
+
+        String baseReq = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "reason": "Yêu cầu kiểm tra quyền đặc quyền có step-up",
+                    "durationMinutes": 30,
+                    "accessScope": {"domains": ["MEASUREMENT"]}
+                }
+                """.formatted(targetUserId);
+
+        // 1. Missing step-up (neither password nor token) -> 403 Forbidden
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(baseReq))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // 2. Wrong step-up password -> 401 Unauthorized
+        String wrongPwdReq = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "reason": "Yêu cầu kiểm tra sai password",
+                    "durationMinutes": 30,
+                    "accessScope": {"domains": ["MEASUREMENT"]},
+                    "stepUpPassword": "WrongAdminPassword123!"
+                }
+                """.formatted(targetUserId);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(wrongPwdReq))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_CREDENTIALS"));
+
+        // 3. Expired or invalid step-up authentication ID -> 403 Forbidden
+        UUID fakeStepUpId = UUID.randomUUID();
+        String invalidTokenReq = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "reason": "Yêu cầu kiểm tra token không tồn tại",
+                    "durationMinutes": 30,
+                    "accessScope": {"domains": ["MEASUREMENT"]},
+                    "stepUpAuthenticationId": "%s"
+                }
+                """.formatted(targetUserId, fakeStepUpId);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidTokenReq))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // 4. Step-up token issued to another admin -> 403 Forbidden
+        MvcResult otherStepUpRes = mockMvc.perform(post("/api/v1/admin/auth/step-up")
+                        .with(adminJwt(otherAdminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "actionCode": "PRIVILEGED_ACCESS_REQUEST",
+                                    "password": "%s"
+                                }
+                                """.formatted(DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String otherStepUpId = objectMapper.readTree(otherStepUpRes.getResponse().getContentAsString())
+                .get("stepUpAuthenticationId").asText();
+
+        String crossAdminReq = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "reason": "Yêu cầu kiểm tra dùng token của admin khác",
+                    "durationMinutes": 30,
+                    "accessScope": {"domains": ["MEASUREMENT"]},
+                    "stepUpAuthenticationId": "%s"
+                }
+                """.formatted(targetUserId, otherStepUpId);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(crossAdminReq))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // 5. Valid step-up token issued to current admin -> 201 Created
+        MvcResult validStepUpRes = mockMvc.perform(post("/api/v1/admin/auth/step-up")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "actionCode": "PRIVILEGED_ACCESS_REQUEST",
+                                    "password": "%s"
+                                }
+                                """.formatted(DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String validStepUpId = objectMapper.readTree(validStepUpRes.getResponse().getContentAsString())
+                .get("stepUpAuthenticationId").asText();
+
+        String validTokenReq = """
+                {
+                    "targetUserId": "%s",
+                    "purpose": "DATA_CORRECTION",
+                    "reason": "Yêu cầu hợp lệ dùng step-up token",
+                    "durationMinutes": 30,
+                    "accessScope": {"domains": ["MEASUREMENT"]},
+                    "stepUpAuthenticationId": "%s"
+                }
+                """.formatted(targetUserId, validStepUpId);
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTokenReq))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.currentlyActive").value(true));
+    }
+
+    @Test
+    @DisplayName("P1.B Purpose & Scope Guard: Data correction rejects privileged sessions with wrong purpose, out-of-scope domain or mismatched resource")
+    void testGovernedDataCorrection_ScopeAndPurposeValidation() throws Exception {
+        UUID adminId = createAdmin("scope_admin@fitcoach.vn");
+        UUID studentId = createStudent("scope_student@fitcoach.vn", "Trần Scope");
+        UUID measurementId = createMeasurement(studentId, "WEIGHT", 68.0, "KG");
+
+        UUID supportCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-SCOPE-1', ?, 'Hiệu chỉnh số đo', 'Nhầm cân nặng', 'MEDIUM'::fitness.severity_level, 'OPEN', now(), now())
+                """, supportCaseId, studentId);
+
+        // 1. Privileged session with purpose = 'SUPPORT' (not 'DATA_CORRECTION') -> 403 Forbidden
+        UUID supportPurposePrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'SUPPORT', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Điều tra hỗ trợ thường', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, supportPurposePrivId, adminId, adminId, studentId, supportCaseId);
+
+        String correctionWithSupportPurpose = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Thử sửa với session purpose là SUPPORT",
+                    "proposedData": {"value": 65.0, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, supportPurposePrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(correctionWithSupportPurpose))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // 2. Privileged session with accessScope = {"domains":["USER_PROFILE"]} attempting MEASUREMENT -> 403 Forbidden
+        UUID userProfileScopePrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'DATA_CORRECTION', '{"domains":["USER_PROFILE"]}'::jsonb,
+                    'Chỉ cho phép hồ sơ người dùng', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, userProfileScopePrivId, adminId, adminId, studentId, supportCaseId);
+
+        String correctionWithOutOfScopeDomain = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Thử sửa số đo với session chỉ có domain USER_PROFILE",
+                    "proposedData": {"value": 65.0, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, userProfileScopePrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(correctionWithOutOfScopeDomain))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        // 3. Resource-targeted session with mismatched resource ID -> 403 Forbidden
+        UUID otherMeasurementId = UUID.randomUUID();
+        UUID resourcePrivId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_resource_type, target_resource_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, 'MEASUREMENT', ?,
+                    'DATA_CORRECTION', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Chỉ cho phép sửa measurement khác', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, resourcePrivId, adminId, adminId, otherMeasurementId, supportCaseId);
+
+        String correctionWithMismatchedResource = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Thử sửa measurement khác với session resource ID",
+                    "proposedData": {"value": 65.0, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, resourcePrivId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(correctionWithMismatchedResource))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("P2.A Unit Validation: Measurement correction rejects unknown unit and dimension-incompatible unit with HTTP 400")
+    void testGovernedDataCorrection_UnitValidation() throws Exception {
+        UUID adminId = createAdmin("unit_admin@fitcoach.vn");
+        UUID studentId = createStudent("unit_student@fitcoach.vn", "Hoàng Unit");
+        UUID measurementId = createMeasurement(studentId, "WEIGHT", 80.0, "KG");
+
+        UUID supportCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-UNIT-1', ?, 'Sai số đo', 'Nhầm cân nặng', 'MEDIUM'::fitness.severity_level, 'OPEN', now(), now())
+                """, supportCaseId, studentId);
+
+        UUID privAccessId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason, related_support_case_id,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'DATA_CORRECTION', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Sửa số đo học viên', ?,
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, privAccessId, adminId, adminId, studentId, supportCaseId);
+
+        // 1. Unknown unit code -> 400 Bad Request
+        String unknownUnitCorrection = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Điều chỉnh số đo với đơn vị không tồn tại",
+                    "proposedData": {"value": 75.0, "unit": "UNKNOWN_CUSTOM_UNIT"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, privAccessId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(unknownUnitCorrection))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        // 2. Incompatible unit (e.g. CM length unit for WEIGHT metric) -> 400 Bad Request
+        String incompatibleUnitCorrection = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Điều chỉnh cân nặng nhưng dùng đơn vị cm",
+                    "proposedData": {"value": 75.0, "unit": "cm"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, privAccessId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(incompatibleUnitCorrection))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        // 3. Valid compatible unit ("kg") -> 201 Created
+        String validUnitCorrection = """
+                {
+                    "supportCaseId": "%s",
+                    "targetType": "MEASUREMENT",
+                    "targetId": "%s",
+                    "reason": "Điều chỉnh cân nặng đúng đơn vị kg",
+                    "proposedData": {"value": 76.5, "unit": "kg"},
+                    "privilegedAccessRequestId": "%s",
+                    "stepUpPassword": "%s"
+                }
+                """.formatted(supportCaseId, measurementId, privAccessId, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/data-corrections")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUnitCorrection))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetType").value("MEASUREMENT"))
+                .andExpect(jsonPath("$.targetId").value(measurementId.toString()));
+    }
+
+    @Test
+    @DisplayName("P2.B JSON Metadata Audit: Support case note and status changes serialize special characters safely into valid JSON")
+    void testSupportCase_SpecialCharactersInAuditMetadata() throws Exception {
+        UUID adminId = createAdmin("json_admin@fitcoach.vn");
+        UUID requesterId = createUser("json_user@fitcoach.vn", "Đỗ Văn JSON");
+
+        // 1. Create support case
+        String createJson = """
+                {
+                    "requesterId": "%s",
+                    "subject": "Vấn đề tài khoản và số đo",
+                    "description": "Mô tả chi tiết hỗ trợ",
+                    "priority": "HIGH"
+                }
+                """.formatted(requesterId);
+
+        MvcResult createRes = mockMvc.perform(post("/api/v1/admin/support-cases")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String caseIdStr = objectMapper.readTree(createRes.getResponse().getContentAsString()).get("id").asText();
+        UUID caseId = UUID.fromString(caseIdStr);
+
+        // 2. Add note with newlines, backslashes, double quotes, and Vietnamese diacritics
+        String noteContent = "Ghi chú kỹ thuật: C:\\system\\config.json\nDòng thứ 2: \"Đã giải quyết xong\"\nTiếng Việt có dấu: Hệ thống Huấn luyện viên thể hình";
+        String noteJson = """
+                {
+                    "note": %s
+                }
+                """.formatted(objectMapper.writeValueAsString(noteContent));
+
+        mockMvc.perform(post("/api/v1/admin/support-cases/" + caseId + "/notes")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(noteJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events").isArray());
+
+        // 3. Update status with special characters in note
+        String statusNoteContent = "Chuyển trạng thái:\nĐường dẫn: C:\\logs\\audit.log\n\"Hoàn thành xác minh\"";
+        String statusJson = """
+                {
+                    "status": "IN_PROGRESS",
+                    "note": %s
+                }
+                """.formatted(objectMapper.writeValueAsString(statusNoteContent));
+
+        mockMvc.perform(post("/api/v1/admin/support-cases/" + caseId + "/status")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(statusJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.status").value("IN_PROGRESS"));
+
+        // 4. Query audit logs to ensure valid JSON parsing and search works
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .with(adminJwt(adminId))
+                        .param("targetType", "SUPPORT_CASE")
+                        .param("targetId", caseId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].metadataJson").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("P2.C Collision-Free Support Cases: Support case numbers are sequence-backed and collision-free under concurrent multi-threaded load")
+    void testSupportCase_ConcurrentCreationNoCollision() throws Exception {
+        UUID adminId = createAdmin("seq_admin@fitcoach.vn");
+        UUID requesterId = createUser("seq_user@fitcoach.vn", "Vũ Sequence");
+
+        int concurrency = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch endGate = new CountDownLatch(concurrency);
+        Set<String> generatedCaseNumbers = Collections.synchronizedSet(new java.util.HashSet<>());
+        AtomicInteger successCount = new AtomicInteger(0);
+        List<Throwable> errors = Collections.synchronizedList(new java.util.ArrayList<>());
+
+        for (int i = 0; i < concurrency; i++) {
+            final int index = i;
+            executor.submit(() -> {
+                try {
+                    startGate.await();
+                    String createJson = """
+                            {
+                                "requesterId": "%s",
+                                "subject": "Case đồng thời số %d",
+                                "description": "Mô tả trường hợp kiểm thử concurrent sequence",
+                                "priority": "LOW"
+                            }
+                            """.formatted(requesterId, index);
+
+                    MvcResult res = mockMvc.perform(post("/api/v1/admin/support-cases")
+                                    .with(adminJwt(adminId))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(createJson))
+                            .andExpect(status().isCreated())
+                            .andReturn();
+
+                    String caseNumber = objectMapper.readTree(res.getResponse().getContentAsString())
+                            .get("caseNumber").asText();
+
+                    assertThat(caseNumber).startsWith("SUP-");
+                    boolean added = generatedCaseNumbers.add(caseNumber);
+                    assertThat(added)
+                            .withFailMessage("Collision detected for case number: %s", caseNumber)
+                            .isTrue();
+
+                    successCount.incrementAndGet();
+                } catch (Throwable t) {
+                    errors.add(t);
+                } finally {
+                    endGate.countDown();
+                }
+            });
+        }
+
+        startGate.countDown();
+        boolean completed = endGate.await(15, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(completed).isTrue();
+        assertThat(errors).isEmpty();
+        assertThat(successCount.get()).isEqualTo(concurrency);
+        assertThat(generatedCaseNumbers).hasSize(concurrency);
+    }
+
+    @Test
+    @DisplayName("P2.C Legacy Data Upgrade: Sequence automatically advances past existing legacy case numbers")
+    void testSupportCase_SequenceAdvancementAfterLegacyDataUpgrade() throws Exception {
+        UUID adminId = createAdmin("legacy_seq_admin@fitcoach.vn");
+        UUID requesterId = createUser("legacy_seq_user@fitcoach.vn", "Trần Legacy");
+
+        // 1. Simulate legacy V58 case data with high numeric suffix (e.g. SUP-950000)
+        UUID legacyCaseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.support_cases (id, case_number, requester_id, subject, description, priority, status, opened_at, updated_at)
+                VALUES (?, 'SUP-950000', ?, 'Phiếu hỗ trợ legacy trước V59', 'Mô tả legacy', 'LOW'::fitness.severity_level, 'OPEN', now(), now())
+                """, legacyCaseId, requesterId);
+
+        // 2. Execute V59 sequence synchronization logic on existing data
+        jdbcTemplate.execute("""
+                DO $$
+                DECLARE
+                    max_val bigint;
+                BEGIN
+                    SELECT COALESCE(MAX(NULLIF(regexp_replace(case_number, '^SUP-', ''), '')::bigint), 100000)
+                    INTO max_val
+                    FROM fitness.support_cases
+                    WHERE case_number ~ '^SUP-[0-9]+$';
+
+                    IF max_val >= 100001 THEN
+                        PERFORM setval('fitness.support_case_number_seq', max_val);
+                    END IF;
+                END $$;
+                """);
+
+        // 3. Create a new support case and verify case number strictly exceeds the legacy max value
+        String createJson = """
+                {
+                    "requesterId": "%s",
+                    "subject": "Case mới sau nâng cấp V59",
+                    "description": "Kiểm tra mã mới vượt mã legacy",
+                    "priority": "HIGH"
+                }
+                """.formatted(requesterId);
+
+        MvcResult res = mockMvc.perform(post("/api/v1/admin/support-cases")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String newCaseNumber = objectMapper.readTree(res.getResponse().getContentAsString())
+                .get("caseNumber").asText();
+
+        assertThat(newCaseNumber).startsWith("SUP-");
+        long newSuffix = Long.parseLong(newCaseNumber.substring(4));
+        assertThat(newSuffix).isGreaterThanOrEqualTo(950001L);
+    }
+
+    @Test
+    @DisplayName("P2.B JSON Metadata: Moderation warning with special characters in reason stores valid JSON in security_events")
+    void testModerationWarning_SpecialCharactersInReasonProducesValidJson() throws Exception {
+        UUID adminId = createAdmin("warn_json_admin@fitcoach.vn");
+        UUID targetUserId = createUser("warn_json_user@fitcoach.vn", "Lê Văn Warning");
+
+        // 1. Create moderation case
+        UUID caseId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.moderation_cases (id, subject_user_id, status, priority, opened_at, updated_at)
+                VALUES (?, ?, 'OPEN', 'MEDIUM'::fitness.severity_level, now(), now())
+                """, caseId, targetUserId);
+
+        // 2. Perform WARNING action with complex multiline, quotes, backslashes, and Vietnamese characters
+        String specialReason = "Cảnh báo vi phạm nội dung:\nĐường dẫn: C:\\rules\\policy.txt\n\"Nghiêm cấm hành vi gian lận\"\nTiếng Việt: Có dấu đầy đủ 100%";
+        String actionJson = """
+                {
+                    "actionType": "WARNING",
+                    "targetUserId": "%s",
+                    "reason": %s
+                }
+                """.formatted(targetUserId, objectMapper.writeValueAsString(specialReason));
+
+        mockMvc.perform(post("/api/v1/admin/moderation-cases/" + caseId + "/actions")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(actionJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.actionType").value("WARNING"));
+
+        // 3. Verify security event was stored with valid JSON
+        List<String> eventDetails = jdbcTemplate.query(
+                "SELECT details::text FROM fitness.security_events WHERE user_id = ? AND event_type = 'USER_MODERATION_WARNING' ORDER BY occurred_at DESC LIMIT 1",
+                (rs, rowNum) -> rs.getString(1),
+                targetUserId
+        );
+
+        assertThat(eventDetails).isNotEmpty();
+        var rootNode = objectMapper.readTree(eventDetails.get(0));
+        assertThat(rootNode.get("caseId").asText()).isEqualTo(caseId.toString());
+        assertThat(rootNode.get("reason").asText()).isEqualTo(specialReason);
+    }
+
+    @Test
+    @DisplayName("P1.A Privileged Access: Revocation requires non-blank reason")
+    void testPrivilegedAccessRevocationValidation() throws Exception {
+        UUID adminId = createAdmin("revoke_val_admin@fitcoach.vn");
+        UUID studentId = createStudent("revoke_val_student@fitcoach.vn", "Học viên Revoke");
+
+        UUID privId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.privileged_data_access_requests (
+                    id, requested_by_admin_id, approved_by_admin_id, target_user_id,
+                    purpose, access_scope, reason,
+                    status, requested_at, approved_at, opened_at, expires_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'DATA_CORRECTION', '{"domains":["MEASUREMENT"]}'::jsonb,
+                    'Hỗ trợ kiểm tra số đo',
+                    'ACTIVE'::fitness.privileged_access_status, now(), now(), now(), now() + interval '1 hour'
+                )
+                """, privId, adminId, adminId, studentId);
+
+        // Revoke with empty reason -> 400 Bad Request
+        String emptyReasonJson = """
+                {
+                    "reason": "   "
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/admin/privileged-access/" + privId + "/revoke")
+                        .with(adminJwt(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emptyReasonJson))
+                .andExpect(status().isBadRequest());
     }
 }

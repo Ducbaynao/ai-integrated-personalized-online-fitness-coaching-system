@@ -5,9 +5,9 @@ import com.fitnesscoaching.platform.common.exception.ApplicationValidationExcept
 import com.fitnesscoaching.platform.common.exception.InvalidLifecycleTransitionException;
 import com.fitnesscoaching.platform.common.exception.PrivilegedAccessNotFoundException;
 import com.fitnesscoaching.platform.common.exception.SupportCaseNotFoundException;
-import com.fitnesscoaching.platform.modules.administration.application.service.AdminStepUpService;
-import com.fitnesscoaching.platform.modules.administration.privileged.adapter.out.persistence.PrivilegedAccessPersistenceAdapter;
+import com.fitnesscoaching.platform.modules.administration.application.port.in.AdminStepUpUseCase;
 import com.fitnesscoaching.platform.modules.administration.privileged.application.model.PrivilegedAccessModel;
+import com.fitnesscoaching.platform.modules.administration.privileged.application.port.in.PrivilegedAccessQuery;
 import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
@@ -40,8 +40,8 @@ public class DataCorrectionService implements DataCorrectionUseCase {
 
     private final DataCorrectionPersistenceAdapter persistence;
     private final SupportCasePersistenceAdapter supportCasePersistence;
-    private final PrivilegedAccessPersistenceAdapter privilegedAccessPersistence;
-    private final AdminStepUpService adminStepUpService;
+    private final PrivilegedAccessQuery privilegedAccessQuery;
+    private final AdminStepUpUseCase adminStepUpService;
     private final UserAccountStatusQuery userAccountStatusQuery;
     private final UserRoleQuery userRoleQuery;
     private final UserPermissionQuery userPermissionQuery;
@@ -52,8 +52,8 @@ public class DataCorrectionService implements DataCorrectionUseCase {
     public DataCorrectionService(
             DataCorrectionPersistenceAdapter persistence,
             SupportCasePersistenceAdapter supportCasePersistence,
-            PrivilegedAccessPersistenceAdapter privilegedAccessPersistence,
-            AdminStepUpService adminStepUpService,
+            PrivilegedAccessQuery privilegedAccessQuery,
+            AdminStepUpUseCase adminStepUpService,
             UserAccountStatusQuery userAccountStatusQuery,
             UserRoleQuery userRoleQuery,
             UserPermissionQuery userPermissionQuery,
@@ -63,7 +63,7 @@ public class DataCorrectionService implements DataCorrectionUseCase {
     ) {
         this.persistence = persistence;
         this.supportCasePersistence = supportCasePersistence;
-        this.privilegedAccessPersistence = privilegedAccessPersistence;
+        this.privilegedAccessQuery = privilegedAccessQuery;
         this.adminStepUpService = adminStepUpService;
         this.userAccountStatusQuery = userAccountStatusQuery;
         this.userRoleQuery = userRoleQuery;
@@ -113,20 +113,26 @@ public class DataCorrectionService implements DataCorrectionUseCase {
 
         Instant now = Instant.now(clock);
 
-        PrivilegedAccessModel privAccess = privilegedAccessPersistence.findById(request.privilegedAccessRequestId())
+        PrivilegedAccessModel privAccess = privilegedAccessQuery.findById(request.privilegedAccessRequestId())
                 .orElseThrow(() -> new PrivilegedAccessNotFoundException("Privileged access request not found: " + request.privilegedAccessRequestId()));
 
         if (!privAccess.isActive(now) || !adminUserId.equals(privAccess.requestedByAdminId())) {
             throw new AccessDeniedException("Active privileged data access belonging to current administrator is required");
         }
 
+        if (!"DATA_CORRECTION".equalsIgnoreCase(privAccess.purpose())) {
+            throw new AccessDeniedException("Privileged access session purpose must be DATA_CORRECTION. Current purpose: " + privAccess.purpose());
+        }
+
         if (privAccess.relatedSupportCaseId() != null && !privAccess.relatedSupportCaseId().equals(request.supportCaseId())) {
             throw new AccessDeniedException("Privileged access request is associated with a different support case");
         }
 
+        String targetType = request.targetType().trim().toUpperCase();
+        verifyAccessScope(privAccess.accessScopeJson(), targetType);
+
         UUID stepUpId = adminStepUpService.resolveOrVerifyStepUp(adminUserId, "DATA_CORRECTION", request.stepUpPassword(), request.stepUpAuthenticationId());
 
-        String targetType = request.targetType().trim().toUpperCase();
         Map<String, Object> beforeDataMap = new HashMap<>();
         Map<String, Object> appliedDataMap = new HashMap<>();
 
@@ -136,8 +142,16 @@ public class DataCorrectionService implements DataCorrectionUseCase {
 
             UUID studentId = (UUID) existing.get("student_id");
 
-            if (privAccess.targetUserId() != null && !privAccess.targetUserId().equals(studentId)) {
-                throw new AccessDeniedException("Privileged access session target user does not match the measurement student");
+            if (privAccess.targetUserId() != null) {
+                if (!privAccess.targetUserId().equals(studentId)) {
+                    throw new AccessDeniedException("Privileged access session target user does not match the measurement student");
+                }
+            } else if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
+                if (!"MEASUREMENT".equalsIgnoreCase(privAccess.targetResourceType()) || !privAccess.targetResourceId().equals(request.targetId())) {
+                    throw new AccessDeniedException("Privileged access session target resource does not match this measurement");
+                }
+            } else {
+                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this measurement");
             }
 
             if (supportCase.requesterId() != null && !supportCase.requesterId().equals(studentId)) {
@@ -166,14 +180,25 @@ public class DataCorrectionService implements DataCorrectionUseCase {
 
             Short existingUnitId = existing.get("unit_id") != null ? ((Number) existing.get("unit_id")).shortValue() : null;
             Short targetUnitId = existingUnitId;
+            int metricDefId = ((Number) existing.get("metric_definition_id")).intValue();
 
             if (request.proposedData().get("unit") != null) {
-                String unitStr = request.proposedData().get("unit").toString();
-                targetUnitId = persistence.findUnitIdByCode(unitStr)
-                        .orElse(existingUnitId);
+                String unitStr = request.proposedData().get("unit").toString().trim();
+                if (unitStr.isBlank()) {
+                    throw new ApplicationValidationException("Proposed measurement unit cannot be empty");
+                }
+                Map<String, Object> unitInfo = persistence.findUnitInfoByCode(unitStr)
+                        .orElseThrow(() -> new ApplicationValidationException("Unknown measurement unit code: " + unitStr));
+                targetUnitId = (Short) unitInfo.get("id");
+                String selectedDim = (String) unitInfo.get("dimension");
+
+                String defaultDim = persistence.findMetricDefaultUnitDimension(metricDefId).orElse("");
+                if (!defaultDim.isBlank() && !selectedDim.isBlank() && !defaultDim.equalsIgnoreCase(selectedDim)) {
+                    throw new ApplicationValidationException("Measurement unit '" + unitStr + "' (" + selectedDim +
+                            ") is incompatible with metric dimension: " + defaultDim);
+                }
             }
 
-            int metricDefId = ((Number) existing.get("metric_definition_id")).intValue();
             Short sourceId = existing.get("source_id") != null ? ((Number) existing.get("source_id")).shortValue() : (short) 1;
             Instant measuredAt = existing.get("measured_at") != null
                     ? ((Timestamp) existing.get("measured_at")).toInstant()
@@ -196,8 +221,17 @@ public class DataCorrectionService implements DataCorrectionUseCase {
         } else if ("USER_PROFILE".equals(targetType)) {
             UUID targetUserId = request.targetId();
 
-            if (privAccess.targetUserId() != null && !privAccess.targetUserId().equals(targetUserId)) {
-                throw new AccessDeniedException("Privileged access session target user does not match the target user profile");
+            if (privAccess.targetUserId() != null) {
+                if (!privAccess.targetUserId().equals(targetUserId)) {
+                    throw new AccessDeniedException("Privileged access session target user does not match the target user profile");
+                }
+            } else if (privAccess.targetResourceType() != null && privAccess.targetResourceId() != null) {
+                if ((!"USER_PROFILE".equalsIgnoreCase(privAccess.targetResourceType()) && !"USER".equalsIgnoreCase(privAccess.targetResourceType()))
+                        || !privAccess.targetResourceId().equals(targetUserId)) {
+                    throw new AccessDeniedException("Privileged access session target resource does not match this user profile");
+                }
+            } else {
+                throw new AccessDeniedException("Privileged access session has neither target user nor target resource matching this user profile");
             }
 
             if (supportCase.requesterId() != null && !supportCase.requesterId().equals(targetUserId)) {
@@ -253,7 +287,7 @@ public class DataCorrectionService implements DataCorrectionUseCase {
         supportCasePersistence.insertEvent(
                 UUID.randomUUID(), request.supportCaseId(), "DATA_CORRECTION_APPLIED", adminUserId,
                 "Data correction executed on " + targetType + " ID: " + request.targetId() + ". Reason: " + request.reason().trim(),
-                "{\"correctionId\":\"" + correctionId + "\",\"targetType\":\"" + targetType + "\"}", now
+                toJson(Map.of("correctionId", correctionId.toString(), "targetType", targetType)), now
         );
 
         auditService.recordAudit(AuditRecord.builder()
@@ -264,12 +298,56 @@ public class DataCorrectionService implements DataCorrectionUseCase {
                 .targetId(request.targetId())
                 .beforeDataJson(beforeDataJson)
                 .afterDataJson(appliedDataJson)
-                .metadataJson("{\"supportCaseId\":\"" + request.supportCaseId() + "\",\"correctionId\":\"" + correctionId + "\"}")
+                .metadataJson(toJson(Map.of("supportCaseId", request.supportCaseId().toString(), "correctionId", correctionId.toString())))
                 .occurredAt(now)
                 .build());
 
         return persistence.findById(correctionId)
                 .orElseThrow(() -> new ApplicationValidationException("Data correction not found after insert: " + correctionId));
+    }
+
+    private void verifyAccessScope(String accessScopeJson, String targetType) {
+        if (accessScopeJson == null || accessScopeJson.isBlank() || "{}".equals(accessScopeJson.trim())) {
+            return;
+        }
+        try {
+            var node = objectMapper.readTree(accessScopeJson);
+            if (node.has("domains") && node.get("domains").isArray()) {
+                boolean matched = false;
+                for (var el : node.get("domains")) {
+                    String domain = el.asText().trim();
+                    if ("*".equals(domain) || "ALL".equalsIgnoreCase(domain) || targetType.equalsIgnoreCase(domain)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access domain scope");
+                }
+            }
+            if (node.has("targetTypes") && node.get("targetTypes").isArray()) {
+                boolean matched = false;
+                for (var el : node.get("targetTypes")) {
+                    String tt = el.asText().trim();
+                    if ("*".equals(tt) || "ALL".equalsIgnoreCase(tt) || targetType.equalsIgnoreCase(tt)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target types scope");
+                }
+            }
+            if (node.has("targetType") && node.get("targetType").isTextual()) {
+                String tt = node.get("targetType").asText().trim();
+                if (!"*".equals(tt) && !"ALL".equalsIgnoreCase(tt) && !targetType.equalsIgnoreCase(tt)) {
+                    throw new AccessDeniedException("Target type " + targetType + " is outside privileged access target type scope");
+                }
+            }
+        } catch (AccessDeniedException ade) {
+            throw ade;
+        } catch (Exception ignored) {
+        }
     }
 
     private String toJson(Object obj) {
