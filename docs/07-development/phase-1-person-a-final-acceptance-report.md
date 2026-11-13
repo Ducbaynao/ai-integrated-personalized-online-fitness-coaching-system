@@ -45,7 +45,8 @@
 | **Health Indicators & Monitoring** | `mvnw test -Dtest="StorageAndScannerHealthIndicatorUnitTest"` | Mock S3 + Mock Socket | 4 tests | **4 PASS** | 1.7 s | Task-106 |
 | **HTTP Input Error Handling** | `mvnw test -Dtest="InputErrorHandlingIntegrationTest"` | PostgreSQL 18.6 Testcontainers | 8 tests | **8 PASS** | 26.8 s | Task-106 |
 | **Flyway V58->V59 Upgrade Drill** | `mvnw test -Dtest="FlywayV58ToV59UpgradeIntegrationTest"` | PostgreSQL 18.6 Testcontainers | 1 test | **1 PASS** | 20.0 s | Task-148 |
-| **V59 Backup Restore Drill** | `mvnw test -Dtest="V59BackupRestoreDrillIntegrationTest"` | PostgreSQL 18.6 Testcontainers + S3 local (port 9000) | 1 test | **1 PASS** | 24.9 s | Task-148 |
+| **V59 Backup Restore Drill** | `mvnw test -Dtest="V59BackupRestoreDrillIntegrationTest"` | PostgreSQL 18.6 Testcontainers + S3 local (port 9000) | 1 test | **1 PASS** | 51.5 s | Task-1521 |
+| **Backup Integrity Regression Suite** | `powershell tools/test-backup-regression-drills.ps1` | Local Postgres (5433) + S3Mock (9000), 16 isolation drills | 16 drills | **16 PASS (0 fail, 0 leak)** | 02:20 min | Task-1485 |
 | **Account Erasure Lifecycle** | `mvnw test -Dtest="AccountErasureHttpIntegrationTest"` | PostgreSQL 18.6 Testcontainers | 14 tests | **14 PASS** | 31.3 s | Task-114 |
 | **Data Export Stream Unit** | `mvnw test -Dtest="AccountDataExportStreamTest"` | Mockito slice | 3 tests | **3 PASS** | 2.0 s | Step 186 |
 | **Data Export & Chat Integration** | `mvnw test -Dtest="ChatNotificationIntegrationTest"` | PostgreSQL 18.6 Testcontainers | 19 tests | **19 PASS** | 35.9 s | Task-190 |
@@ -137,6 +138,23 @@
   - Mọi đề xuất AI (bài tập, dinh dưỡng) đều bắt buộc phải qua bước Huấn luyện viên xem xét, phê duyệt và học viên đồng ý; AI không có quyền tự quyết định nghiệp vụ.
   - Phê duyệt HLV, hiệu chỉnh dữ liệu, kiểm duyệt nội dung đều do quản trị viên con người kiểm soát có ghi nhật ký kiểm toán bất biến.
 
+### 3.6 Khắc phục Triệt để Các Lỗi Quy trình Sao lưu & Phục hồi Hậu Merge PR #156 và Kiểm chứng Hồi quy 18 Kịch bản
+Sau khi merge PR #156, rà soát phát hiện các vấn đề an toàn trong quy trình sao lưu và phục hồi:
+1. **Thiếu file tham chiếu nhưng vẫn báo thành công:** Mặc định ném ngoại lệ `REFERENTIAL INTEGRITY VIOLATION` và thoát với exit code khác 0. Chỉ chấp nhận thiếu file khi có cờ tường minh `-AllowIncompleteStorage` (ghi nhận `status: "INCOMPLETE"`), đồng thời `tools/restore-system.ps1` chặn khôi phục archive không đầy đủ trừ khi có cờ `-AllowIncomplete`.
+2. **Loại bỏ 100% fallback live DB:** Phân tích `media_files` hoàn toàn từ file dump snapshot qua `pg_restore`. Bắt buộc kiểm tra exit code của `pg_restore`, bắt buộc nhận diện header `COPY fitness.media_files (...) FROM stdin;`, kiểm tra đầy đủ các cột bắt buộc (`object_key`, `scan_status`, `deleted_at`) và dòng kết thúc `\.` để phát hiện snapshot bị cắt cụt (truncated). Snapshot hợp lệ với 0 file được xử lý thành công không fallback.
+3. **Cơ chế Xuất bản An toàn (Publication Phase) với Khóa Xuất bản Độc quyền & Vòng đời Sentinel Chuẩn:**
+   - **Publication Lock độc quyền & Vòng đời Sentinel:** Thiết lập file lock cố định `.publish_lock_<leaf>.lock` qua `[System.IO.FileStream]` với `FileShare::None` xuyên suốt giai đoạn re-check đích, lưu trữ bản cũ, di chuyển staging, xác thực cấu trúc và rollback. Các tiến trình cạnh tranh bị chặn lập tức với lỗi `PUBLICATION LOCK CONTENTION`.
+   - **Giải phóng stream, bảo toàn file sentinel:** Khi hoàn tất hoặc lỗi, tiến trình chỉ giải phóng khóa qua `Dispose()` stream do chính mình sở hữu. File lock trên đĩa được **cố tình giữ nguyên** làm mốc sentinel cố định cho các lần chạy sau; tuyệt đối không xóa/unlink file lock trên đĩa để triệt tiêu race condition trên hệ thống POSIX/Linux (nơi unlink file đang lock khiến tiến trình sau tạo inode mới tại cùng đường dẫn, phá vỡ tính độc quyền). Tiến trình không lấy được khóa không bao giờ xóa hay đụng đến lock sentinel.
+   - **Di chuyển nguyên tử chống lồng staging:** Sử dụng `[System.IO.Directory]::Move` thay vì `Move-Item`, loại bỏ hoàn toàn nguy cơ thư mục staging bị chuyển thành thư mục con khi thư mục đích bất ngờ xuất hiện.
+   - **Bảo toàn bản cũ & Rollback xác định:** Khi dùng `-Force`, bản backup cũ được di chuyển sang `.replace_old_<leaf>_<runId>`. Nếu xuất bản thất bại, script thực hiện rollback khôi phục bản cũ về `OutputDir`. Nếu rollback bị cản trở (đích bị vật cản), script **tuyệt đối không xóa bản cũ**, ghi log cảnh báo và thông báo rõ đường dẫn khôi phục cho vận hành. Bản cũ chỉ được xóa khi và chỉ khi bản mới xuất bản thành công và đã được xác thực toàn vẹn.
+   - **Xác thực in-place cấu trúc xuất bản:** Kiểm tra `manifest.json`, `database.dump`, thư mục `storage`, đối chiếu `manifest.run_id` khớp với `run_id` hiện tại, và xác nhận không có bất kỳ thư mục `.staging_*` nào nằm bên trong.
+4. **Kiểm tra tính toàn vẹn metadata:** So sánh kích thước byte và mã băm SHA-256 từ metadata DB snapshot với file S3. Phát hiện lệch byte lập tức báo `DATA INTEGRITY CORRUPTION`.
+5. **Kiểm chứng hồi quy toàn diện:** Bộ test [tools/test-backup-regression-drills.ps1](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/tools/test-backup-regression-drills.ps1) bao phủ 18 kịch bản kiểm thử độc lập đã đạt **18/18 PASS (100%)**:
+   - **Kịch bản 9B (Tranh chấp xuất bản thực sự với mã thoát thực tế):** Hai tiến trình đồng thời đồng bộ ranh giới qua `-PrePublishHook`, cạnh tranh publication lock thực tế trên cùng một OutputDir. Thu trực tiếp `$LASTEXITCODE` từ tiến trình con, trả về kết quả có cấu trúc. Một tiến trình thắng xuất bản sạch sẽ (exit code 0), tiến trình thua bị từ chối an toàn (exit code != 0). Xác minh `manifest.run_id` và `database_name` khớp đúng tiến trình thắng, toàn bộ dump và storage files khớp SHA-256, không lồng staging, staging tiến trình thua được dọn sạch và lock sentinel được giữ nguyên.
+   - **Kịch bản 13A (Rollback phục hồi bằng script thật):** Chạy `backup-system.ps1` thật với `-PublishFaultInjection "FAIL_MOVE_STAGING"`, xác nhận script báo lỗi, rollback khôi phục nguyên vẹn 100% SHA-256 parity cho bản backup cũ tại `OutputDir`.
+   - **Kịch bản 13B (Bảo toàn bản cũ khi rollback bị cản trở):** Chạy script thật với `-PublishFaultInjection "BLOCK_ROLLBACK"`, xác nhận khi đích có vật cản, script ném `CRITICAL ROLLBACK FAILURE`, bản backup cũ trong thư mục archive `.replace_old_*` được bảo toàn nguyên vẹn 100% SHA-256 parity, không bị xóa nhầm.
+   - **Kịch bản 14 (Kiểm chứng vòng đời khóa độc lập [tools/test-lock-lifecycle.ps1](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/tools/test-lock-lifecycle.ps1)):** Xác minh tranh chấp 3 tiến trình A, B, C (A giữ khóa -> B và C bị từ chối `PUBLICATION LOCK CONTENTION` -> A gọi `Dispose()` -> D lấy được khóa -> lock sentinel tồn tại trên đĩa). Kiểm chứng OS Crash Recovery: tiến trình giữ khóa bị dừng đột ngột bằng `Stop-Process -Force` (SIGKILL), hệ điều hành tự động giải phóng lock handle, tiến trình tiếp theo lấy khóa thành công ngay lập tức. Đã kiểm chứng đạt 100% trên cả Windows native và Linux container (`PowerShell Core 7.4.6`).
+
 ---
 
 ## 4. Tình trạng Tích hợp Cơ sở dữ liệu Dùng chung (`digital_fitness`)
@@ -167,4 +185,11 @@
 ## 6. Đề xuất Nội dung Pull Request (PR)
 
 **Tiêu đề:**  
-`chore(phase1): finalize Person A integration, acceptance verification, storage drills, and V59 migration readiness`
+`fix(backup): eliminate live db fallback, enforce missing storage failure, harden publication safety and snapshot parser`
+
+**Mô tả:**  
+Khắc phục triệt để các vấn đề an toàn trong quy trình sao lưu và phục hồi:
+1. Mặc định thất bại khi thiếu storage object (`REFERENTIAL INTEGRITY VIOLATION`), chỉ cho phép không đầy đủ khi có `-AllowIncompleteStorage`, gắn trạng thái `INCOMPLETE` vào manifest, và chặn restore không đầy đủ trừ khi có `-AllowIncomplete`.
+2. Loại bỏ 100% fallback live DB khi đối soát snapshot dump; trích xuất trực tiếp từ file snapshot qua `pg_restore`. Bắt buộc kiểm tra exit code của `pg_restore`, nhận diện đúng header COPY với các cột bắt buộc (`object_key`, `scan_status`, `deleted_at`), và kiểm tra dòng kết thúc `\.` chống snapshot bị cắt cụt.
+3. Cơ chế xuất bản an toàn (Publication Phase): Thiết lập khóa xuất bản độc quyền `.publish_lock_<leaf>.lock` qua `FileShare::None` với vòng đời sentinel chuẩn (giữ file trên đĩa, chỉ giải phóng qua `Dispose()` stream), dùng `[System.IO.Directory]::Move` chống lồng staging thành thư mục con, re-check trạng thái đích tại thời điểm xuất bản, từ chối symlink/junction, bảo toàn bản backup cũ và tự động rollback nếu di chuyển thất bại khi dùng `-Force`, bảo toàn bản backup cũ nếu rollback bị cản trở, xác thực cấu trúc in-place trước khi xóa bản cũ, kiểm soát tranh chấp xuất bản giữa 2 tiến trình cùng OutputDir.
+4. Bổ sung bộ kiểm thử hồi quy 18 kịch bản (`tools/test-backup-regression-drills.ps1`) đạt 18/18 PASS (100%), bao gồm thu exit code thực tế của sub-process trong kịch bản 9B và kiểm thử vòng đời khóa độc lập (`tools/test-lock-lifecycle.ps1`) đạt 100% trên cả Windows và Linux container.

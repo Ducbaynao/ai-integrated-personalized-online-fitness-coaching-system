@@ -8,16 +8,24 @@ param(
     [string]$TargetS3Endpoint = "http://localhost:9000",
     [string]$TargetS3Bucket = "fitness-media-restore-test",
     [switch]$VerifyOnly,
+    [switch]$AllowIncomplete,
     [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
 $curlCommand = if ($env:OS -eq "Windows_NT") { "curl.exe" } else { "curl" }
 
+# Helper: Encode S3 URI path segments
+function Get-S3ObjectUrl([string]$endpoint, [string]$bucket, [string]$key) {
+    $segments = $key.Split('/') | ForEach-Object { [System.Uri]::EscapeDataString($_) }
+    $encodedKey = $segments -join '/'
+    return "$($endpoint.TrimEnd('/'))/$bucket/$encodedKey"
+}
+
 $BackupDir = [System.IO.Path]::GetFullPath($BackupDir)
 $manifestPath = Join-Path $BackupDir "manifest.json"
 
-if (-not (Test-Path $manifestPath)) {
+if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Manifest file not found: $manifestPath"
 }
 
@@ -27,6 +35,7 @@ if ($TargetDbName -eq "digital_fitness" -and -not $Force) {
     throw "SAFETY ABORT: Target database is the primary system of record ('$TargetDbName'). Overwriting requires explicit -Force authorization."
 }
 
+# 1. Parse & Verify Manifest Integrity & Completeness
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  Digital Fitness Infrastructure Restore & Verification" -ForegroundColor Cyan
 Write-Host "  Backup Directory: $BackupDir" -ForegroundColor Cyan
@@ -34,16 +43,26 @@ Write-Host "  Target Database:  $TargetDbName" -ForegroundColor Cyan
 Write-Host "  Target S3 Bucket: $TargetS3Bucket ($TargetS3Endpoint)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Parse & Verify Manifest Integrity
-Write-Host "[1/4] Verifying backup artifact checksums..." -ForegroundColor Yellow
-$manifest = Get-Content -Path $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+Write-Host "[1/4] Verifying backup artifact checksums & completeness..." -ForegroundColor Yellow
+$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+
+$missingCount = if ($manifest.storage.missing_count) { [int]$manifest.storage.missing_count } else { 0 }
+$isArchiveIncomplete = ($manifest.status -eq "INCOMPLETE" -or $manifest.completeness -eq "INCOMPLETE" -or $missingCount -gt 0)
+
+if ($isArchiveIncomplete -and -not $AllowIncomplete) {
+    throw "SAFETY ABORT: Backup manifest indicates this is an INCOMPLETE archive ($missingCount missing referenced storage object(s)). Restoring an incomplete archive requires explicit -AllowIncomplete authorization."
+}
+
+if ($isArchiveIncomplete) {
+    Write-Host "  WARNING: Restoring an INCOMPLETE backup archive ($missingCount missing object(s)) under -AllowIncomplete authorization." -ForegroundColor Yellow
+}
 
 $dumpFile = Join-Path $BackupDir $manifest.database.dump_file
-if (-not (Test-Path $dumpFile)) {
+if (-not (Test-Path -LiteralPath $dumpFile)) {
     throw "Database dump file missing: $dumpFile"
 }
 
-$dumpHash = (Get-FileHash -Path $dumpFile -Algorithm SHA256).Hash.ToLowerInvariant()
+$dumpHash = (Get-FileHash -LiteralPath $dumpFile -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($dumpHash -ne $manifest.database.dump_sha256.ToLowerInvariant()) {
     throw "Database dump SHA256 mismatch! Expected: $($manifest.database.dump_sha256), Actual: $dumpHash"
 }
@@ -53,16 +72,18 @@ $storageDir = Join-Path $BackupDir "storage"
 if ($manifest.storage.objects) {
     foreach ($obj in $manifest.storage.objects) {
         $filePath = Join-Path $storageDir $obj.key
-        if (-not (Test-Path $filePath)) {
+        if (-not (Test-Path -LiteralPath $filePath)) {
             throw "Storage object file missing from backup: $filePath"
         }
-        $fileHash = (Get-FileHash -Path $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $fileHash = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($fileHash -ne $obj.sha256.ToLowerInvariant()) {
             throw "Storage object checksum mismatch for $($obj.key)! Expected: $($obj.sha256), Actual: $fileHash"
         }
         Write-Host "  Storage object verified: $($obj.key) (SHA256: $fileHash)" -ForegroundColor Gray
     }
     Write-Host "  All $($manifest.storage.objects.Count) storage object checksums verified." -ForegroundColor Green
+} else {
+    Write-Host "  No storage objects recorded in backup." -ForegroundColor Gray
 }
 
 if ($VerifyOnly) {
@@ -133,23 +154,23 @@ try {
     if ($manifest.storage.objects) {
         foreach ($obj in $manifest.storage.objects) {
             $sourcePath = Join-Path $storageDir $obj.key
-            $targetUri = "$TargetS3Endpoint/$TargetS3Bucket/$($obj.key)"
+            $targetUri = Get-S3ObjectUrl $TargetS3Endpoint $TargetS3Bucket $obj.key
 
-            # Upload using curl
-            & $curlCommand -s -f -X PUT --upload-file "$sourcePath" "$targetUri"
+            # Upload using curl with -g (globoff) to support brackets in filenames/keys
+            & $curlCommand -s -f -g -X PUT --upload-file "$sourcePath" "$targetUri"
             if ($LASTEXITCODE -ne 0) {
-                throw "Failed to upload object $($obj.key) to $targetUri"
+                throw "Failed to upload object $($obj.key) to $targetUri (exit code $LASTEXITCODE)"
             }
 
             # Download back to temp file and verify SHA256 parity
             $tempVerifyFile = Join-Path $tempVerifyDir "verify.tmp"
-            & $curlCommand -s -f "$targetUri" -o "$tempVerifyFile"
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tempVerifyFile)) {
+            & $curlCommand -s -f -g "$targetUri" -o "$tempVerifyFile"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $tempVerifyFile)) {
                 throw "Failed to download restored object $($obj.key) from $targetUri"
             }
 
-            $downloadHash = (Get-FileHash -Path $tempVerifyFile -Algorithm SHA256).Hash.ToLowerInvariant()
-            Remove-Item -Path $tempVerifyFile -Force -ErrorAction SilentlyContinue
+            $downloadHash = (Get-FileHash -LiteralPath $tempVerifyFile -Algorithm SHA256).Hash.ToLowerInvariant()
+            Remove-Item -LiteralPath $tempVerifyFile -Force -ErrorAction SilentlyContinue
 
             if ($downloadHash -ne $obj.sha256.ToLowerInvariant()) {
                 throw "Restored S3 object hash mismatch for $($obj.key)! Expected: $($obj.sha256), Got: $downloadHash"
@@ -159,7 +180,7 @@ try {
         }
     }
 } finally {
-    Remove-Item -Path $tempVerifyDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $tempVerifyDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Host "  Storage restore complete. Restored $restoredObjectCount objects." -ForegroundColor Green
 
