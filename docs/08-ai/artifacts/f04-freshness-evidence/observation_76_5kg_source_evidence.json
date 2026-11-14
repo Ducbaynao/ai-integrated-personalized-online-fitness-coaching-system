@@ -1,0 +1,60 @@
+{
+  "description": "Bằng chứng nguồn đối chiếu quan sát 76.5 kg (fixture f0400003-0000-0000-0000-000000000003) phục vụ kiểm chứng freshness và scope",
+  "observation": {
+    "id": "f0400003-0000-0000-0000-000000000003",
+    "studentId": "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "metricCode": "WEIGHT",
+    "metricDefinitionId": 1,
+    "numericValue": 76.50000000,
+    "unitId": 1,
+    "unitCode": "KG",
+    "measuredAt": "2026-11-05T08:00:00+00:00",
+    "createdAt": "2026-11-14T07:02:35.499986+00:00",
+    "validationStatusDuringVerification": "VALID",
+    "validationStatusPostTeardown": "REJECTED",
+    "provenanceNotes": "Quan sát được chèn thực tế vào bảng fitness.measurements với validation_status='VALID'. Sau khi hoàn tất kiểm chứng, bản ghi được cập nhật về 'REJECTED' nhằm bảo toàn dữ liệu mẫu mà không vi phạm trigger protect_measurement_observation()."
+  },
+  "verificationScenarios": {
+    "scenario1_outOfWindow_preAsOf": {
+      "targetWindow": {
+        "fromDate": "2026-10-01",
+        "toDate": "2026-10-31",
+        "timezone": "UTC"
+      },
+      "asOf": "2026-11-14T07:02:35.864202500Z",
+      "measuredAtRelation": "measured_at (2026-11-05) > toDate (2026-10-31) và measured_at < asOf",
+      "expectedOutcome": "Out of window, out-of-scope mutation -> Không làm summary tháng 10 bị stale",
+      "actualOutcome": {
+        "isStale": false,
+        "needsRefresh": false,
+        "evidenceArtifact": "docs/08-ai/artifacts/f04-freshness-evidence/step_c2_readback_after_pre_asof_out_of_window_mutation.json"
+      }
+    },
+    "scenario2_inWindow_scopeInclusion": {
+      "targetWindow": {
+        "fromDate": "2026-11-01",
+        "toDate": "2026-11-10",
+        "timezone": "UTC"
+      },
+      "asOf": "2026-11-14T07:02:35.864202500Z",
+      "measuredAtRelation": "fromDate (2026-11-01) <= measured_at (2026-11-05) <= toDate (2026-11-10)",
+      "expectedOutcome": "In window -> Được Progress Engine thu nạp, tính toán và đưa vào F04 summary",
+      "actualOutcome": {
+        "runId": "b582e1d6-48ae-48ed-b95e-1aa6984912fa",
+        "metricEvaluations": [
+          {
+            "metricCode": "WEIGHT",
+            "trendDirection": "INSUFFICIENT_DATA",
+            "message": "Chỉ số Weight chưa đủ quan sát để xác định xu hướng."
+          }
+        ],
+        "factsReferenced": [
+          "measurement.WEIGHT.trend:INSUFFICIENT_DATA"
+        ],
+        "isStale": false,
+        "needsRefresh": false,
+        "evidenceArtifact": "docs/08-ai/artifacts/f04-freshness-evidence/step_e2_summary_including_pre_asof_observation.json"
+      }
+    }
+  }
+}
