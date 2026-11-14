@@ -11897,6 +11897,26 @@ components:
         actorId:
           type: string
           format: uuid
+        fromDate:
+          type: string
+          format: date
+          description: Start date of the summary window (inclusive).
+        toDate:
+          type: string
+          format: date
+          description: End date of the summary window (inclusive).
+        timezone:
+          type: string
+          description: Timezone identifier used for day boundaries.
+        requestedMetricCodes:
+          type: array
+          items:
+            type: string
+          description: Metric codes explicitly requested in the summary query.
+        metricScope:
+          type: string
+          enum: [ALL, SELECTED, UNKNOWN_LEGACY]
+          description: Scope of metrics requested (ALL for all metrics, SELECTED for specific metrics, UNKNOWN_LEGACY for older summaries without scope metadata).
         runStatus:
           type: string
           enum: [SUCCEEDED, FAILED, REJECTED_BY_VALIDATOR]

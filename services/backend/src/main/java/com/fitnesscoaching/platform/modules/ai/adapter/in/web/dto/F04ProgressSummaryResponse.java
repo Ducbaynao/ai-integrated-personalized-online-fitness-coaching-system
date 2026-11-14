@@ -1,18 +1,27 @@
 package com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Public response DTO for F04 progress summarization and readback.
  * Strictly presents INFORMATION projection without mutations or plan proposals.
+ * Preserves the original requested scope (fromDate, toDate, timezone, requestedMetricCodes, metricScope)
+ * to ensure that refreshes on saved summaries never mutate scope unintentionally.
  */
 public record F04ProgressSummaryResponse(
         UUID runId,
         UUID correlationId,
         UUID studentId,
         UUID actorId,
+        LocalDate fromDate,
+        LocalDate toDate,
+        String timezone,
+        Set<String> requestedMetricCodes,
+        String metricScope,
         String runStatus,
         String resultType,
         String reasonCode,
@@ -30,6 +39,60 @@ public record F04ProgressSummaryResponse(
         Boolean needsRefresh,
         String currentWatermark
 ) {
+    /**
+     * Backward-compatibility constructor for legacy callers and tests without explicit scope parameters.
+     */
+    public F04ProgressSummaryResponse(
+            UUID runId,
+            UUID correlationId,
+            UUID studentId,
+            UUID actorId,
+            String runStatus,
+            String resultType,
+            String reasonCode,
+            String summary,
+            WorkoutProgressSummaryDto workoutProgressSummary,
+            MeasurementProgressSummaryDto measurementProgressSummary,
+            ContinuityEvaluationDto continuityEvaluation,
+            List<String> limitations,
+            List<String> missingData,
+            List<String> factsReferenced,
+            Instant asOf,
+            String sourceWatermark,
+            UsageDto usage,
+            Boolean isStale,
+            Boolean needsRefresh,
+            String currentWatermark
+    ) {
+        this(
+                runId,
+                correlationId,
+                studentId,
+                actorId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                runStatus,
+                resultType,
+                reasonCode,
+                summary,
+                workoutProgressSummary,
+                measurementProgressSummary,
+                continuityEvaluation,
+                limitations,
+                missingData,
+                factsReferenced,
+                asOf,
+                sourceWatermark,
+                usage,
+                isStale,
+                needsRefresh,
+                currentWatermark
+        );
+    }
+
     public record WorkoutProgressSummaryDto(
             String completionEvaluation,
             String adherenceEvaluation,
@@ -58,6 +121,52 @@ public record F04ProgressSummaryResponse(
             Integer totalTokens
     ) {}
 
+    public F04ProgressSummaryResponse withScope(
+            LocalDate fromDate,
+            LocalDate toDate,
+            String timezone,
+            Set<String> requestedMetricCodes,
+            String metricScope
+    ) {
+        return new F04ProgressSummaryResponse(
+                runId(),
+                correlationId(),
+                studentId(),
+                actorId(),
+                fromDate,
+                toDate,
+                timezone,
+                requestedMetricCodes,
+                metricScope,
+                runStatus(),
+                resultType(),
+                reasonCode(),
+                summary(),
+                workoutProgressSummary(),
+                measurementProgressSummary(),
+                continuityEvaluation(),
+                limitations(),
+                missingData(),
+                factsReferenced(),
+                asOf(),
+                sourceWatermark(),
+                usage(),
+                isStale(),
+                needsRefresh(),
+                currentWatermark()
+        );
+    }
+
+    public F04ProgressSummaryResponse withScope(
+            LocalDate fromDate,
+            LocalDate toDate,
+            String timezone,
+            Set<String> requestedMetricCodes
+    ) {
+        String derivedScope = (requestedMetricCodes != null && !requestedMetricCodes.isEmpty()) ? "SELECTED" : "ALL";
+        return withScope(fromDate, toDate, timezone, requestedMetricCodes, derivedScope);
+    }
+
     public static F04ProgressSummaryResponse withFreshness(
             F04ProgressSummaryResponse base,
             Boolean isStale,
@@ -69,6 +178,11 @@ public record F04ProgressSummaryResponse(
                 base.correlationId(),
                 base.studentId(),
                 base.actorId(),
+                base.fromDate(),
+                base.toDate(),
+                base.timezone(),
+                base.requestedMetricCodes(),
+                base.metricScope(),
                 base.runStatus(),
                 base.resultType(),
                 base.reasonCode(),
@@ -100,6 +214,11 @@ public record F04ProgressSummaryResponse(
                 correlationId(),
                 studentId(),
                 actorId(),
+                fromDate(),
+                toDate(),
+                timezone(),
+                requestedMetricCodes(),
+                metricScope(),
                 runStatus(),
                 resultType(),
                 reasonCode(),
@@ -131,6 +250,11 @@ public record F04ProgressSummaryResponse(
                 correlationId(),
                 studentId(),
                 actorId(),
+                fromDate(),
+                toDate(),
+                timezone(),
+                requestedMetricCodes(),
+                metricScope(),
                 runStatus(),
                 resultType(),
                 reasonCode(),

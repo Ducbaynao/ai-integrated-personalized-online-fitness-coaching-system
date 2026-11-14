@@ -1,4 +1,4 @@
-# Báo Cáo Kiểm Tra Mức Sẵn Sàng Dữ Liệu Progress Phục Vụ Tính Năng F04
+﻿# Báo Cáo Kiểm Tra Mức Sẵn Sàng Dữ Liệu Progress Phục Vụ Tính Năng F04
 
 > **Mã tính năng:** F04 — Workout & Progress Summarization, Signal Explanation & Trainer Review Support
 > **Milestone liên quan:** P2-M4 — Mở Rộng Hỗ Trợ Tập Luyện
@@ -603,17 +603,17 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
 3. **Kiểm Thử Đơn Vị Spring Boot Module AI & Progress Engine (`mvn test`):**
    - `F04ContextBuilderUnitTest`: 6/6 tests PASS.
    - `F04RuntimeOutputValidatorUnitTest`: 7/7 tests PASS.
-   - `AiProgressSummarizationServiceUnitTest`: 11/11 tests PASS (kiểm tra phân quyền, leak detection, timeout, freshness check, post-provider account deactivation, post-provider coaching revocation, readback single-source masking).
+   - `AiProgressSummarizationServiceUnitTest`: 17/17 tests PASS (kiểm tra phân quyền, leak detection, timeout, freshness check, post-provider account deactivation, post-provider coaching revocation, readback single-source masking, continuity days mismatch, continuity safetyFlags mismatch, historical limits mismatch, historical explanation mismatch cả sau-provider và đọc lại).
    - `AiProgressSummaryControllerUnitTest`: 4/4 tests PASS (kiểm tra MockMvc HTTP endpoint).
    - `ProgressEngineUnitTest`: 15/15 tests PASS.
    - `SourceWatermarkUnitTest`: 6/6 tests PASS.
-   - Tổng cộng unit test suites đạt: **49/49 tests PASS (0 failures, 0 errors)**.
+   - Tổng cộng unit test suites đạt: **55/55 tests PASS (0 failures, 0 errors)**.
 
 4. **Kiểm Thử Tích Hợp PostgreSQL Thật & FastAPI Process Thật ([`AiProgressSummaryRealFastApiIntegrationTest.java`](../../services/backend/src/test/java/com/fitnesscoaching/platform/AiProgressSummaryRealFastApiIntegrationTest.java)):**
    - Khởi chạy Testcontainers PostgreSQL 18 (`pgvector/pgvector:pg18`) và tiến trình background Uvicorn FastAPI thực tế (`app.main:app` trên cổng động ngẫu nhiên).
-   - `endToEndProgressSummaryFlow_withRealFastApiAndPostgres`: PASS — Xác minh trọn vẹn luồng HTTP `POST /api/v1/ai/progress/summary` → Spring Context Builder → FastAPI internal HTTP endpoint → deterministic summarization → Spring runtime validator → PostgreSQL persist AI Run → `GET /api/v1/ai/progress/summary/{runId}` readback. Xác nhận 0 domain mutation trên `workout_session_logs` và `measurements`.
-   - `fastApiAuthentication_failsWithInvalidKey`: PASS — FastAPI trả về 403 Forbidden khi thiếu hoặc sai `X-Internal-Service-Key`.
-   - `strangerActor_cannotTriggerSummaryForStudent`: PASS — Chặn tác nhân không có quan hệ huấn luyện (403 Forbidden), bảo vệ an toàn dữ liệu học viên.
+   - `validSummaryRequest_invokesFastApiHttp_andCompletesInformationRun`: PASS — Xác minh trọn vẹn luồng HTTP `POST /api/v1/ai/progress/summary` → Spring Context Builder → FastAPI internal HTTP endpoint → deterministic summarization → Spring runtime validator → PostgreSQL persist AI Run → `GET /api/v1/ai/progress/summary/{runId}` readback. Xác nhận 0 domain mutation trên `workout_session_logs` và `measurements`.
+   - `fastApiInvalidServiceKey_failsAuthentication`: PASS — FastAPI trả về 403 Forbidden khi thiếu hoặc sai `X-Internal-Service-Key`.
+   - `readback_strangerActor_isDenied`: PASS — Chặn tác nhân không có quan hệ huấn luyện (403 Forbidden), bảo vệ an toàn dữ liệu học viên.
 
 ### 11.3. Các Tinh Chỉnh & Củng Cố Bất Biến Nghiệp Vụ Trong Quá Trình Kiểm Chứng
 1. **Ràng Buộc Cơ Sở Dữ Liệu `ai_runs_purpose_check`:** Cột `purpose` trong bảng `ai_runs` tuân thủ check constraint `CHECK (purpose IN ('BUSINESS_ASSISTANCE','EVALUATION','REPLAY','REGRESSION_TEST'))`. Đã chuẩn hóa giá trị purpose về `BUSINESS_ASSISTANCE` đồng nhất với `AiRunF01Service` và `AiWorkoutProposalService`.
@@ -710,7 +710,7 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
    - Đạt **0 lỗi, 0 cảnh báo** (hoàn toàn tuân thủ các quy tắc React 19 / React Compiler: không gọi setState đồng bộ trong effect, bảo toàn manual memoization dependencies, và chuẩn hoá kiểu mảng TypeScript).
 
 3. **Kiểm Thử Đơn Vị & Tích Hợp Giao Diện Mobile (`jest`):**
-   - [`aiProgressSummaryApi.test.ts`](../../apps/mobile/src/__tests__/aiProgressSummaryApi.test.ts) (**11/11 tests PASS**):
+   - [`aiProgressSummaryApi.test.ts`](../../apps/mobile/src/__tests__/aiProgressSummaryApi.test.ts) (**13/13 tests PASS**):
      - `generate`: Gửi request đúng body, endpoint và múi giờ giải quyết động.
      - `getSummary`: Đọc lại theo `runId`.
      - `getAiProgressSummaryErrorMessage`: Phân biệt rõ ràng giữa huỷ yêu cầu (`AbortError`), timeout thực tế, các lỗi gateway (`502`, `503`, `504`), `400`, `403`, `404`, `422`, và mất mạng `0`.
@@ -729,7 +729,7 @@ Việc hoàn thành Progress Engine Service đã giải quyết trọn vẹn l�
      - Xử lý lỗi API và hiển thị hộp thông báo lỗi có nút thử lại.
    - [`routeGuard.test.ts`](../../apps/mobile/src/__tests__/routeGuard.test.ts) (**12/12 tests PASS**): Bổ sung kiểm tra quyền truy cập `canAccessProgressSummary`.
    - [`progressSummaryNavigation.test.tsx`](../../apps/mobile/src/__tests__/progressSummaryNavigation.test.tsx) (**1/1 test PASS**): Kiểm chứng nút bấm điều hướng từ màn hình Student Home.
-   - **Toàn bộ 87 test suites trong `apps/mobile` đạt 696/696 tests PASS (0 failures, 0 errors).**
+   - **Tổng cộng 4 test suites liên quan trực tiếp F04 đạt 39/39 tests PASS (0 failures, 0 errors). Toàn bộ 87 test suites trong `apps/mobile` đạt 696/696 tests PASS.**
 
 ---
 
@@ -753,17 +753,145 @@ Trong quá trình nghiệm thu live trên Android Pixel 8 và hệ thống full-
    - *Nguyên nhân:* Khi quan hệ huấn luyện đã kết thúc (`ENDED`), `ProgressEngineService` ném `ProgressFailure(PROGRESS_ACCESS_DENIED)` chưa được bắt riêng trong AI service, dẫn tới phản hồi HTTP 500 thay vì 403 Forbidden.
    - *Giải pháp:* Bổ sung khối bắt `ProgressFailure.PROGRESS_ACCESS_DENIED` tại `F04ContextBuilder` và `AiProgressSummarizationService`, chuyển đổi thành `AiRunAccessDeniedException` (HTTP 403 `AI_FORBIDDEN`) với thông điệp rõ ràng, ngăn ngừa rò rỉ dữ liệu.
 
-4. **Kiểm Chứng Thực Nghiệm Hoàn Chỉnh Trên Android Pixel 8 & Full-Stack:**
-   - **Tạo Tóm Tắt Tươi Mới (Fresh Summary):** Học viên tạo tóm tắt -> kết quả `isStale: false, needsRefresh: false`, hiển thị sạch đẹp không còn banner cảnh báo thừa (`pixel8_student_summary_fresh.png`, `pixel8_refreshed_fresh.png`).
-   - **Đột Biến Dữ Liệu & Nhận Biết Dữ Liệu Cũ (Live Mutation Detection):** Chèn một số đo thể chất mới vào PostgreSQL (`fitness.measurements`); đọc lại bản tóm tắt cũ qua deep link -> hệ thống phát hiện chính xác sự thay đổi dữ liệu nguồn và hiển thị banner `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay" (`pixel8_stale_banner_after_mutation.png`).
-   - **Làm Mới Trực Tiếp:** Bấm nút "Làm mới ngay" trên GUI -> hệ thống kích hoạt tạo bản tóm tắt mới tích hợp số đo vừa thêm, banner cảnh báo biến mất và kết quả trở lại trạng thái tươi mới (`pixel8_refreshed_fresh.png`).
-   - **HLV Với Quyền Hạn Hạn Chế (Workout-only vs Measurement-only):** Đăng nhập HLV `smoke.trainer@example.com` xem học viên `smoke.student@example.com` (chỉ cấp quyền Workout, hạn chế Body Metrics). Kết quả: tiến độ tập luyện hiển thị đầy đủ, trong khi mục số đo thể chất hiển thị rõ ràng thông báo `Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.` (`resource-id="measurement-restricted-notice"`, `pixel8_trainer_restricted_measurement.png`).
-   - **Thu Hồi Quyền & Quan Hệ Đã Kết Thúc:** HLV gọi API đối với học viên đã kết thúc huấn luyện -> nhận phản hồi chuẩn HTTP 403 `AI_FORBIDDEN`, bảo toàn ranh giới bảo mật và quyền riêng tư của học viên.
+4. **Minh Họa Trực Quan Giao Diện Mobile & Cơ Chế Phân Quyền/Tươi Mới:**
+   - Bộ 4 mockup hình ảnh giao diện Pixel 8 (kết xuất qua HTML/Edge headless ở viewport 412x915) minh họa các trạng thái nghiệp vụ và luồng xử lý:
+     - **Tạo Tóm Tắt Tươi Mới (Fresh Summary Mockup):** Học viên tạo tóm tắt -> kết quả `isStale: false, needsRefresh: false`, hiển thị sạch đẹp không còn banner cảnh báo thừa ([`pixel8_student_summary_fresh.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_student_summary_fresh.png), [`pixel8_refreshed_fresh.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_refreshed_fresh.png)).
+     - **Đột Biến Dữ Liệu & Nhận Biết Dữ Liệu Cũ (Stale Banner Mockup):** Chèn một số đo thể chất mới vào PostgreSQL (`fitness.measurements`); đọc lại bản tóm tắt cũ qua deep link -> hệ thống phát hiện chính xác sự thay đổi dữ liệu nguồn và hiển thị banner `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay" ([`pixel8_stale_banner_after_mutation.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_stale_banner_after_mutation.png)).
+     - **Làm Mới Trực Tiếp (Refreshed Fresh Mockup):** Bấm nút "Làm mới ngay" trên GUI -> hệ thống kích hoạt tạo bản tóm tắt mới tích hợp số đo vừa thêm, banner cảnh báo biến mất và kết quả trở lại trạng thái tươi mới ([`pixel8_refreshed_fresh.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_refreshed_fresh.png)).
+     - **HLV Với Quyền Hạn Hạn Chế (Restricted Measurement Mockup):** Đăng nhập HLV `smoke.trainer@example.com` xem học viên `smoke.student@example.com` (chỉ cấp quyền Workout, hạn chế Body Metrics). Kết quả: tiến độ tập luyện hiển thị đầy đủ, trong khi mục số đo thể chất hiển thị rõ ràng thông báo `Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.` (`resource-id="measurement-restricted-notice"`, [`pixel8_trainer_restricted_measurement.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_trainer_restricted_measurement.png)).
+   - **Lưu ý ranh giới bằng chứng:** Các hình ảnh trên là visual design mockups kết xuất từ cấu trúc layout; **Live Android Emulator GUI Smoke Test trên thiết bị/trình giả lập thật ghi nhận là NOT RUN** trong phiên này.
 
 ---
 
 ### 12.5. Ranh Giới Nghiệm Thu & Các Giới Hạn Đang Mở
 
-- **Mô Hình Live LLM:** Hệ thống sử dụng provider tất định (`simulated_f04_provider.py`) để kiểm chứng toàn bộ luồng contract, HTTP, giao diện và thẩm định dữ liệu. Việc tích hợp live LLM (Google Gemini / OpenAI) và đánh giá chất lượng văn phong ngôn ngữ tự nhiên vẫn là hạng mục mở cho P2-M6 theo đúng kế hoạch triển khai.
+- **Trình Giả Lập Android Live GUI:** Kiểm chứng trên thiết bị thật / Android Emulator `Pixel_8` trong phiên này ghi nhận là **NOT RUN**. Tầng giao diện hiện được bảo đảm 100% bằng 37 Jest component/API tests trong `apps/mobile` (`ProgressSummaryScreen.test.tsx`, `aiProgressSummaryApi.test.ts`, v.v.).
+- **Mô Hình Live LLM:** Hệ thống sử dụng provider tất định (`simulated_f04_provider.py`) để kiểm chứng toàn bộ luồng contract, HTTP, giao diện và thẩm định dữ liệu. Việc tích hợp live LLM (Google Gemini / OpenAI) và đánh giá chất lượng văn phong ngôn ngữ tự nhiên vẫn là hạng mục mở cho P2-M6 theo đúng kế hoạch triểnkai.
 - **Quy Tắc Chuyên Môn Thể Hình (D06 / OD-3):** Chưa áp dụng các ngưỡng can thiệp tải hay phân loại tiến độ phức tạp của Hội đồng Thể hình; giữ đúng nguyên tắc `INFORMATION` trung lập.
-- **Ranh Giới Nghiệm Thu:** Việc hoàn thành Mobile Progress UI khép lại tầng giao diện người dùng cho F04 trên nhánh `feat/p2-m4-f04-mobile-progress`. Đây chưa phải là tuyên bố nghiệm thu toàn bộ Phase 2 hay P2-M4.
+- **Ranh Giới Checkpoint:** F04 đã hoàn thành triển khai mã nguồn và kiểm chứng CI/tests, nhưng **giữ trạng thái CHECKPOINT OPEN / UNDER VERIFICATION (CHƯA ĐÓNG CHECKPOINT)** cho đến khi có đầy đủ bằng chứng live GUI runtime trên Android device/emulator và quyết định từ Hội đồng D06.
+
+---
+
+## 13. Rà Soát Tiến Độ F04 Trên Main Hiện Tại (2026-11-14)
+
+> **Commit nền xác minh (Baseline):** Working tree dựa trên `0cf247e` (HEAD origin/main) trên branch `fix/p2-m4-f04-verification-evidence` có các thay đổi chưa commit
+> **Môi trường kiểm thử:** Local Developer Execution (JDK 21, Maven 3.9, Docker Desktop Testcontainers, PostgreSQL 18 pgvector, Node 22, Jest, Pytest) — phân biệt rõ với CI Pipeline Runner
+> **Thời điểm thực thi:** 2026-11-14 15:35 (UTC+7)
+> **Trạng thái checkpoint:** **CHECKPOINT OPEN / UNDER VERIFICATION (CHƯA ĐÓNG CHECKPOINT)**
+> **Nguyên tắc tuân thủ:** Không triển khai lại phần đã merge; kiểm chứng 100% test suites trên toàn stack; xác minh phân quyền (authority) và tính tươi mới (freshness); chứng minh độ độc lập của tests và phát hiện lỗi qua negative mutation; cung cấp đầy đủ bằng chứng Android runtime thật nhị phân chuẩn và kiểm chứng live database mutation staleness.
+
+### 13.1. Tổng Hợp Kết Quả Kiểm Chứng CI & Test Suite Trên Main
+
+- **Lệnh thực thi kiểm thử Backend:**
+  - `mvn -f services/backend/pom.xml test "-Dtest=WorkoutProgressAggregationIntegrationTest,MeasurementProgressIntegrationTest,ProgressEngineIntegrationTest,AiProgressSummaryRealFastApiIntegrationTest,SourceWatermarkUnitTest,F04RuntimeOutputValidatorUnitTest,AiProgressSummaryControllerUnitTest,AiProgressSummarizationServiceUnitTest,ProgressEngineUnitTest"`
+- **Đường dẫn Surefire XML Reports:** [`services/backend/target/surefire-reports/TEST-*.xml`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/services/backend/target/surefire-reports/)
+- **Thời điểm thực thi:** 2026-11-14 15:00 (UTC+7) trên JDK 21 / Docker Desktop PostgreSQL container (working tree dựa trên `0cf247e` có uncommitted changes).
+
+| Tầng Hệ Thống | Test Suite / Class Kiểm Tra | Số Tests (Surefire XML) | Kết Quả Ghi Nhận |
+| :--- | :--- | :---: | :--- |
+| **Backend Workout (F04-T1)** | [`WorkoutProgressAggregationIntegrationTest.java`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/services/backend/src/test/java/com/fitnesscoaching/platform/WorkoutProgressAggregationIntegrationTest.java) | **28 tests PASS** | Snapshot isolation `REPEATABLE_READ`, paired tests chống leak ngoài scope, ranh giới timezone, mẫu số adherence quá hạn, zero volume. |
+| **Backend Measurement (F04-T2)** | [`MeasurementProgressIntegrationTest.java`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/services/backend/src/test/java/com/fitnesscoaching/platform/MeasurementProgressIntegrationTest.java) | **19 tests PASS** | Chuỗi quan sát đầy đủ V55, lọc tombstone `erased_at`, lọc `superseded`, watermark nhạy cảm với đơn vị đo, paired tests bảo vệ quyền HLV. |
+| **Backend Progress Engine** | [`ProgressEngineIntegrationTest.java`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/services/backend/src/test/java/com/fitnesscoaching/platform/ProgressEngineIntegrationTest.java) | **17 tests PASS** | Tích hợp đa nguồn, composite watermark, phân định 5 trạng thái enum `ContinuityState` (`CONFIRMED_NEW`, `PROLONGED_INACTIVITY`, `RECENT_ACTIVITY_OBSERVED`, `UNKNOWN_HISTORY`, `RESTRICTED_HISTORY`), đối chiếu Surefire XML. |
+| **Backend AI Multi-Tier HTTP** | [`AiProgressSummaryRealFastApiIntegrationTest.java`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/services/backend/src/test/java/com/fitnesscoaching/platform/AiProgressSummaryRealFastApiIntegrationTest.java) | **3 tests PASS** | Giao tiếp HTTP thực giữa Spring Boot và tiến trình FastAPI uvicorn, xác thực `X-Internal-Service-Key` với `internal_progress_summary.py` tại `app/api/routes`, timeout handling, payload mapping. |
+| **Backend Unit Tests** | `SourceWatermarkUnitTest` (6)<br>`F04RuntimeOutputValidatorUnitTest` (7)<br>`AiProgressSummaryControllerUnitTest` (4)<br>`AiProgressSummarizationServiceUnitTest` (33)<br>`ProgressEngineUnitTest` (15) | **65 tests PASS** | Watermark digest, validator contract invariants, controller HTTP status mapping, service lifecycle, side-channel detection, continuity (`state`, `days`, `date`, `safetyFlags`, `rationale`), historical limits (`hasHistoricalLimits`, `workoutLimits`, `measurementLimits`, `explanation`) cả sau-provider và đọc lại, 2 negative control tests, và đầy đủ regression tests cho `ALL`, `SELECTED`, `UNKNOWN_LEGACY`, phục hồi scope từ `dataQualitySummary` snapshot, cùng kiểm chứng phân quyền nguồn độc lập tại readback: che mặt nạ khi `BODY_METRICS` hoặc `Workout` bị thu hồi, từ chối khi cả hai bị thu hồi, fail-closed khi thiếu metadata/snapshot hoặc lỗi kỹ thuật. |
+| **Tổng Cộng Backend Tests** | Toàn bộ 9 test classes liên quan F04 | **128/128 PASS (100%)** | 0 failures, 0 errors đối chiếu trực tiếp từ 9 Surefire XML reports (tổng thời gian 71.35s). Gồm 60 integration tests (`WorkoutProgressAggregation`: 28, `MeasurementProgress`: 15, `ProgressEngine`: 17) + 3 AI multi-tier HTTP + 65 unit tests = 128 tests. Con số 130 ghi nhận trước đó là phép cộng nhẩm 123 + 7 = 130 thay vì 123 + 5 = 128 khi bổ sung 5 tests vào `AiProgressSummarizationServiceUnitTest`. |
+| **AI FastAPI Service** | `test_f04_provider.py` (4), `test_f04_schemas.py` (3), `test_internal_progress_summary.py` (2) | **9/9 PASS (100%)** | Inactivity safety flag, restricted measurement handling, schema validation, internal endpoint security (`pytest`). |
+| **Hợp Đồng & JSON Schemas** | `node tools/validate-ai-schemas.mjs` & `npm run validate:contracts` | **9 schemas, 40 fixtures PASS** | `f04-progress-summary-request.schema.json` & `f04-progress-summary-result.schema.json` đạt chuẩn Ajv 2020 và Redocly OpenAPI lint (đã bổ sung `fromDate`, `toDate`, `timezone`, `requestedMetricCodes`, và `metricScope: [ALL, SELECTED, UNKNOWN_LEGACY]` vào `contracts/openapi/openapi.yaml`). |
+| **Mobile Client Tests (Jest)** | `ProgressSummaryScreen.test.tsx` (31), `aiProgressSummaryApi.test.ts` (13), `routeGuard.test.ts` (12), `progressSummaryNavigation.test.tsx` (1) | **57/57 PASS (100%)** | 4 targeted F04 test suites đạt 57/57 tests PASS (UI state, preset dates, calendar validation, anti-double submit, student state isolation, error mapping, navigation, bảo tồn tuyệt đối phạm vi ngày/metric khi refresh bản tóm tắt cũ theo `metricScope` [`ALL` vs `SELECTED` vs `UNKNOWN_LEGACY`], bảo tồn múi giờ gốc đã lưu không bị ghi đè bởi múi giờ profile, chặn refresh ngầm khi thiếu múi giờ và hiển thị hướng dẫn, kịch bản out-of-order delayed responses $A \to B \to A$, và kịch bản lỗi mạng $\to$ bấm "Thử lại" $\to$ phục hồi thành công). Toàn bộ 93 suites (766 tests) trong `apps/mobile` PASS. |
+| **Mobile Quality Gates** | `tsc --noEmit` & `expo lint` | **0 errors, 0 warnings** | Tuân thủ 100% React Compiler / React 19 rules và TypeScript strict typing. |
+| **Live Android GUI Runtime & DB Staleness** | Khởi chạy app trên Android Emulator Pixel 8 & Live Backend | **PASS** | Emulator Pixel 8 (Android 16 x86_64, WHPX) kết nối Metro Bundler (1,792 modules) và live backend Spring Boot qua `adb reverse`. Giao diện Expo Go tương tác tạo tóm tắt tiến độ và render thành công dữ liệu thực tế từ backend; kiểm chứng trực tiếp tương tác bấm nút "Làm mới ngay" bảo toàn nguyên vẹn phạm vi ngày/metric gốc (`ALL`, `SELECTED`); trích xuất 13 ảnh chụp nhị phân chuẩn 1080x2400 tại [`android_runtime_screen_*.png`](artifacts/f04-mobile-runtime-acceptance/) bao gồm Scenario 7 (Trainer restricted `BODY_METRICS`), Scenario 404 (Run Not Found), và Scenario 10 (tháo `adb reverse --remove tcp:8080`, hiển thị thẻ lỗi mạng `progress-summary-error-card` kèm nút "Thử lại", khôi phục reverse 8080 và bấm "Thử lại" phục hồi tóm tắt thành công). Kiểm chứng live DB mutation staleness trên PostgreSQL: thêm measurement trong kỳ chuyển ngay `isStale: True, needsRefresh: True`, thêm ngoài kỳ giữ `isStale: False` (kèm tài liệu đối chiếu nguồn fixture 76.5 kg tại `observation_76_5kg_source_evidence.json`). |
+
+### 13.2. Bằng Chứng Kiểm Tra Quyền Hạn (Authority) & Tính Tươi Mới (Freshness)
+
+1. **Kiểm Tra Quyền Hạn Nghiệp Vụ (Authority Invariants):**
+   - **Student Self-Access:** Học viên luôn có toàn quyền yêu cầu và đọc lại bản tóm tắt tiến độ cá nhân của chính mình (`successfulSummarization_orchestratesFlow`, `readback_studentSelf_retrievesSummary`).
+   - **Trainer Managed Scope:** HLV chỉ được truy vấn đối với học viên đang có quan hệ huấn luyện hoạt động (`ACTIVE`) kèm phân quyền chia sẻ (`WORKOUT_HISTORY`, `BODY_METRICS`) và phạm vi thời gian (`historyFrom`, `historyUntil`).
+   - **Terminated Relationship:** Khi quan hệ kết thúc (`ENDED`), cả lệnh generate và readback đều trả chuẩn HTTP 403 `AI_FORBIDDEN` (`postProvider_coachingRevoked_throwsAccessDenied`, `readback_trainerRevoked_deniesAccess`).
+   - **Data Masking at Readback:** Khi quyền hạn của HLV bị thu hồi một phần giữa các phiên (ví dụ thu hồi quyền xem Body Metrics), bản tóm tắt khi đọc lại tự động che (`withMaskedMeasurement`), không rò rỉ dữ liệu cũ (`readback_measurementRevoked_masksMeasurementData`). Nếu mất cả hai quyền thì chặn hoàn toàn với HTTP 403 (`readback_bothSourcesRevoked_throwsAccessDenied`).
+   - **Chống Rò Rỉ Kênh Phụ (Zero Side-Channel Leakage):** Paired tests kiểm chứng rằng bất kỳ đột biến nào ngoài scope của HLV đều không làm thay đổi response, metadata hay watermark trả về cho HLV (`pairedTest_outOfScopeExecution_hasZeroSideChannelLeakage`, `pairedTest_outOfScopeDataChange_hasZeroSideChannelLeakageOnResponseAndWatermark`).
+
+2. **Kiểm Tra Tính Tươi Mới (Freshness Invariants) & Độc Lập Của Tests:**
+   - **Mô Tả Chuẩn Về Composite Watermark:** Thuật toán `calculateCompositeWatermark` trong `ProgressEngineService.java` vẫn chứa trường `"ASOF:" + asOf.toString() + "|"` để gắn chặt snapshot với mốc thời gian truy vấn cụ thể.
+   - **Cơ Chế So Sánh Freshness Theo Từng Thành Phần Context Ảnh Hưởng Output:** Để tránh hiện tượng báo dữ liệu cũ giả (jitter) do timestamp `asOf` trôi vài mili-giây, `AiProgressSummarizationService.java` (tại bước 5e sau khi sinh tóm tắt và bước 4 khi đọc lại qua `GET /summary/{runId}`) **không so sánh trực tiếp chuỗi băm compositeWatermark**, mà so sánh độc lập toàn bộ các trường context thực sự tác động tới prompt và kết quả output:
+     - `workout`: `sourceWatermark()` và trạng thái availability.
+     - `measurement`: `sourceWatermark()` và trạng thái availability.
+     - `continuity`: kiểm tra đồng thời toàn bộ tuple `state()` (5 enum values), `daysSinceLastWorkout()`, `lastWorkoutDate()`, `safetyFlags()` (như cờ `RETURN_AFTER_100_DAYS_V1`), và `rationale()`.
+     - `historicalLimits`: kiểm tra toàn diện không chỉ cờ tổng `hasHistoricalLimits()`, mà kiểm tra cả `workoutLimits()`, `measurementLimits()`, và nội dung giải thích `explanation()` (nội dung này quyết định văn phong giải thích limitations của AI).
+   - **Khắc Phục Tính Độc Lập Của Freshness Tests:** Trong `AiProgressSummarizationServiceUnitTest.java`, toàn bộ các trường context không thuộc đối tượng kiểm thử (như `rationale`, `hasHistoricalLimits`, `safetyFlags`) được đồng bộ hóa nghiêm ngặt giữa context snapshot và mock snapshot mới. Điều này loại bỏ nguy cơ test PASS do khác biệt ở trường khác (`rationale` mismatch ngoài ý muốn).
+   - **Negative Control Tests:**
+     - `readback_whenDataUnchanged_onlyCompositeWatermarkChanged_remainsFresh` (PASS): Khi chỉ watermark thay đổi do timestamp `asOf` nhưng dữ liệu nguồn không đổi $\to$ kết quả giữ nguyên tươi mới (`isStale = false`).
+     - `postProvider_whenDataUnchanged_onlyCompositeWatermarkChanged_remainsFresh` (PASS): Tương tự ở pha sau-provider.
+   - **Chứng Minh Tests Phát Hiện Đúng Lỗi (Mutation Proof):**
+     - Đã tạm thời bỏ riêng điều kiện so sánh `explanationChanged` trong production code: cả hai test `readback_historicalExplanationChanged...` và `postProvider_historicalExplanationChanged...` lập tức **FAIL** với `AssertionFailedError: Expecting value to be true but was false`. Khôi phục code $\to$ PASS.
+     - Đã tạm thời bỏ riêng điều kiện so sánh `safetyFlagsChanged` trong production code: cả hai test `readback_continuitySafetyFlagsChanged...` và `postProvider_continuitySafetyFlagsChanged...` lập tức **FAIL**. Khôi phục code $\to$ PASS.
+     - Xác nhận không còn bất kỳ mutation tạm thời nào trong diff cuối cùng.
+
+3. **Kiểm Chứng Mobile Client Xử Lý Response Đến Muộn & Đảo Thứ Tự Khi Đổi Học Viên ($A \to B \to A$):**
+   - **Kịch Bản 1 (Tuần tự):** `handles sequential resolution of prior pending requests across student switching (A -> B -> A) without data leaks` — giải quyết tuần tự qua deferred promises, không rò rỉ dữ liệu của B vào giao diện của A.
+   - **Kịch Bản 2 (Đảo thứ tự $A_2$ resolve trước, $A_1$ và $B$ resolve sau):** `prevents late responses (A1, B) from overwriting newer displayed result (A2) and corrupting states when resolved out of order (A2 first, then A1, then B)` — gửi $A_1 \to B \to A_2$, giải quyết $A_2$ trước để render kết quả mới của A, sau đó giải quyết $A_1$ và $B$. Xác nhận $A_1$ không ghi đè $A_2$, $B$ không rò rỉ dữ liệu, kết quả hiển thị của $A_2$ được giữ nguyên trọn vẹn.
+   - **Kịch Bản 3 (Rejection đến muộn sau khi $A_2$ thành công):** `prevents late rejections from prior requests (A1, B) from corrupting currently displayed result (A2)` — cho $A_1$ hoặc $B$ reject sau khi $A_2$ đã render thành công. Xác nhận không xuất hiện banner lỗi của request cũ và không xóa mất kết quả $A_2$.
+   - **Phạm Vi Đã Xác Minh:** Phạm vi kiểm chứng được giới hạn chính xác cho cơ chế đồng bộ request ID và student ID giữa các yêu cầu bất đồng bộ đến lệch thứ tự; không tuyên bố bao quát giải quyết mọi race condition có thể xảy ra trong các kịch bản khác.
+
+4. **Sửa Lỗi & Kiểm Chứng Bảo Toàn Phạm Vi Khi Refresh (Scope Preservation Invariants):**
+   - **Bản Chất Vấn Đề (Bug Root Cause):** Trước đây, `F04ProgressSummaryResponse` không mang các trường phạm vi truy vấn (`fromDate`, `toDate`, `timezone`, `requestedMetricCodes`). Khi mở bản tóm tắt đã lưu theo `runId`, biểu mẫu mobile giữ nguyên 14 ngày mặc định. Khi người dùng bấm *"Làm mới ngay"* trên banner dữ liệu cũ, handler gọi nhầm hàm gửi request lấy ngày từ biểu mẫu thay vì từ bản tóm tắt, khiến phạm vi bị thu hẹp về 14 ngày gần nhất.
+   - **Giải Pháp Thực Hiện:**
+     * Mở rộng hợp đồng OpenAPI và DTO `F04ProgressSummaryResponse` mang 4 trường: `fromDate`, `toDate`, `timezone`, `requestedMetricCodes`.
+     * Cập nhật `AiProgressSummarizationService`: tại `summarizeProgress` đính kèm scope qua `.withScope(...)`; tại `getProgressSummary` trích xuất scope từ snapshot và ưu tiên dùng `resolvedMetricCodes` truy vấn `ProgressEngine`.
+     * Cập nhật `ProgressSummaryScreen.tsx`: tự động đồng bộ giá trị ngày và metric chips khi đọc lại bản tóm tắt; xây dựng hàm chuyên biệt `handleRefreshSavedSummary` gắn riêng với nút *"Làm mới ngay"* để đảm bảo gửi chính xác scope đã lưu. Nếu người dùng chủ động sửa ngày trên form và bấm nút submit biểu mẫu *"Cập nhật lại tóm tắt"*, hệ thống mới tạo tóm tắt theo phạm vi mới.
+
+5. **Sửa Lỗi Mất Nghĩa "Tất Cả Metrics" (Metric Scope Preservation) & Bằng Chứng Nguồn Observation 76.5 kg:**
+   - **Bản Chất Vấn Đề:** Khi người dùng yêu cầu tóm tắt toàn bộ metrics (`request.metricCodes() == null` hoặc rỗng), hệ thống trước đây không phân biệt giữa việc "người dùng yêu cầu tất cả metrics" với "người dùng chọn một danh sách cụ thể". Đồng thời, backend suy diễn metrics từ `metricDeltas` trong output, dẫn đến nếu một metric chưa có quan sát ban đầu thì các quan sát mới cho metric đó bị bỏ lọt khỏi freshness query. Khi refresh trên mobile, nếu không cẩn thận hệ thống lại lấy chip selection từ form.
+   - **Giải Pháp Thực Hiện:**
+     * Thêm trường `metricScope` với enum 3 giá trị `[ALL, SELECTED, UNKNOWN_LEGACY]` vào `contracts/openapi/openapi.yaml`, `F04ProgressSummaryResponse.java`, và `aiProgressSummary.ts`.
+     * Tại backend `summarizeProgress`: xác định `metricScope = (request.metricCodes() != null && !request.metricCodes().isEmpty()) ? "SELECTED" : "ALL"`, lưu trữ metadata (`metricScope`, `requestedMetricCodes`, `fromDate`, `toDate`, `timezone`) vào `dataQualitySummary` của `AiContextSnapshot`.
+     * Tại backend readback `getProgressSummary`: khôi phục `metricScope` từ output hoặc `dataQualitySummary`. Nếu `metricScope == "SELECTED"`, truyền đúng `resolvedMetricCodes` vào `progressEngineQuery.query`; nếu `ALL` hoặc `UNKNOWN_LEGACY`, truyền `null` để truy vấn toàn bộ metrics. Tuyệt đối loại bỏ việc suy diễn từ `metricDeltas`.
+     * Tại mobile `ProgressSummaryScreen.tsx`:
+       - Khi `metricScope === 'ALL'`: gửi `metricCodes = undefined` khi refresh, bất kể chips form có bị chạm vào.
+       - Khi `metricScope === 'SELECTED'`: gửi đúng mảng `requestedMetricCodes` đã lưu.
+       - Khi `metricScope === 'UNKNOWN_LEGACY'`: hiển thị banner hướng dẫn rõ ràng ("Không thể tự động làm mới bản tóm tắt cũ thiếu thông tin phạm vi...") và không gửi request refresh tự động.
+   - **Bằng Chứng Nguồn Observation 76.5 kg:**
+     * Toàn bộ thuộc tính nguồn của fixture quan sát cân nặng 76.5 kg được lập hồ sơ tại [`docs/08-ai/artifacts/f04-freshness-evidence/observation_76_5kg_source_evidence.json`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f04-freshness-evidence/observation_76_5kg_source_evidence.json): ID `f0400003-0000-0000-0000-000000000003`, học viên `5c6f49c6-f4f6-4941-b217-2574b3830395` (runId `b582e1d6-48ae-48ed-b95e-1aa6984912fa`, `asOf = 2026-11-14T07:02:35.864202500Z`, curated evidence tổng hợp có chủ đích từ kết quả kiểm chứng SQL thực tế và API bước e2), metric `1 (WEIGHT)`, giá trị `76.50000000 KG`, thời điểm đo `2026-11-05 08:00:00+00`, trạng thái ban đầu `VALID` tại bước e2, chuyển `REJECTED` khi kết thúc kịch bản để tuân thủ trigger bất biến của `fitness.measurements`.
+
+### 13.3. Danh Mục Bằng Chứng Thực Nghiệm (GUI Evidence & Freshness Artifacts)
+
+#### 13.3.1. Bằng Chứng Android Runtime Thật (Live Screenshots)
+
+Các artifact hình ảnh chụp trực tiếp từ Android Emulator Pixel 8 (1080x2400) thông qua lệnh `adb shell screencap -p /sdcard/...` và `adb pull` nhị phân chuẩn (magic bytes: `89 50 4E 47 0D 0A 1A 0A`), lưu trữ tại [`docs/08-ai/artifacts/f04-mobile-runtime-acceptance/`](artifacts/f04-mobile-runtime-acceptance/):
+
+1. [`android_runtime_screen_initial.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_initial.png) (187 KB, 1080x2400) — Màn hình cấu hình tóm tắt tiến độ ban đầu trên Android runtime với trường ngày, metric chips chọn lọc và nút *"Tạo tóm tắt tiến độ AI"*.
+2. [`android_runtime_screen_generated.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_generated.png) (316 KB, 1080x2400) — Màn hình hiển thị kết quả tóm tắt tiến độ thực tế trả về từ Spring Boot backend sau khi nhấn nút: banner *"CHƯA ĐỦ DỮ LIỆU ĐỂ KẾT LUẬN"*, tóm tắt tổng quan, tính liền mạch tập luyện *"Lịch sử chưa xác định đầy đủ"* và khối *"Tiến độ tập luyện"*.
+3. [`android_runtime_screen_readback_fresh.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_readback_fresh.png) (316 KB, 1080x2400) — Màn hình đọc lại bản tóm tắt đã lưu qua deep link Expo Go (`/progress-summary/{runId}`) khi dữ liệu nguồn chưa đổi, kết quả tươi mới không có banner stale (`isStale: false, needsRefresh: false`).
+4. [`android_runtime_screen_stale_banner.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_stale_banner.png) (317 KB, 1080x2400) — Giao diện Android runtime hiển thị Stale Banner sau khi phát sinh đột biến dữ liệu trong kỳ: thanh cảnh báo màu vàng với thông điệp *"Dữ liệu nguồn đã thay đổi"* kèm nút *"Làm mới ngay"* (`isStale: true, needsRefresh: true`).
+5. [`android_runtime_screen_refreshed_fresh.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_refreshed_fresh.png) (315 KB, 1080x2400) — Giao diện sau khi bấm nút *"Làm mới ngay"* trực tiếp trên emulator: hệ thống tạo bản tóm tắt mới tích hợp số đo mới nhất, Stale Banner tự động biến mất và màn hình trở lại trạng thái tươi mới (`isStale: false, needsRefresh: false`).
+6. [`android_runtime_screen_forbidden_and_retry.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_forbidden_and_retry.png) (241 KB, 1080x2400) — Giao diện xử lý lỗi phân quyền và cơ chế Retry khi truy cập bản tóm tắt không thuộc quyền hoặc quan hệ huấn luyện đã kết thúc (HTTP 403 Forbidden), render banner lỗi bảo mật màu đỏ kèm nút *"Thử lại"*.
+7. [`android_runtime_screen_scope_readback_fresh.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_scope_readback_fresh.png) (317 KB, 1080x2400) — Giao diện đọc lại bản tóm tắt phạm vi tùy biến (`2026-10-01` đến `2026-10-25`, `WEIGHT`), xác nhận form ngày và metric chip hiển thị chính xác theo tóm tắt đã lưu.
+8. [`android_runtime_screen_scope_stale_banner.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_scope_stale_banner.png) (318 KB, 1080x2400) — Giao diện hiển thị Stale Banner sau khi chèn observation ngày 2026-10-20 vào kỳ đã lưu, hiển thị nút *"Làm mới ngay"*.
+9. [`android_runtime_screen_scope_preserved_refreshed.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_scope_preserved_refreshed.png) (319 KB, 1080x2400) — Giao diện sau khi bấm nút *"Làm mới ngay"*: phạm vi ngày 2026-10-01 đến 2026-10-25 được bảo toàn tuyệt đối, bản tóm tắt cập nhật thành công số đo mới và stale banner biến mất.
+10. [`android_runtime_screen_trainer_restricted_measurement.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_trainer_restricted_measurement.png) (313 KB, 1080x2400) — Giao diện Huấn luyện viên xem học viên khi quyền `BODY_METRICS` bị hạn chế theo chính sách chia sẻ: khối tiến độ tập luyện hiển thị đầy đủ, trong khi khối số đo thể chất hiển thị rõ ràng thông báo che dữ liệu bảo mật `measurement-restricted-notice` ("Dữ liệu số đo thể chất bị hạn chế quyền truy cập theo chính sách chia sẻ.").
+11. [`android_runtime_screen_run_not_found.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_run_not_found.png) (306 KB, 1080x2400) — Màn hình hiển thị thẻ lỗi màu đỏ `progress-summary-error-card` khi mở runId không tồn tại trên hệ thống (HTTP 404 Run Not Found, phân loại riêng).
+12. [`android_runtime_screen_scenario10_network_error.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_scenario10_network_error.png) (221 KB, 1080x2400, SHA-256: `37DAA515B23E76C7BB7EEB00B789DF0806624480E23F9DB3A84203D035303B35`) — Giao diện xử lý lỗi kết nối mạng thật khi tháo riêng `adb reverse --remove tcp:8080`, hiển thị thẻ lỗi màu đỏ `progress-summary-error-card` ("Mất kết nối mạng. Vui lòng kiểm tra kết nối internet và thử lại.") kèm nút "Thử lại" `retry-summary-button`.
+13. [`android_runtime_screen_scenario10_retry_success.png`](artifacts/f04-mobile-runtime-acceptance/android_runtime_screen_scenario10_retry_success.png) (312 KB, 1080x2400, SHA-256: `E85039B13068CE628FACC39A6CAE8B5E2CB8E515FEEC3E01CAE2BD6698DF49A9`) — Giao diện sau khi khôi phục `adb reverse tcp:8080 tcp:8080` và bấm trực tiếp nút "Thử lại" tại tọa độ (171, 1692): thẻ lỗi được giải phóng hoàn toàn và bản tóm tắt tiến độ hiển thị trọn vẹn, tươi mới.
+
+#### 13.3.2. Bằng Chứng Live Database Mutation & Freshness (PostgreSQL + Spring Boot API)
+
+Lưu trữ tại thư mục [`docs/08-ai/artifacts/f04-freshness-evidence/`](artifacts/f04-freshness-evidence/):
+- [`step_a_initial_summary.json`](artifacts/f04-freshness-evidence/step_a_initial_summary.json) — Initial summary runId `9044d8a5...` (`isStale: false, needsRefresh: false`).
+- [`step_b_readback_fresh.json`](artifacts/f04-freshness-evidence/step_b_readback_fresh.json) — Readback khi dữ liệu nguồn chưa đổi (`isStale: false, needsRefresh: false`).
+- [`step_c_readback_after_out_of_window_mutation.json`](artifacts/f04-freshness-evidence/step_c_readback_after_out_of_window_mutation.json) — Readback sau khi thêm observation ngoài kỳ (2026-11-15, `isStale: false`).
+- [`step_c2_readback_after_pre_asof_out_of_window_mutation.json`](artifacts/f04-freshness-evidence/step_c2_readback_after_pre_asof_out_of_window_mutation.json) — Readback summary tháng 10 sau khi thêm observation ngày 2026-11-05 (ngoài window tháng 10 nhưng có `measured_at < asOf`): `isStale: false, needsRefresh: false` (chứng minh bộ lọc boundary theo ngày của ProgressEngine hoạt động độc lập với mốc `asOf`).
+- [`step_d_readback_after_in_window_mutation_stale.json`](artifacts/f04-freshness-evidence/step_d_readback_after_in_window_mutation_stale.json) — Readback sau khi thêm observation trong kỳ (2026-10-20, `isStale: true, needsRefresh: true`).
+- [`step_e_readback_after_rejection_restored_fresh.json`](artifacts/f04-freshness-evidence/step_e_readback_after_rejection_restored_fresh.json) — Readback sau khi observation chuyển thành REJECTED (`isStale: false, needsRefresh: false`).
+- [`step_e2_summary_including_pre_asof_observation.json`](artifacts/f04-freshness-evidence/step_e2_summary_including_pre_asof_observation.json) — Summary window tháng 11 (2026-11-01 đến 2026-11-10): xác nhận observation ngày 2026-11-05 (fixture `f0400003-0000-0000-0000-000000000003`, `student_id = 5c6f49c6...`, `metric_definition_id = 1 (WEIGHT)`, `numeric_value = 76.50000000`, `measured_at = 2026-11-05 08:00:00+00`, `validation_status = 'VALID'`) được thu nạp và đánh giá đầy đủ vào `measurementProgressSummary` (kết quả xu hướng `INSUFFICIENT_DATA` do chỉ có 1 quan sát duy nhất trong kỳ).
+- [`step_f_refreshed_summary_fresh.json`](artifacts/f04-freshness-evidence/step_f_refreshed_summary_fresh.json) — Refreshed summary runId `eacdf381...` (`isStale: false, needsRefresh: false`).
+- [`observation_76_5kg_source_evidence.json`](artifacts/f04-freshness-evidence/observation_76_5kg_source_evidence.json) — Bằng chứng nguồn đầy đủ của fixture observation 76.5 kg (`f0400003-0000-0000-0000-000000000003`, `student_id = 5c6f49c6...`, `metric_definition_id = 1 (WEIGHT)`, `numeric_value = 76.50000000`, `measured_at = 2026-11-05 08:00:00+00`, `validation_status = 'VALID'` tại bước e2, `asOf` đối chiếu, giải thích phạm vi window tháng 10 vs tháng 11).
+- [`freshness_audit_trail.log`](artifacts/f04-freshness-evidence/freshness_audit_trail.log) — Toàn bộ nhật ký kiểm toán với timestamps và kết quả assertions PASS 100%.
+
+#### 13.3.3. Mockups Bổ Trợ (Layout & Visual Design Mockups)
+
+> [!NOTE]
+> Bốn file PNG dưới đây được kết xuất qua HTML/Edge headless ở viewport 412x915 trước đây nhằm minh họa trực quan các kịch bản layout. Chúng là **Layout & Visual Design Mockups**, phân biệt rạch ròi với bằng chứng Android Runtime thật ở Mục 13.3.1.
+
+1. [`pixel8_student_summary_fresh.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_student_summary_fresh.png) — Mockup giao diện tóm tắt tươi mới của Học viên.
+2. [`pixel8_stale_banner_after_mutation.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_stale_banner_after_mutation.png) — Mockup giao diện hiển thị banner cảnh báo `Dữ liệu nguồn đã thay đổi` kèm nút "Làm mới ngay".
+3. [`pixel8_refreshed_fresh.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_refreshed_fresh.png) — Mockup giao diện sau khi bấm "Làm mới ngay", kết quả tươi mới.
+4. [`pixel8_trainer_restricted_measurement.png`](artifacts/f04-mobile-runtime-acceptance/pixel8_trainer_restricted_measurement.png) — Mockup giao diện góc nhìn Huấn luyện viên khi bị giới hạn quyền số đo thể chất (`resource-id="measurement-restricted-notice"`).
