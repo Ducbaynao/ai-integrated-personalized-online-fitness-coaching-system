@@ -118,7 +118,7 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Lịch tập đã xác nhận</Text>
     <WorkoutButton label="Quay lại học viên" secondary onPress={() => router.back()} />
     <WorkoutButton testID="open-trainer-change-proposals" label="Xem đề xuất đổi hoặc hủy lịch" secondary onPress={() => router.push(`/coaching/${relationshipId}/change-proposals` as never)} />
-    <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch dự kiến của {relationship?.counterparty.displayName || 'học viên này'}. Chỉ xem; Trainer không thể bắt đầu, bỏ qua hoặc xem nhật ký tập từ đây.</Text>
+    <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch dự kiến của {relationship?.counterparty.displayName || 'học viên này'}. Chỉ xem; Huấn luyện viên không thể bắt đầu, bỏ qua hoặc xem nhật ký tập từ đây.</Text>
     <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Cửa sổ 30 ngày</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Từ {formatTrainerScheduleTime(range.from, 'UTC')} đến trước {formatTrainerScheduleTime(range.until, 'UTC')}</Text>

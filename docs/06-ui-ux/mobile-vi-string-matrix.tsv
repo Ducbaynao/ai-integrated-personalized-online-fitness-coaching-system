@@ -1,0 +1,538 @@
+Màn hoặc component	Dòng trước sửa	Loại	Chuỗi tiếng Anh ban đầu	Cách hiển thị tiếng Việt	Xử lý
+features/ai-knowledge/AiKnowledgeScreen.tsx	383	jsx	Trang:	Trang:	Giữ tên riêng/ký hiệu
+features/auth/HomeScreen.tsx	90	jsx	Email	Email	Giữ tên riêng/ký hiệu
+features/auth/RegisterScreen.tsx	130	attribute:placeholder	Alex Smith	Alex Smith	Giữ tên riêng/ký hiệu
+features/auth/RegisterScreen.tsx	147	jsx	Email	Email	Giữ tên riêng/ký hiệu
+features/auth/RegisterScreen.tsx	157	attribute:placeholder	you@example.com	bạn@example.com	Dịch chuỗi giao diện
+features/auth/SignInScreen.tsx	117	jsx	Email	Email	Giữ tên riêng/ký hiệu
+features/auth/SignInScreen.tsx	127	attribute:placeholder	you@example.com	bạn@example.com	Dịch chuỗi giao diện
+features/chat/ChatScreens.tsx	259	jsx	KiB	KiB	Giữ tên riêng/ký hiệu
+features/chat/ChatScreens.tsx	305	literal-review	Missing plan ID	Thiếu mã kế hoạch	Dịch chuỗi giao diện
+features/chat/ChatScreens.tsx	—	mixed copy	trạng thái push	trạng thái thông báo đẩy	Dịch câu pha tiếng Anh
+features/chat/ChatScreens.tsx	—	mixed copy	được bật push	được bật thông báo đẩy	Dịch câu pha tiếng Anh
+features/chat/PushSettingsScreen.tsx	101	jsx	Push:	Thông báo đẩy:	Dịch chuỗi giao diện
+features/chat/PushSettingsScreen.tsx	—	mixed copy	Nhắc lịch qua push	Nhắc lịch qua thông báo đẩy	Dịch câu pha tiếng Anh
+features/chat/PushSettingsScreen.tsx	—	mixed copy	Bật riêng push	Bật riêng thông báo đẩy	Dịch câu pha tiếng Anh
+features/chat/PushSettingsScreen.tsx	—	mixed copy	Tắt push 	Tắt thông báo đẩy 	Dịch câu pha tiếng Anh
+features/chat/PushSettingsScreen.tsx	—	mixed copy	Bật push 	Bật thông báo đẩy 	Dịch câu pha tiếng Anh
+features/coaching/RelationshipDetailScreen.tsx	36	literal-review	Missing relationship	Thiếu thông tin quan hệ huấn luyện	Dịch chuỗi giao diện
+features/coaching/StudentLookupScreen.tsx	30	attribute:placeholder	hocvien@example.com	hocvien@example.com	Giữ tên riêng/ký hiệu
+features/goal/components/CreateGoalModal.tsx	66	literal-review	Goal title is required.	Vui lòng nhập tên mục tiêu.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	70	literal-review	Goal title must not exceed 200 characters.	Tên mục tiêu không được quá 200 ký tự.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	78	literal-review	Timeline duration must be a positive number of days.	Thời hạn phải là số ngày dương.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	116	jsx	Create Fitness Goal	Tạo mục tiêu thể chất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	119	jsx	Establish your primary fitness journey. You can adjust targets or transition later.	Thiết lập hành trình tập luyện chính của bạn. Bạn có thể điều chỉnh mục tiêu hoặc chuyển đổi sau này.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	138	jsx	Goal Title *	Tiêu đề mục tiêu *	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	142	attribute:accessibilityLabel	Goal title	Tiêu đề mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	156	attribute:placeholder	e.g. 12-Week Fat Loss & Strength	Ví dụ: Giảm mỡ và tăng sức mạnh trong 12 tuần	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	166	jsx	Primary Objective Type *	Loại mục tiêu chính *	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	207	jsx	Duration (Days)	Thời hạn (ngày)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	211	attribute:accessibilityLabel	Duration in days	Thời hạn tính bằng ngày	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	232	jsx	Personal Notes (Optional)	Ghi chú cá nhân (không bắt buộc)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	236	attribute:accessibilityLabel	Goal notes	Ghi chú mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	247	attribute:placeholder	Specific motivations, target benchmarks, or reminders...	Động lực cụ thể, điểm chuẩn mục tiêu hoặc lời nhắc nhở...	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	261	attribute:accessibilityLabel	Cancel goal creation	Hủy việc tạo mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	266	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	273	attribute:accessibilityLabel	Submit new goal	Gửi mục tiêu mới	Dịch chuỗi giao diện
+features/goal/components/CreateGoalModal.tsx	287	jsx	Create Goal	Tạo mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	63	literal-review	Proposal reason is required explaining the coaching adjustment.	Vui lòng nêu lý do điều chỉnh huấn luyện.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	67	literal-review	Reason must not exceed 500 characters.	Lý do không được quá 500 ký tự.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	75	literal-review	Duration must be a positive number of days.	Thời hạn phải là số ngày dương.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	113	jsx	Propose Goal Modification	Đề xuất sửa đổi mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	116	jsx	Propose target adjustments for your student. Changes become active only upon student acceptance.	Đề xuất điều chỉnh chỉ tiêu cho học viên. Thay đổi chỉ có hiệu lực sau khi học viên chấp nhận.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	135	jsx	Coaching Reason * (Max 500 chars)	Lý do đề xuất * (tối đa 500 ký tự)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	139	attribute:accessibilityLabel	Proposal coaching reason	Lý do đề xuất của huấn luyện viên	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	153	attribute:placeholder	e.g. Accelerating hypertrophy progression based on rapid strength adaptation	Ví dụ: Tăng tiến độ phát triển cơ dựa trên khả năng thích nghi sức mạnh	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	165	jsx	Proposed Goal Title	Tiêu đề mục tiêu đề xuất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	169	attribute:accessibilityLabel	Proposed goal title	Tiêu đề mục tiêu đề xuất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	180	attribute:placeholder	e.g. Advanced Hypertrophy Phase 2	Ví dụ: Giai đoạn tăng cơ nâng cao 2	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	190	jsx	Primary Focus	Trọng tâm chính	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	228	jsx	Proposed Duration (Days)	Thời lượng đề xuất (Ngày)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	232	attribute:accessibilityLabel	Proposed duration in days	Thời lượng đề xuất tính bằng ngày	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	255	attribute:accessibilityLabel	Cancel proposal	Hủy đề xuất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	260	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	267	attribute:accessibilityLabel	Submit proposal	Gửi đề xuất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalProposalModal.tsx	281	jsx	Send Proposal	Gửi đề xuất	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	62	literal-review	Transition reason is required to start a new journey.	Vui lòng nêu lý do bắt đầu hành trình mục tiêu mới.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	66	literal-review	Transition reason must not exceed 100 characters.	Lý do chuyển mục tiêu không được quá 100 ký tự.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	72	literal-review	New goal title is required.	Vui lòng nhập tên mục tiêu mới.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	76	literal-review	Goal title must not exceed 200 characters.	Tên mục tiêu không được quá 200 ký tự.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	84	literal-review	Duration must be a positive number of days.	Thời hạn phải là số ngày dương.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	123	jsx	Transition to New Journey	Chuyển sang hành trình mới	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	126	jsx	Conclude your current goal journey and begin a fresh journey from Day 1. Complete historical progress is preserved.	Kết thúc mục tiêu hiện tại và bắt đầu mục tiêu mới từ ngày đầu tiên. Toàn bộ lịch sử tiến độ vẫn được giữ nguyên.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	146	jsx	Transition Reason * (Max 100 chars)	Lý do chuyển đổi * (Tối đa 100 ký tự)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	150	attribute:accessibilityLabel	Transition reason	Lý do chuyển đổi	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	164	attribute:placeholder	e.g. Completed cut, starting lean bulking journey	Ví dụ: Hoàn thành giai đoạn giảm mỡ, bắt đầu tăng cơ nạc	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	174	jsx	New Goal Title *	Tiêu đề mục tiêu mới *	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	178	attribute:accessibilityLabel	New goal title	Tiêu đề mục tiêu mới	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	192	attribute:placeholder	e.g. 16-Week Muscle Hypertrophy Phase	Ví dụ: Giai đoạn tăng cơ 16 tuần	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	202	jsx	New Objective Type *	Loại mục tiêu mới *	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	242	jsx	Duration (Days)	Thời hạn (ngày)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	246	attribute:accessibilityLabel	New goal duration in days	Thời lượng mục tiêu mới tính bằng ngày	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	267	jsx	Transition Notes (Optional)	Ghi chú chuyển tiếp (Tùy chọn)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	271	attribute:accessibilityLabel	Transition notes	Ghi chú chuyển tiếp	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	282	attribute:placeholder	Notes on the transition, previous accomplishments...	Ghi chú về quá trình chuyển đổi, thành tích trước đó...	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	296	attribute:accessibilityLabel	Cancel transition	Hủy chuyển đổi	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	301	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	308	attribute:accessibilityLabel	Submit transition	Gửi chuyển đổi	Dịch chuỗi giao diện
+features/goal/components/CreateGoalTransitionModal.tsx	322	jsx	Start New Journey	Bắt đầu hành trình mới	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	63	literal-review	Change reason is required to create a new goal version.	Vui lòng nêu lý do tạo phiên bản mục tiêu mới.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	67	literal-review	Change reason must not exceed 100 characters.	Lý do thay đổi không được quá 100 ký tự.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	75	literal-review	Duration must be a positive number of days.	Thời hạn phải là số ngày dương.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	114	jsx	Adjust Goal (New Version)	Điều chỉnh mục tiêu (Phiên bản mới)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	117	jsx	Create a new version to adjust your targets or timeline while preserving complete earlier history.	Tạo phiên bản mới để điều chỉnh chỉ tiêu hoặc thời hạn, đồng thời giữ nguyên toàn bộ lịch sử trước đó.	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	137	jsx	Change Reason * (Max 100 chars)	Lý do thay đổi * (Tối đa 100 ký tự)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	141	attribute:accessibilityLabel	Change reason	Lý do thay đổi	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	155	attribute:placeholder	e.g. Schedule adjustment, progressed faster than expected	Ví dụ: Điều chỉnh lịch, tiến triển nhanh hơn dự kiến	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	165	jsx	Change Summary / Context (Optional)	Tóm tắt thay đổi / Bối cảnh (không bắt buộc)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	169	attribute:accessibilityLabel	Change summary	Tóm tắt thay đổi	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	180	attribute:placeholder	Describe what adjustments were made in this version...	Mô tả những điều chỉnh đã được thực hiện trong phiên bản này...	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	192	jsx	Goal Title	Tiêu đề mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	196	attribute:accessibilityLabel	Updated goal title	Tên mục tiêu đã cập nhật	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	207	attribute:placeholder	Goal title	Tiêu đề mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	217	jsx	Objective Type	Loại mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	257	jsx	Adjusted Duration (Days)	Thời hạn điều chỉnh (ngày)	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	261	attribute:accessibilityLabel	Adjusted duration in days	Thời hạn điều chỉnh tính bằng ngày	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	284	attribute:accessibilityLabel	Cancel goal adjustment	Hủy điều chỉnh mục tiêu	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	289	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	296	attribute:accessibilityLabel	Save adjusted version	Lưu phiên bản đã điều chỉnh	Dịch chuỗi giao diện
+features/goal/components/CreateGoalVersionModal.tsx	310	jsx	Save New Version	Lưu phiên bản mới	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	78	literal-review	Failed to load more versions.	Không thể tải thêm phiên bản.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	80	literal-review	Failed to load goal versions.	Không thể tải các phiên bản mục tiêu.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	105	literal-review	Failed to load goal transitions.	Không thể tải lịch sử chuyển mục tiêu.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	148	attribute:accessibilityLabel	Goal Versions Tab	Thẻ phiên bản mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	169	jsx	Goal Versions (	Phiên bản mục tiêu (	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	176	attribute:accessibilityLabel	Goal Transitions Tab	Thẻ chuyển đổi mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	197	jsx	Transitions (	Chuyển tiếp (	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	205	literal-review	Goal Versions preserve strategic milestones and adjustments within this same goal journey.	Các phiên bản ghi lại mốc và điều chỉnh trong cùng một hành trình mục tiêu.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	206	literal-review	Goal Transitions record cross-journey transitions when switching from a previous goal to a new journey.	Lịch sử chuyển mục tiêu ghi lại việc chuyển sang hành trình mục tiêu mới.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	216	jsx	Loading versions...	Đang tải phiên bản...	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	232	attribute:accessibilityLabel	Retry loading versions	Thử tải lại các phiên bản	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	235	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	246	jsx	No version records found.	Không tìm thấy bản ghi phiên bản nào.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	264	jsx	Version	Phiên bản	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	264	literal-review	Untitled	Chưa có tiêu đề	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	273	jsx	CURRENT	HIỆN TẠI	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	281	jsx	Effective:	Có hiệu lực:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	287	literal-review	(Present)	(Hiện tại)	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	294	jsx	Change Reason:	Lý do thay đổi:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	311	jsx	Lock Reason:	Lý do khóa:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	329	attribute:accessibilityLabel	Retry loading more versions	Thử tải lại phiên bản khác	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	341	attribute:accessibilityLabel	Load more versions	Tải thêm phiên bản	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	352	jsx	Load More Versions (	Tải thêm phiên bản (	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	352	jsx	shown)	hiển thị)	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	369	jsx	Loading transitions...	Đang tải chuyển tiếp...	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	385	attribute:accessibilityLabel	Retry loading transitions	Thử tải lại quá trình chuyển đổi	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	399	jsx	No goal transition records found for this goal.	Không tìm thấy bản ghi chuyển đổi mục tiêu nào cho mục tiêu này.	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	415	jsx	Transition:	Chuyển tiếp:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	420	jsx	Date:	Ngày:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	429	jsx	Notes:	Ghi chú:	Dịch chuỗi giao diện
+features/goal/components/GoalHistoryTab.tsx	435	jsx	Initiated by:	Người khởi xướng:	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	29	attribute:accessibilityLabel	Goal is currently paused	Mục tiêu hiện đang bị tạm dừng	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	38	jsx	⏸ Goal is Currently Paused	⏸ Mục tiêu hiện đang bị tạm dừng	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	41	jsx	Active training time is frozen. Your target dates and history remain preserved.	Thời gian tập luyện tích lũy tạm dừng. Ngày mục tiêu và lịch sử vẫn được giữ nguyên.	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	45	jsx	Paused at:	Tạm dừng lúc:	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	71	jsx	Goal Version	Phiên bản mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	73	literal-review	Initial	Ban đầu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	78	jsx	Start Date	Ngày bắt đầu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	80	literal-review	Unknown	Chưa rõ	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	85	jsx	Target Date	Ngày mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	87	literal-review	Not set	Chưa thiết lập	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	92	jsx	Timeline Duration	Thời hạn mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	94	literal-review	Calculated	Được tính tự động	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	99	jsx	Last Updated	Cập nhật lần cuối	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	107	jsx	Status Note	Ghi chú trạng thái	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	125	jsx	Objectives	Mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	140	jsx	PRIMARY	CHÍNH	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	152	jsx	No primary objective specified.	Chưa xác định loại mục tiêu chính.	Dịch chuỗi giao diện
+features/goal/components/GoalOverviewTab.tsx	168	jsx	SECONDARY	PHỤ	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	88	literal-review	Failed to load more proposals.	Không thể tải thêm đề xuất.	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	90	literal-review	Failed to load goal proposals.	Không thể tải các đề xuất mục tiêu.	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	217	jsx	Loading proposals...	Đang tải đề xuất...	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	231	attribute:accessibilityLabel	Retry loading proposals	Thử tải lại đề xuất	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	234	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	245	jsx	No Proposals Found	Không tìm thấy đề xuất nào	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	249	literal-review	You have no pending goal proposals waiting for review.	Bạn không có đề xuất mục tiêu nào đang chờ xem xét.	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	250	literal-review	There are no proposals matching this filter.	Không có đề xuất nào phù hợp với bộ lọc.	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	275	jsx	From:	Từ:	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	294	jsx	Proposed Title:	Tiêu đề đề xuất:	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	306	jsx	Proposed	Đề xuất	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	309	jsx	Review →	Xem lại →	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	324	attribute:accessibilityLabel	Retry loading more proposals	Thử tải lại đề xuất khác	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	336	attribute:accessibilityLabel	Load more proposals	Tải thêm đề xuất	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	347	jsx	Load More Proposals (	Tải thêm đề xuất (	Dịch chuỗi giao diện
+features/goal/components/GoalProposalsTab.tsx	347	jsx	shown)	hiển thị)	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	29	jsx	No Measurable Targets	Không có mục tiêu có thể đo lường được	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	32	jsx	This goal has no target metric measurements configured.	Mục tiêu này chưa có chỉ tiêu đo lường.	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	56	literal-review	Unknown	Chưa rõ	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	63	literal-review	Not recorded	Chưa ghi nhận	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	97	jsx	Baseline	Thông tin ban đầu	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	106	jsx	Goal Target	Chỉ tiêu mục tiêu	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	121	jsx	Target Repetitions:	Số lần lặp mục tiêu:	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	124	jsx	reps	lần	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	132	jsx	Target Date:	Ngày mục tiêu:	Dịch chuỗi giao diện
+features/goal/components/GoalTargetsTab.tsx	142	jsx	Note:	Lưu ý:	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	41	literal-review	Pause Fitness Goal	Tạm dừng mục tiêu thể chất	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	41	literal-review	Resume Fitness Goal	Tiếp tục mục tiêu thể chất	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	42	literal-review	Pause Goal	Tạm dừng mục tiêu	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	42	literal-review	Resume Goal	Tiếp tục mục tiêu	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	52	literal-review	Reason is required to update status.	Vui lòng nêu lý do thay đổi trạng thái.	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	56	literal-review	Reason must not exceed 1000 characters.	Lý do không được quá 1.000 ký tự.	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	98	literal-review	Confirm Action	Xác nhận thao tác	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	102	jsx	Goal:	Mục tiêu:	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	109	literal-review	Pausing will freeze active goal training time without resetting your history or moving your target date. Please state why you are pausing:	Tạm dừng sẽ ngưng tính thời gian tập của mục tiêu, giữ nguyên lịch sử và ngày đích. Vui lòng nêu lý do tạm dừng:	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	110	literal-review	Resuming will reactivate your training journey. Historical pause duration remains recorded in your progress timeline. Please state why you are resuming:	Tiếp tục sẽ kích hoạt lại hành trình tập luyện. Thời gian tạm dừng vẫn được ghi trong lịch sử tiến độ. Vui lòng nêu lý do tiếp tục:	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	115	attribute:accessibilityLabel	Reason for status change	Lý do thay đổi trạng thái	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	124	attribute:placeholder	Enter mandatory reason (max 1000 chars)...	Nhập lý do bắt buộc (tối đa 1000 ký tự)...	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	158	attribute:accessibilityLabel	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	184	jsx	Continue	Tiếp tục	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	192	literal-review	Are you sure you want to pause this goal? You can resume it anytime when you are ready to train again.	Bạn có chắc muốn tạm dừng mục tiêu? Bạn có thể tiếp tục khi sẵn sàng tập lại.	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	193	literal-review	Are you sure you want to resume this goal? Make sure you do not have another active fitness goal running.	Bạn có chắc muốn tiếp tục mục tiêu? Hãy đảm bảo bạn không có mục tiêu thể chất khác đang hoạt động.	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	205	jsx	Recorded reason:	Lý do được ghi lại:	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	216	attribute:accessibilityLabel	Back to edit reason	Quay lại chỉnh sửa lý do	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	221	jsx	Back	Quay lại	Dịch chuỗi giao diện
+features/goal/components/PauseResumeGoalModal.tsx	243	jsx	Confirm &	Xác nhận và	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	207	literal-review	Failed to sync goal status.	Không thể đồng bộ trạng thái mục tiêu.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	216	literal-review	Goal not found or inaccessible.	Không tìm thấy mục tiêu hoặc bạn không có quyền xem.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	225	literal-review	Failed to load fitness goal.	Không thể tải mục tiêu thể chất.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	379	literal-review	An unexpected error occurred while updating goal status.	Có lỗi xảy ra khi cập nhật trạng thái mục tiêu.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	383	literal-review	You already have another active fitness goal. Only one active goal is permitted at a time.	Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	386	literal-review	The goal status was updated by another request. Please refresh to see the latest status.	Trạng thái mục tiêu đã được thay đổi. Vui lòng tải lại để xem trạng thái mới nhất.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	390	literal-review	Goal status conflict occurred. Please refresh and try again.	Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại và thử lại.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	395	literal-review	Status Update Failed	Không thể cập nhật trạng thái	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	439	literal-review	You already have an active fitness goal. Only one active goal is permitted.	Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	442	literal-review	Creation Failed	Không thể tạo mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	442	literal-review	Unable to create fitness goal.	Không thể tạo mục tiêu thể chất.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	479	literal-review	Goal version conflict occurred. Another change was made. Please reload.	Phiên bản mục tiêu đã thay đổi. Vui lòng tải lại.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	482	literal-review	Version Adjustment Failed	Không thể điều chỉnh phiên bản	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	482	literal-review	Unable to adjust goal.	Không thể điều chỉnh mục tiêu.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	521	literal-review	Transition conflict occurred. The goal state has changed. Please reload.	Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	524	literal-review	Transition Failed	Không thể chuyển mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	524	literal-review	Unable to transition goal journey.	Không thể chuyển sang hành trình mục tiêu mới.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	545	jsx	No Active Fitness Goal	Chưa có mục tiêu thể chất đang hoạt động	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	548	jsx	You currently do not have an active or paused fitness goal. When you or your coach establish a fitness goal, it will appear here.	Bạn hiện chưa có mục tiêu thể chất đang hoạt động hoặc tạm dừng. Khi bạn hoặc huấn luyện viên tạo mục tiêu, mục tiêu sẽ xuất hiện tại đây.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	555	attribute:accessibilityLabel	Create New Fitness Goal	Tạo mục tiêu thể chất mới	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	558	jsx	Create Fitness Goal	Tạo mục tiêu thể chất	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	564	attribute:accessibilityLabel	Check Pending Proposals	Xem đề xuất đang chờ	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	568	jsx	Check Goal Proposals	Xem đề xuất mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	599	attribute:accessibilityLabel	Go back	Quay lại	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	608	jsx	← Back	← Quay lại	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	611	jsx	Fitness Goal	Mục tiêu thể chất	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	637	jsx	Unable to Load Goal	Không thể tải mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	644	attribute:accessibilityLabel	Retry loading goal	Thử tải lại mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	647	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	673	jsx	Goal Version Conflict	Xung đột phiên bản mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	686	attribute:accessibilityLabel	Reload goal	Tải lại mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	692	jsx	Reload	Tải lại	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	704	attribute:accessibilityLabel	Pause Goal	Tạm dừng mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	716	jsx	⏸ Pause Goal	⏸ Tạm dừng mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	725	attribute:accessibilityLabel	Resume Goal	Tiếp tục mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	735	jsx	▶ Resume Goal	▶ Tiếp tục mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	744	attribute:accessibilityLabel	Adjust Goal	Điều chỉnh mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	754	jsx	✎ Adjust Goal	✎ Điều chỉnh mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	761	attribute:accessibilityLabel	Transition Journey	Hành trình chuyển tiếp	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	771	jsx	↻ Transition	↻ Chuyển đổi	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	799	jsx	Unable to sync latest goal status	Không thể đồng bộ hóa trạng thái mục tiêu mới nhất	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	806	jsx	Please retry to update your goal status before making changes.	Vui lòng thử cập nhật lại trạng thái mục tiêu của bạn trước khi thực hiện thay đổi.	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	812	attribute:accessibilityLabel	Retry syncing goal status	Thử đồng bộ lại trạng thái mục tiêu	Dịch chuỗi giao diện
+features/goal/CurrentGoalScreen.tsx	815	jsx	Retry Sync	Thử lại đồng bộ hóa	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	126	literal-review	Failed to load goal proposal details.	Không thể tải chi tiết đề xuất mục tiêu.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	172	literal-review	A rejection note is required so your coach understands your reasoning.	Vui lòng nêu lý do từ chối để huấn luyện viên hiểu quyết định của bạn.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	191	literal-review	Proposal Updated	Đã cập nhật đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	200	literal-review	Failed to submit decision.	Không thể gửi quyết định.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	205	literal-review	This proposal has already been decided by another request and cannot be decided again.	Đề xuất đã được xử lý ở một yêu cầu khác và không thể xử lý lại.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	209	literal-review	This proposal has expired and can no longer be decided.	Đề xuất đã hết hạn và không thể xử lý.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	213	literal-review	The base goal version has changed. This proposal is outdated and cannot be applied. Please refresh to see the latest goal.	Phiên bản mục tiêu gốc đã thay đổi. Đề xuất này không còn hiệu lực. Vui lòng tải lại mục tiêu.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	217	literal-review	The proposal contains no effective changes from the current active version.	Đề xuất không có thay đổi so với phiên bản đang hoạt động.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	221	literal-review	A conflict occurred while processing your decision. Please refresh.	Có xung đột khi xử lý quyết định. Vui lòng tải lại.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	228	literal-review	Decision Failed	Không thể xử lý quyết định	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	256	attribute:accessibilityLabel	Retry loading proposal	Thử tải lại đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	260	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	265	attribute:accessibilityLabel	Go back	Quay lại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	272	jsx	Go Back	Quay lại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	300	jsx	Proposal not found.	Không tìm thấy đề xuất.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	336	jsx	← Back	← Quay lại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	339	jsx	Goal Proposal	Đề xuất mục tiêu	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	400	jsx	Status:	Trạng thái:	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	403	jsx	Source:	Nguồn:	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	407	jsx	Proposal Reason:	Lý do đề xuất:	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	411	jsx	Decision Note:	Ghi chú quyết định:	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	423	jsx	Current vs Proposed Comparison	So sánh hiện tại và đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	430	jsx	Current Version	Phiên bản hiện tại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	433	literal-review	No active title	Chưa có tiêu đề đang hoạt động	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	439	jsx	Proposed Update	Đề xuất cập nhật	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	454	literal-review	Unchanged	Không đổi	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	463	jsx	Current Duration / Target	Thời hạn / Chỉ tiêu hiện tại	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	466	literal-review	No duration set	Chưa đặt thời hạn	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	473	jsx	Proposed Duration / Target	Thời hạn / Chỉ tiêu đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	507	jsx	Proposed Objectives (	Loại mục tiêu đề xuất (	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	511	jsx	No objective changes proposed.	Không có thay đổi loại mục tiêu được đề xuất.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	570	jsx	Proposed Targets (	Chỉ tiêu đề xuất (	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	574	jsx	No target changes proposed.	Không có thay đổi chỉ tiêu được đề xuất.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	594	jsx	Start Value	Giá trị bắt đầu	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	604	jsx	Target Value	Giá trị mục tiêu	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	621	jsx	Target Date	Ngày mục tiêu	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	645	attribute:accessibilityLabel	Accept Proposal	Chấp nhận đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	654	attribute:accessibilityLabel	Reject Proposal	Từ chối đề xuất	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	694	literal-review	Accepting applies the approved changes. Depending on the proposed primary goal, this may create a new version of your current goal or start a new goal journey. Your fitness history will remain preserved.	Chấp nhận sẽ áp dụng các thay đổi được đề xuất. Tùy mục tiêu chính, hệ thống sẽ tạo phiên bản mới hoặc bắt đầu hành trình mục tiêu mới. Lịch sử tập luyện được giữ lại.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	695	literal-review	Rejecting this proposal will keep your current goal version unchanged. Please provide a reason so your coach can adjust.	Từ chối sẽ giữ nguyên phiên bản mục tiêu hiện tại. Vui lòng nêu lý do để huấn luyện viên điều chỉnh.	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	702	literal-review	Rejection Reason (Required)	Lý do từ chối (bắt buộc)	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	723	literal-review	Optional note for your decision	Ghi chú cho quyết định (không bắt buộc)	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	724	literal-review	Mandatory reason for rejecting proposal	Lý do từ chối đề xuất (bắt buộc)	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	736	literal-review	Add an optional comment for your coach...	Thêm lời nhắn cho huấn luyện viên (không bắt buộc)...	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	737	literal-review	Explain why you are rejecting this proposal...	Nêu lý do bạn từ chối đề xuất...	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	763	attribute:accessibilityLabel	Cancel	Hủy	Dịch chuỗi giao diện
+features/goal/GoalProposalDetailScreen.tsx	792	jsx	Confirm	Xác nhận	Dịch chuỗi giao diện
+features/nutrition/NutritionScreen.tsx	293	jsx	· USDA FDC	· USDA FDC	Giữ tên riêng/ký hiệu
+features/nutrition/NutritionScreen.tsx	296	jsx	· revision	· bản sửa đổi	Dịch chuỗi giao diện
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Nguồn catalog đã duyệt	Nguồn danh mục đã duyệt	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Lưu correction	Lưu điều chỉnh	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Lịch sử correction vẫn được giữ.	Lịch sử điều chỉnh vẫn được giữ.	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Món chưa có nutrient nào	Món chưa có chất dinh dưỡng nào	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Thực phẩm catalog đã duyệt	Thực phẩm trong danh mục đã duyệt	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Đang tải catalog	Đang tải danh mục	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Không tải được catalog	Không tải được danh mục	Dịch câu pha tiếng Anh
+features/nutrition/NutritionScreen.tsx	—	mixed copy	Ghi thực phẩm catalog	Ghi thực phẩm trong danh mục	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	344	jsx	→ sau	→ sau	Giữ tên riêng/ký hiệu
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Không có Goal Version phù hợp	Không có phiên bản mục tiêu phù hợp	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Cần chọn nutrient	Cần chọn chất dinh dưỡng	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Chọn nutrient của ngày	Chọn chất dinh dưỡng của ngày	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Catalog trống	Danh mục trống	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Chưa có loại Goal hợp lệ	Chưa có loại mục tiêu hợp lệ	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Ngày này không có target.	Ngày này không có chỉ tiêu.	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Ghi đè target ngày này	Ghi đè chỉ tiêu ngày này	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Lưu ghi đè theo phiên bản Goal này	Lưu ghi đè theo phiên bản mục tiêu này	Dịch câu pha tiếng Anh
+features/nutrition/NutritionStrategyScreen.tsx	—	mixed copy	Lịch sử sửa target	Lịch sử sửa chỉ tiêu	Dịch câu pha tiếng Anh
+features/onboarding/ChoosePurposeScreen.tsx	38	jsx	Welcome to Digital Fitness	Chào mừng đến với Digital Fitness	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	41	jsx	Choose how you would like to start today. You can always activate the other capability later from your account settings.	Chọn cách bạn muốn bắt đầu. Bạn có thể kích hoạt vai trò còn lại sau trong cài đặt tài khoản.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	51	attribute:accessibilityLabel	I want to be coached. Continue to Student Onboarding.	Tôi muốn tập luyện. Tiếp tục tạo hồ sơ Học viên.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	52	attribute:accessibilityHint	Sets up your personal student fitness profile.	Tạo hồ sơ thể chất cá nhân cho Học viên.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	65	jsx	STUDENT	HỌC VIÊN	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	70	jsx	I want to be coached	Tôi muốn tập luyện	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	73	jsx	Track workouts, set personal fitness goals, follow structured plans, and work with a coach or follow self-directed training.	Theo dõi buổi tập, đặt mục tiêu thể chất, thực hiện kế hoạch và lựa chọn tập cùng huấn luyện viên hoặc tự tập.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	78	jsx	Start Student Onboarding →	Tạo hồ sơ Học viên →	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	87	attribute:accessibilityLabel	I want to coach. Continue to Trainer Profile Setup.	Tôi muốn huấn luyện. Tiếp tục tạo hồ sơ Huấn luyện viên.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	88	attribute:accessibilityHint	Sets up your professional trainer profile.	Thiết lập hồ sơ huấn luyện viên chuyên nghiệp của bạn.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	101	jsx	TRAINER	HUẤN LUYỆN VIÊN	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	106	jsx	I want to coach others	Tôi muốn huấn luyện người khác	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	109	jsx	Build your professional trainer profile, set your experience and coaching details, and prepare for future verification.	Tạo hồ sơ Huấn luyện viên, khai báo kinh nghiệm và thông tin huấn luyện để chuẩn bị xác minh.	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	114	jsx	Set up Trainer Profile →	Thiết lập hồ sơ huấn luyện viên →	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	122	jsx	Logged in as	Đang đăng nhập bằng	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	127	attribute:accessibilityLabel	Sign out of your account	Đăng xuất khỏi tài khoản của bạn	Dịch chuỗi giao diện
+features/onboarding/ChoosePurposeScreen.tsx	131	jsx	Sign Out	Đăng xuất	Dịch chuỗi giao diện
+features/progress-summary/ProgressSummaryScreen.tsx	344	attribute:placeholder	YYYY-MM-DD	YYYY-MM-DD	Giữ tên riêng/ký hiệu
+features/student/StudentOnboardingScreen.tsx	184	jsx	Welcome	Chào mừng	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	187	jsx	Complete Your Student Profile	Hoàn thiện hồ sơ Học viên	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	190	jsx	Set up your fitness baseline so we can personalize your training journey.	Cung cấp thông tin thể chất ban đầu để cá nhân hóa quá trình tập luyện.	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	206	jsx	Date of Birth	Ngày sinh	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	208	jsx	Format: YYYY-MM-DD (e.g., 1995-06-15)	Định dạng: YYYY-MM-DD (ví dụ: 1995-06-15)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	213	attribute:accessibilityHint	Enter your date of birth in YYYY-MM-DD format	Nhập ngày sinh của bạn theo định dạng YYYY-MM-DD	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	222	attribute:placeholder	YYYY-MM-DD	YYYY-MM-DD	Giữ tên riêng/ký hiệu
+features/student/StudentOnboardingScreen.tsx	236	jsx	Gender	Giới tính	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	273	jsx	Experience Level	Trình độ tập luyện	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	310	jsx	Training Experience (Months)	Kinh nghiệm tập luyện (tháng)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	312	jsx	Total months of regular workout experience (e.g., 12)	Tổng số tháng kinh nghiệm tập luyện thường xuyên (ví dụ: 12)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	316	attribute:accessibilityLabel	Training Experience in Months	Kinh nghiệm tập luyện tính bằng tháng	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	317	attribute:accessibilityHint	Enter number of months you have trained	Nhập số tháng bạn đã tập luyện	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	342	jsx	Available Days Per Week	Số ngày có thể tập mỗi tuần	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	344	jsx	How many days per week can you train? (1 to 7)	Bạn có thể tập luyện bao nhiêu ngày mỗi tuần? (1 đến 7)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	385	jsx	Preferred Session Duration (Minutes)	Thời lượng buổi tập mong muốn (phút)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	387	jsx	Typical duration between 5 and 480 minutes	Thời lượng thông thường từ 5 đến 480 phút	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	423	attribute:accessibilityLabel	Preferred Session Duration in Minutes	Thời lượng buổi tập mong muốn tính bằng phút	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	424	attribute:accessibilityHint	Enter minutes per workout session	Nhập số phút mỗi buổi tập luyện	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	436	attribute:placeholder	Or enter custom minutes (e.g., 45)	Hoặc nhập số phút tùy chỉnh (ví dụ: 45)	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	452	attribute:accessibilityLabel	Complete Setup	Hoàn tất thiết lập	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	477	attribute:accessibilityLabel	Continue without details	Tiếp tục mà chưa nhập thông tin	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	497	attribute:accessibilityLabel	Sign out or switch account	Đăng xuất hoặc chuyển đổi tài khoản	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	502	jsx	Not your account?	Không phải tài khoản của bạn?	Dịch chuỗi giao diện
+features/student/StudentOnboardingScreen.tsx	504	jsx	Sign out	Đăng xuất	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	218	literal-review	No changes were made.	Chưa có thay đổi nào.	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	269	attribute:accessibilityLabel	Go to Home	Về Trang chủ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	273	jsx	← Home	← Trang chủ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	282	jsx	Loading student profile...	Đang tải hồ sơ học viên...	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	290	jsx	Unable to Load Profile	Không thể tải hồ sơ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	296	attribute:accessibilityLabel	Retry loading profile	Thử tải lại hồ sơ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	299	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	307	jsx	No Student Profile	Chưa có hồ sơ Học viên	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	309	jsx	You have not set up your Student Profile yet.	Bạn chưa tạo hồ sơ Học viên.	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	314	attribute:accessibilityLabel	Create Student Profile	Tạo hồ sơ Học viên	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	317	jsx	Complete Setup	Hoàn tất thiết lập	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	327	jsx	Student Profile	Hồ sơ Học viên	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	329	jsx	Your personal fitness baseline and preferences	Thông tin thể chất ban đầu và sở thích của bạn	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	335	attribute:accessibilityLabel	Edit Profile	Chỉnh sửa hồ sơ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	339	jsx	Edit	Chỉnh sửa	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	351	jsx	Date of Birth	Ngày sinh	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	358	jsx	Gender	Giới tính	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	365	jsx	Experience Level	Trình độ tập luyện	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	372	jsx	Experience Months	Số tháng tập luyện	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	381	jsx	Available Days / Week	Số ngày có thể tập mỗi tuần	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	390	jsx	Session Duration	Thời lượng buổi tập	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	399	jsx	Onboarding Status	Trạng thái thiết lập hồ sơ	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	414	jsx	Edit Student Profile	Chỉnh sửa hồ sơ học viên	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	416	jsx	Update only the fields you wish to change	Chỉ cập nhật các trường bạn muốn thay đổi	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	430	jsx	Format: YYYY-MM-DD	Định dạng: YYYY-MM-DD	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	441	attribute:placeholder	YYYY-MM-DD	YYYY-MM-DD	Giữ tên riêng/ký hiệu
+features/student/StudentProfileScreen.tsx	532	attribute:accessibilityLabel	Training Experience in Months	Kinh nghiệm tập luyện tính bằng tháng	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	556	jsx	Available Days Per Week	Số ngày có thể tập mỗi tuần	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	596	jsx	Session Duration (Minutes)	Thời lượng buổi tập (phút)	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	631	attribute:accessibilityLabel	Preferred Session Duration in Minutes	Thời lượng buổi tập mong muốn tính bằng phút	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	642	attribute:placeholder	Minutes (5 to 480)	Phút (5 đến 480)	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	658	attribute:accessibilityLabel	Save Changes	Lưu thay đổi	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	682	attribute:accessibilityLabel	Cancel Editing	Hủy chỉnh sửa	Dịch chuỗi giao diện
+features/student/StudentProfileScreen.tsx	686	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	92	literal-review	This public handle is already in use. Please choose another.	Đường dẫn công khai này đã được dùng. Vui lòng chọn đường dẫn khác.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	98	literal-review	Trainer capability has been revoked on this account. Please contact platform administration.	Quyền huấn luyện của tài khoản đã bị thu hồi. Vui lòng liên hệ quản trị nền tảng.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	121	literal-review	Failed to create Trainer Profile.	Không thể tạo hồ sơ huấn luyện viên.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	124	literal-review	Network error. Please try again.	Lỗi mạng. Vui lòng thử lại.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	142	jsx	Trainer Profile Setup	Thiết lập hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	145	jsx	Activate your trainer capability to configure your coaching profile.	Kích hoạt vai trò Huấn luyện viên để thiết lập hồ sơ huấn luyện.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	165	jsx	Coaching Authority Invariant	Quy tắc về quyền huấn luyện	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	172	jsx	Setting up a Trainer Profile activates your trainer capability. However, coaching authority remains disabled until your qualifications and credentials are submitted, reviewed, and approved by platform administration.	Tạo hồ sơ Huấn luyện viên sẽ kích hoạt vai trò tương ứng. Quyền huấn luyện chỉ được cấp sau khi quản trị nền tảng xem xét và phê duyệt bằng cấp, chứng chỉ.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	203	jsx	Public Profile Handle	Định danh hồ sơ công khai	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	206	jsx	Custom URL slug (e.g., coach-alex). Lowercase letters, numbers, and hyphens only.	Định danh URL tùy chọn (ví dụ: coach-alex). Chỉ dùng chữ thường không dấu, chữ số và dấu gạch nối.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	211	attribute:accessibilityHint	Enter a unique URL handle containing lowercase letters, numbers, and hyphens	Nhập định danh URL duy nhất bằng chữ thường không dấu, chữ số và dấu gạch nối	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	214	attribute:placeholder	e.g. coach-alex	Ví dụ: coach-alex	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	244	jsx	Professional Bio	Giới thiệu chuyên môn	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	247	jsx	Describe your coaching background, philosophy, and specializations (up to 4000 characters).	Mô tả nền tảng, triết lý và chuyên môn huấn luyện của bạn (tối đa 4000 ký tự).	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	252	attribute:accessibilityHint	Enter your professional coaching biography	Nhập tiểu sử huấn luyện chuyên nghiệp của bạn	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	256	attribute:placeholder	Tell clients about your background and coaching style...	Giới thiệu kinh nghiệm và phong cách huấn luyện của bạn...	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	286	jsx	Years of Coaching Experience	Số năm kinh nghiệm huấn luyện	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	291	attribute:accessibilityHint	Enter years of experience between 0 and 99.99	Nhập số năm kinh nghiệm từ 0 đến 99,99	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	333	jsx	Accepting Students	Nhận học viên	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	336	jsx	Mark your profile as open to accepting new students once verified.	Cho phép nhận học viên mới sau khi được xác minh.	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	355	attribute:accessibilityLabel	Create Trainer Profile	Tạo hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	368	jsx	Complete Trainer Setup	Hoàn tất thiết lập huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	375	attribute:accessibilityLabel	Skip details and activate trainer profile now	Bỏ qua chi tiết và kích hoạt hồ sơ huấn luyện viên ngay bây giờ	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	380	jsx	Skip details for now	Để sau	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	387	jsx	Logged in as	Đang đăng nhập bằng	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	392	attribute:accessibilityLabel	Sign out of your account	Đăng xuất khỏi tài khoản của bạn	Dịch chuỗi giao diện
+features/trainer/TrainerOnboardingScreen.tsx	396	jsx	Sign Out	Đăng xuất	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	306	literal-review	This public handle is already in use. Please choose another.	Đường dẫn công khai này đã được dùng. Vui lòng chọn đường dẫn khác.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	321	literal-review	Network error. Please try again.	Lỗi mạng. Vui lòng thử lại.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	336	jsx	Loading Trainer Profile...	Đang tải hồ sơ huấn luyện viên...	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	348	jsx	Unable to Load Profile	Không thể tải hồ sơ	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	356	attribute:accessibilityLabel	Retry loading trainer profile	Thử tải lại hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	359	jsx	Retry	Thử lại	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	379	attribute:accessibilityLabel	Go back to home	Về Trang chủ	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	383	jsx	← Back to Overview	← Về Tổng quan	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	391	attribute:accessibilityLabel	Edit Trainer Profile	Chỉnh sửa hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	394	jsx	Edit	Chỉnh sửa	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	401	attribute:accessibilityLabel	Cancel editing	Hủy chỉnh sửa	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	406	jsx	Cancel	Hủy	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	412	attribute:accessibilityLabel	Save Trainer Profile changes	Lưu thay đổi hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	422	jsx	Save	Lưu	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	430	jsx	Trainer Profile	Hồ sơ huấn luyện viên	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	432	jsx	Professional details and coaching eligibility	Thông tin chuyên môn và điều kiện được huấn luyện	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	488	jsx	Status & Governance	Trạng thái và quản lý	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	494	jsx	Verification Status	Trạng thái xác minh	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	529	jsx	Activity Status	Trạng thái hoạt động	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	559	jsx	Coaching Eligibility	Điều kiện được huấn luyện	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	598	jsx	Coaching Authority:	Quyền huấn luyện:	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	621	jsx	Verification Application	Hồ sơ xác minh	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	663	jsx	You have not submitted a verification application yet. Submit your application and qualifications to become eligible to coach students.	Bạn chưa nộp hồ sơ xác minh. Hãy nộp hồ sơ cùng bằng cấp để được xét quyền huấn luyện học viên.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	668	jsx	Application Notes / Qualifications	Ghi chú hồ sơ / Bằng cấp	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	672	attribute:accessibilityLabel	Application notes or qualifications	Ghi chú hồ sơ hoặc bằng cấp	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	683	attribute:placeholder	Enter details about your coaching credentials, experience, or certifications...	Nhập bằng cấp, kinh nghiệm hoặc chứng chỉ huấn luyện...	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	693	jsx	Verification Documents (PDF, PNG, JPEG)	Tài liệu xác minh (PDF, PNG, JPEG)	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	698	attribute:accessibilityLabel	Attach verification document	Đính kèm tài liệu xác minh	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	713	jsx	+ Attach Document (Max 10MB)	+ Đính kèm tài liệu (tối đa 10 MB)	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	762	attribute:accessibilityLabel	Submit verification application	Nộp hồ sơ xác minh	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	776	jsx	Submit Application	Nộp hồ sơ	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	790	jsx	APPLICATION UNDER REVIEW	HỒ SƠ ĐANG ĐƯỢC XEM XÉT	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	794	jsx	Your verification application is currently under review by platform administrators. You will be notified once a decision has been made.	Quản trị nền tảng đang xem xét hồ sơ xác minh của bạn. Bạn sẽ được thông báo khi có quyết định.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	799	jsx	Submitted:	Đã gửi:	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	814	jsx	APPLICATION REJECTED	HỒ SƠ BỊ TỪ CHỐI	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	818	jsx	Your previous application was rejected. Please review the reason below and resubmit with updated information.	Đơn đăng ký trước đó của bạn đã bị từ chối. Vui lòng xem lại lý do bên dưới và gửi lại với thông tin cập nhật.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	831	jsx	Rejection Reason:	Lý do từ chối:	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	842	jsx	Updated Application Notes / Corrections	Ghi chú / Chỉnh sửa hồ sơ đã cập nhật	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	846	attribute:accessibilityLabel	Updated application notes or corrections	Ghi chú hoặc chỉnh sửa hồ sơ đã cập nhật	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	857	attribute:placeholder	Explain how you addressed the rejection reasons...	Giải thích cách bạn giải quyết lý do bị từ chối...	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	867	jsx	Updated Verification Documents (PDF, PNG, JPEG)	Tài liệu xác minh được cập nhật (PDF, PNG, JPEG)	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	872	attribute:accessibilityLabel	Attach updated verification document	Đính kèm tài liệu xác minh đã cập nhật	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	936	attribute:accessibilityLabel	Resubmit verification application	Gửi lại hồ sơ xác minh	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	950	jsx	Resubmit Application	Gửi lại hồ sơ	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	964	jsx	VERIFIED TRAINER	HUẤN LUYỆN VIÊN ĐƯỢC XÁC MINH	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	968	jsx	Your verification application has been approved. You are authorized to coach students when accepting students is enabled.	Hồ sơ xác minh của bạn đã được phê duyệt. Bạn có thể huấn luyện học viên khi bật chế độ nhận học viên.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	973	jsx	Verified on:	Xác minh ngày:	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	998	jsx	Public Profile Handle	Định danh hồ sơ công khai	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1005	attribute:placeholder	e.g. coach-alex	Ví dụ: coach-alex	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1035	jsx	Professional Bio	Giới thiệu chuyên môn	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1043	attribute:placeholder	Tell clients about your coaching background...	Giới thiệu kinh nghiệm huấn luyện của bạn...	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1071	jsx	Years of Coaching Experience	Số năm kinh nghiệm huấn luyện	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1108	jsx	Accepting New Students	Đang nhận học viên mới	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1111	jsx	Open to coaching assignments once verified.	Sẵn sàng nhận học viên sau khi được xác minh.	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1128	jsx	Public Handle	Định danh công khai	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1137	jsx	Experience	Kinh nghiệm	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1148	jsx	Accepting Students	Nhận học viên	Dịch chuỗi giao diện
+features/trainer/TrainerProfileScreen.tsx	1157	jsx	Bio	Giới thiệu	Dịch chuỗi giao diện
+features/workout-execution/workoutExecutionMessages.ts	26	literal-review	Drop set	Hiệp giảm tải	Dịch chuỗi giao diện
+features/workout-execution/WorkoutExecutionScreen.tsx	301	attribute:label	RPE (1–10)	RPE (1–10)	Giữ tên riêng/ký hiệu
+features/workout-execution/WorkoutExecutionScreen.tsx	537	literal-review	Missing exercise target	Chưa có chỉ tiêu bài tập	Dịch chuỗi giao diện
+features/workout-execution/WorkoutExecutionScreen.tsx	—	mixed copy	Backend sẽ xác định kết quả	Hệ thống sẽ xác định kết quả	Dịch câu pha tiếng Anh
+features/workout-plan/components/AiWorkoutAdjustmentModal.tsx	1044	jsx	(ID:	(ID:	Giữ tên riêng/ký hiệu
+features/workout-plan/components/AiWorkoutAdjustmentModal.tsx	—	mixed copy	'Trọng lượng cơ thể (Bodyweight)'	'Trọng lượng cơ thể'	Dịch câu pha tiếng Anh
+features/workout-plan/components/AiWorkoutAdjustmentModal.tsx	—	mixed copy	Thay bài tập tương đương (Exercise Substitution)	Thay bài tập tương đương	Dịch câu pha tiếng Anh
+features/workout-plan/components/AiWorkoutProposalModal.tsx	589	attribute:placeholder	YYYY-MM-DD	YYYY-MM-DD	Giữ tên riêng/ký hiệu
+features/workout-plan/components/AiWorkoutProposalModal.tsx	993	jsx	(ID:	(ID:	Giữ tên riêng/ký hiệu
+features/workout-plan/components/AiWorkoutProposalModal.tsx	1157	jsx	[ID:	[ID:	Giữ tên riêng/ký hiệu
+features/workout-plan/components/AiWorkoutProposalModal.tsx	1157	jsx	... · Aggregate Version:	... · Phiên bản tổng hợp:	Dịch chuỗi giao diện
+features/workout-plan/components/AiWorkoutProposalModal.tsx	—	mixed copy	label: 'Bodyweight'	label: 'Trọng lượng cơ thể'	Dịch câu pha tiếng Anh
+features/workout-plan/components/AiWorkoutProposalModal.tsx	—	mixed copy	label: 'Tạ đơn (Dumbbell)'	label: 'Tạ đơn'	Dịch câu pha tiếng Anh
+features/workout-plan/components/AiWorkoutProposalModal.tsx	—	mixed copy	label: 'Thanh đòn (Barbell)'	label: 'Thanh đòn'	Dịch câu pha tiếng Anh
+features/workout-plan/components/WorkoutPlanVersionContent.tsx	—	mixed copy	} reps`	} lần`	Dịch câu pha tiếng Anh
+features/workout-plan/StudentWorkoutPlansScreen.tsx	—	mixed copy	Backend sẽ kiểm tra chế độ SELF_DIRECTED khi lưu	Hệ thống sẽ kiểm tra chế độ tự tập khi lưu	Dịch câu pha tiếng Anh
+features/workout-plan/TrainerProgramScreen.tsx	—	mixed copy	Backend sẽ xác minh lại quyền hiện tại	Hệ thống sẽ xác minh lại quyền hiện tại	Dịch câu pha tiếng Anh
+features/workout-plan/TrainerWorkoutPlanDetailScreen.tsx	84	literal-review	Missing workout plan	Không tìm thấy kế hoạch tập	Dịch chuỗi giao diện
+features/workout-plan/TrainerWorkoutPlanDetailScreen.tsx	—	mixed copy	Backend sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.	Hệ thống sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	124	literal-review	Missing plan	Không tìm thấy kế hoạch	Dịch chuỗi giao diện
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	item.exerciseName ?? 'Exercise'	item.exerciseName ?? 'Bài tập'	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	Exercise lịch sử này	Bài tập trong lịch sử này	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	chọn Exercise active khác	chọn bài tập đang hoạt động khác	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	label="Reps từ"	label="Số lần lặp từ"	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	label="Reps đến"	label="Số lần lặp đến"	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	tên, Exercise đang khả dụng	tên, bài tập đang khả dụng	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	reps, mức tạ	số lần lặp, mức tạ	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	reps tối đa không nhỏ hơn reps tối thiểu	số lần lặp tối đa không nhỏ hơn số lần lặp tối thiểu	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	—	mixed copy	label="Quay lại chọn Exercise"	label="Quay lại chọn bài tập"	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanDetailScreen.tsx	80	literal-review	Missing plan	Không tìm thấy kế hoạch	Dịch chuỗi giao diện
+features/workout-plan/WorkoutPlanDetailScreen.tsx	100	literal-review	Missing source	Không tìm thấy nguồn dữ liệu	Dịch chuỗi giao diện
+features/workout-plan/WorkoutPlanDetailScreen.tsx	—	mixed copy	sẽ được backend kiểm tra lại với trạng thái và phiên bản mới nhất.	sẽ được hệ thống kiểm tra lại với trạng thái và phiên bản mới nhất.	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanHistoryScreen.tsx	—	mixed copy	Nguồn vẫn là bản ghi Trainer-authored bất biến. Hệ thống sẽ tạo một Student-owned DRAFT mới với lineage rõ ràng.	Bản kế hoạch do huấn luyện viên tạo vẫn được giữ nguyên. Hệ thống sẽ tạo bản nháp mới do học viên sở hữu và ghi rõ nguồn gốc.	Dịch câu pha tiếng Anh
+features/workout-plan/WorkoutPlanHistoryScreen.tsx	—	mixed copy	Canonical hiện tại:	Bản chuẩn hiện tại:	Dịch câu pha tiếng Anh
+features/workout-recurrence/RecurrenceCreateScreen.tsx	—	mixed copy	kế hoạch ACTIVE	kế hoạch đang hoạt động	Dịch câu pha tiếng Anh
+features/workout-recurrence/RecurrenceCreateScreen.tsx	—	mixed copy	đề xuất PENDING	đề xuất đang chờ	Dịch câu pha tiếng Anh
+features/workout-recurrence/RecurrenceDetailScreen.tsx	149	jsx	Block	Chặn	Dịch chuỗi giao diện
+features/workout-recurrence/RecurrenceDetailScreen.tsx	151	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-recurrence/RecurrenceDetailScreen.tsx	—	mixed copy	Backend kiểm tra lại quyền	Hệ thống kiểm tra lại quyền	Dịch câu pha tiếng Anh
+features/workout-recurrence/RecurrenceDetailScreen.tsx	—	mixed copy	Appointment.	lịch hẹn.	Dịch câu pha tiếng Anh
+features/workout-recurrence/RecurrenceListScreen.tsx	—	mixed copy	Quyền xem Student	Quyền xem học viên	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	127	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	—	mixed copy	Đề xuất PENDING	Đề xuất đang chờ	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	—	mixed copy	ACCEPT sẽ được máy chủ kiểm tra lại	Việc chấp nhận sẽ được hệ thống kiểm tra lại	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	—	mixed copy	REJECT giữ nguyên lịch	Việc từ chối giữ nguyên lịch	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	—	mixed copy	lịch hẹn liên kết vẫn CONFIRMED	lịch hẹn liên kết vẫn được xác nhận	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/StudentChangeProposalsScreen.tsx	62	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule-change-proposals/TrainerChangeProposalDetailScreen.tsx	92	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule-change-proposals/TrainerChangeProposalDetailScreen.tsx	—	mixed copy	Lý do Trainer nêu:	Lý do huấn luyện viên nêu:	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	148	attribute:placeholder	YYYY-MM-DDTHH:mm	YYYY-MM-DDTHH:mm	Giữ tên riêng/ký hiệu
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	168	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	—	mixed copy	Thiếu metadata nguồn, local-time intent hoặc supervision	Thiếu thông tin nguồn, giờ địa phương dự kiến hoặc thông tin giám sát	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	—	mixed copy	occurrence version, execution seal, Appointment	phiên bản buổi tập, trạng thái khóa nhật ký và lịch hẹn	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	—	mixed copy	Chỉ một occurrence.	Chỉ một buổi tập.	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	—	mixed copy	Học viên sẽ ACCEPT/REJECT	Học viên sẽ chấp nhận hoặc từ chối	Dịch câu pha tiếng Anh
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	—	mixed copy	đề xuất PENDING không đổi occurrence	đề xuất đang chờ không đổi buổi tập	Dịch câu pha tiếng Anh
+features/workout-schedule-proposals/StudentScheduleProposalDetailScreen.tsx	—	mixed copy	lịch hẹn CONFIRMED	lịch hẹn đã xác nhận	Dịch câu pha tiếng Anh
+features/workout-schedule-proposals/StudentScheduleProposalDetailScreen.tsx	—	mixed copy	đề xuất vẫn PENDING	đề xuất vẫn đang chờ	Dịch câu pha tiếng Anh
+features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx	257	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx	—	mixed copy	lịch hẹn CONFIRMED	lịch hẹn đã xác nhận	Dịch câu pha tiếng Anh
+features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx	—	mixed copy	kế hoạch ACTIVE	kế hoạch đang hoạt động	Dịch câu pha tiếng Anh
+features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx	—	mixed copy	Múi giờ Trainer chọn	Múi giờ huấn luyện viên chọn	Dịch câu pha tiếng Anh
+features/workout-schedule/StudentConfirmBatchScreen.tsx	176	attribute:placeholder	YYYY-MM-DD	YYYY-MM-DD	Giữ tên riêng/ký hiệu
+features/workout-schedule/StudentConfirmBatchScreen.tsx	199	attribute:placeholder	YYYY-MM-DDTHH:mm	YYYY-MM-DDTHH:mm	Giữ tên riêng/ký hiệu
+features/workout-schedule/StudentConfirmBatchScreen.tsx	230	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule/StudentConfirmBatchScreen.tsx	—	mixed copy	kế hoạch ACTIVE	kế hoạch đang hoạt động	Dịch câu pha tiếng Anh
+features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx	184	jsx	UTC	UTC	Giữ tên riêng/ký hiệu
+features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx	214	attribute:placeholder	YYYY-MM-DDTHH:mm	YYYY-MM-DDTHH:mm	Giữ tên riêng/ký hiệu
+features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx	—	mixed copy	lịch hẹn CONFIRMED	lịch hẹn đã xác nhận	Dịch câu pha tiếng Anh
+features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx	—	mixed copy	Lịch hẹn vẫn CONFIRMED	Lịch hẹn vẫn được xác nhận	Dịch câu pha tiếng Anh
+features/workout-schedule/TrainerWorkoutScheduleScreen.tsx	—	mixed copy	Trainer không thể	Huấn luyện viên không thể	Dịch câu pha tiếng Anh

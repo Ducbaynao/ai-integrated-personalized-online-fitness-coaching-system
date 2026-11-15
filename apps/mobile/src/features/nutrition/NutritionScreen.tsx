@@ -208,7 +208,7 @@ export function NutritionScreen() {
       {dayQuery.data.items.map((item) => <WorkoutCard key={item.id}>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.name}</Text>
         {item.kind === 'CATALOG_QUANTIFIED' ? <Text style={[styles.body, { color: theme.textSecondary }]}>
-          Nguồn catalog đã duyệt · {item.servings} {item.quantityBasis === 'GRAM' ? 'g' : item.quantityBasis === 'MILLILITRE' ? 'ml' : item.servingLabel ?? 'khẩu phần'} · revision đã chốt trong lịch sử
+          Nguồn danh mục đã duyệt · {item.servings} {item.quantityBasis === 'GRAM' ? 'g' : item.quantityBasis === 'MILLILITRE' ? 'ml' : item.servingLabel ?? 'khẩu phần'} · bản sửa đổi đã chốt trong lịch sử
         </Text> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{item.kind === 'DESCRIPTION_ONLY' ? 'Chưa định lượng' : `${item.servings ?? '?'} ${item.servingLabel ?? 'khẩu phần'}`}</Text>
         <WorkoutButton label={`Sửa ${item.name}`} secondary onPress={() => {
@@ -260,9 +260,9 @@ export function NutritionScreen() {
             </Text></Pressable>)}
         <WorkoutButton label="Ghi món" disabled={busy || !validContext} onPress={addItem} />
       </> : <>
-        <WorkoutButton label="Lưu correction" disabled={busy} onPress={() => correct(false)} />
+        <WorkoutButton label="Lưu điều chỉnh" disabled={busy} onPress={() => correct(false)} />
         {!confirmRemove ? <WorkoutButton label="Xóa món (giữ lịch sử)" secondary disabled={busy} onPress={() => setConfirmRemove(true)} /> :
-          <><Text style={[styles.body, { color: theme.textPrimary }]}>Xác nhận xóa món khỏi ngày? Lịch sử correction vẫn được giữ.</Text>
+          <><Text style={[styles.body, { color: theme.textPrimary }]}>Xác nhận xóa món khỏi ngày? Lịch sử điều chỉnh vẫn được giữ.</Text>
             <WorkoutButton label="Xác nhận xóa món" disabled={busy} onPress={() => correct(true)} />
             <WorkoutButton label="Không xóa" secondary onPress={() => setConfirmRemove(false)} /></>}
         {historyQuery.data?.map((entry) => <Text key={entry.id} style={[styles.body, { color: theme.textSecondary }]}>
@@ -273,7 +273,7 @@ export function NutritionScreen() {
     </WorkoutCard>
     <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{editingFood ? `Bổ sung dinh dưỡng cho ${editingFood.name}` : 'Tạo món riêng'}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn tự khai báo; để trống chất dinh dưỡng chưa biết, chỉ nhập 0 nếu thực sự bằng 0. Món chưa có nutrient nào là bản nháp, chưa thể ghi theo khẩu phần.</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn tự khai báo; để trống chất dinh dưỡng chưa biết, chỉ nhập 0 nếu thực sự bằng 0. Món chưa có chất dinh dưỡng nào là bản nháp, chưa thể ghi theo khẩu phần.</Text>
       {input('Tên món', name, setName)}{input('Tên một khẩu phần', servingLabel, setServingLabel)}
       {input('Kcal mỗi khẩu phần', kcal, setKcal, 'decimal-pad')}{input('Protein (g)', protein, setProtein, 'decimal-pad')}
       {input('Carb (g)', carbs, setCarbs, 'decimal-pad')}{input('Chất béo (g)', fat, setFat, 'decimal-pad')}
@@ -281,10 +281,10 @@ export function NutritionScreen() {
       {editingFood ? <WorkoutButton label="Hủy chỉnh món nháp" secondary onPress={() => setEditingFood(null)} /> : null}
     </WorkoutCard>
     <WorkoutCard>
-      <Text style={[styles.h2, { color: theme.textPrimary }]}>Thực phẩm catalog đã duyệt</Text>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Thực phẩm trong danh mục đã duyệt</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Tập nhỏ USDA Foundation Foods do quản trị viên công bố. Giá trị thiếu là chưa biết, không phải 0.</Text>
-      {catalogQuery.isPending ? <WorkoutState title="Đang tải catalog" message="Vui lòng chờ." busy /> : null}
-      {catalogQuery.isError ? <WorkoutState title="Không tải được catalog" message="Kiểm tra kết nối rồi thử lại." onRetry={() => catalogQuery.refetch()} /> : null}
+      {catalogQuery.isPending ? <WorkoutState title="Đang tải danh mục" message="Vui lòng chờ." busy /> : null}
+      {catalogQuery.isError ? <WorkoutState title="Không tải được danh mục" message="Kiểm tra kết nối rồi thử lại." onRetry={() => catalogQuery.refetch()} /> : null}
       {catalogQuery.data?.length === 0 ? <WorkoutState title="Chưa có thực phẩm được công bố" message="Bạn vẫn có thể ghi món riêng do mình khai báo." /> : null}
       {catalogQuery.data?.map((food) => <Pressable key={food.id} accessibilityRole="radio"
         accessibilityLabel={`Chọn ${food.name}, USDA FDC ${food.fdcId}`}
@@ -293,26 +293,26 @@ export function NutritionScreen() {
         <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogFoodId === food.id ? '◉' : '○'} {food.name} · USDA FDC {food.fdcId}</Text>
       </Pressable>)}
       {chosenCatalog ? <>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: {chosenCatalog.sourceName} · {chosenCatalog.sourceRelease} · revision {chosenCatalog.revisionNumber}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: {chosenCatalog.sourceName} · {chosenCatalog.sourceRelease} · bản sửa đổi {chosenCatalog.revisionNumber}</Text>
         {(['GRAM', 'SERVING', 'MILLILITRE'] as const).map((basis) => {
           const allowed = basis === 'GRAM' || chosenCatalog.portions.some((part) => basis === 'SERVING'
             ? part.gramsPerServing != null : part.gramsPerMl != null);
           return <Pressable key={basis} accessibilityRole="radio"
-            accessibilityLabel={`Đơn vị ${basis}`}
+            accessibilityLabel={`Đơn vị ${basis === 'GRAM' ? 'gam' : basis === 'SERVING' ? 'khẩu phần' : 'mililít'}`}
             accessibilityState={{ checked: catalogBasis === basis, disabled: !allowed }} disabled={!allowed}
             onPress={() => { setCatalogBasis(basis); setCatalogPortionId(''); }} style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogBasis === basis ? '◉' : '○'} {basis === 'GRAM' ? 'Gram (g)' : basis === 'SERVING' ? 'Khẩu phần có khối lượng đã duyệt' : 'Mililít (ml) có bằng chứng quy đổi'}{allowed ? '' : ' · chưa có dữ liệu'}</Text>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogBasis === basis ? '◉' : '○'} {basis === 'GRAM' ? 'Gam (g)' : basis === 'SERVING' ? 'Khẩu phần có khối lượng đã duyệt' : 'Mililít (ml) có bằng chứng quy đổi'}{allowed ? '' : ' · chưa có dữ liệu'}</Text>
           </Pressable>;
         })}
         {catalogBasis !== 'GRAM' ? chosenCatalog.portions.filter((part) => catalogBasis === 'SERVING'
           ? part.gramsPerServing != null : part.gramsPerMl != null).map((part) =>
           <Pressable key={part.id} accessibilityRole="radio" accessibilityState={{ checked: catalogPortionId === part.id }}
-            accessibilityLabel={`Portion ${part.label}, nguồn ${catalogBasis === 'SERVING' ? part.factorSource ?? 'chưa rõ' : part.mlFactorSource ?? 'chưa rõ'}`}
+            accessibilityLabel={`Khẩu phần ${part.label}, nguồn ${catalogBasis === 'SERVING' ? part.factorSource ?? 'chưa rõ' : part.mlFactorSource ?? 'chưa rõ'}`}
             onPress={() => setCatalogPortionId(part.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
             <Text style={[styles.body, { color: theme.textPrimary }]}>{catalogPortionId === part.id ? '◉' : '○'} {part.label} · {catalogBasis === 'SERVING' ? part.factorSource : part.mlFactorSource}</Text>
           </Pressable>) : null}
         {input('Số lượng theo đơn vị đã chọn', catalogQuantity, setCatalogQuantity, 'decimal-pad')}
-        <WorkoutButton label="Ghi thực phẩm catalog" disabled={busy || !validContext} onPress={addCatalogItem} />
+        <WorkoutButton label="Ghi thực phẩm trong danh mục" disabled={busy || !validContext} onPress={addCatalogItem} />
       </> : null}
     </WorkoutCard>
   </ScrollView>;

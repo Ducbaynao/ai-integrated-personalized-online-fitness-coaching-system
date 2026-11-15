@@ -10,6 +10,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { aiRecommendationStatusLabels } from '@/localization/displayLabels';
 import { spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -497,7 +498,7 @@ export function AiWorkoutAdjustmentModal({
 
       const formatLoad = (val: number | null | undefined, unit: string | null | undefined) => {
         if (isConfirmedBodyweight(val, unit)) {
-          return 'Trọng lượng cơ thể (Bodyweight)';
+          return 'Trọng lượng cơ thể';
         }
         if (val === null || val === undefined) {
           return unit ? `Chưa có dữ liệu (${unit})` : 'Chưa có dữ liệu';
@@ -798,7 +799,7 @@ export function AiWorkoutAdjustmentModal({
                         ...typography.label,
                       }}
                     >
-                      Thay bài tập tương đương (Exercise Substitution)
+                      Thay bài tập tương đương
                     </Text>
                   </TouchableOpacity>
 
@@ -999,7 +1000,7 @@ export function AiWorkoutAdjustmentModal({
               <WorkoutCard>
                 <View style={styles.proposalHeaderRow}>
                   <Text style={[styles.badge, { backgroundColor: theme.primary, color: theme.textOnPrimary }]}>
-                    {proposal.status}
+                    {aiRecommendationStatusLabels[proposal.status]}
                   </Text>
                   <Text style={[styles.authorityLabel, { color: theme.textSecondary }]}>
                     Thẩm quyền: {proposal.decisionAuthority}
@@ -1168,7 +1169,7 @@ export function AiWorkoutAdjustmentModal({
               {isAlreadyDecided && !appliedResult ? (
                 <WorkoutCard>
                   <Text style={[styles.badge, { backgroundColor: theme.surface, color: theme.textSecondary }]}>
-                    Đề xuất đã ở trạng thái {proposal.status}.
+                    Đề xuất đã ở trạng thái {aiRecommendationStatusLabels[proposal.status]}.
                   </Text>
                 </WorkoutCard>
               ) : null}

@@ -212,11 +212,11 @@ describe('Accessibility Attributes on Auth Screens', () => {
     const root = tree!.root;
 
     const slugInput = root.findByProps({ testID: 'trainer-slug-input' });
-    expect(slugInput.props.accessibilityLabel).toBe('Public Profile Handle');
+    expect(slugInput.props.accessibilityLabel).toBe('Định danh hồ sơ công khai');
 
     const submitBtn = root.findByProps({ testID: 'trainer-submit-button' });
     expect(submitBtn.props.accessibilityRole).toBe('button');
-    expect(submitBtn.props.accessibilityLabel).toBe('Create Trainer Profile');
+    expect(submitBtn.props.accessibilityLabel).toBe('Tạo hồ sơ huấn luyện viên');
 
     const notice = root.findByProps({ testID: 'coaching-authority-notice' });
     expect(notice.props.accessibilityRole).toBe('alert');

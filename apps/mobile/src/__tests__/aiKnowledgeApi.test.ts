@@ -162,7 +162,7 @@ describe('aiKnowledgeApi', () => {
       const err = new Error('The operation was aborted');
       err.name = 'AbortError';
       expect(getAiKnowledgeErrorMessage(err)).toBe(
-        'Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.'
+        'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.'
       );
     });
 
@@ -194,7 +194,7 @@ describe('aiKnowledgeApi', () => {
         reasonCode: 'TIMEOUT',
       });
       expect(getAiKnowledgeErrorMessage(err)).toBe(
-        'Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.'
+        'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.'
       );
     });
 

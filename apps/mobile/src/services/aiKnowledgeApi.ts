@@ -38,7 +38,7 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
     error instanceof Error &&
     (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout'))
   ) {
-    return 'Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+    return 'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.';
   }
 
   if (error instanceof ApiError) {
@@ -56,14 +56,14 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
         return 'Dịch vụ mô hình AI gặp sự cố trong quá trình tạo câu trả lời. Vui lòng thử lại sau.';
       }
       if (reasonCode === 'TIMEOUT') {
-        return 'Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+        return 'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.';
       }
       if (reasonCode === 'RULE_BLOCKED') {
         return 'Câu hỏi bị từ chối do chính sách an toàn của hệ thống.';
       }
 
       if (rawErrorMsg && !rawErrorMsg.startsWith('Request failed with status')) {
-        return rawErrorMsg;
+        return 'Không thể hoàn tất tra cứu. Vui lòng thử lại.';
       }
     }
 
@@ -78,7 +78,7 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
       return 'Bài tập hoặc tài liệu tham chiếu không tồn tại trong hệ thống.';
     }
     if (error.status === 504) {
-      return 'Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+      return 'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.';
     }
     if (error.status === 502) {
       return 'Dịch vụ AI phản hồi không hợp lệ hoặc không vượt qua kiểm định an toàn.';
@@ -156,7 +156,7 @@ export const aiKnowledgeApi = {
       });
     } catch (err: unknown) {
       if (controller.signal.aborted) {
-        throw new Error('Yêu cầu tra cứu quá thời gian chờ (timeout). Vui lòng thử lại sau.');
+        throw new Error('Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.');
       }
       throw err;
     } finally {

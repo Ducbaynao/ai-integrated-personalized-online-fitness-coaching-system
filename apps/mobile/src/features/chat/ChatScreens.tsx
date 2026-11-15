@@ -302,7 +302,7 @@ export function ChatLinkedResourceScreen({ messageId }: { messageId: string }) {
     queryFn: async () => {
       const item = link.data!;
       if (item.type === 'WORKOUT_PLAN_VERSION') {
-        if (!item.parentId) throw new Error('Missing plan ID');
+        if (!item.parentId) throw new Error('Thiếu mã kế hoạch');
         const plan = await workoutPlanApi.detail(item.parentId);
         const version = await workoutPlanApi.version(item.parentId, item.resourceId);
         return { title: plan.plan.name, summary: `Phiên bản ${version.version.versionNumber} · ${version.sessions.length} buổi tập` };
@@ -378,18 +378,18 @@ export function NotificationsScreen() {
     <CoachingButton label="Tùy chọn thông báo đẩy" secondary onPress={() => router.push('/notifications/push' as never)} />
     {query.isPending ? <CoachingState busy title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
     {query.isError ? <CoachingState title="Không thể tải thông báo" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
-    {deliveryError ? <CoachingState title="Không thể xem trạng thái push" message={deliveryError} /> : null}
+    {deliveryError ? <CoachingState title="Không thể xem trạng thái thông báo đẩy" message={deliveryError} /> : null}
     {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có thông báo" message="Tin nhắn và cập nhật lịch hẹn sẽ xuất hiện ở đây." /> : null}
     {!query.isError && rows.map(item => <CoachingCard key={item.id}>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.title}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.body}</Text>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
-      <CoachingButton label="Xem trạng thái push" secondary onPress={() => { void showDelivery(item.id); }} />
+      <CoachingButton label="Xem trạng thái thông báo đẩy" secondary onPress={() => { void showDelivery(item.id); }} />
       {visibleDelivery?.id === item.id ? <Text style={[styles.body, { color: theme.textSecondary }]}>
         {visibleDelivery.items.length ? visibleDelivery.items.map(state => ({
           QUEUED: 'Đang chờ', TICKET_ACCEPTED: 'Expo đã nhận', PROVIDER_ACCEPTED: 'Nhà cung cấp đã nhận',
           DEVICE_ACKNOWLEDGED: 'Ứng dụng trên thiết bị đã xác nhận', FAILED: 'Gửi thất bại', SKIPPED: 'Không gửi do quyền/tùy chọn',
-        }[state.status])).join(', ') : 'Không có thiết bị được bật push khi sự kiện xảy ra.'}
+        }[state.status])).join(', ') : 'Không có thiết bị được bật thông báo đẩy khi sự kiện xảy ra.'}
       </Text> : null}
       {item.relatedEntityType === 'APPOINTMENT_REQUEST' && item.relatedEntityId
         ? <CoachingButton label="Xem yêu cầu lịch hẹn" secondary onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}

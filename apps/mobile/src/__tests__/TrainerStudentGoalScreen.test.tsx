@@ -279,7 +279,7 @@ describe('TrainerStudentGoalScreen', () => {
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Xung đột',
-      'Goal proposals can only be created for an ACTIVE fitness goal.'
+      'Không thể gửi đề xuất do mục tiêu đã thay đổi trạng thái.'
     );
   });
 

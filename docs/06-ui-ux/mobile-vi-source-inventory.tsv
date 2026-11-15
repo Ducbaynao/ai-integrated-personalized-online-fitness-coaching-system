@@ -1,0 +1,89 @@
+Tệp source	Loại	Export	Nhánh trạng thái tìm thấy trong source
+components/CapabilitySwitcher.tsx	Component	CapabilitySwitcher	authority
+components/animated-icon.tsx	Component	AnimatedSplashOverlay, AnimatedIcon	display only
+components/animated-icon.web.tsx	Component	AnimatedSplashOverlay, AnimatedIcon	display only
+components/external-link.tsx	Component	ExternalLink	display only
+components/hint-row.tsx	Component	HintRow	display only
+components/themed-text.tsx	Component	ThemedText	display only
+components/themed-view.tsx	Component	ThemedView	display only
+components/ui/collapsible.tsx	Component	Collapsible	display only
+components/web-badge.tsx	Component	WebBadge	display only
+features/ai-knowledge/AiKnowledgeScreen.tsx	Screen	AiKnowledgeScreen	loading, error, empty, edit/input
+features/appointments/AppointmentScreens.tsx	View/feature	AppointmentHomeScreen, AppointmentCreateScreen, AppointmentRequestScreen, AppointmentDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/attention/AttentionReviewScreen.tsx	Screen	AttentionReviewScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/auth/AuthContext.tsx	View/feature	AuthProvider, useAuth	loading, confirm/modal, authority
+features/auth/HomeScreen.tsx	Screen	HomeScreen	loading, empty, authority
+features/auth/RegisterScreen.tsx	Screen	RegisterScreen	loading, error, edit/input
+features/auth/SessionGateScreen.tsx	Screen	SessionGateScreen	loading
+features/auth/SignInScreen.tsx	Screen	SignInScreen	loading, error, empty, edit/input
+features/auth/VerifyEmailScreen.tsx	Screen	VerifyEmailScreen	loading, error, edit/input, confirm/modal
+features/chat/ChatScreens.tsx	View/feature	ChatInboxScreen, ConversationScreen, ChatLinkedResourceScreen, NotificationsScreen	loading, error, empty, edit/input, authority
+features/chat/PushReceiptListener.tsx	View/feature	PushReceiptListener	authority
+features/chat/PushSettingsScreen.tsx	Screen	PushSettingsScreen	loading, error, edit/input, authority
+features/coaching/CoachingHubScreen.tsx	Screen	CoachingHubScreen	loading, error, empty, authority
+features/coaching/RelationshipDetailScreen.tsx	Screen	RelationshipDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/coaching/SharingPermissionsScreen.tsx	Screen	SharingPermissionsScreen	loading, error, confirm/modal, authority
+features/coaching/StudentLookupScreen.tsx	Screen	StudentLookupScreen	loading, error, edit/input
+features/coaching/TrainerDirectoryScreen.tsx	Screen	TrainerDirectoryScreen	loading, error, empty, edit/input
+features/coaching/TrainerStudentGoalScreen.tsx	Screen	TrainerStudentGoalScreen	loading, error, empty, confirm/modal
+features/coaching/components/CoachingUi.tsx	Component	CoachingButton, CoachingState, CoachingCard, coachingUiStyles	loading
+features/exercise/ExerciseCatalogScreen.tsx	Screen	ExerciseCatalogScreen	display only
+features/exercise/ExerciseDetailScreen.tsx	Screen	ExerciseDetailScreen	loading, error, empty
+features/exercise/ExercisePicker.tsx	View/feature	ExercisePicker	confirm/modal
+features/exercise/components/ExerciseCatalogContent.tsx	Component	ExerciseCatalogContent	loading, error, empty, confirm/modal
+features/exercise/components/ExerciseFilterModal.tsx	Component	ExerciseFilterModal	loading, error, confirm/modal
+features/exercise/components/ExerciseListItem.tsx	Component	ExerciseListItem	empty
+features/exercise/components/SearchAndFilterBar.tsx	Component	SearchAndFilterBar	edit/input
+features/goal/CurrentGoalScreen.tsx	Screen	isGoalActionAllowed, CurrentGoalScreen	loading, error, empty, confirm/modal
+features/goal/GoalProposalDetailScreen.tsx	Screen	GoalProposalDetailScreen	loading, error, empty, edit/input, confirm/modal
+features/goal/components/CreateGoalModal.tsx	Component	GOAL_TYPE_OPTIONS, CreateGoalModal	loading, edit/input, confirm/modal
+features/goal/components/CreateGoalProposalModal.tsx	Component	GOAL_TYPE_OPTIONS, CreateGoalProposalModal	loading, edit/input, confirm/modal
+features/goal/components/CreateGoalTransitionModal.tsx	Component	CreateGoalTransitionModal	loading, edit/input, confirm/modal
+features/goal/components/CreateGoalVersionModal.tsx	Component	CreateGoalVersionModal	loading, edit/input, confirm/modal
+features/goal/components/GoalHistoryTab.tsx	Component	GoalHistoryTab	loading, empty
+features/goal/components/GoalOverviewTab.tsx	Component	GoalOverviewTab	empty
+features/goal/components/GoalProposalsTab.tsx	Component	GoalProposalsTab	loading, empty
+features/goal/components/GoalScreenSkeleton.tsx	Component	GoalScreenSkeleton	display only
+features/goal/components/GoalStatusBadge.tsx	Component	GoalStatusBadge	display only
+features/goal/components/GoalTargetsTab.tsx	Component	GoalTargetsTab	empty
+features/goal/components/PauseResumeGoalModal.tsx	Component	PauseResumeGoalModal	loading, edit/input, confirm/modal
+features/nutrition/NutritionScreen.tsx	Screen	nutritionKeys, nutrientText, nutrientLabel, NutritionScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/nutrition/NutritionStrategyScreen.tsx	Screen	strategyKeys, buildStrategyTargets, NutritionStrategyScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/nutrition/TrainerNutritionScreen.tsx	Screen	TrainerNutritionScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/onboarding/ChoosePurposeScreen.tsx	Screen	ChoosePurposeScreen	display only
+features/progress-summary/ProgressSummaryScreen.tsx	Screen	ProgressSummaryScreen	loading, error, empty, edit/input, authority
+features/student/StudentOnboardingScreen.tsx	Screen	StudentOnboardingScreen	loading, error, edit/input
+features/student/StudentProfileScreen.tsx	Screen	StudentProfileScreen	loading, error, empty, edit/input
+features/trainer/TrainerHomeScreen.tsx	Screen	TrainerHomeScreen	loading, authority
+features/trainer/TrainerOnboardingScreen.tsx	Screen	TrainerOnboardingScreen	loading, error, edit/input, authority
+features/trainer/TrainerProfileScreen.tsx	Screen	TrainerProfileScreen	loading, error, empty, edit/input, authority
+features/workout-execution/WorkoutExecutionScreen.tsx	Screen	CurrentWorkoutExecutionScreen, WorkoutExecutionDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-execution/WorkoutHistoryScreen.tsx	Screen	WorkoutHistoryScreen	loading, error, empty, authority
+features/workout-execution/components/WorkoutExecutionUi.tsx	Component	ExecutionButton, ExecutionCard, ExecutionState, executionStyles	loading
+features/workout-plan/StudentWorkoutPlansScreen.tsx	Screen	StudentWorkoutPlansScreen	loading, error, empty, confirm/modal, authority
+features/workout-plan/TrainerProgramScreen.tsx	Screen	TrainerProgramScreen	loading, error, empty, confirm/modal, authority
+features/workout-plan/TrainerWorkoutPlanDetailScreen.tsx	Screen	TrainerWorkoutPlanDetailScreen	loading, error, empty, confirm/modal, authority
+features/workout-plan/WorkoutPlanBuilderScreen.tsx	Screen	WorkoutPlanBuilderScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-plan/WorkoutPlanDetailScreen.tsx	Screen	WorkoutPlanDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-plan/WorkoutPlanHistoryScreen.tsx	Screen	WorkoutPlanHistoryScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-plan/components/AiWorkoutAdjustmentModal.tsx	Component	AiWorkoutAdjustmentModal	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-plan/components/AiWorkoutProposalModal.tsx	Component	AiWorkoutProposalModal	loading, error, empty, edit/input, confirm/modal
+features/workout-plan/components/WorkoutPlanVersionContent.tsx	Component	WorkoutPlanVersionContent	loading, error, empty
+features/workout-plan/components/WorkoutUi.tsx	Component	WorkoutButton, WorkoutCard, WorkoutState, workoutStyles	loading
+features/workout-recurrence/RecurrenceCreateScreen.tsx	Screen	StudentRecurrenceCreateScreen, TrainerRecurrenceCreateScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-recurrence/RecurrenceDetailScreen.tsx	Screen	StudentRecurrenceDetailScreen, TrainerRecurrenceDetailScreen	loading, error, empty, confirm/modal, authority
+features/workout-recurrence/RecurrenceListScreen.tsx	Screen	recurrenceStatus, StudentRecurrenceListScreen, TrainerRecurrenceListScreen	loading, error, empty, authority
+features/workout-schedule-change-proposals/StudentChangeProposalDetailScreen.tsx	Screen	StudentChangeProposalDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-schedule-change-proposals/StudentChangeProposalsScreen.tsx	Screen	StudentChangeProposalsScreen	loading, error, empty, authority
+features/workout-schedule-change-proposals/TrainerChangeProposalDetailScreen.tsx	Screen	TrainerChangeProposalDetailScreen	loading, error, empty, confirm/modal, authority
+features/workout-schedule-change-proposals/TrainerChangeProposalsScreen.tsx	Screen	TrainerChangeProposalsScreen	loading, error, empty, authority
+features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx	Screen	TrainerCreateChangeProposalScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-schedule-proposals/StudentScheduleProposalDetailScreen.tsx	Screen	StudentScheduleProposalDetailScreen	loading, error, empty, confirm/modal, authority
+features/workout-schedule-proposals/StudentScheduleProposalsScreen.tsx	Screen	StudentScheduleProposalsScreen	loading, error, empty, authority
+features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx	Screen	TrainerCreateScheduleProposalScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-schedule-proposals/TrainerScheduleProposalDetailScreen.tsx	Screen	TrainerScheduleProposalDetailScreen	loading, error, empty, confirm/modal, authority
+features/workout-schedule-proposals/TrainerScheduleProposalsScreen.tsx	Screen	TrainerScheduleProposalsScreen	loading, error, empty, authority
+features/workout-schedule/StudentConfirmBatchScreen.tsx	Screen	StudentConfirmBatchScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx	Screen	StudentWorkoutScheduleDetailScreen	loading, error, empty, edit/input, confirm/modal, authority
+features/workout-schedule/StudentWorkoutScheduleScreen.tsx	Screen	StudentWorkoutScheduleScreen	loading, error, empty, confirm/modal, authority
+features/workout-schedule/TrainerWorkoutScheduleScreen.tsx	Screen	TrainerWorkoutScheduleScreen	loading, error, empty, authority

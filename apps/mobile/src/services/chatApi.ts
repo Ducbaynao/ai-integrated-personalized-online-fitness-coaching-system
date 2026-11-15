@@ -50,7 +50,7 @@ export const chatApi = {
     body.append('commandKey', commandKey);
     // Expo's fetch converts Blob/File bytes, but rejects React Native's legacy { uri } form part.
     const localResponse = await fetch(file.uri);
-    if (!localResponse.ok) throw new Error('Cannot read selected attachment');
+    if (!localResponse.ok) throw new Error('Không thể đọc tệp đính kèm đã chọn.');
     const localBlob = await localResponse.blob();
     body.append('file', localBlob.slice(0, localBlob.size, file.mimeType), file.name);
     return request<ChatMessage>(`/chat/students/${encodeURIComponent(studentId)}/attachments`, { method: 'POST', body });

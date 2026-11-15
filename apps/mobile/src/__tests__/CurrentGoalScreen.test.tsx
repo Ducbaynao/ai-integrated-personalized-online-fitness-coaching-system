@@ -285,8 +285,8 @@ describe('CurrentGoalScreen', () => {
       });
 
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Status Update Failed',
-        'You already have another active fitness goal. Only one active goal is permitted at a time.'
+        'Không thể cập nhật trạng thái',
+        'Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.'
       );
     });
 
@@ -324,8 +324,8 @@ describe('CurrentGoalScreen', () => {
       });
 
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Status Update Failed',
-        'The goal status was updated by another request. Please refresh to see the latest status.'
+        'Không thể cập nhật trạng thái',
+        'Trạng thái mục tiêu đã được thay đổi. Vui lòng tải lại để xem trạng thái mới nhất.'
       );
     });
 
@@ -357,8 +357,8 @@ describe('CurrentGoalScreen', () => {
       });
 
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Status Update Failed',
-        'Goal status conflict occurred. Please refresh and try again.'
+        'Không thể cập nhật trạng thái',
+        'Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại và thử lại.'
       );
     });
   });
@@ -1092,8 +1092,8 @@ describe('CurrentGoalScreen', () => {
 
       // Alert should be displayed for the failed mutation
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Status Update Failed',
-        'Server error'
+        'Không thể cập nhật trạng thái',
+        'Có lỗi xảy ra khi cập nhật trạng thái mục tiêu.'
       );
 
       // Now resolve the ongoing refresh

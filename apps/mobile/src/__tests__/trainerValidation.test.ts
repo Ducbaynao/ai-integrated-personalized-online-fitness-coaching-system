@@ -22,28 +22,28 @@ describe('trainerValidation', () => {
     it('returns error if slug exceeds 100 characters', () => {
       const longSlug = 'a'.repeat(101);
       expect(validatePublicSlug(longSlug)).toBe(
-        'Public slug cannot exceed 100 characters.'
+        'Đường dẫn công khai không được quá 100 ký tự.'
       );
     });
 
     it('returns error for invalid slug patterns', () => {
       expect(validatePublicSlug('Coach-Alex')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
       expect(validatePublicSlug('-coach')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
       expect(validatePublicSlug('coach-')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
       expect(validatePublicSlug('coach--alex')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
       expect(validatePublicSlug('coach alex')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
       expect(validatePublicSlug('coach_alex')).toBe(
-        'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.'
+        'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.'
       );
     });
   });
@@ -61,7 +61,7 @@ describe('trainerValidation', () => {
 
     it('returns error for bio exceeding 4000 characters', () => {
       const longBio = 'x'.repeat(4001);
-      expect(validateBio(longBio)).toBe('Bio cannot exceed 4000 characters.');
+      expect(validateBio(longBio)).toBe('Giới thiệu không được quá 4.000 ký tự.');
     });
   });
 
@@ -81,19 +81,19 @@ describe('trainerValidation', () => {
 
     it('returns error for negative experience', () => {
       expect(validateYearsExperience('-1')).toBe(
-        'Years of experience cannot be negative.'
+        'Số năm kinh nghiệm không được âm.'
       );
     });
 
     it('returns error for experience exceeding 99.99', () => {
       expect(validateYearsExperience('100')).toBe(
-        'Years of experience cannot exceed 99.99.'
+        'Số năm kinh nghiệm không được quá 99,99.'
       );
     });
 
     it('returns error for non-numeric input', () => {
       expect(validateYearsExperience('abc')).toBe(
-        'Years of experience must be a valid number.'
+        'Số năm kinh nghiệm phải là số hợp lệ.'
       );
     });
   });

@@ -136,7 +136,7 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
     <WorkoutButton label="Quay lại" secondary onPress={() => router.back()} />
     {parentBusy || versionQuery.isPending && sourceReady ? <WorkoutState busy title="Đang tải kế hoạch" message="Vui lòng chờ." /> : null}
     {parentError || versionQuery.isError && !concealed ? <WorkoutState title="Không thể tải kế hoạch" message="Kiểm tra kết nối hoặc quyền xem." onRetry={() => { refreshParent(); versionQuery.refetch(); }} /> : null}
-    {!published || concealed ? <WorkoutState title="Chưa thể tạo series" message={concealed ? 'Quyền xem kế hoạch đã thay đổi.' : 'Cần kế hoạch ACTIVE và phiên bản đã xuất bản hiện hành cùng quyền phù hợp.'} /> : <>
+    {!published || concealed ? <WorkoutState title="Chưa thể tạo series" message={concealed ? 'Quyền xem kế hoạch đã thay đổi.' : 'Cần kế hoạch đang hoạt động và phiên bản đã xuất bản hiện hành cùng quyền phù hợp.'} /> : <>
       <WorkoutCard>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Phiên bản nguồn {version.versionNumber}. Series lặp toàn bộ block {Math.max(0, ...sessions.map(s => s.weekNumber))} tuần, kể cả tuần không chọn buổi; chỉ tạo buổi đã chọn. Tiếp tục đến khi Học viên dừng hoặc nguồn bị tạm dừng.</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Job chỉ xét kỳ bắt đầu trong 30 ngày tới. DST thiếu/nhập nhằng và xung đột sẽ được ghi lại để xem, không tự đoán offset hay lịch hẹn huấn luyện.</Text>
@@ -166,7 +166,7 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
       {preview.error ? <WorkoutState title="Cần kiểm tra biểu mẫu" message={preview.error} /> : null}
       {!review ? <WorkoutButton testID="series-preview" label="Xem trước toàn series" disabled={!!preview.error} onPress={() => setReview(true)} /> : <WorkoutCard testID="series-preview-card">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận toàn series</Text>
-        <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu {anchor} · {timezone} · {entries.length} buổi được chọn. {relationshipId ? 'Chỉ tạo đề xuất PENDING; Học viên quyết định sau.' : 'Chỉ các kỳ hợp lệ trong cửa sổ 30 ngày mới được tạo.'}</Text>
+        <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu {anchor} · {timezone} · {entries.length} buổi được chọn. {relationshipId ? 'Chỉ tạo đề xuất đang chờ; Học viên quyết định sau.' : 'Chỉ các kỳ hợp lệ trong cửa sổ 30 ngày mới được tạo.'}</Text>
         {entries.map(entry => <Text key={entry.session.id} style={[styles.body, { color: theme.textSecondary }]}>{entry.session.name}: {entry.firstLocalStart} → {entry.firstLocalEnd}</Text>)}
         {preview.warnings.map(warning => <Text key={warning} style={[styles.body, { color: theme.warningText }]}>{warning}</Text>)}
         <View style={styles.row}><WorkoutButton label="Sửa lại" secondary onPress={() => { setReview(false); setPending(null); }} />

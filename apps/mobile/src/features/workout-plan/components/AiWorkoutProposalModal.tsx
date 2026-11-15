@@ -10,6 +10,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { aiRecommendationStatusLabels } from '@/localization/displayLabels';
 import {
   aiWorkoutProposalApi,
   getWorkoutProposalErrorMessage,
@@ -478,7 +479,7 @@ export function AiWorkoutProposalModal({
                   <Text style={[styles.alertTitle, { color: theme.dangerText }]}>Cần bổ sung thông tin hồ sơ</Text>
                   {fieldErrors['fitnessGoal'] ? (
                     <Text style={[styles.alertBody, { color: theme.textPrimary }]}>
-                      • Mục tiêu tập luyện: Chưa có Mục tiêu thể hình (Goal) ACTIVE. Vui lòng vào màn hình Mục tiêu để tạo và kích hoạt mục tiêu trước khi thiết kế giáo án.
+                      • Mục tiêu tập luyện: Chưa có mục tiêu thể chất đang hoạt động. Vui lòng vào màn hình Mục tiêu để tạo và kích hoạt mục tiêu trước khi thiết kế giáo án.
                     </Text>
                   ) : null}
                   {fieldErrors['trainingExperienceLevel'] ? (
@@ -610,9 +611,9 @@ export function AiWorkoutProposalModal({
               </Text>
               <View style={styles.chipsRow}>
                 {[
-                  { id: 'BODYWEIGHT', label: 'Bodyweight' },
-                  { id: 'DUMBBELL', label: 'Tạ đơn (Dumbbell)' },
-                  { id: 'BARBELL', label: 'Thanh đòn (Barbell)' },
+                  { id: 'BODYWEIGHT', label: 'Trọng lượng cơ thể' },
+                  { id: 'DUMBBELL', label: 'Tạ đơn' },
+                  { id: 'BARBELL', label: 'Thanh đòn' },
                   { id: 'RESISTANCE_BAND', label: 'Dây kháng lực' },
                   { id: 'CABLE', label: 'Máy cáp (Cable)' },
                   { id: 'MACHINE', label: 'Máy tạ (Machine)' },
@@ -804,7 +805,7 @@ export function AiWorkoutProposalModal({
                 <View style={styles.badgeRow}>
                   <View style={[styles.badge, { backgroundColor: theme.surfaceSubtle }]}>
                     <Text style={[styles.badgeText, { color: theme.textPrimary }]}>
-                      Trạng thái: {proposal.status}
+                      Trạng thái: {aiRecommendationStatusLabels[proposal.status]}
                     </Text>
                   </View>
                   <View style={[styles.badge, { backgroundColor: theme.surfaceSubtle }]}>
@@ -1154,7 +1155,7 @@ export function AiWorkoutProposalModal({
                         {currentActivePlan.plan.name} (Phiên bản công bố: {currentActivePlan.currentVersion?.versionNumber ? `v${currentActivePlan.currentVersion.versionNumber}` : 'Chưa có phiên bản'}) · Chủ thể: {currentActivePlan.plan.decisionOwnerType === 'TRAINER' ? 'Huấn luyện viên' : 'Học viên tự quản'}
                       </Text>
                       <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 2, fontSize: 12 }]}>
-                        [ID: {currentActivePlan.plan.id.slice(0, 8)}... · Aggregate Version: {currentActivePlan.plan.aggregateVersion}]
+                        [ID: {currentActivePlan.plan.id.slice(0, 8)}... · Phiên bản tổng hợp: {currentActivePlan.plan.aggregateVersion}]
                       </Text>
 
                       <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: 8 }]}>

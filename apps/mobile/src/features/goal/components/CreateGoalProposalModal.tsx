@@ -15,11 +15,11 @@ import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 
 export const GOAL_TYPE_OPTIONS = [
-  { code: 'FAT_LOSS', label: 'Fat Loss (Giảm mỡ)' },
-  { code: 'MUSCLE_GAIN', label: 'Muscle Gain (Tăng cơ)' },
-  { code: 'STRENGTH', label: 'Strength (Sức mạnh)' },
-  { code: 'FITNESS_IMPROVEMENT', label: 'Fitness Improvement (Thể lực)' },
-  { code: 'MAINTENANCE', label: 'Maintenance (Duy trì)' },
+  { code: 'FAT_LOSS', label: 'Giảm mỡ' },
+  { code: 'MUSCLE_GAIN', label: 'Tăng cơ' },
+  { code: 'STRENGTH', label: 'Tăng sức mạnh' },
+  { code: 'FITNESS_IMPROVEMENT', label: 'Cải thiện thể lực' },
+  { code: 'MAINTENANCE', label: 'Duy trì thể lực' },
 ];
 
 interface CreateGoalProposalModalProps {
@@ -60,11 +60,11 @@ export function CreateGoalProposalModal({
   const handleSubmit = async () => {
     const trimmedReason = reason.trim();
     if (!trimmedReason) {
-      setValidationError('Proposal reason is required explaining the coaching adjustment.');
+      setValidationError('Vui lòng nêu lý do điều chỉnh huấn luyện.');
       return;
     }
     if (trimmedReason.length > 500) {
-      setValidationError('Reason must not exceed 500 characters.');
+      setValidationError('Lý do không được quá 500 ký tự.');
       return;
     }
 
@@ -72,7 +72,7 @@ export function CreateGoalProposalModal({
     if (proposedDurationDays.trim()) {
       const num = parseInt(proposedDurationDays.trim(), 10);
       if (isNaN(num) || num <= 0) {
-        setValidationError('Duration must be a positive number of days.');
+        setValidationError('Thời hạn phải là số ngày dương.');
         return;
       }
       parsedDuration = num;
@@ -110,10 +110,10 @@ export function CreateGoalProposalModal({
           ]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-              Propose Goal Modification
+              Đề xuất sửa đổi mục tiêu
             </Text>
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-              Propose target adjustments for your student. Changes become active only upon student acceptance.
+              Đề xuất điều chỉnh chỉ tiêu cho học viên. Thay đổi chỉ có hiệu lực sau khi học viên chấp nhận.
             </Text>
 
             {validationError && (
@@ -132,11 +132,11 @@ export function CreateGoalProposalModal({
             {/* Coaching Reason Input (Mandatory) */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Coaching Reason * (Max 500 chars)
+                Lý do đề xuất * (tối đa 500 ký tự)
               </Text>
               <TextInput
                 testID="goal-proposal-reason-input"
-                accessibilityLabel="Proposal coaching reason"
+                accessibilityLabel="Lý do đề xuất của huấn luyện viên"
                 style={[
                   styles.textArea,
                   {
@@ -150,7 +150,7 @@ export function CreateGoalProposalModal({
                   setReason(val);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="e.g. Accelerating hypertrophy progression based on rapid strength adaptation"
+                placeholder="Ví dụ: Tăng tiến độ phát triển cơ dựa trên khả năng thích nghi sức mạnh"
                 placeholderTextColor={themeColors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -162,11 +162,11 @@ export function CreateGoalProposalModal({
             {/* Proposed Title Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Proposed Goal Title
+                Tiêu đề mục tiêu đề xuất
               </Text>
               <TextInput
                 testID="goal-proposal-title-input"
-                accessibilityLabel="Proposed goal title"
+                accessibilityLabel="Tiêu đề mục tiêu đề xuất"
                 style={[
                   styles.input,
                   {
@@ -177,7 +177,7 @@ export function CreateGoalProposalModal({
                 ]}
                 value={proposedTitle}
                 onChangeText={setProposedTitle}
-                placeholder="e.g. Advanced Hypertrophy Phase 2"
+                placeholder="Ví dụ: Giai đoạn tăng cơ nâng cao 2"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
                 editable={!isSubmitting}
@@ -187,7 +187,7 @@ export function CreateGoalProposalModal({
             {/* Goal Type Chips */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Primary Focus
+                Trọng tâm chính
               </Text>
               <View style={styles.chipRow}>
                 {GOAL_TYPE_OPTIONS.map((opt) => {
@@ -197,7 +197,7 @@ export function CreateGoalProposalModal({
                       key={opt.code}
                       testID={`goal-type-chip-${opt.code}`}
                       accessibilityRole="button"
-                      accessibilityLabel={`Select ${opt.label}`}
+                      accessibilityLabel={`Chọn ${opt.label}`}
                       style={[
                         styles.chip,
                         {
@@ -225,11 +225,11 @@ export function CreateGoalProposalModal({
             {/* Proposed Duration */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Proposed Duration (Days)
+                Thời lượng đề xuất (Ngày)
               </Text>
               <TextInput
                 testID="goal-proposal-duration-input"
-                accessibilityLabel="Proposed duration in days"
+                accessibilityLabel="Thời lượng đề xuất tính bằng ngày"
                 style={[
                   styles.input,
                   {
@@ -252,19 +252,19 @@ export function CreateGoalProposalModal({
               <Pressable
                 testID="goal-proposal-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel proposal"
+                accessibilityLabel="Hủy đề xuất"
                 disabled={isSubmitting}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
 
               <Pressable
                 testID="goal-proposal-submit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Submit proposal"
+                accessibilityLabel="Gửi đề xuất"
                 disabled={isSubmitting}
                 onPress={handleSubmit}
                 style={[
@@ -278,7 +278,7 @@ export function CreateGoalProposalModal({
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Send Proposal</Text>
+                  <Text style={styles.primaryButtonText}>Gửi đề xuất</Text>
                 )}
               </Pressable>
             </View>

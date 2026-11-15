@@ -91,15 +91,15 @@ export default function PushSettingsScreen() {
           value={quietStart} onChangeText={setQuietStart} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
         <TextInput accessibilityLabel="Giờ kết thúc yên tĩnh HH:mm" placeholder="Kết thúc HH:mm (có thể bỏ trống)"
           value={quietEnd} onChangeText={setQuietEnd} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Nhắc lịch qua push chỉ gửi sau giờ yên tĩnh nếu lịch chưa bắt đầu. Bật riêng push cho “Nhắc lịch hẹn” hoặc “Nhắc buổi tập”.</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Nhắc lịch qua thông báo đẩy chỉ gửi sau giờ yên tĩnh nếu lịch chưa bắt đầu. Bật riêng thông báo đẩy cho “Nhắc lịch hẹn” hoặc “Nhắc buổi tập”.</Text>
       </View> : null}
       {formError ? <CoachingState title="Chưa lưu được" message={formError} /> : null}
       {!query.isPending && !query.isError ? pushCategories.map(([category, title]) => {
         const current = query.data?.find(item => item.eventType === category);
         return <CoachingCard key={category}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{title}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Push: {current?.enabled ? 'Đang bật' : 'Đang tắt'}{current?.timezone ? ` · ${current.timezone}` : ''}</Text>
-          <CoachingButton label={current?.enabled ? `Tắt push ${title}` : `Bật push ${title}`}
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Thông báo đẩy: {current?.enabled ? 'Đang bật' : 'Đang tắt'}{current?.timezone ? ` · ${current.timezone}` : ''}</Text>
+          <CoachingButton label={current?.enabled ? `Tắt thông báo đẩy ${title}` : `Bật thông báo đẩy ${title}`}
             busy={mutation.isPending} disabled={mutation.isPending}
             onPress={() => save(category, !current?.enabled)} />
         </CoachingCard>;

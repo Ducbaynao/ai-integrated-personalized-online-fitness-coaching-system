@@ -26,7 +26,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
         <View
           testID="paused-status-banner"
           accessibilityRole="alert"
-          accessibilityLabel="Goal is currently paused"
+          accessibilityLabel="Mục tiêu hiện đang bị tạm dừng"
           style={[
             styles.banner,
             {
@@ -35,19 +35,19 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
             },
           ]}>
           <Text style={[styles.bannerTitle, { color: themeColors.warningText }]}>
-            ⏸ Goal is Currently Paused
+            ⏸ Mục tiêu hiện đang bị tạm dừng
           </Text>
           <Text style={[styles.bannerBody, { color: themeColors.textPrimary }]}>
-            Active training time is frozen. Your target dates and history remain preserved.
+            Thời gian tập luyện tích lũy tạm dừng. Ngày mục tiêu và lịch sử vẫn được giữ nguyên.
           </Text>
           {goal.pausedAt && (
             <Text style={[styles.bannerDate, { color: themeColors.textSecondary }]}>
-              Paused at: {new Date(goal.pausedAt).toLocaleString()}
+              Tạm dừng lúc: {new Date(goal.pausedAt).toLocaleString('vi-VN')}
             </Text>
           )}
           {goal.statusReason && (
             <Text style={[styles.bannerReason, { color: themeColors.textPrimary }]}>
-              {`Reason: "${goal.statusReason}"`}
+              {`Lý do: "${goal.statusReason}"`}
             </Text>
           )}
         </View>
@@ -68,43 +68,43 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Goal Version</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Phiên bản mục tiêu</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {version ? `Version ${version.versionNumber}` : 'Initial'}
+            {version ? `Phiên bản ${version.versionNumber}` : 'Ban đầu'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Start Date</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Ngày bắt đầu</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {version?.startDate ?? 'Unknown'}
+            {version?.startDate ?? 'Chưa rõ'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Target Date</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Ngày mục tiêu</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {version?.targetDate ?? 'Not set'}
+            {version?.targetDate ?? 'Chưa thiết lập'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Timeline Duration</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Thời hạn mục tiêu</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {version?.durationDays ? `${version.durationDays} days` : 'Calculated'}
+            {version?.durationDays ? `${version.durationDays} ngày` : 'Được tính tự động'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Last Updated</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Cập nhật lần cuối</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString() : 'Unknown'}
+            {goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('vi-VN') : 'Chưa rõ'}
           </Text>
         </View>
 
         {goal.statusReason && goal.status !== 'PAUSED' && (
           <View style={styles.reasonRow}>
-            <Text style={[styles.label, { color: themeColors.textSecondary }]}>Status Note</Text>
+            <Text style={[styles.label, { color: themeColors.textSecondary }]}>Ghi chú trạng thái</Text>
             <Text style={[styles.noteText, { color: themeColors.textPrimary }]}>
               {goal.statusReason}
             </Text>
@@ -122,7 +122,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
           },
         ]}>
         <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-          Objectives
+          Mục tiêu
         </Text>
 
         {primaryObjective ? (
@@ -137,7 +137,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
                   { backgroundColor: themeColors.brandSoft },
                 ]}>
                 <Text style={[styles.priorityText, { color: themeColors.primary }]}>
-                  PRIMARY
+                  CHÍNH
                 </Text>
               </View>
             </View>
@@ -149,7 +149,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
           </View>
         ) : (
           <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-            No primary objective specified.
+            Chưa xác định loại mục tiêu chính.
           </Text>
         )}
 
@@ -165,7 +165,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
                   { backgroundColor: themeColors.surfaceSubtle },
                 ]}>
                 <Text style={[styles.priorityText, { color: themeColors.textSecondary }]}>
-                  SECONDARY
+                  PHỤ
                 </Text>
               </View>
             </View>

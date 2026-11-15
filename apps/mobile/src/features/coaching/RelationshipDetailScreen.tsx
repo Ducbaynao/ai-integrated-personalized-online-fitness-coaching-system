@@ -33,7 +33,7 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
   const actionPolicy = useMemo(() => relationship && user ? availableCoachingActions(relationship, user.id, query.data?.resume ?? null) : null, [relationship, user, query.data?.resume]);
   const mutation = useMutation({
     mutationFn: async (action: PendingAction) => {
-      if (!relationship) throw new Error('Missing relationship');
+      if (!relationship) throw new Error('Thiếu thông tin quan hệ huấn luyện');
       const operationKey = commandKey.current ?? createCommandKey();
       commandKey.current = operationKey;
       if (action.kind === 'relationship') return coachingApi.relationshipAction(relationship.id, action.action, relationship.version, reason, operationKey);
@@ -134,7 +134,7 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}>
         <CoachingCard testID="lifecycle-confirmation">
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thao tác</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>{pendingAction ? `${labels[pendingAction.kind === 'request-resume' ? 'request-resume' : pendingAction.action]} sẽ được backend kiểm tra lại theo trạng thái mới nhất.` : ''}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>{pendingAction ? `${labels[pendingAction.kind === 'request-resume' ? 'request-resume' : pendingAction.action]} sẽ được hệ thống kiểm tra lại theo trạng thái mới nhất.` : ''}</Text>
           {requiresReason ? <><Text style={[styles.label, { color: theme.textPrimary }]}>Lý do kết thúc</Text><TextInput testID="end-reason-input" accessibilityLabel="Lý do kết thúc huấn luyện" value={reason} onChangeText={setReason} maxLength={500} multiline style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} /></> : null}
           <View style={styles.row}><CoachingButton label="Quay lại" secondary disabled={mutation.isPending} onPress={closeAction} /><CoachingButton testID="confirm-lifecycle-action" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={mutation.isPending} disabled={submitDisabled} danger={pendingAction?.kind === 'relationship' && ['end', 'reject'].includes(pendingAction.action)} onPress={() => pendingAction && mutation.mutate(pendingAction)} /></View>
         </CoachingCard>

@@ -51,6 +51,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "audit:ui-strings": "node scripts/audit-ui-strings.cjs",
+    "audit:ui-mixed": "node scripts/audit-mixed-ui.cjs",
     "typecheck": "tsc --noEmit",
     "test": "jest"
   },

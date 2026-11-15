@@ -36,7 +36,7 @@ describe('B08 push settings screen', () => {
     });
     expect(reminderApi.set).toHaveBeenCalledWith('APPOINTMENT_REMINDER', true);
     expect(pushApi.set).not.toHaveBeenCalled();
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Bật push Tin nhắn' }).props.onPress());
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Bật thông báo đẩy Tin nhắn' }).props.onPress());
     expect(pushApi.set).not.toHaveBeenCalled();
     renderer.act(() => {
       tree.root.findByProps({ accessibilityLabel: 'Tìm múi giờ IANA' }).props.onChangeText('Ho_Chi_Minh');

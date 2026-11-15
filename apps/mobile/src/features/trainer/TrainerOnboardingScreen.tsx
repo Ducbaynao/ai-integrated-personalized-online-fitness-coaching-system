@@ -13,6 +13,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { apiErrorMessage } from '@/localization/displayLabels';
 import { useAuth } from '@/features/auth/AuthContext';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { ApiError } from '@/types/auth';
@@ -89,13 +90,13 @@ export function TrainerOnboardingScreen() {
           const code = err.errorResponse?.errorCode;
           if (code === 'TRAINER_SLUG_ALREADY_EXISTS') {
             setFieldErrors({
-              publicSlug: 'This public handle is already in use. Please choose another.',
+              publicSlug: 'Đường dẫn công khai này đã được dùng. Vui lòng chọn đường dẫn khác.',
             });
             return;
           }
           if (code === 'TRAINER_CAPABILITY_REVOKED') {
             setErrorMessage(
-              'Trainer capability has been revoked on this account. Please contact platform administration.'
+              'Quyền huấn luyện của tài khoản đã bị thu hồi. Vui lòng liên hệ quản trị nền tảng.'
             );
             return;
           }
@@ -114,14 +115,14 @@ export function TrainerOnboardingScreen() {
         if (err.errorResponse?.fieldErrors && err.errorResponse.fieldErrors.length > 0) {
           const apiMap: Record<string, string> = {};
           err.errorResponse.fieldErrors.forEach((fe) => {
-            apiMap[fe.field] = fe.message;
+            apiMap[fe.field] = 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.';
           });
           setFieldErrors(apiMap);
         } else {
-          setErrorMessage(err.message || 'Failed to create Trainer Profile.');
+          setErrorMessage(apiErrorMessage(err, 'Không thể tạo hồ sơ huấn luyện viên.'));
         }
       } else {
-        setErrorMessage('Network error. Please try again.');
+        setErrorMessage('Lỗi mạng. Vui lòng thử lại.');
       }
     } finally {
       isSubmittingRef.current = false;
@@ -139,10 +140,10 @@ export function TrainerOnboardingScreen() {
         keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-            Trainer Profile Setup
+            Thiết lập hồ sơ huấn luyện viên
           </Text>
           <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-            Activate your trainer capability to configure your coaching profile.
+            Kích hoạt vai trò Huấn luyện viên để thiết lập hồ sơ huấn luyện.
           </Text>
         </View>
 
@@ -162,16 +163,14 @@ export function TrainerOnboardingScreen() {
               styles.noticeTitle,
               { color: themeColors.textPrimary },
             ]}>
-            Coaching Authority Invariant
+            Quy tắc về quyền huấn luyện
           </Text>
           <Text
             style={[
               styles.noticeText,
               { color: themeColors.textSecondary },
             ]}>
-            Setting up a Trainer Profile activates your trainer capability. However, coaching authority
-            remains disabled until your qualifications and credentials are submitted, reviewed, and approved by
-            platform administration.
+            Tạo hồ sơ Huấn luyện viên sẽ kích hoạt vai trò tương ứng. Quyền huấn luyện chỉ được cấp sau khi quản trị nền tảng xem xét và phê duyệt bằng cấp, chứng chỉ.
           </Text>
         </View>
 
@@ -200,18 +199,18 @@ export function TrainerOnboardingScreen() {
           {/* Public Slug */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-              Public Profile Handle
+              Định danh hồ sơ công khai
             </Text>
             <Text style={[styles.fieldHint, { color: themeColors.textSecondary }]}>
-              Custom URL slug (e.g., coach-alex). Lowercase letters, numbers, and hyphens only.
+              Định danh URL tùy chọn (ví dụ: coach-alex). Chỉ dùng chữ thường không dấu, chữ số và dấu gạch nối.
             </Text>
             <TextInput
               testID="trainer-slug-input"
-              accessibilityLabel="Public Profile Handle"
-              accessibilityHint="Enter a unique URL handle containing lowercase letters, numbers, and hyphens"
+              accessibilityLabel="Định danh hồ sơ công khai"
+              accessibilityHint="Nhập định danh URL duy nhất bằng chữ thường không dấu, chữ số và dấu gạch nối"
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="e.g. coach-alex"
+              placeholder="Ví dụ: coach-alex"
               placeholderTextColor={themeColors.textSecondary}
               value={publicSlug}
               onChangeText={(val) => {
@@ -241,19 +240,19 @@ export function TrainerOnboardingScreen() {
           {/* Bio */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-              Professional Bio
+              Giới thiệu chuyên môn
             </Text>
             <Text style={[styles.fieldHint, { color: themeColors.textSecondary }]}>
-              Describe your coaching background, philosophy, and specializations (up to 4000 characters).
+              Mô tả nền tảng, triết lý và chuyên môn huấn luyện của bạn (tối đa 4000 ký tự).
             </Text>
             <TextInput
               testID="trainer-bio-input"
-              accessibilityLabel="Professional Bio"
-              accessibilityHint="Enter your professional coaching biography"
+              accessibilityLabel="Giới thiệu chuyên môn"
+              accessibilityHint="Nhập tiểu sử huấn luyện chuyên nghiệp của bạn"
               multiline
               numberOfLines={4}
               maxLength={4000}
-              placeholder="Tell clients about your background and coaching style..."
+              placeholder="Giới thiệu kinh nghiệm và phong cách huấn luyện của bạn..."
               placeholderTextColor={themeColors.textSecondary}
               value={bio}
               onChangeText={(val) => {
@@ -283,12 +282,12 @@ export function TrainerOnboardingScreen() {
           {/* Years of Experience */}
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-              Years of Coaching Experience
+              Số năm kinh nghiệm huấn luyện
             </Text>
             <TextInput
               testID="trainer-experience-input"
-              accessibilityLabel="Years of Coaching Experience"
-              accessibilityHint="Enter years of experience between 0 and 99.99"
+              accessibilityLabel="Số năm kinh nghiệm huấn luyện"
+              accessibilityHint="Nhập số năm kinh nghiệm từ 0 đến 99,99"
               keyboardType="decimal-pad"
               placeholder="e.g. 5"
               placeholderTextColor={themeColors.textSecondary}
@@ -330,15 +329,15 @@ export function TrainerOnboardingScreen() {
             ]}>
             <View style={styles.switchInfo}>
               <Text style={[styles.switchLabel, { color: themeColors.textPrimary }]}>
-                Accepting Students
+                Nhận học viên
               </Text>
               <Text style={[styles.switchDescription, { color: themeColors.textSecondary }]}>
-                Mark your profile as open to accepting new students once verified.
+                Cho phép nhận học viên mới sau khi được xác minh.
               </Text>
             </View>
             <Switch
               testID="trainer-accepting-switch"
-              accessibilityLabel="Accepting Students"
+              accessibilityLabel="Nhận học viên"
               value={acceptingStudents}
               onValueChange={setAcceptingStudents}
               trackColor={{ false: colors.neutral[300], true: themeColors.primary }}
@@ -352,7 +351,7 @@ export function TrainerOnboardingScreen() {
           <Pressable
             testID="trainer-submit-button"
             accessibilityRole="button"
-            accessibilityLabel="Create Trainer Profile"
+            accessibilityLabel="Tạo hồ sơ huấn luyện viên"
             disabled={isSubmitting}
             onPress={() => submitProfile(false)}
             style={[
@@ -365,35 +364,35 @@ export function TrainerOnboardingScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
-              <Text style={styles.primaryButtonText}>Complete Trainer Setup</Text>
+              <Text style={styles.primaryButtonText}>Hoàn tất thiết lập huấn luyện viên</Text>
             )}
           </Pressable>
 
           <Pressable
             testID="trainer-skip-button"
             accessibilityRole="button"
-            accessibilityLabel="Skip details and activate trainer profile now"
+            accessibilityLabel="Bỏ qua chi tiết và kích hoạt hồ sơ huấn luyện viên ngay bây giờ"
             disabled={isSubmitting}
             onPress={() => submitProfile(true)}
             style={styles.secondaryButton}>
             <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-              Skip details for now
+              Để sau
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: themeColors.textSecondary }]}>
-            Logged in as {user?.email}
+            Đang đăng nhập bằng {user?.email}
           </Text>
           <Pressable
             testID="trainer-onboarding-logout-button"
             accessibilityRole="button"
-            accessibilityLabel="Sign out of your account"
+            accessibilityLabel="Đăng xuất khỏi tài khoản của bạn"
             onPress={logout}
             style={styles.logoutButton}>
             <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>
-              Sign Out
+              Đăng xuất
             </Text>
           </Pressable>
         </View>

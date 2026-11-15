@@ -154,7 +154,7 @@ export function RegisterScreen() {
                 styles.input,
                 { color: textColor, borderColor: fieldErrors.email ? themeColors.dangerText : borderColor },
               ]}
-              placeholder="you@example.com"
+              placeholder="bạn@example.com"
               placeholderTextColor={subtextColor}
               keyboardType="email-address"
               autoCapitalize="none"

@@ -60,7 +60,7 @@ function PermissionRow({ item, relationshipId, editable }: { item: PermissionSum
         <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}>
           <CoachingCard testID={`sharing-confirmation-${item.dataScope}`}>
             <Text style={[styles.h2, { color: theme.textPrimary }]}>{confirmation === 'revoke' ? 'Xác nhận thu hồi quyền' : 'Xác nhận thay đổi quyền'}</Text>
-            <Text style={[styles.body, { color: theme.textSecondary }]}>{confirmation === 'revoke' ? 'Huấn luyện viên sẽ không còn quyền trong phạm vi này sau khi backend xác nhận.' : `Phạm vi sẽ được đặt thành ${decision === 'ALLOW' ? 'Cho phép' : 'Không chia sẻ'} với mức ${accessLevelLabels[level]}.`}</Text>
+            <Text style={[styles.body, { color: theme.textSecondary }]}>{confirmation === 'revoke' ? 'Huấn luyện viên sẽ không còn quyền trong phạm vi này sau khi hệ thống xác nhận.' : `Phạm vi sẽ được đặt thành ${decision === 'ALLOW' ? 'Cho phép' : 'Không chia sẻ'} với mức ${accessLevelLabels[level]}.`}</Text>
             {(save.isError || revoke.isError) ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{coachingErrorMessage(save.error ?? revoke.error)}</Text> : null}
             <View style={styles.row}>
               <CoachingButton label="Quay lại" secondary disabled={busy} onPress={closeConfirmation} />
@@ -84,7 +84,7 @@ export function SharingPermissionsScreen({ relationshipId }: { relationshipId: s
   return <ScrollView testID="sharing-permissions-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Quyền chia sẻ dữ liệu</Text>
     <Text style={[styles.label, { color: theme.textPrimary }]}>Quan hệ: {coachingStatusLabels[query.data.relationshipStatus]}</Text>
-    <Text style={[styles.body, { color: theme.textSecondary }]}>{editable ? 'Bạn quyết định từng phạm vi dữ liệu được chia sẻ.' : 'Trạng thái chỉ đọc do backend xác định.'}</Text>
+    <Text style={[styles.body, { color: theme.textSecondary }]}>{editable ? 'Bạn quyết định từng phạm vi dữ liệu được chia sẻ.' : 'Trạng thái chỉ đọc do hệ thống xác định.'}</Text>
     {query.data.items.map((item) => <PermissionRow key={item.dataScope} item={item} relationshipId={relationshipId} editable={editable} />)}
   </ScrollView>;
 }

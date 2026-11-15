@@ -78,7 +78,7 @@ export function TrainerChangeProposalDetailScreen({ relationshipId, proposalId }
         <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ cũ: {formatChangeTime(proposal.oldPlannedStartAt, proposal.oldTimezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc cũ: {proposal.oldPlannedEndAt ? formatChangeTime(proposal.oldPlannedEndAt, proposal.oldTimezone) : 'Chưa rõ trong bản ghi cũ'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất lúc: {formatChangeTime(proposal.proposedAt, proposal.oldTimezone)}</Text>
-        {proposal.reason ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do Trainer nêu: {proposal.reason}</Text> : null}
+        {proposal.reason ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do huấn luyện viên nêu: {proposal.reason}</Text> : null}
         {proposal.appointmentId ? <>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất gắn với một lịch hẹn đã xác nhận. Khi Học viên chấp nhận, máy chủ kiểm tra lại đúng lịch hẹn và phiên bản đã ghi nhận.</Text>
           <WorkoutButton testID="trainer-change-open-appointment" label="Xem lịch hẹn liên kết" secondary onPress={() => router.push(`/appointments/${proposal.appointmentId}` as never)} />

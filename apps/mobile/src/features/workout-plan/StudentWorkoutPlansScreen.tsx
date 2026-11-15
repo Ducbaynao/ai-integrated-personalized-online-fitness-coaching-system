@@ -51,7 +51,7 @@ export function StudentWorkoutPlansScreen() {
     </WorkoutCard>
 
     <WorkoutButton testID="ai-workout-proposal-button" label="Đề xuất giáo án 1 tuần (AI)" secondary onPress={() => setIsAiProposalVisible(true)} hint="AI hỗ trợ thiết kế giáo án phù hợp mục tiêu" />
-    <WorkoutButton testID="create-workout-plan-button" label="Tạo kế hoạch mới" onPress={() => router.push('/workout-plans/new' as never)} hint="Backend sẽ kiểm tra chế độ SELF_DIRECTED khi lưu" />
+    <WorkoutButton testID="create-workout-plan-button" label="Tạo kế hoạch mới" onPress={() => router.push('/workout-plans/new' as never)} hint="Hệ thống sẽ kiểm tra chế độ tự tập khi lưu" />
 
     <WorkoutCard testID="workout-plan-list">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Kế hoạch khác và lịch sử</Text>

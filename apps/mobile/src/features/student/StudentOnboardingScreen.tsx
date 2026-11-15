@@ -12,6 +12,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { apiErrorMessage, experienceLabels, genderLabels } from '@/localization/displayLabels';
 import { useAuth } from '@/features/auth/AuthContext';
 import { studentProfileApi } from '@/services/studentProfileApi';
 import { ApiError } from '@/types/auth';
@@ -23,17 +24,17 @@ import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 
 const GENDER_OPTIONS: { label: string; value: Gender }[] = [
-  { label: 'Male', value: 'MALE' },
-  { label: 'Female', value: 'FEMALE' },
-  { label: 'Non-binary', value: 'NON_BINARY' },
-  { label: 'Other', value: 'OTHER' },
-  { label: 'Prefer not to say', value: 'PREFER_NOT_TO_SAY' },
+  { label: genderLabels.MALE, value: 'MALE' },
+  { label: genderLabels.FEMALE, value: 'FEMALE' },
+  { label: genderLabels.NON_BINARY, value: 'NON_BINARY' },
+  { label: genderLabels.OTHER, value: 'OTHER' },
+  { label: genderLabels.PREFER_NOT_TO_SAY, value: 'PREFER_NOT_TO_SAY' },
 ];
 
 const EXPERIENCE_OPTIONS: { label: string; value: TrainingExperienceLevel }[] = [
-  { label: 'Beginner', value: 'BEGINNER' },
-  { label: 'Intermediate', value: 'INTERMEDIATE' },
-  { label: 'Advanced', value: 'ADVANCED' },
+  { label: experienceLabels.BEGINNER, value: 'BEGINNER' },
+  { label: experienceLabels.INTERMEDIATE, value: 'INTERMEDIATE' },
+  { label: experienceLabels.ADVANCED, value: 'ADVANCED' },
 ];
 
 const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -140,13 +141,13 @@ export function StudentOnboardingScreen() {
         if (err.errorResponse?.fieldErrors && err.errorResponse.fieldErrors.length > 0) {
           const map: Record<string, string> = {};
           err.errorResponse.fieldErrors.forEach((fe) => {
-            map[fe.field] = fe.message;
+            map[fe.field] = 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.';
           });
           setFieldErrors(map);
         }
-        setErrorMessage(err.message || 'Failed to complete student onboarding.');
+        setErrorMessage(apiErrorMessage(err, 'Không thể hoàn tất hồ sơ học viên.'));
       } else {
-        setErrorMessage('An unexpected error occurred. Please check your connection and try again.');
+        setErrorMessage('Có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.');
       }
     } finally {
       isSubmittingRef.current = false;
@@ -181,13 +182,13 @@ export function StudentOnboardingScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.greeting, { color: textColor }]}>
-              Welcome{user?.displayName ? `, ${user.displayName}` : ''}!
+              Chào mừng{user?.displayName ? `, ${user.displayName}` : ''}!
             </Text>
             <Text style={[styles.title, { color: textColor }]}>
-              Complete Your Student Profile
+              Hoàn thiện hồ sơ Học viên
             </Text>
             <Text style={[styles.subtitle, { color: subtextColor }]}>
-              Set up your fitness baseline so we can personalize your training journey.
+              Cung cấp thông tin thể chất ban đầu để cá nhân hóa quá trình tập luyện.
             </Text>
           </View>
 
@@ -203,14 +204,14 @@ export function StudentOnboardingScreen() {
 
           {/* 1. Date of Birth */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Date of Birth</Text>
+            <Text style={[styles.label, { color: textColor }]}>Ngày sinh</Text>
             <Text style={[styles.helperText, { color: subtextColor }]}>
-              Format: YYYY-MM-DD (e.g., 1995-06-15)
+              Định dạng: YYYY-MM-DD (ví dụ: 1995-06-15)
             </Text>
             <TextInput
               testID="dob-input"
-              accessibilityLabel="Date of Birth"
-              accessibilityHint="Enter your date of birth in YYYY-MM-DD format"
+              accessibilityLabel="Ngày sinh"
+              accessibilityHint="Nhập ngày sinh của bạn theo định dạng YYYY-MM-DD"
               aria-invalid={!!fieldErrors.dateOfBirth}
               style={[
                 styles.input,
@@ -233,7 +234,7 @@ export function StudentOnboardingScreen() {
 
           {/* 2. Gender */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Gender</Text>
+            <Text style={[styles.label, { color: textColor }]}>Giới tính</Text>
             <View style={styles.chipsContainer}>
               {GENDER_OPTIONS.map((opt) => {
                 const isSelected = gender === opt.value;
@@ -270,7 +271,7 @@ export function StudentOnboardingScreen() {
 
           {/* 3. Training Experience Level */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Experience Level</Text>
+            <Text style={[styles.label, { color: textColor }]}>Trình độ tập luyện</Text>
             <View style={styles.chipsContainer}>
               {EXPERIENCE_OPTIONS.map((opt) => {
                 const isSelected = trainingExperienceLevel === opt.value;
@@ -307,14 +308,14 @@ export function StudentOnboardingScreen() {
 
           {/* 4. Training Experience (Months) */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Training Experience (Months)</Text>
+            <Text style={[styles.label, { color: textColor }]}>Kinh nghiệm tập luyện (tháng)</Text>
             <Text style={[styles.helperText, { color: subtextColor }]}>
-              Total months of regular workout experience (e.g., 12)
+              Tổng số tháng kinh nghiệm tập luyện thường xuyên (ví dụ: 12)
             </Text>
             <TextInput
               testID="months-input"
-              accessibilityLabel="Training Experience in Months"
-              accessibilityHint="Enter number of months you have trained"
+              accessibilityLabel="Kinh nghiệm tập luyện tính bằng tháng"
+              accessibilityHint="Nhập số tháng bạn đã tập luyện"
               aria-invalid={!!fieldErrors.trainingExperienceMonths}
               style={[
                 styles.input,
@@ -339,9 +340,9 @@ export function StudentOnboardingScreen() {
 
           {/* 5. Available Days Per Week */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Available Days Per Week</Text>
+            <Text style={[styles.label, { color: textColor }]}>Số ngày có thể tập mỗi tuần</Text>
             <Text style={[styles.helperText, { color: subtextColor }]}>
-              How many days per week can you train? (1 to 7)
+              Bạn có thể tập luyện bao nhiêu ngày mỗi tuần? (1 đến 7)
             </Text>
             <View style={styles.chipsContainer}>
               {DAY_OPTIONS.map((day) => {
@@ -351,7 +352,7 @@ export function StudentOnboardingScreen() {
                     key={day}
                     testID={`days-chip-${day}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${day} days per week`}
+                    accessibilityLabel={`${day} ngày mỗi tuần`}
                     accessibilityState={{ selected: isSelected }}
                     disabled={isSubmitting}
                     onPress={() => handleDaysSelect(day)}
@@ -382,9 +383,9 @@ export function StudentOnboardingScreen() {
 
           {/* 6. Preferred Session Duration */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Preferred Session Duration (Minutes)</Text>
+            <Text style={[styles.label, { color: textColor }]}>Thời lượng buổi tập mong muốn (phút)</Text>
             <Text style={[styles.helperText, { color: subtextColor }]}>
-              Typical duration between 5 and 480 minutes
+              Thời lượng thông thường từ 5 đến 480 phút
             </Text>
             <View style={styles.chipsContainer}>
               {DURATION_PRESETS.map((preset) => {
@@ -394,7 +395,7 @@ export function StudentOnboardingScreen() {
                     key={preset}
                     testID={`duration-chip-${preset}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${preset} minutes`}
+                    accessibilityLabel={`${preset} phút`}
                     accessibilityState={{ selected: isSelected }}
                     disabled={isSubmitting}
                     onPress={() => handleDurationPreset(preset)}
@@ -420,8 +421,8 @@ export function StudentOnboardingScreen() {
             </View>
             <TextInput
               testID="duration-input"
-              accessibilityLabel="Preferred Session Duration in Minutes"
-              accessibilityHint="Enter minutes per workout session"
+              accessibilityLabel="Thời lượng buổi tập mong muốn tính bằng phút"
+              accessibilityHint="Nhập số phút mỗi buổi tập luyện"
               aria-invalid={!!fieldErrors.preferredSessionMinutes}
               style={[
                 styles.input,
@@ -433,7 +434,7 @@ export function StudentOnboardingScreen() {
                   marginTop: spacing.xs,
                 },
               ]}
-              placeholder="Or enter custom minutes (e.g., 45)"
+              placeholder="Hoặc nhập số phút tùy chỉnh (ví dụ: 45)"
               placeholderTextColor={subtextColor}
               value={preferredSessionMinutes}
               onChangeText={setPreferredSessionMinutes}
@@ -449,7 +450,7 @@ export function StudentOnboardingScreen() {
           <Pressable
             testID="submit-button"
             accessibilityRole="button"
-            accessibilityLabel="Complete Setup"
+            accessibilityLabel="Hoàn tất thiết lập"
             accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
             style={({ pressed }) => [
               styles.primaryButton,
@@ -466,7 +467,7 @@ export function StudentOnboardingScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={themeColors.textOnPrimary} />
             ) : (
-              <Text style={styles.primaryButtonText}>Complete Setup</Text>
+              <Text style={styles.primaryButtonText}>Hoàn tất thiết lập</Text>
             )}
           </Pressable>
 
@@ -474,7 +475,7 @@ export function StudentOnboardingScreen() {
           <Pressable
             testID="skip-button"
             accessibilityRole="button"
-            accessibilityLabel="Continue without details"
+            accessibilityLabel="Tiếp tục mà chưa nhập thông tin"
             accessibilityState={{ disabled: isSubmitting }}
             style={({ pressed }) => [
               styles.secondaryButton,
@@ -486,7 +487,7 @@ export function StudentOnboardingScreen() {
             onPress={() => submitProfile(true)}
             disabled={isSubmitting}>
             <Text style={[styles.secondaryButtonText, { color: textColor }]}>
-              Continue without details
+              Tiếp tục mà chưa nhập thông tin
             </Text>
           </Pressable>
 
@@ -494,14 +495,14 @@ export function StudentOnboardingScreen() {
           <Pressable
             testID="logout-button"
             accessibilityRole="button"
-            accessibilityLabel="Sign out or switch account"
+            accessibilityLabel="Đăng xuất hoặc chuyển đổi tài khoản"
             disabled={isSubmitting}
             style={styles.switchAccount}
             onPress={handleLogout}>
             <Text style={[styles.switchAccountText, { color: subtextColor }]}>
-              Not your account?{' '}
+              Không phải tài khoản của bạn?{' '}
               <Text style={{ color: themeColors.primary, fontWeight: '600' }}>
-                Sign out
+                Đăng xuất
               </Text>
             </Text>
           </Pressable>

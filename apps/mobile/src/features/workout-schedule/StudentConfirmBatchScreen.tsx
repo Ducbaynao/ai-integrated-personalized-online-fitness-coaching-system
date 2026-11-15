@@ -10,6 +10,7 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
 import { appointmentApi } from '@/services/appointmentApi';
 import { ApiError } from '@/types/auth';
+import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displayLabels';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { ConfirmWorkoutScheduleBatchRequest } from '@/types/workoutScheduleBatch';
 import { isMonday, proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -110,7 +111,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
       const status = reason instanceof ApiError ? reason.status : undefined;
       const itemMessages = reason instanceof ApiError ? reason.errorResponse?.itemErrors?.map((item) => {
         const index = body.items.findIndex((entry) => entry.clientItemId === item.clientItemId);
-        return `${entries[index]?.session.name ?? 'Buổi trong đợt lịch'}${item.field ? ` (${item.field})` : ''}: ${item.message}`;
+        return `${entries[index]?.session.name ?? 'Buổi trong đợt lịch'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${localizedServerMessage(item.message, 'Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại.')}`;
       }) ?? [] : [];
       setError([batchError(reason), ...itemMessages].join('\n'));
       if (status === 403 || status === 404) {
@@ -161,7 +162,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
   return <ScrollView testID="student-confirm-batch-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Tự lên lịch tập</Text>
     <WorkoutButton label="Quay lại kế hoạch" secondary onPress={() => router.back()} />
-    {!sourceReady ? <WorkoutState title="Chưa có kế hoạch phù hợp" message="Chỉ kế hoạch ACTIVE với phiên bản đã xuất bản và đang hiệu lực mới có thể xác nhận lịch. Không dùng bản nháp hoặc phiên bản lịch sử." /> : null}
+    {!sourceReady ? <WorkoutState title="Chưa có kế hoạch phù hợp" message="Chỉ kế hoạch đang hoạt động với phiên bản đã xuất bản và đang hiệu lực mới có thể xác nhận lịch. Không dùng bản nháp hoặc phiên bản lịch sử." /> : null}
     {sourceReady && plan ? <>
       <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{plan.name}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {version?.versionNumber} · {sessions.length} buổi. Lịch chỉ được tạo sau khi bạn xác nhận toàn bộ đợt.</Text></WorkoutCard>

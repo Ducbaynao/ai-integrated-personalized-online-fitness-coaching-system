@@ -115,7 +115,7 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {item.planSummary?.planName?.trim() || 'Chưa có tên kế hoạch'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu hiện tại: {formatTrainerScheduleTime(item.plannedStartAt, item.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc hiện tại: {item.plannedEndAt ? formatTrainerScheduleTime(item.plannedEndAt, item.timezone) : 'Chưa rõ trong bản ghi cũ'}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Máy chủ sẽ kiểm tra lại occurrence version, execution seal, Appointment và quyền trước khi lưu đề xuất. Tạo đề xuất chưa đổi lịch.</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Máy chủ sẽ kiểm tra lại phiên bản buổi tập, trạng thái khóa nhật ký và lịch hẹn và quyền trước khi lưu đề xuất. Tạo đề xuất chưa đổi lịch.</Text>
       </WorkoutCard>
       {!canSelect ? <WorkoutState testID="create-change-ineligible" title="Không thể đề xuất từ buổi này" message="Cần occurrence SCHEDULED và quyền Đóng góp hiện hành." /> : <>
         <View style={styles.row}>
@@ -126,12 +126,12 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         {!rescheduleSourceReady ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>
           {item.sessionSummary?.supervisionRequirement === 'COACH_REQUIRED'
             ? 'Buổi cần Huấn luyện viên giám sát nhưng không có liên kết lịch hẹn hiện hành; không thể đề xuất đổi lịch.'
-            : 'Thiếu metadata nguồn, local-time intent hoặc supervision; không thể đề xuất đổi lịch từ bản ghi này.'}
+            : 'Thiếu thông tin nguồn, giờ địa phương dự kiến hoặc thông tin giám sát; không thể đề xuất đổi lịch từ bản ghi này.'}
         </Text> : null}
         {changeType === 'RESCHEDULE' && rescheduleSourceReady ? <WorkoutCard testID="create-change-reschedule-form">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Giờ thay thế</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn tường minh IANA timezone, giờ bắt đầu/kết thúc địa phương và UTC offset. Không suy thời lượng từ kế hoạch.</Text>
-          {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đề xuất phải nằm trọn trong cùng lịch hẹn CONFIRMED. Lịch hẹn không tự đổi; backend sẽ kiểm lại ID và phiên bản khi Học viên chấp nhận.</Text> : null}
+          {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đề xuất phải nằm trọn trong cùng một lịch hẹn đã xác nhận. Lịch hẹn không tự đổi; hệ thống sẽ kiểm lại mã và phiên bản khi học viên chấp nhận.</Text> : null}
           {item.timezone ? <WorkoutButton label={`Dùng múi giờ occurrence: ${item.timezone}`} secondary onPress={() => editDestination({ timezone: item.timezone ?? '', startUtcOffset: '', endUtcOffset: '' })} /> : null}
           <TextInput testID="change-timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch}
             style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
@@ -157,7 +157,7 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         </WorkoutCard> : null}
         {changeType ? <WorkoutCard>
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Lý do đề xuất</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Có thể nêu lý do để Học viên hiểu trước khi quyết định. Hủy theo đề xuất vẫn cần Học viên ACCEPT; nếu lúc đó đã qua giờ bắt đầu, backend yêu cầu Học viên cung cấp lý do quyết định.</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Có thể nêu lý do để học viên hiểu trước khi quyết định. Hủy theo đề xuất vẫn cần học viên chấp nhận; nếu lúc đó đã qua giờ bắt đầu, hệ thống yêu cầu học viên cung cấp lý do quyết định.</Text>
           <TextInput testID="change-proposal-reason" accessibilityLabel="Lý do đề xuất thay đổi lịch" placeholder="Lý do (không bắt buộc)" multiline maxLength={1000} value={reason}
             onChangeText={(value) => { setReason(value); resetReview(); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
           <WorkoutButton testID="review-change-proposal" label="Xem trước đề xuất" disabled={mutation.isPending} onPress={review} />
@@ -168,7 +168,7 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
           {changeType === 'RESCHEDULE' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ đề xuất: {destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {destination.timezone}</Text> : null}
           {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn hiện có là một lifecycle riêng. Đề xuất hủy buổi tập không hủy lịch hẹn; đề xuất đổi lịch không tự dời lịch hẹn.</Text> : null}
           {reason.trim() ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {reason.trim()}</Text> : null}
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ một occurrence. Học viên sẽ ACCEPT/REJECT; gửi đề xuất PENDING không đổi occurrence hay giữ chỗ trên lịch.</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ một buổi tập. Học viên sẽ chấp nhận hoặc từ chối; gửi đề xuất đang chờ không đổi buổi tập hay giữ chỗ trên lịch.</Text>
           <WorkoutButton testID="confirm-create-change-proposal" label="Gửi đề xuất cho Học viên" busy={mutation.isPending} disabled={mutation.isPending || needsReview} onPress={send} />
         </WorkoutCard> : null}
       </>}

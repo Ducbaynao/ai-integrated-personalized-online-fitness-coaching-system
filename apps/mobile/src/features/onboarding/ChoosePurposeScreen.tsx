@@ -35,11 +35,10 @@ export function ChoosePurposeScreen() {
       style={[styles.container, { backgroundColor: themeColors.canvas }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-          Welcome to Digital Fitness
+          Chào mừng đến với Digital Fitness
         </Text>
         <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-          Choose how you would like to start today. You can always activate the other capability
-          later from your account settings.
+          Chọn cách bạn muốn bắt đầu. Bạn có thể kích hoạt vai trò còn lại sau trong cài đặt tài khoản.
         </Text>
       </View>
 
@@ -48,8 +47,8 @@ export function ChoosePurposeScreen() {
         <Pressable
           testID="select-student-purpose-button"
           accessibilityRole="button"
-          accessibilityLabel="I want to be coached. Continue to Student Onboarding."
-          accessibilityHint="Sets up your personal student fitness profile."
+          accessibilityLabel="Tôi muốn tập luyện. Tiếp tục tạo hồ sơ Học viên."
+          accessibilityHint="Tạo hồ sơ thể chất cá nhân cho Học viên."
           onPress={handleSelectStudent}
           style={({ pressed }) => [
             styles.card,
@@ -62,20 +61,19 @@ export function ChoosePurposeScreen() {
           <View style={styles.cardBadgeContainer}>
             <View style={[styles.cardBadge, { backgroundColor: colors.brand[50] }]}>
               <Text style={[styles.cardBadgeText, { color: colors.brand[700] }]}>
-                STUDENT
+                HỌC VIÊN
               </Text>
             </View>
           </View>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            I want to be coached
+            Tôi muốn tập luyện
           </Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
-            Track workouts, set personal fitness goals, follow structured plans, and work with a
-            coach or follow self-directed training.
+            Theo dõi buổi tập, đặt mục tiêu thể chất, thực hiện kế hoạch và lựa chọn tập cùng huấn luyện viên hoặc tự tập.
           </Text>
           <View style={styles.cardAction}>
             <Text style={[styles.cardActionText, { color: themeColors.primary }]}>
-              Start Student Onboarding →
+              Tạo hồ sơ Học viên →
             </Text>
           </View>
         </Pressable>
@@ -84,8 +82,8 @@ export function ChoosePurposeScreen() {
         <Pressable
           testID="select-trainer-purpose-button"
           accessibilityRole="button"
-          accessibilityLabel="I want to coach. Continue to Trainer Profile Setup."
-          accessibilityHint="Sets up your professional trainer profile."
+          accessibilityLabel="Tôi muốn huấn luyện. Tiếp tục tạo hồ sơ Huấn luyện viên."
+          accessibilityHint="Thiết lập hồ sơ huấn luyện viên chuyên nghiệp của bạn."
           onPress={handleSelectTrainer}
           style={({ pressed }) => [
             styles.card,
@@ -98,20 +96,19 @@ export function ChoosePurposeScreen() {
           <View style={styles.cardBadgeContainer}>
             <View style={[styles.cardBadge, { backgroundColor: colors.warning[100] }]}>
               <Text style={[styles.cardBadgeText, { color: colors.warning[600] }]}>
-                TRAINER
+                HUẤN LUYỆN VIÊN
               </Text>
             </View>
           </View>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            I want to coach others
+            Tôi muốn huấn luyện người khác
           </Text>
           <Text style={[styles.cardDescription, { color: themeColors.textSecondary }]}>
-            Build your professional trainer profile, set your experience and coaching details,
-            and prepare for future verification.
+            Tạo hồ sơ Huấn luyện viên, khai báo kinh nghiệm và thông tin huấn luyện để chuẩn bị xác minh.
           </Text>
           <View style={styles.cardAction}>
             <Text style={[styles.cardActionText, { color: themeColors.primary }]}>
-              Set up Trainer Profile →
+              Thiết lập hồ sơ huấn luyện viên →
             </Text>
           </View>
         </Pressable>
@@ -119,16 +116,16 @@ export function ChoosePurposeScreen() {
 
       <View style={styles.footer}>
         <Text style={[styles.footerNote, { color: themeColors.textSecondary }]}>
-          Logged in as {user?.email}
+          Đang đăng nhập bằng {user?.email}
         </Text>
         <Pressable
           testID="choose-purpose-logout-button"
           accessibilityRole="button"
-          accessibilityLabel="Sign out of your account"
+          accessibilityLabel="Đăng xuất khỏi tài khoản của bạn"
           onPress={logout}
           style={styles.logoutButton}>
           <Text style={[styles.logoutText, { color: themeColors.textSecondary }]}>
-            Sign Out
+            Đăng xuất
           </Text>
         </Pressable>
       </View>

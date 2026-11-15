@@ -23,7 +23,7 @@ export const workoutSetStatusLabels: Record<WorkoutExecutionSetCompletionStatus,
 export const workoutSetTypeLabels: Record<WorkoutExecutionSetType, string> = {
   WARMUP: 'Khởi động',
   WORKING: 'Hiệp chính',
-  DROP: 'Drop set',
+  DROP: 'Hiệp giảm tải',
   FAILURE: 'Đến ngưỡng',
   AMRAP: 'Tối đa số lần',
   COOLDOWN: 'Thả lỏng',

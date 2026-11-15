@@ -137,7 +137,7 @@ function RecurrenceDetail({ seriesId, actorId, allowed, canWithdraw, trainerStud
           ? <WorkoutButton testID="series-withdraw" label="Rút đề xuất" secondary onPress={() => open('WITHDRAW')} /> : null}
         {confirm ? <WorkoutCard testID="series-command-confirmation">
           <Text accessibilityRole="alert" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận {confirm === 'ACCEPT' ? 'chấp nhận series' : confirm === 'REJECT' ? 'từ chối' : confirm === 'STOP' ? 'dừng series' : 'rút đề xuất'}?</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Backend kiểm tra lại quyền và phiên bản. Kỳ đã tạo vẫn là lịch sử; không tự tạo Appointment.</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Hệ thống kiểm tra lại quyền và phiên bản. Kỳ đã tạo vẫn là lịch sử; không tự tạo lịch hẹn.</Text>
           <View style={styles.row}><WorkoutButton label="Xem lại" secondary onPress={() => { setConfirm(null); setPending(null); }} />
             <WorkoutButton testID="series-confirm-command" label="Xác nhận" busy={mutation.isPending} disabled={mutation.isPending} onPress={send} /></View>
         </WorkoutCard> : null}
@@ -146,7 +146,7 @@ function RecurrenceDetail({ seriesId, actorId, allowed, canWithdraw, trainerStud
         {periods.isError ? <WorkoutState title="Không thể tải từng kỳ" message="Kiểm tra kết nối hoặc quyền truy cập." onRetry={() => periods.refetch()} /> : null}
         {!periods.isPending && !periods.isError && !periods.data?.pages.some(page => page.items.length) ? <WorkoutState title="Chưa có kỳ được xử lý" message="Job hằng ngày chỉ xét giờ bắt đầu trong 30 ngày tới." /> : null}
         {periods.data?.pages.flatMap(page => page.items).map(period => <WorkoutCard key={period.periodId} testID={`series-period-${period.periodId}`}>
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Block {period.blockIteration + 1} · {outcomeLabels[period.outcome]}</Text>
+          <Text style={[styles.label, { color: theme.textPrimary }]}>Chặn {period.blockIteration + 1} · {outcomeLabels[period.outcome]}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>{period.localStart} → {period.localEnd} · {period.timezone}</Text>
           {period.startUtcOffset ? <Text style={[styles.body, { color: theme.textSecondary }]}>UTC {period.startUtcOffset} → {period.endUtcOffset}</Text> : null}
           {period.occurrenceId && !relationshipId ? <WorkoutButton label="Xem buổi đã tạo" secondary onPress={() => router.push(`/workouts/schedule/${period.occurrenceId}` as never)} /> : null}

@@ -139,11 +139,11 @@ describe('B07 nutrition screens', () => {
     input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
     renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn Foundation oats, USDA FDC 12345' }).props.onPress());
-    expect(tree.root.findByProps({ accessibilityLabel: 'Đơn vị MILLILITRE' }).props.disabled).toBe(true);
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Đơn vị SERVING' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Portion cup, nguồn USDA portion weight' }).props.onPress());
+    expect(tree.root.findByProps({ accessibilityLabel: 'Đơn vị mililít' }).props.disabled).toBe(true);
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Đơn vị khẩu phần' }).props.onPress());
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Khẩu phần cup, nguồn USDA portion weight' }).props.onPress());
     input(tree, 'Số lượng theo đơn vị đã chọn', '1.25');
-    await renderer.act(async () => { press(tree, 'Ghi thực phẩm catalog'); });
+    await renderer.act(async () => { press(tree, 'Ghi thực phẩm trong danh mục'); });
     expect(nutritionApi.addCatalogItem).toHaveBeenCalledWith('2026-10-13',
       expect.objectContaining({ catalogFoodId: 'catalog-food', expectedRevisionId: 'revision-id',
         portionId: 'portion-id', quantityBasis: 'SERVING', quantity: 1.25,

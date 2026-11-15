@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { apiErrorMessage } from '@/localization/displayLabels';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
@@ -204,7 +205,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             setReconciliationState({
               identity: targetIdentity,
               status: 'failed',
-              error: err?.message || 'Failed to sync goal status.',
+              error: apiErrorMessage(err, 'Không thể đồng bộ trạng thái mục tiêu.'),
             });
             return;
           }
@@ -213,7 +214,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
           }
           if (err instanceof ApiError && err.status === 404) {
             if (goalId) {
-              setError('Goal not found or inaccessible.');
+              setError('Không tìm thấy mục tiêu hoặc bạn không có quyền xem.');
               setGoal(null);
               setLoadedIdentity(null);
             } else {
@@ -222,7 +223,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
               setError(null);
             }
           } else {
-            setError(err?.message || 'Failed to load fitness goal.');
+            setError(apiErrorMessage(err, 'Không thể tải mục tiêu thể chất.'));
             setGoal(null);
             setLoadedIdentity(null);
           }
@@ -376,23 +377,21 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         return;
       }
 
-      let message = 'An unexpected error occurred while updating goal status.';
+      let message = 'Có lỗi xảy ra khi cập nhật trạng thái mục tiêu.';
       if (err instanceof ApiError) {
         if (err.errorResponse?.errorCode === 'ACTIVE_FITNESS_GOAL_ALREADY_EXISTS') {
           message =
-            'You already have another active fitness goal. Only one active goal is permitted at a time.';
+            'Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.';
         } else if (err.errorResponse?.errorCode === 'GOAL_LIFECYCLE_CONFLICT') {
           message =
-            'The goal status was updated by another request. Please refresh to see the latest status.';
+            'Trạng thái mục tiêu đã được thay đổi. Vui lòng tải lại để xem trạng thái mới nhất.';
         } else if (err.status === 409) {
-          message =
-            err.errorResponse?.message ||
-            'Goal status conflict occurred. Please refresh and try again.';
-        } else if (err.errorResponse?.message) {
-          message = err.errorResponse.message;
+          message = 'Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại và thử lại.';
+        } else {
+          message = apiErrorMessage(err, message);
         }
       }
-      Alert.alert('Status Update Failed', message);
+      Alert.alert('Không thể cập nhật trạng thái', message);
       throw err;
     } finally {
       if (
@@ -435,11 +434,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 409) {
         setConflictBanner(
-          err.errorResponse?.message ||
-            'You already have an active fitness goal. Only one active goal is permitted.'
+          'Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.'
         );
       } else {
-        Alert.alert('Creation Failed', err?.message || 'Unable to create fitness goal.');
+        Alert.alert('Không thể tạo mục tiêu', apiErrorMessage(err, 'Không thể tạo mục tiêu thể chất.'));
       }
       throw err;
     } finally {
@@ -475,11 +473,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 409) {
         setConflictBanner(
-          err.errorResponse?.message ||
-            'Goal version conflict occurred. Another change was made. Please reload.'
+          'Phiên bản mục tiêu đã thay đổi. Vui lòng tải lại.'
         );
       } else {
-        Alert.alert('Version Adjustment Failed', err?.message || 'Unable to adjust goal.');
+        Alert.alert('Không thể điều chỉnh phiên bản', apiErrorMessage(err, 'Không thể điều chỉnh mục tiêu.'));
       }
       throw err;
     } finally {
@@ -517,11 +514,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 409) {
         setConflictBanner(
-          err.errorResponse?.message ||
-            'Transition conflict occurred. The goal state has changed. Please reload.'
+          'Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại.'
         );
       } else {
-        Alert.alert('Transition Failed', err?.message || 'Unable to transition goal journey.');
+        Alert.alert('Không thể chuyển mục tiêu', apiErrorMessage(err, 'Không thể chuyển sang hành trình mục tiêu mới.'));
       }
       throw err;
     } finally {
@@ -542,30 +538,29 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
           <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
-            No Active Fitness Goal
+            Chưa có mục tiêu thể chất đang hoạt động
           </Text>
           <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
-            You currently do not have an active or paused fitness goal. When you or your coach
-            establish a fitness goal, it will appear here.
+            Bạn hiện chưa có mục tiêu thể chất đang hoạt động hoặc tạm dừng. Khi bạn hoặc huấn luyện viên tạo mục tiêu, mục tiêu sẽ xuất hiện tại đây.
           </Text>
 
           <Pressable
             testID="create-first-goal-button"
             accessibilityRole="button"
-            accessibilityLabel="Create New Fitness Goal"
+            accessibilityLabel="Tạo mục tiêu thể chất mới"
             style={[styles.primaryActionButton, { backgroundColor: themeColors.primary, marginBottom: spacing.sm }]}
             onPress={() => setCreateGoalModalVisible(true)}>
-            <Text style={styles.primaryActionText}>Create Fitness Goal</Text>
+            <Text style={styles.primaryActionText}>Tạo mục tiêu thể chất</Text>
           </Pressable>
 
           <Pressable
             testID="view-proposals-empty-button"
             accessibilityRole="button"
-            accessibilityLabel="Check Pending Proposals"
+            accessibilityLabel="Xem đề xuất đang chờ"
             style={[styles.secondaryActionButton, { borderColor: themeColors.border }]}
             onPress={() => setActiveTab('proposals')}>
             <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-              Check Goal Proposals
+              Xem đề xuất mục tiêu
             </Text>
           </Pressable>
         </View>
@@ -596,7 +591,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         <Pressable
           testID="goal-screen-back-button"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel="Quay lại"
           style={styles.backButton}
           onPress={() => {
             if (router.canGoBack()) {
@@ -605,10 +600,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
               router.replace('/' as any);
             }
           }}>
-          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>← Back</Text>
+          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>← Quay lại</Text>
         </Pressable>
         <Text style={[styles.screenTitle, { color: themeColors.textPrimary }]}>
-          Fitness Goal
+          Mục tiêu thể chất
         </Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -634,17 +629,17 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
               { backgroundColor: themeColors.surface, borderColor: themeColors.border },
             ]}>
             <Text style={[styles.errorTitle, { color: themeColors.dangerText }]}>
-              Unable to Load Goal
+              Không thể tải mục tiêu
             </Text>
             <Text style={[styles.errorSubtitle, { color: themeColors.textSecondary }]}>
               {error}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Retry loading goal"
+              accessibilityLabel="Thử tải lại mục tiêu"
               style={[styles.primaryActionButton, { backgroundColor: themeColors.primary }]}
               onPress={() => loadGoal({ showLoading: true })}>
-              <Text style={styles.primaryActionText}>Retry</Text>
+              <Text style={styles.primaryActionText}>Thử lại</Text>
             </Pressable>
           </View>
         )}
@@ -670,7 +665,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                       styles.reconciliationCardTitle,
                       { color: themeColors.warningText },
                     ]}>
-                    Goal Version Conflict
+                    Xung đột phiên bản mục tiêu
                   </Text>
                   <Text
                     style={[
@@ -683,13 +678,13 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                 <Pressable
                   testID="reload-goal-conflict-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Reload goal"
+                  accessibilityLabel="Tải lại mục tiêu"
                   style={[styles.retryActionButton, { backgroundColor: themeColors.primary }]}
                   onPress={() => {
                     setConflictBanner(null);
                     loadGoal({ showLoading: true });
                   }}>
-                  <Text style={styles.retryActionText}>Reload</Text>
+                  <Text style={styles.retryActionText}>Tải lại</Text>
                 </Pressable>
               </View>
             )}
@@ -701,7 +696,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                   <Pressable
                     testID="pause-goal-button"
                     accessibilityRole="button"
-                    accessibilityLabel="Pause Goal"
+                    accessibilityLabel="Tạm dừng mục tiêu"
                     style={({ pressed }) => [
                       styles.pauseActionButton,
                       {
@@ -713,7 +708,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                     ]}
                     onPress={handleOpenPause}>
                     <Text style={[styles.pauseActionText, { color: themeColors.warningText }]}>
-                      ⏸ Pause Goal
+                      ⏸ Tạm dừng mục tiêu
                     </Text>
                   </Pressable>
                 )}
@@ -722,7 +717,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                   <Pressable
                     testID="resume-goal-button"
                     accessibilityRole="button"
-                    accessibilityLabel="Resume Goal"
+                    accessibilityLabel="Tiếp tục mục tiêu"
                     style={({ pressed }) => [
                       styles.resumeActionButton,
                       {
@@ -732,7 +727,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                       },
                     ]}
                     onPress={handleOpenResume}>
-                    <Text style={styles.resumeActionText}>▶ Resume Goal</Text>
+                    <Text style={styles.resumeActionText}>▶ Tiếp tục mục tiêu</Text>
                   </Pressable>
                 )}
 
@@ -741,7 +736,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                     <Pressable
                       testID="adjust-goal-version-button"
                       accessibilityRole="button"
-                      accessibilityLabel="Adjust Goal"
+                      accessibilityLabel="Điều chỉnh mục tiêu"
                       style={({ pressed }) => [
                         styles.secondaryActionButton,
                         {
@@ -751,14 +746,14 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                       ]}
                       onPress={() => setCreateVersionModalVisible(true)}>
                       <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-                        ✎ Adjust Goal
+                        ✎ Điều chỉnh mục tiêu
                       </Text>
                     </Pressable>
 
                     <Pressable
                       testID="transition-goal-button"
                       accessibilityRole="button"
-                      accessibilityLabel="Transition Journey"
+                      accessibilityLabel="Hành trình chuyển tiếp"
                       style={({ pressed }) => [
                         styles.secondaryActionButton,
                         {
@@ -768,7 +763,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                       ]}
                       onPress={() => setCreateTransitionModalVisible(true)}>
                       <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-                        ↻ Transition
+                        ↻ Chuyển đổi
                       </Text>
                     </Pressable>
                   </>
@@ -796,23 +791,23 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                         styles.reconciliationCardTitle,
                         { color: themeColors.warningText },
                       ]}>
-                      Unable to sync latest goal status
+                      Không thể đồng bộ hóa trạng thái mục tiêu mới nhất
                     </Text>
                     <Text
                       style={[
                         styles.reconciliationCardSubtitle,
                         { color: themeColors.textSecondary },
                       ]}>
-                      Please retry to update your goal status before making changes.
+                      Vui lòng thử cập nhật lại trạng thái mục tiêu của bạn trước khi thực hiện thay đổi.
                     </Text>
                   </View>
                   <Pressable
                     testID="retry-reconciliation-button"
                     accessibilityRole="button"
-                    accessibilityLabel="Retry syncing goal status"
+                    accessibilityLabel="Thử đồng bộ lại trạng thái mục tiêu"
                     style={[styles.retryActionButton, { backgroundColor: themeColors.primary }]}
                     onPress={handleRetryReconciliation}>
-                    <Text style={styles.retryActionText}>Retry Sync</Text>
+                    <Text style={styles.retryActionText}>Thử lại đồng bộ hóa</Text>
                   </Pressable>
                 </View>
             )}
@@ -828,13 +823,18 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
               ]}>
               {(['overview', 'targets', 'history', 'proposals'] as MainTab[]).map((tab) => {
                 const isSelected = activeTab === tab;
-                const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+                const label = {
+                  overview: 'Tổng quan',
+                  targets: 'Chỉ tiêu',
+                  history: 'Lịch sử',
+                  proposals: 'Đề xuất',
+                }[tab];
                 return (
                   <Pressable
                     key={tab}
                     testID={`tab-${tab}-button`}
                     accessibilityRole="tab"
-                    accessibilityLabel={`${label} Tab`}
+                    accessibilityLabel={`Thẻ ${label}`}
                     accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.tabItem,

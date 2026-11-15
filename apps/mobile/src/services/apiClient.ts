@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/env';
+import { apiErrorMessage } from '@/localization/displayLabels';
 import { tokenStorage } from '@/services/storage';
 import {
   ApiError,
@@ -39,7 +40,6 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     let errorResponse: ErrorResponse | undefined;
-    let errorMessage = `Request failed with status ${response.status}`;
 
     let rawData: unknown = undefined;
     if (isJson) {
@@ -49,11 +49,6 @@ async function parseResponse<T>(response: Response): Promise<T> {
         if (data && typeof data === 'object') {
           if ('errorCode' in data && 'message' in data) {
             errorResponse = data as ErrorResponse;
-            errorMessage = errorResponse.message;
-          } else if ('error' in data && data.error && typeof data.error === 'object' && 'message' in data.error) {
-            errorMessage = String((data.error as any).message);
-          } else if ('message' in data && typeof data.message === 'string') {
-            errorMessage = data.message;
           }
         }
       } catch {
@@ -61,7 +56,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
       }
     }
 
-    throw new ApiError(response.status, errorMessage, errorResponse, rawData);
+    throw new ApiError(response.status, apiErrorMessage({ status: response.status, errorResponse }, 'Yêu cầu không thành công. Vui lòng thử lại.'), errorResponse, rawData);
   }
 
   if (response.status === 204) {
@@ -83,7 +78,7 @@ async function performTokenRefresh(): Promise<TokenPairResponse> {
   if (!refreshToken) {
     await tokenStorage.clearTokens();
     sessionExpiredHandler?.();
-    throw new ApiError(401, 'No refresh token available');
+    throw new ApiError(401, 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
   }
 
   try {
@@ -141,7 +136,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (rest.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
       throw err;
     }
-    throw new ApiError(0, 'Network connection failed. Please check your internet connection.');
+    throw new ApiError(0, 'Không thể kết nối mạng. Vui lòng kiểm tra kết nối Internet.');
   }
 
   // Intercept 401 for authenticated requests (and only if not already retried)
@@ -188,7 +183,7 @@ export async function downloadAuthenticated(path: string, retried = false): Prom
       headers: { Authorization: `Bearer ${accessToken ?? ''}`, 'Cache-Control': 'no-store' },
     });
   } catch {
-    throw new ApiError(0, 'Network connection failed');
+    throw new ApiError(0, 'Không thể kết nối mạng.');
   }
   if (response.status === 401 && !retried) {
     if (!refreshPromise) refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
@@ -197,7 +192,7 @@ export async function downloadAuthenticated(path: string, retried = false): Prom
   }
   if (!response.ok) {
     await parseResponse(response);
-    throw new ApiError(response.status, 'Attachment unavailable');
+    throw new ApiError(response.status, 'Không thể tải tệp đính kèm.');
   }
   return new Uint8Array(await response.arrayBuffer());
 }

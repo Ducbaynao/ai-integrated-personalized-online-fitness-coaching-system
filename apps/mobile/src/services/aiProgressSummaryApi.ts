@@ -63,7 +63,7 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
       error.message.includes('timeout') ||
       error.message.includes('timed out')
     ) {
-      return 'Yêu cầu tóm tắt quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+      return 'Yêu cầu tóm tắt quá thời gian chờ. Vui lòng thử lại sau.';
     }
   }
 
@@ -79,9 +79,8 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
     }
 
     if (code === 'VALIDATION_FAILED' || code === 'BAD_REQUEST' || error.status === 400) {
-      const fieldMsg = error.errorResponse?.fieldErrors?.map((f) => f.message).join(', ');
-      if (fieldMsg) {
-        return `Thông tin yêu cầu không hợp lệ: ${fieldMsg}`;
+      if (error.errorResponse?.fieldErrors?.length) {
+        return 'Thông tin yêu cầu không hợp lệ. Vui lòng kiểm tra các trường đã nhập.';
       }
       return 'Khoảng ngày không hợp lệ. Vui lòng đảm bảo ngày bắt đầu không sau ngày kết thúc.';
     }
@@ -95,15 +94,15 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
     }
 
     if (error.status === 504) {
-      return 'Dịch vụ phản hồi quá thời gian chờ (Gateway Timeout). Vui lòng thử lại.';
+      return 'Dịch vụ phản hồi quá thời gian chờ. Vui lòng thử lại.';
     }
 
     if (error.status === 502) {
-      return 'Không thể kết nối đến dịch vụ phân tích AI (Bad Gateway). Vui lòng thử lại sau.';
+      return 'Không thể kết nối đến dịch vụ phân tích AI. Vui lòng thử lại sau.';
     }
 
     if (error.status === 503) {
-      return 'Dịch vụ phân tích AI tạm thời không khả dụng hoặc quá tải (Service Unavailable). Vui lòng thử lại sau.';
+      return 'Dịch vụ phân tích AI tạm thời không khả dụng hoặc quá tải. Vui lòng thử lại sau.';
     }
 
     if (error.status === 0) {

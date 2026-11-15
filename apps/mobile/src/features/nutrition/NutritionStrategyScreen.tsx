@@ -145,7 +145,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
         throw new Error('Chọn loại mục tiêu, tên, múi giờ IANA và ngày hiệu lực hợp lệ.');
       if (trainer && (!canPropose || !reason.trim())) throw new Error('Cần quyền đóng góp hiện hành và lý do đề xuất.');
       if (kind === 'CHANGE_TARGET' && (!goal || !latestVersion || latestVersion.dateSemantics !== 'HALF_OPEN'))
-        throw new Error('Không có Goal Version phù hợp để đổi mục tiêu.');
+        throw new Error('Không có phiên bản mục tiêu phù hợp để đổi mục tiêu.');
       const body: NutritionChangeBody = { kind, goalId: kind === 'CHANGE_TARGET' ? goal!.id : null,
         expectedGoalVersion: kind === 'CHANGE_TARGET' ? goal!.aggregateVersion : null,
         baseVersionId: kind === 'CHANGE_TARGET' ? latestVersion!.id : null,
@@ -160,7 +160,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     const data = dayQuery.data;
     const raw = overrideAmount.trim();
     if (!data?.goalVersionId || data.frozen || !nutrient || !/^\d+(\.\d{1,6})?$/.test(raw) || !overrideReason.trim()) {
-      setMessage('Cần chọn nutrient, nhập lượng hợp lệ và lý do; ngày đã chốt không thể sửa.'); return;
+      setMessage('Cần chọn chất dinh dưỡng, nhập lượng hợp lệ và lý do; ngày đã chốt không thể sửa.'); return;
     }
     const existing = data.targets.find((target) => target.nutrientId === nutrient.id && target.source === 'OVERRIDE');
     send({ kind: 'override', day, body: { timezone, goalVersionId: data.goalVersionId, nutrientId: nutrient.id,
@@ -172,7 +172,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     const amount = correctionAmount.trim();
     if (!dayQuery.data?.frozen || !target || target.correctionVersion === null
         || !/^\d+(\.\d{1,6})?$/.test(amount) || !correctionReason.trim()) {
-      setMessage('Chọn nutrient của ngày đã chốt, nhập số hợp lệ và lý do sửa bắt buộc.'); return;
+      setMessage('Chọn chất dinh dưỡng của ngày đã chốt, nhập số hợp lệ và lý do sửa bắt buộc.'); return;
     }
     send({ kind: 'frozenCorrection', day, body: { timezone, nutrientId: target.nutrientId,
       targetAmount: Number(amount), expectedVersion: target.correctionVersion,
@@ -199,7 +199,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
         <Text style={[styles.label, { color: theme.textPrimary }]}>Bản {version.versionNumber}: {version.effectiveFrom} → {version.effectiveUntil ?? 'chưa kết thúc'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>{version.dateSemantics === 'LEGACY' ? 'Bản lịch sử; không tự diễn giải theo khoảng mới.' : `Múi giờ ${version.timezone}`}</Text>
         {version.targets.map((target) => <Text key={`${target.nutrientId}:${target.dayType}`} style={[styles.body, { color: theme.textPrimary }]}>
-          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient chưa có tên'} · {dayTypeLabel[target.dayType]}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'}
+          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Chất dinh dưỡng chưa có tên'} · {dayTypeLabel[target.dayType]}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'}
         </Text>)}
       </View>)}
     </WorkoutCard>
@@ -217,23 +217,23 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     {trainer && !canPropose ? <WorkoutState title="Chỉ xem" message="Cần Coaching Period và quyền NUTRITION_GOAL Đóng góp hiện hành để đề xuất." /> : null}
     {(!trainer || canPropose) && <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{trainer ? 'Đề xuất thay đổi' : 'Xác nhận chiến lược'}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>{trainer ? 'Chỉ học viên có thể chấp nhận; đề xuất không đổi target ngay.' : 'Thay đổi này tạo Target Version mới, không sửa Food Log.'}</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>{trainer ? 'Chỉ học viên có thể chấp nhận; đề xuất chưa thay đổi chỉ tiêu ngay.' : 'Thay đổi này tạo phiên bản chỉ tiêu mới, không sửa nhật ký ăn uống.'}</Text>
       <View style={styles.row}>
-        <WorkoutButton label="Goal mới" secondary={kind !== 'NEW_GOAL'} onPress={() => { setKind('NEW_GOAL'); setPreviewChange(null); }} />
-        <WorkoutButton label="Đổi target" secondary={kind !== 'CHANGE_TARGET'} disabled={!goal || !latestVersion || latestVersion.dateSemantics !== 'HALF_OPEN'}
+        <WorkoutButton label="Mục tiêu mới" secondary={kind !== 'NEW_GOAL'} onPress={() => { setKind('NEW_GOAL'); setPreviewChange(null); }} />
+        <WorkoutButton label="Đổi chỉ tiêu" secondary={kind !== 'CHANGE_TARGET'} disabled={!goal || !latestVersion || latestVersion.dateSemantics !== 'HALF_OPEN'}
           onPress={() => { setKind('CHANGE_TARGET'); setPreviewChange(null); }} />
       </View>
       {input('Tên mục tiêu', title, (value) => { setTitle(value); setPreviewChange(null); })}
-      <Text style={[styles.label, { color: theme.textPrimary }]}>Loại Goal từ catalog</Text>
-      {typesQuery.isPending || nutrientsQuery.isPending ? <WorkoutState title="Đang tải catalog" message="Vui lòng chờ." busy /> : null}
-      {typesQuery.isError || nutrientsQuery.isError ? <WorkoutState title="Không tải được catalog" message="Không thể chọn ID khi catalog chưa có." onRetry={() => { typesQuery.refetch(); nutrientsQuery.refetch(); }} /> : null}
-      {typesQuery.data?.length === 0 ? <WorkoutState title="Catalog trống" message="Chưa có loại Goal hợp lệ; không thể gửi dữ liệu tự đoán." /> : null}
+      <Text style={[styles.label, { color: theme.textPrimary }]}>Loại mục tiêu từ danh mục</Text>
+      {typesQuery.isPending || nutrientsQuery.isPending ? <WorkoutState title="Đang tải danh mục" message="Vui lòng chờ." busy /> : null}
+      {typesQuery.isError || nutrientsQuery.isError ? <WorkoutState title="Không tải được danh mục" message="Không thể chọn mục khi danh mục chưa có." onRetry={() => { typesQuery.refetch(); nutrientsQuery.refetch(); }} /> : null}
+      {typesQuery.data?.length === 0 ? <WorkoutState title="Danh mục trống" message="Chưa có loại mục tiêu hợp lệ; không thể gửi dữ liệu tự đoán." /> : null}
       {typesQuery.data?.map((type) => <Pressable key={type.id} accessibilityRole="radio" accessibilityLabel={`Chọn loại mục tiêu ${type.name}`} accessibilityState={{ checked: goalTypeId === type.id }}
         onPress={() => { setGoalTypeId(type.id); setPreviewChange(null); }} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={[styles.body, { color: theme.textPrimary }]}>{goalTypeId === type.id ? '◉' : '○'} {type.name}</Text></Pressable>)}
-      {input('Múi giờ IANA của lịch target', timezone, (value) => { setTimezone(value); setDayConfirmed(false); setPreviewChange(null); })}
+      {input('Múi giờ IANA của lịch chỉ tiêu', timezone, (value) => { setTimezone(value); setDayConfirmed(false); setPreviewChange(null); })}
       {input('Có hiệu lực từ ngày (YYYY-MM-DD)', effectiveFrom, (value) => { setEffectiveFrom(value); setPreviewChange(null); })}
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày đầu chỉ dùng khi chưa chốt target; thay đổi sau phải từ ngày kế tiếp hoặc tương lai. Backend kiểm tra mốc thời gian.</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày đầu chỉ dùng khi chưa chốt chỉ tiêu; thay đổi sau phải từ ngày kế tiếp hoặc tương lai. Hệ thống sẽ kiểm tra mốc thời gian.</Text>
       {nutrientsQuery.data?.map((nutrient) => <View key={nutrient.id}>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{nutrient.name} ({nutrient.unitSymbol})</Text>
         {dayTypes.map((dayType) => <React.Fragment key={dayType}>{input(`${nutrient.name} · ${dayTypeLabel[dayType]} (${nutrient.unitSymbol})`,
@@ -243,7 +243,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
       <WorkoutButton label="Xem trước toàn bộ mục tiêu" disabled={busy || !typesQuery.data?.length || !nutrientsQuery.data?.length} onPress={prepareChange} />
       {previewChange ? <WorkoutCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Xem trước trước khi gửi</Text>
-        <Text style={[styles.body, { color: theme.textPrimary }]}>{previewChange.kind === 'NEW_GOAL' ? 'Goal mới' : 'Đổi target'} · {previewChange.title} · {previewChange.effectiveFrom} · {previewChange.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textPrimary }]}>{previewChange.kind === 'NEW_GOAL' ? 'Mục tiêu mới' : 'Đổi chỉ tiêu'} · {previewChange.title} · {previewChange.effectiveFrom} · {previewChange.timezone}</Text>
         {previewChange.targets.map((target) => <Text key={`${target.nutrientId}:${target.dayType}`} style={[styles.body, { color: theme.textPrimary }]}>
           {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name} · {dayTypeLabel[target.dayType]}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol}
         </Text>)}
@@ -257,10 +257,10 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
       {stateQuery.data.proposals.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có đề xuất.</Text> : null}
       {stateQuery.data.proposals.map((proposal) => <WorkoutCard key={proposal.id}>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{proposal.title} · {proposalLabel[proposal.status]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>{proposal.kind === 'NEW_GOAL' ? 'Goal mới' : 'Đổi target'} · {proposal.effectiveFrom} · {proposal.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>{proposal.kind === 'NEW_GOAL' ? 'Mục tiêu mới' : 'Đổi chỉ tiêu'} · {proposal.effectiveFrom} · {proposal.timezone}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {proposal.reason}</Text>
         {proposal.targets.map((target) => <Text key={`${target.nutrientId}:${target.dayType}`} style={[styles.body, { color: theme.textPrimary }]}>
-          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient chưa có tên'} · {dayTypeLabel[target.dayType]}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'}
+          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Chất dinh dưỡng chưa có tên'} · {dayTypeLabel[target.dayType]}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'}
         </Text>)}
         {!trainer && proposal.status === 'PENDING' ? <View style={styles.row}>
           <WorkoutButton label="Xem để chấp nhận" onPress={() => setDecision({ proposal, action: 'ACCEPT' })} />
@@ -269,7 +269,7 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
       </WorkoutCard>)}
       {decision ? <WorkoutCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{decision.action === 'ACCEPT' ? 'Xác nhận áp dụng toàn bộ đề xuất?' : 'Xác nhận từ chối?'}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>{decision.proposal.title} · {decision.proposal.effectiveFrom} · {decision.proposal.timezone}. Backend sẽ kiểm tra lại quyền và phiên bản.</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>{decision.proposal.title} · {decision.proposal.effectiveFrom} · {decision.proposal.timezone}. Hệ thống sẽ kiểm tra lại quyền và phiên bản.</Text>
         <WorkoutButton label="Xác nhận quyết định" disabled={busy} onPress={() => send({ kind: 'decision', proposalId: decision.proposal.id,
           body: { decision: decision.action, expectedProposalVersion: decision.proposal.proposalVersion, commandKey: createCommandKey() } })} />
         <WorkoutButton label="Quay lại" secondary onPress={() => setDecision(null)} />
@@ -278,35 +278,35 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     {!trainer ? <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Mục tiêu cho một ngày</Text>
       {input('Ngày (YYYY-MM-DD)', day, (value) => { setDay(value); setDayConfirmed(false); })}
-      <Text style={[styles.body, { color: theme.textSecondary }]}>Múi giờ target: {timezone || 'chưa chọn'}. GET chỉ xem trước; lần ghi đầu hoặc xác nhận ngày sẽ chốt snapshot.</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Múi giờ của chỉ tiêu: {timezone || 'chưa chọn'}. Dữ liệu chỉ là bản xem trước; lần ghi đầu hoặc xác nhận ngày sẽ chốt dữ liệu tại thời điểm đó.</Text>
       <WorkoutButton label="Xem ngày theo múi giờ đã chọn" disabled={!moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}
         onPress={() => setDayConfirmed(true)} />
       {validDay && dayQuery.isPending ? <WorkoutState title="Đang tải mục tiêu ngày" message="Vui lòng chờ." busy /> : null}
       {validDay && dayQuery.isError ? <WorkoutState title="Không thể xem ngày" message="Múi giờ hoặc bản lịch sử không còn phù hợp." onRetry={() => dayQuery.refetch()} /> : null}
       {dayQuery.data ? <>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{dayTypeLabel[dayQuery.data.dayType]} · {dayQuery.data.frozen ? 'Đã chốt' : 'Xem trước, chưa chốt'}</Text>
-        {dayQuery.data.targets.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày này không có target. Điều đó không nói gì về lượng đã ăn.</Text> : null}
+        {dayQuery.data.targets.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày này không có chỉ tiêu. Điều đó không nói gì về lượng đã ăn.</Text> : null}
         {dayQuery.data.targets.map((target) => <Text key={target.nutrientId} style={[styles.body, { color: theme.textPrimary }]}>
-          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient chưa có tên'}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'} · {target.source === 'OVERRIDE' ? 'Ghi đè' : target.source === 'DAY_TYPE' ? 'Theo loại ngày' : 'Mặc định'}
+          {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Chất dinh dưỡng chưa có tên'}: {target.targetAmount} {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.unitSymbol ?? 'đơn vị chưa rõ'} · {target.source === 'OVERRIDE' ? 'Ghi đè' : target.source === 'DAY_TYPE' ? 'Theo loại ngày' : 'Mặc định'}
         </Text>)}
         {dayQuery.data.frozen ? <>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>So sánh tiến độ dùng target sau correction. Target gốc và lượng ăn thực tế không bị ghi đè.</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>So sánh tiến độ dùng chỉ tiêu sau điều chỉnh. Chỉ tiêu gốc và lượng ăn thực tế không bị ghi đè.</Text>
           {dayQuery.data.targets.map((target) => <Text key={`original-${target.nutrientId}`} style={[styles.body, { color: theme.textSecondary }]}>
-            {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Nutrient'}: gốc {target.originalTargetAmount ?? 'chưa rõ'} → hiện tại {target.targetAmount} · phiên bản sửa {target.correctionVersion ?? 0}
+            {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'Chất dinh dưỡng'}: gốc {target.originalTargetAmount ?? 'chưa rõ'} → hiện tại {target.targetAmount} · phiên bản sửa {target.correctionVersion ?? 0}
           </Text>)}
           {dayQuery.data.targets.map((target) => <Pressable key={`correct-${target.nutrientId}`} accessibilityRole="radio"
-            accessibilityLabel={`Sửa target nutrient ${target.nutrientId}`}
+            accessibilityLabel={`Sửa chỉ tiêu chất dinh dưỡng ${target.nutrientId}`}
             accessibilityState={{ checked: correctionNutrientId === target.nutrientId }}
             onPress={() => { setCorrectionNutrientId(target.nutrientId); setConfirmCorrection(false); }}
             style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Text style={[styles.body, { color: theme.textPrimary }]}>{correctionNutrientId === target.nutrientId ? '◉' : '○'} Sửa {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'nutrient'}</Text>
+            <Text style={[styles.body, { color: theme.textPrimary }]}>{correctionNutrientId === target.nutrientId ? '◉' : '○'} Sửa {nutrientsQuery.data?.find((item) => item.id === target.nutrientId)?.name ?? 'chất dinh dưỡng'}</Text>
           </Pressable>)}
-          {input('Target sau correction', correctionAmount, (value) => { setCorrectionAmount(value); setConfirmCorrection(false); }, true)}
-          {input('Lý do correction', correctionReason, (value) => { setCorrectionReason(value); setConfirmCorrection(false); })}
-          {!confirmCorrection ? <WorkoutButton label="Xem lại correction target đã chốt" disabled={busy}
+          {input('Chỉ tiêu sau điều chỉnh', correctionAmount, (value) => { setCorrectionAmount(value); setConfirmCorrection(false); }, true)}
+          {input('Lý do điều chỉnh', correctionReason, (value) => { setCorrectionReason(value); setConfirmCorrection(false); })}
+          {!confirmCorrection ? <WorkoutButton label="Xem lại điều chỉnh chỉ tiêu đã chốt" disabled={busy}
             onPress={() => setConfirmCorrection(true)} /> : <>
-            <Text style={[styles.body, { color: theme.textPrimary }]}>Chỉ sửa nutrient đã chọn của ngày {day}; target gốc và Food Log actual được giữ nguyên. Lý do: {correctionReason || 'chưa nhập'}.</Text>
-            <WorkoutButton label="Xác nhận correction" disabled={busy} onPress={correctFrozenTarget} />
+            <Text style={[styles.body, { color: theme.textPrimary }]}>Chỉ sửa chất dinh dưỡng đã chọn của ngày {day}; chỉ tiêu gốc và lượng ăn thực tế được giữ nguyên. Lý do: {correctionReason || 'chưa nhập'}.</Text>
+            <WorkoutButton label="Xác nhận điều chỉnh" disabled={busy} onPress={correctFrozenTarget} />
             <WorkoutButton label="Quay lại" secondary onPress={() => setConfirmCorrection(false)} />
           </>}
         </> : null}
@@ -315,33 +315,33 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
             <WorkoutButton label="Chọn ngày nghỉ" secondary onPress={() => send({ kind: 'dayType', day, body: { timezone, dayType: 'REST_DAY', commandKey: createCommandKey() } })} />
             <WorkoutButton label="Bỏ chọn ngày nghỉ" secondary onPress={() => send({ kind: 'dayType', day, body: { timezone, dayType: 'DEFAULT', commandKey: createCommandKey() } })} />
           </View>
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Ghi đè target ngày này</Text>
+          <Text style={[styles.label, { color: theme.textPrimary }]}>Ghi đè chỉ tiêu ngày này</Text>
           {nutrientsQuery.data?.map((nutrient) => <Pressable key={nutrient.id} accessibilityRole="radio"
             accessibilityState={{ checked: overrideNutrientId === nutrient.id }} onPress={() => setOverrideNutrientId(nutrient.id)}
             style={{ minHeight: 44, justifyContent: 'center' }}><Text style={[styles.body, { color: theme.textPrimary }]}>
               {overrideNutrientId === nutrient.id ? '◉' : '○'} {nutrient.name} ({nutrient.unitSymbol})</Text></Pressable>)}
           {input('Lượng ghi đè', overrideAmount, setOverrideAmount, true)}
           {input('Lý do ghi đè', overrideReason, setOverrideReason)}
-          <WorkoutButton label="Lưu ghi đè theo phiên bản Goal này" disabled={busy} onPress={chooseOverride} />
+          <WorkoutButton label="Lưu ghi đè theo phiên bản mục tiêu này" disabled={busy} onPress={chooseOverride} />
         </> : null}
       </> : null}
     </WorkoutCard> : null}
     {trainer ? <WorkoutCard>
-      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử correction target đã chốt</Text>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử điều chỉnh chỉ tiêu đã chốt</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ đọc khi còn quyền NUTRITION_GOAL VIEW hiện hành; không có nút sửa.</Text>
       {input('Ngày (YYYY-MM-DD)', day, (value) => { setDay(value); setDayConfirmed(false); })}
-      {input('Múi giờ IANA của target', timezone, (value) => { setTimezone(value); setDayConfirmed(false); })}
+      {input('Múi giờ IANA của chỉ tiêu', timezone, (value) => { setTimezone(value); setDayConfirmed(false); })}
       <WorkoutButton label="Xem lịch sử ngày này" secondary
         disabled={!moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}
         onPress={() => setDayConfirmed(true)} />
     </WorkoutCard> : null}
     {validDay ? <WorkoutCard>
-      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử sửa target</Text>
+      <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử sửa chỉ tiêu</Text>
       {correctionHistoryQuery.isPending ? <WorkoutState title="Đang tải lịch sử" message="Vui lòng chờ." busy /> : null}
       {correctionHistoryQuery.isError ? <WorkoutState title="Không xem được lịch sử" message="Quyền hoặc dữ liệu ngày này không còn khả dụng." onRetry={() => correctionHistoryQuery.refetch()} /> : null}
-      {correctionHistoryQuery.data?.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có correction cho ngày này.</Text> : null}
+      {correctionHistoryQuery.data?.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có điều chỉnh cho ngày này.</Text> : null}
       {correctionHistoryQuery.data?.map((entry) => <Text key={entry.id} style={[styles.body, { color: theme.textPrimary }]}>
-        {nutrientsQuery.data?.find((item) => item.id === entry.nutrientId)?.name ?? 'Nutrient'} · gốc {entry.originalAmount} · trước {entry.beforeAmount} → sau {entry.afterAmount} · {entry.reason} · người sửa {entry.actorId} · {entry.correctedAt}
+        {nutrientsQuery.data?.find((item) => item.id === entry.nutrientId)?.name ?? 'Chất dinh dưỡng'} · gốc {entry.originalAmount} · trước {entry.beforeAmount} → sau {entry.afterAmount} · {entry.reason} · người sửa {entry.actorId} · {entry.correctedAt}
       </Text>)}
     </WorkoutCard> : null}
   </ScrollView>;
