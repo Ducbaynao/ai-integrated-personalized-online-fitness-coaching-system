@@ -24,6 +24,7 @@ Tệp route	Nhóm	Screen hoặc feature được import
 (app)/coaching/[relationshipId]/planned-workout-series/new.tsx	App	@/features/workout-recurrence/RecurrenceCreateScreen (TrainerRecurrenceCreateScreen)
 (app)/coaching/[relationshipId]/program.tsx	App	@/features/workout-plan/TrainerProgramScreen (TrainerProgramScreen)
 (app)/coaching/[relationshipId]/progress-summary.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessProgressSummary); @/features/coaching/coachingQueries (useRelationshipDetail); @/features/progress-summary/ProgressSummaryScreen (ProgressSummaryScreen)
+(app)/coaching/[relationshipId]/progress.tsx	App	@/features/auth/AuthContext (useAuth); @/features/coaching/TrainerStudentProgressScreen (TrainerStudentProgressScreen)
 (app)/coaching/[relationshipId]/schedule-proposals/[proposalId].tsx	App	@/features/workout-schedule-proposals/TrainerScheduleProposalDetailScreen (TrainerScheduleProposalDetailScreen)
 (app)/coaching/[relationshipId]/schedule-proposals/index.tsx	App	@/features/workout-schedule-proposals/TrainerScheduleProposalsScreen (TrainerScheduleProposalsScreen)
 (app)/coaching/[relationshipId]/schedule-proposals/new.tsx	App	@/features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen (TrainerCreateScheduleProposalScreen)
@@ -39,6 +40,7 @@ Tệp route	Nhóm	Screen hoặc feature được import
 (app)/goals/[goalId].tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessFitnessGoals); @/features/goal/CurrentGoalScreen (CurrentGoalScreen)
 (app)/goals/index.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessFitnessGoals); @/features/goal/CurrentGoalScreen (CurrentGoalScreen)
 (app)/index.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/HomeScreen (HomeScreen); @/features/trainer/TrainerHomeScreen (TrainerHomeScreen)
+(app)/measurements/index.tsx	App	@/features/measurements/MeasurementsScreen (MeasurementsScreen)
 (app)/notifications/index.tsx	App	@/features/chat/ChatScreens (NotificationsScreen)
 (app)/notifications/push.tsx	App	Layout/route logic
 (app)/nutrition/index.tsx	App	@/features/nutrition/NutritionScreen (NutritionScreen)
@@ -48,6 +50,7 @@ Tệp route	Nhóm	Screen hoặc feature được import
 (app)/profile.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessStudentProfile); @/features/student/StudentProfileScreen (StudentProfileScreen)
 (app)/progress-summary/[runId].tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessProgressSummary); @/features/progress-summary/ProgressSummaryScreen (ProgressSummaryScreen)
 (app)/progress-summary/index.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessProgressSummary); @/features/progress-summary/ProgressSummaryScreen (ProgressSummaryScreen)
+(app)/progress/index.tsx	App	@/features/progress/ProgressDashboardScreen (ProgressDashboardScreen)
 (app)/students/[studentId]/workout-plans/[planId]/builder.tsx	App	@/features/workout-plan/WorkoutPlanBuilderScreen (WorkoutPlanBuilderScreen)
 (app)/students/[studentId]/workout-plans/[planId]/index.tsx	App	@/features/workout-plan/WorkoutPlanDetailScreen (WorkoutPlanDetailScreen)
 (app)/trainer-profile.tsx	App	@/features/auth/AuthContext (useAuth); @/features/auth/routeGuard (canAccessTrainerProfile); @/features/trainer/TrainerProfileScreen (TrainerProfileScreen)

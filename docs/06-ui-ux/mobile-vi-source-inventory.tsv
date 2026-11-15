@@ -26,6 +26,7 @@ features/coaching/SharingPermissionsScreen.tsx	Screen	SharingPermissionsScreen	l
 features/coaching/StudentLookupScreen.tsx	Screen	StudentLookupScreen	loading, error, edit/input
 features/coaching/TrainerDirectoryScreen.tsx	Screen	TrainerDirectoryScreen	loading, error, empty, edit/input
 features/coaching/TrainerStudentGoalScreen.tsx	Screen	TrainerStudentGoalScreen	loading, error, empty, confirm/modal
+features/coaching/TrainerStudentProgressScreen.tsx	Screen	TrainerStudentProgressScreen	loading, error
 features/coaching/components/CoachingUi.tsx	Component	CoachingButton, CoachingState, CoachingCard, coachingUiStyles	loading
 features/exercise/ExerciseCatalogScreen.tsx	Screen	ExerciseCatalogScreen	display only
 features/exercise/ExerciseDetailScreen.tsx	Screen	ExerciseDetailScreen	loading, error, empty
@@ -47,11 +48,16 @@ features/goal/components/GoalScreenSkeleton.tsx	Component	GoalScreenSkeleton	dis
 features/goal/components/GoalStatusBadge.tsx	Component	GoalStatusBadge	display only
 features/goal/components/GoalTargetsTab.tsx	Component	GoalTargetsTab	empty
 features/goal/components/PauseResumeGoalModal.tsx	Component	PauseResumeGoalModal	loading, edit/input, confirm/modal
+features/measurements/MeasurementsScreen.tsx	Screen	MeasurementsScreen	loading, error, empty, edit/input, confirm/modal
+features/measurements/components/AddMeasurementModal.tsx	Component	AddMeasurementModal	loading, edit/input, confirm/modal
+features/measurements/components/CorrectMeasurementModal.tsx	Component	CorrectMeasurementModal	loading, edit/input, confirm/modal
 features/nutrition/NutritionScreen.tsx	Screen	nutritionKeys, nutrientText, nutrientLabel, NutritionScreen	loading, error, empty, edit/input, confirm/modal, authority
 features/nutrition/NutritionStrategyScreen.tsx	Screen	strategyKeys, buildStrategyTargets, NutritionStrategyScreen	loading, error, empty, edit/input, confirm/modal, authority
 features/nutrition/TrainerNutritionScreen.tsx	Screen	TrainerNutritionScreen	loading, error, empty, edit/input, confirm/modal, authority
 features/onboarding/ChoosePurposeScreen.tsx	Screen	ChoosePurposeScreen	display only
 features/progress-summary/ProgressSummaryScreen.tsx	Screen	ProgressSummaryScreen	loading, error, empty, edit/input, authority
+features/progress/ProgressDashboardScreen.tsx	Screen	ProgressDashboardScreen	loading, error, empty, confirm/modal
+features/progress/components/UploadProgressPhotoModal.tsx	Component	UploadProgressPhotoModal	loading, edit/input, confirm/modal
 features/student/StudentOnboardingScreen.tsx	Screen	StudentOnboardingScreen	loading, error, edit/input
 features/student/StudentProfileScreen.tsx	Screen	StudentProfileScreen	loading, error, empty, edit/input
 features/trainer/TrainerHomeScreen.tsx	Screen	TrainerHomeScreen	loading, authority

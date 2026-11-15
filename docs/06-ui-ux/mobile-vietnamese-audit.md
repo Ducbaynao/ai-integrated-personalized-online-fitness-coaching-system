@@ -1,10 +1,10 @@
 # Audit tiếng Việt cho Mobile (worktree B06)
 
-Nguồn kiểm: cây `apps/mobile/src` tại branch `feature/b06-phase1-schedule-appointment-closure`, HEAD `db289f3ef66c4c8e49f4943b0888cc2ba5b9cbcb`. Inventory được lập từ source thực tế: 78 tệp route/layout Expo Router (74 route, 4 layout), 53 tệp `*Screen.tsx`, 9 component dùng chung trong `src/components`, 19 nhóm feature. Không suy màn đã có từ tài liệu thiết kế.
+Nguồn kiểm ban đầu: cây `apps/mobile/src` tại branch `feature/b06-phase1-schedule-appointment-closure`, HEAD `db289f3ef66c4c8e49f4943b0888cc2ba5b9cbcb`. Sau khi tích hợp `main` tại `6716f56`, inventory được tạo lại từ source thực tế: 81 tệp route/layout Expo Router (77 route, 4 layout), 56 tệp `*Screen.tsx`, 9 component dùng chung trong `src/components`, 21 nhóm feature. Không suy màn đã có từ tài liệu thiết kế.
 
 - [Danh sách từng route/layout và screen/feature được import](mobile-vi-route-inventory.tsv)
-- [Danh sách 88 screen/view/component và nhánh trạng thái phát hiện từ source](mobile-vi-source-inventory.tsv)
-- [Ma trận 537 cặp màn/component → chuỗi tiếng Anh ban đầu → cách xử lý](mobile-vi-string-matrix.tsv)
+- [Danh sách 94 screen/view/component và nhánh trạng thái phát hiện từ source sau tích hợp](mobile-vi-source-inventory.tsv)
+- [Ma trận 537 cặp màn/component → chuỗi tiếng Anh ban đầu → cách xử lý ở baseline B06](mobile-vi-string-matrix.tsv)
 - Cách tái kiểm: trong `apps/mobile`, chạy `npm run audit:ui-strings` và `npm run audit:ui-mixed`. Script thứ nhất rà JSX, nhãn accessibility, placeholder, literal và template; script thứ hai tìm câu tiếng Việt pha thuật ngữ tiếng Anh. Kết quả cần được duyệt theo ngữ cảnh, vì mã API, tên biến và dữ liệu người dùng cũng có thể được liệt kê.
 
 ## Coverage theo màn và trạng thái có trong source
@@ -22,6 +22,7 @@ Nguồn kiểm: cây `apps/mobile/src` tại branch `feature/b06-phase1-schedule
 | Nutrition và Nutrition Strategy | Nhật ký, danh mục, đơn vị, correction, mục tiêu dinh dưỡng, ngày đã chốt, lịch sử, đề xuất; rỗng/lỗi/xác nhận | Việt hóa `catalog`, `target`, `nutrient`, `correction`, `Food Log`, nhãn đơn vị và accessibility; giữ ID, version, provenance và giá trị null là chưa rõ |
 | Chat, linked resources, inbox, reminders | Hội thoại, tệp đính kèm, tài nguyên liên kết, thông báo, cấu hình thông báo đẩy và nhắc lịch; trạng thái quyền/lỗi/tệp | Rà nhãn, thông báo, accessibility; Việt hóa “push” thành “thông báo đẩy”; giữ tên file và dữ liệu tin nhắn |
 | AI knowledge và progress summary | Tra cứu, dẫn nguồn, giới hạn, trạng thái chạy, số liệu tiến độ, lỗi mạng/timeout/403/404 | Copy cố định và lỗi được Việt hóa; dữ liệu/đầu ra từ AI và nguồn trích dẫn được giữ theo nội dung trả về |
+| Progress và Measurements được bổ sung từ `main` | Dashboard, biểu đồ, ghi/sửa số đo, ảnh tiến độ và màn Trainer xem tiến độ | Đã rà source sau tích hợp; nhãn UI dùng tiếng Việt, bộ quét còn mã enum/định dạng và thuật ngữ chuyên ngành. Chưa kiểm trên Pixel_7 |
 
 Các màn trong bảng được audit bằng source và test, **chưa xác nhận trực tiếp trên Pixel_7**. Không có bằng chứng thao tác/chụp ảnh thiết bị cho từng route trong đợt này. Các nhánh phụ thuộc dữ liệu server thật hoặc quyền từng tài khoản không thể kiểm trực tiếp bằng Jest.
 
@@ -30,7 +31,7 @@ Các màn trong bảng được audit bằng source và test, **chưa xác nhậ
 - Dùng `src/localization/displayLabels.ts` cho các enum Student, Trainer, Goal và đề xuất AI; chỉ đổi nhãn, không đổi giá trị gửi/lưu qua API. Lỗi HTTP phổ biến được hiển thị bằng câu tiếng Việt; mã và chi tiết gốc vẫn nằm trong `ApiError.errorResponse` để xử lý nghiệp vụ.
 - Giữ tên riêng/viết tắt theo lựa chọn của người dùng: **Digital Fitness, USDA FDC, RPE, URL**; tương tự giữ `Email`, `UTC`, `IANA`, `KiB`, `ID`, tên định dạng tệp, tên thiết bị/hệ điều hành và chuỗi định dạng ngày `YYYY-MM-DD` / `YYYY-MM-DDTHH:mm`. Ví dụ `coach-alex`, `hocvien@example.com`, `Alex Smith` là dữ liệu mẫu. `Trang:` và `→ sau` đã là tiếng Việt nhưng bị bộ quét ASCII liệt kê.
 - 20 literal/template tiếng Anh còn lại do bộ quét nêu là thông điệp lập trình nội bộ, chuỗi so khớp lỗi backend, thông tin thiết bị gửi API, khóa/định dạng hoặc kiểm tra UUID; không được render trực tiếp như nhãn giao diện. Mã route, enum, ID, field name và API contract tiếp tục giữ nguyên. Tên bài tập, tên thực phẩm, nội dung chat, lý do do người dùng/quản trị nhập, văn bản AI và tên nguồn có thể là tiếng Anh vì là dữ liệu động; không dịch tùy tiện để tránh đổi ý nghĩa.
-- `audit:ui-mixed` còn 3 kết quả được giữ: nhãn URL và ví dụ `coach-alex` trong hồ sơ huấn luyện viên.
+- `audit:ui-mixed` còn 4 kết quả được giữ: nhãn URL/ví dụ `coach-alex` trong hồ sơ huấn luyện viên và câu giải thích Progress Engine/AI ở màn Progress.
 
 ## Giới hạn xác minh
 
