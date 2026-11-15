@@ -12,6 +12,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { GoalProposal, ProposalStatus } from '@/types/goal';
+import { goalProposalStatusLabels } from '@/localization/displayLabels';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 
 interface GoalProposalsTabProps {
@@ -21,6 +22,12 @@ interface GoalProposalsTabProps {
 }
 
 type FilterOption = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED';
+const filterLabels: Record<FilterOption, string> = {
+  ALL: 'Tất cả',
+  PENDING: goalProposalStatusLabels.PENDING,
+  ACCEPTED: goalProposalStatusLabels.ACCEPTED,
+  REJECTED: goalProposalStatusLabels.REJECTED,
+};
 
 const PAGE_SIZE = 20;
 
@@ -85,9 +92,9 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
       } catch (err: any) {
         if (reqId !== requestSeqRef.current) return;
         if (isAppend) {
-          setLoadMoreError(err?.message || 'Failed to load more proposals.');
+          setLoadMoreError(err?.message || 'Không thể tải thêm đề xuất.');
         } else {
-          setError(err?.message || 'Failed to load goal proposals.');
+          setError(err?.message || 'Không thể tải các đề xuất mục tiêu.');
         }
       } finally {
         if (reqId === requestSeqRef.current) {
@@ -182,7 +189,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
             key={tab}
             testID={`proposals-filter-${tab.toLowerCase()}`}
             accessibilityRole="tab"
-            accessibilityLabel={`Filter by ${tab} proposals`}
+            accessibilityLabel={`Lọc đề xuất: ${filterLabels[tab]}`}
             accessibilityState={{ selected: activeFilter === tab }}
             style={[
               styles.filterTab,
@@ -203,7 +210,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                   fontWeight: activeFilter === tab ? '700' : '500',
                 },
               ]}>
-              {tab === 'ALL' ? 'All' : tab.charAt(0) + tab.slice(1).toLowerCase()}
+              {filterLabels[tab]}
             </Text>
           </Pressable>
         ))}
@@ -214,7 +221,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={themeColors.primary} />
           <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
-            Loading proposals...
+            Đang tải đề xuất...
           </Text>
         </View>
       ) : error ? (
@@ -228,10 +235,10 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
           <Pressable
             testID="retry-proposals-button"
             accessibilityRole="button"
-            accessibilityLabel="Retry loading proposals"
+            accessibilityLabel="Thử tải lại đề xuất"
             onPress={() => loadProposals(0, false, activeFilter)}
             style={[styles.retryButton, { backgroundColor: themeColors.primary }]}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
           </Pressable>
         </View>
       ) : proposals.length === 0 ? (
@@ -242,12 +249,12 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
           <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
-            No Proposals Found
+            Không tìm thấy đề xuất nào
           </Text>
           <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
             {activeFilter === 'PENDING'
-              ? 'You have no pending goal proposals waiting for review.'
-              : 'There are no proposals matching this filter.'}
+              ? 'Bạn không có đề xuất mục tiêu nào đang chờ xem xét.'
+              : 'Không có đề xuất nào phù hợp với bộ lọc.'}
           </Text>
         </View>
       ) : (
@@ -259,7 +266,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                 key={proposal.id}
                 testID={`proposal-item-${proposal.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={`View proposal details: ${proposal.reason}. Status: ${proposal.status}`}
+                accessibilityLabel={`Xem chi tiết đề xuất: ${proposal.reason}. Trạng thái: ${goalProposalStatusLabels[proposal.status]}`}
                 onPress={() => handleProposalPress(proposal.id)}
                 style={({ pressed }) => [
                   styles.card,
@@ -272,7 +279,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                 <View style={styles.cardHeader}>
                   <View style={styles.sourceTag}>
                     <Text style={[styles.sourceText, { color: themeColors.textSecondary }]}>
-                      From: {proposal.source}
+                      Từ: {proposal.source}
                     </Text>
                   </View>
                   <View
@@ -284,14 +291,14 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                       },
                     ]}>
                     <Text style={[styles.statusBadgeText, { color: statusStyle.text }]}>
-                      {proposal.status}
+                      {goalProposalStatusLabels[proposal.status]}
                     </Text>
                   </View>
                 </View>
 
                 {proposal.proposedTitle && (
                   <Text style={[styles.proposalTitle, { color: themeColors.textPrimary }]}>
-                    Proposed Title: {proposal.proposedTitle}
+                    Tiêu đề đề xuất: {proposal.proposedTitle}
                   </Text>
                 )}
 
@@ -303,10 +310,10 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
 
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaText, { color: themeColors.textSecondary }]}>
-                    Proposed {new Date(proposal.createdAt).toLocaleDateString()}
+                    Đề xuất {new Date(proposal.createdAt).toLocaleDateString('vi-VN')}
                   </Text>
                   <Text style={[styles.arrowText, { color: themeColors.primary }]}>
-                    Review →
+                    Xem lại →
                   </Text>
                 </View>
               </Pressable>
@@ -321,10 +328,10 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
               <Pressable
                 testID="retry-load-more-proposals-button"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading more proposals"
+                accessibilityLabel="Thử tải lại đề xuất khác"
                 style={[styles.retrySmallButton, { backgroundColor: themeColors.primary }]}
                 onPress={handleLoadMore}>
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <Text style={styles.retryButtonText}>Thử lại</Text>
               </Pressable>
             </View>
           )}
@@ -333,7 +340,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
             <Pressable
               testID="load-more-proposals-button"
               accessibilityRole="button"
-              accessibilityLabel="Load more proposals"
+              accessibilityLabel="Tải thêm đề xuất"
               disabled={isLoadingMore}
               style={[
                 styles.loadMoreButton,
@@ -344,7 +351,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                 <ActivityIndicator size="small" color={themeColors.primary} />
               ) : (
                 <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>
-                  Load More Proposals ({proposals.length} shown)
+                  Tải thêm đề xuất ({proposals.length} hiển thị)
                 </Text>
               )}
             </Pressable>

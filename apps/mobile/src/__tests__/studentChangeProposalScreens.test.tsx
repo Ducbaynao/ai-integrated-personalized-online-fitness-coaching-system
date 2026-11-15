@@ -122,7 +122,7 @@ describe('Student change proposal screens', () => {
     expect(mockPush).toHaveBeenCalledWith('/appointments/appointment-1');
     renderer.act(() => tree.root.findByProps({ testID: 'student-change-accept' }).props.onPress());
     expect(JSON.stringify(tree.toJSON()))
-      .toContain('Lịch hẹn liên kết vẫn CONFIRMED');
+      .toContain('Lịch hẹn liên kết vẫn được xác nhận');
     renderer.act(() => tree.unmount());
   });
 

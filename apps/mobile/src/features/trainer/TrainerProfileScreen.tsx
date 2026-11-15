@@ -13,6 +13,8 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { apiErrorMessage, coachingBlockingLabels, trainerActivityLabels, unspecified, verificationLabels } from '@/localization/displayLabels';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/features/auth/AuthContext';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
@@ -80,7 +82,7 @@ export function TrainerProfileScreen() {
 
       const asset = result.assets[0];
       if (asset.size && asset.size > 10 * 1024 * 1024) {
-        setDocUploadError('File size exceeds the 10 MB limit.');
+        setDocUploadError('Tệp vượt quá giới hạn 10 MB.');
         return;
       }
 
@@ -90,9 +92,9 @@ export function TrainerProfileScreen() {
       setUploadedDocs((prev) => [...prev, uploaded]);
     } catch (err) {
       if (err instanceof ApiError) {
-        setDocUploadError(err.message || 'Failed to upload document.');
+        setDocUploadError(apiErrorMessage(err, 'Không thể tải tài liệu lên.'));
       } else {
-        setDocUploadError('Failed to select or upload document.');
+        setDocUploadError('Không thể chọn hoặc tải tài liệu lên.');
       }
     } finally {
       setIsUploadingDoc(false);
@@ -131,9 +133,9 @@ export function TrainerProfileScreen() {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        setLoadError(err.message || 'Failed to load Trainer Profile.');
+        setLoadError(apiErrorMessage(err, 'Không thể tải hồ sơ huấn luyện viên.'));
       } else {
-        setLoadError('Network error. Unable to load profile.');
+        setLoadError('Không thể tải hồ sơ huấn luyện viên. Vui lòng thử lại.');
       }
     } finally {
       setIsLoading(false);
@@ -165,9 +167,9 @@ export function TrainerProfileScreen() {
       } catch (err) {
         if (isMounted) {
           if (err instanceof ApiError) {
-            setLoadError(err.message || 'Failed to load Trainer Profile.');
+            setLoadError(apiErrorMessage(err, 'Không thể tải hồ sơ huấn luyện viên.'));
           } else {
-            setLoadError('Network error. Unable to load profile.');
+            setLoadError('Không thể tải hồ sơ huấn luyện viên. Vui lòng thử lại.');
           }
           setIsLoading(false);
         }
@@ -195,16 +197,16 @@ export function TrainerProfileScreen() {
       const isResubmit = profile?.verificationStatus === 'REJECTED';
       setAppSuccess(
         isResubmit
-          ? 'Application resubmitted successfully. It is now pending review.'
-          : 'Application submitted successfully. It is now pending review.'
+          ? 'Đã nộp lại đơn. Hồ sơ đang chờ xét duyệt.'
+          : 'Đã nộp đơn. Hồ sơ đang chờ xét duyệt.'
       );
       const updatedProfile = await trainerProfileApi.getMyTrainerProfile();
       setProfile(updatedProfile);
     } catch (err) {
       if (err instanceof ApiError) {
-        setAppError(err.message || 'Failed to submit application.');
+        setAppError(apiErrorMessage(err, 'Không thể nộp đơn.'));
       } else {
-        setAppError('Network error. Unable to submit application.');
+        setAppError('Không thể nộp đơn. Vui lòng thử lại.');
       }
     } finally {
       setIsSubmittingApp(false);
@@ -297,12 +299,12 @@ export function TrainerProfileScreen() {
       setProfile(updated);
       populateForm(updated);
       setIsEditing(false);
-      setSuccessMessage('Trainer Profile updated successfully.');
+      setSuccessMessage('Đã cập nhật hồ sơ huấn luyện viên.');
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409 && err.errorResponse?.errorCode === 'TRAINER_SLUG_ALREADY_EXISTS') {
           setFieldErrors({
-            publicSlug: 'This public handle is already in use. Please choose another.',
+            publicSlug: 'Đường dẫn công khai này đã được dùng. Vui lòng chọn đường dẫn khác.',
           });
           return;
         }
@@ -310,14 +312,14 @@ export function TrainerProfileScreen() {
         if (err.errorResponse?.fieldErrors && err.errorResponse.fieldErrors.length > 0) {
           const apiMap: Record<string, string> = {};
           err.errorResponse.fieldErrors.forEach((fe) => {
-            apiMap[fe.field] = fe.message;
+            apiMap[fe.field] = 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.';
           });
           setFieldErrors(apiMap);
         } else {
-          setSubmitError(err.message || 'Failed to update Trainer Profile.');
+          setSubmitError(apiErrorMessage(err, 'Không thể cập nhật hồ sơ huấn luyện viên.'));
         }
       } else {
-        setSubmitError('Network error. Please try again.');
+        setSubmitError('Lỗi mạng. Vui lòng thử lại.');
       }
     } finally {
       isSubmittingRef.current = false;
@@ -332,7 +334,7 @@ export function TrainerProfileScreen() {
         style={[styles.centerContainer, { backgroundColor: themeColors.canvas }]}>
         <ActivityIndicator size="large" color={themeColors.primary} />
         <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
-          Loading Trainer Profile...
+          Đang tải hồ sơ huấn luyện viên...
         </Text>
       </View>
     );
@@ -344,7 +346,7 @@ export function TrainerProfileScreen() {
         testID="trainer-profile-load-error"
         style={[styles.centerContainer, { backgroundColor: themeColors.canvas }]}>
         <Text style={[styles.errorTitle, { color: themeColors.dangerText }]}>
-          Unable to Load Profile
+          Không thể tải hồ sơ
         </Text>
         <Text style={[styles.errorSubtitle, { color: themeColors.textSecondary }]}>
           {loadError}
@@ -352,16 +354,17 @@ export function TrainerProfileScreen() {
         <Pressable
           testID="trainer-profile-retry-button"
           accessibilityRole="button"
-          accessibilityLabel="Retry loading trainer profile"
+          accessibilityLabel="Thử tải lại hồ sơ huấn luyện viên"
           onPress={fetchProfile}
           style={[styles.primaryButton, { backgroundColor: themeColors.primary, marginTop: spacing.md }]}>
-          <Text style={styles.primaryButtonText}>Retry</Text>
+          <Text style={styles.primaryButtonText}>Thử lại</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: themeColors.canvas }]}>
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: themeColors.canvas }]}>
@@ -374,11 +377,11 @@ export function TrainerProfileScreen() {
           <Pressable
             testID="trainer-profile-back-button"
             accessibilityRole="button"
-            accessibilityLabel="Go back to home"
+            accessibilityLabel="Về Trang chủ"
             onPress={() => router.replace('/(app)')}
             style={styles.backButton}>
             <Text style={[styles.backButtonText, { color: themeColors.primary }]}>
-              ← Back to Overview
+              ← Về Tổng quan
             </Text>
           </Pressable>
 
@@ -386,28 +389,28 @@ export function TrainerProfileScreen() {
             <Pressable
               testID="trainer-profile-edit-button"
               accessibilityRole="button"
-              accessibilityLabel="Edit Trainer Profile"
+              accessibilityLabel="Chỉnh sửa hồ sơ huấn luyện viên"
               onPress={startEditing}
               style={[styles.editButton, { borderColor: themeColors.border }]}>
-              <Text style={[styles.editButtonText, { color: themeColors.primary }]}>Edit</Text>
+              <Text style={[styles.editButtonText, { color: themeColors.primary }]}>Chỉnh sửa</Text>
             </Pressable>
           ) : (
             <View style={styles.editActions}>
               <Pressable
                 testID="trainer-profile-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel editing"
+                accessibilityLabel="Hủy chỉnh sửa"
                 disabled={isSubmitting}
                 onPress={cancelEditing}
                 style={styles.cancelButton}>
                 <Text style={[styles.cancelButtonText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
               <Pressable
                 testID="trainer-profile-save-button"
                 accessibilityRole="button"
-                accessibilityLabel="Save Trainer Profile changes"
+                accessibilityLabel="Lưu thay đổi hồ sơ huấn luyện viên"
                 disabled={isSubmitting}
                 onPress={handleSave}
                 style={[
@@ -417,7 +420,7 @@ export function TrainerProfileScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={styles.saveButtonText}>Lưu</Text>
                 )}
               </Pressable>
             </View>
@@ -425,9 +428,9 @@ export function TrainerProfileScreen() {
         </View>
 
         <View style={styles.header}>
-          <Text style={[styles.title, { color: themeColors.textPrimary }]}>Trainer Profile</Text>
+          <Text style={[styles.title, { color: themeColors.textPrimary }]}>Hồ sơ huấn luyện viên</Text>
           <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-            Professional details and coaching eligibility
+            Thông tin chuyên môn và điều kiện được huấn luyện
           </Text>
         </View>
 
@@ -483,13 +486,13 @@ export function TrainerProfileScreen() {
             },
           ]}>
           <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-            Status & Governance
+            Trạng thái và quản lý
           </Text>
 
           {/* Verification Status */}
           <View style={styles.statusRow}>
             <Text style={[styles.statusLabel, { color: themeColors.textSecondary }]}>
-              Verification Status
+              Trạng thái xác minh
             </Text>
             <View
               testID="trainer-profile-verification-status"
@@ -516,7 +519,7 @@ export function TrainerProfileScreen() {
                         : colors.neutral[700],
                   },
                 ]}>
-                {profile?.verificationStatus ?? 'NOT_SUBMITTED'}
+                {verificationLabels[profile?.verificationStatus ?? 'NOT_SUBMITTED']}
               </Text>
             </View>
           </View>
@@ -524,7 +527,7 @@ export function TrainerProfileScreen() {
           {/* Activity Status */}
           <View style={styles.statusRow}>
             <Text style={[styles.statusLabel, { color: themeColors.textSecondary }]}>
-              Activity Status
+              Trạng thái hoạt động
             </Text>
             <View
               style={[
@@ -546,7 +549,7 @@ export function TrainerProfileScreen() {
                         : colors.neutral[700],
                   },
                 ]}>
-                {profile?.activityStatus ?? 'INACTIVE'}
+                {trainerActivityLabels[profile?.activityStatus ?? 'INACTIVE']}
               </Text>
             </View>
           </View>
@@ -554,7 +557,7 @@ export function TrainerProfileScreen() {
           {/* Coaching Eligibility */}
           <View style={styles.statusRow}>
             <Text style={[styles.statusLabel, { color: themeColors.textSecondary }]}>
-              Coaching Eligibility
+              Điều kiện được huấn luyện
             </Text>
             <View
               testID="trainer-profile-coaching-eligibility"
@@ -577,7 +580,7 @@ export function TrainerProfileScreen() {
                         : themeColors.warningText,
                   },
                 ]}>
-                {profile?.coachingEligibility?.eligible ? 'ELIGIBLE' : 'INELIGIBLE'}
+                {profile?.coachingEligibility?.eligible ? 'Đủ điều kiện' : 'Chưa đủ điều kiện'}
               </Text>
             </View>
           </View>
@@ -593,14 +596,14 @@ export function TrainerProfileScreen() {
               },
             ]}>
             <Text style={[styles.authorityTitle, { color: themeColors.textPrimary }]}>
-              Coaching Authority: {canCoach ? 'Authorized' : 'Unavailable (Verification required)'}
+              Quyền huấn luyện: {canCoach ? 'Đã được cấp' : 'Chưa được cấp (cần xác minh)'}
             </Text>
             <Text style={[styles.authorityDetail, { color: themeColors.textSecondary }]}>
               {canCoach
-                ? 'Coaching authority is granted. You are authorized to accept and coach clients.'
-                : 'Coaching authority is derived from platform verification and administration review. It remains disabled until all policy and credential requirements are approved.'}
+                ? 'Bạn đã được phép nhận và huấn luyện học viên.'
+                : 'Quyền huấn luyện chỉ được cấp sau khi nền tảng xác minh và xét duyệt hồ sơ theo quy định.'}
               {!profile?.coachingEligibility?.eligible && profile?.coachingEligibility?.blockingReasons?.length
-                ? ` Current blocking reasons: ${profile.coachingEligibility.blockingReasons.join(', ')}.`
+                ? ` Lý do chưa đủ điều kiện: ${profile.coachingEligibility.blockingReasons.map((reason) => coachingBlockingLabels[reason]).join(', ')}.`
                 : ''}
             </Text>
           </View>
@@ -616,7 +619,7 @@ export function TrainerProfileScreen() {
             },
           ]}>
           <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-            Verification Application
+            Hồ sơ xác minh
           </Text>
 
           {appSuccess && (
@@ -658,16 +661,15 @@ export function TrainerProfileScreen() {
           {profile?.verificationStatus === 'NOT_SUBMITTED' && (
             <View testID="trainer-application-not-submitted-card" style={styles.appStateContainer}>
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
-                You have not submitted a verification application yet. Submit your application and
-                qualifications to become eligible to coach students.
+                Bạn chưa nộp hồ sơ xác minh. Hãy nộp hồ sơ cùng bằng cấp để được xét quyền huấn luyện học viên.
               </Text>
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Application Notes / Qualifications
+                  Ghi chú hồ sơ / Bằng cấp
                 </Text>
                 <TextInput
                   testID="trainer-application-note-input"
-                  accessibilityLabel="Application notes or qualifications"
+                  accessibilityLabel="Ghi chú hồ sơ hoặc bằng cấp"
                   style={[
                     styles.textArea,
                     {
@@ -678,7 +680,7 @@ export function TrainerProfileScreen() {
                   ]}
                   value={applicantNote}
                   onChangeText={setApplicantNote}
-                  placeholder="Enter details about your coaching credentials, experience, or certifications..."
+                  placeholder="Nhập bằng cấp, kinh nghiệm hoặc chứng chỉ huấn luyện..."
                   placeholderTextColor={themeColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -688,12 +690,12 @@ export function TrainerProfileScreen() {
 
               <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Verification Documents (PDF, PNG, JPEG)
+                  Tài liệu xác minh (PDF, PNG, JPEG)
                 </Text>
                 <Pressable
                   testID="trainer-document-upload-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Attach verification document"
+                  accessibilityLabel="Đính kèm tài liệu xác minh"
                   disabled={isUploadingDoc || isSubmittingApp}
                   onPress={handlePickAndUploadDocument}
                   style={[
@@ -708,7 +710,7 @@ export function TrainerProfileScreen() {
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
-                      + Attach Document (Max 10MB)
+                      + Đính kèm tài liệu (tối đa 10 MB)
                     </Text>
                   )}
                 </Pressable>
@@ -736,13 +738,13 @@ export function TrainerProfileScreen() {
                             {doc.originalFilename}
                           </Text>
                           <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
-                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                            {doc.scanStatus === 'CLEAN' ? 'Đã quét, an toàn' : 'Đang xử lý quét tệp'}
                           </Text>
                         </View>
                         <Pressable
                           testID={`remove-doc-${doc.id}`}
                           accessibilityRole="button"
-                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          accessibilityLabel={`Xóa tài liệu ${doc.originalFilename}`}
                           disabled={isSubmittingApp}
                           onPress={() => handleRemoveDocument(doc.id)}
                           style={styles.removeDocButton}>
@@ -757,7 +759,7 @@ export function TrainerProfileScreen() {
               <Pressable
                 testID="trainer-application-submit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Submit verification application"
+                accessibilityLabel="Nộp hồ sơ xác minh"
                 disabled={isSubmittingApp || isUploadingDoc}
                 onPress={handleSubmitApplication}
                 style={[
@@ -771,7 +773,7 @@ export function TrainerProfileScreen() {
                 {isSubmittingApp ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Submit Application</Text>
+                  <Text style={styles.primaryButtonText}>Nộp hồ sơ</Text>
                 )}
               </Pressable>
             </View>
@@ -785,16 +787,15 @@ export function TrainerProfileScreen() {
                   { backgroundColor: themeColors.warningSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
                 ]}>
                 <Text style={[styles.badgeText, { color: themeColors.warningText }]}>
-                  APPLICATION UNDER REVIEW
+                  HỒ SƠ ĐANG ĐƯỢC XEM XÉT
                 </Text>
               </View>
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
-                Your verification application is currently under review by platform administrators.
-                You will be notified once a decision has been made.
+                Quản trị nền tảng đang xem xét hồ sơ xác minh của bạn. Bạn sẽ được thông báo khi có quyết định.
               </Text>
               {application?.submittedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
-                  Submitted: {new Date(application.submittedAt).toLocaleDateString()}
+                  Đã gửi: {new Date(application.submittedAt).toLocaleDateString('vi-VN')}
                 </Text>
               )}
             </View>
@@ -809,12 +810,11 @@ export function TrainerProfileScreen() {
                   { backgroundColor: themeColors.dangerSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
                 ]}>
                 <Text style={[styles.badgeText, { color: themeColors.dangerText }]}>
-                  APPLICATION REJECTED
+                  HỒ SƠ BỊ TỪ CHỐI
                 </Text>
               </View>
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
-                Your previous application was rejected. Please review the reason below and resubmit
-                with updated information.
+                Đơn đăng ký trước đó của bạn đã bị từ chối. Vui lòng xem lại lý do bên dưới và gửi lại với thông tin cập nhật.
               </Text>
 
               <View
@@ -826,22 +826,22 @@ export function TrainerProfileScreen() {
                   },
                 ]}>
                 <Text style={[styles.rejectionReasonLabel, { color: themeColors.dangerText }]}>
-                  Rejection Reason:
+                  Lý do từ chối:
                 </Text>
                 <Text
                   testID="trainer-application-rejection-reason"
                   style={[styles.rejectionReasonText, { color: themeColors.textPrimary }]}>
-                  {application?.rejectionReason ?? 'Credentials did not satisfy platform requirements.'}
+                  {application?.rejectionReason ?? 'Hồ sơ chưa đáp ứng yêu cầu của nền tảng.'}
                 </Text>
               </View>
 
               <View style={[styles.fieldGroup, { marginTop: spacing.md }]}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Updated Application Notes / Corrections
+                  Ghi chú / Chỉnh sửa hồ sơ đã cập nhật
                 </Text>
                 <TextInput
                   testID="trainer-application-resubmit-note-input"
-                  accessibilityLabel="Updated application notes or corrections"
+                  accessibilityLabel="Ghi chú hoặc chỉnh sửa hồ sơ đã cập nhật"
                   style={[
                     styles.textArea,
                     {
@@ -852,7 +852,7 @@ export function TrainerProfileScreen() {
                   ]}
                   value={applicantNote}
                   onChangeText={setApplicantNote}
-                  placeholder="Explain how you addressed the rejection reasons..."
+                  placeholder="Giải thích cách bạn giải quyết lý do bị từ chối..."
                   placeholderTextColor={themeColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -862,12 +862,12 @@ export function TrainerProfileScreen() {
 
               <View style={[styles.fieldGroup, { marginTop: spacing.sm }]}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Updated Verification Documents (PDF, PNG, JPEG)
+                  Tài liệu xác minh được cập nhật (PDF, PNG, JPEG)
                 </Text>
                 <Pressable
                   testID="trainer-document-resubmit-upload-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Attach updated verification document"
+                  accessibilityLabel="Đính kèm tài liệu xác minh đã cập nhật"
                   disabled={isUploadingDoc || isSubmittingApp}
                   onPress={handlePickAndUploadDocument}
                   style={[
@@ -882,7 +882,7 @@ export function TrainerProfileScreen() {
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Text style={[styles.uploadDocButtonText, { color: themeColors.primary }]}>
-                      + Attach Document (Max 10MB)
+                      + Đính kèm tài liệu (tối đa 10 MB)
                     </Text>
                   )}
                 </Pressable>
@@ -910,13 +910,13 @@ export function TrainerProfileScreen() {
                             {doc.originalFilename}
                           </Text>
                           <Text style={[styles.uploadedDocStatus, { color: themeColors.successText }]}>
-                            {doc.scanStatus === 'CLEAN' ? 'Scanned & Clean' : doc.scanStatus}
+                            {doc.scanStatus === 'CLEAN' ? 'Đã quét, an toàn' : 'Đang xử lý quét tệp'}
                           </Text>
                         </View>
                         <Pressable
                           testID={`remove-doc-${doc.id}`}
                           accessibilityRole="button"
-                          accessibilityLabel={`Remove document ${doc.originalFilename}`}
+                          accessibilityLabel={`Xóa tài liệu ${doc.originalFilename}`}
                           disabled={isSubmittingApp}
                           onPress={() => handleRemoveDocument(doc.id)}
                           style={styles.removeDocButton}>
@@ -931,7 +931,7 @@ export function TrainerProfileScreen() {
               <Pressable
                 testID="trainer-application-resubmit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Resubmit verification application"
+                accessibilityLabel="Gửi lại hồ sơ xác minh"
                 disabled={isSubmittingApp || isUploadingDoc}
                 onPress={handleSubmitApplication}
                 style={[
@@ -945,7 +945,7 @@ export function TrainerProfileScreen() {
                 {isSubmittingApp ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Resubmit Application</Text>
+                  <Text style={styles.primaryButtonText}>Gửi lại hồ sơ</Text>
                 )}
               </Pressable>
             </View>
@@ -959,16 +959,15 @@ export function TrainerProfileScreen() {
                   { backgroundColor: themeColors.successSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
                 ]}>
                 <Text style={[styles.badgeText, { color: themeColors.successText }]}>
-                  VERIFIED TRAINER
+                  HUẤN LUYỆN VIÊN ĐƯỢC XÁC MINH
                 </Text>
               </View>
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
-                Your verification application has been approved. You are authorized to coach
-                students when accepting students is enabled.
+                Hồ sơ xác minh của bạn đã được phê duyệt. Bạn có thể huấn luyện học viên khi bật chế độ nhận học viên.
               </Text>
               {profile?.verifiedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
-                  Verified on: {new Date(profile.verifiedAt).toLocaleDateString()}
+                  Xác minh ngày: {new Date(profile.verifiedAt).toLocaleDateString('vi-VN')}
                 </Text>
               )}
             </View>
@@ -985,7 +984,7 @@ export function TrainerProfileScreen() {
             },
           ]}>
           <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-            {isEditing ? 'Edit Profile Information' : 'Profile Details'}
+            {isEditing ? 'Chỉnh sửa hồ sơ' : 'Chi tiết hồ sơ'}
           </Text>
 
           {isEditing ? (
@@ -993,14 +992,14 @@ export function TrainerProfileScreen() {
               {/* Public Slug */}
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Public Profile Handle
+                  Định danh hồ sơ công khai
                 </Text>
                 <TextInput
                   testID="trainer-profile-slug-input"
-                  accessibilityLabel="Public Profile Handle"
+                  accessibilityLabel="Định danh hồ sơ công khai"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  placeholder="e.g. coach-alex"
+                  placeholder="Ví dụ: coach-alex"
                   placeholderTextColor={themeColors.textSecondary}
                   value={editSlug}
                   onChangeText={(val) => {
@@ -1030,15 +1029,15 @@ export function TrainerProfileScreen() {
               {/* Bio */}
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Professional Bio
+                  Giới thiệu chuyên môn
                 </Text>
                 <TextInput
                   testID="trainer-profile-bio-input"
-                  accessibilityLabel="Professional Bio"
+                  accessibilityLabel="Giới thiệu chuyên môn"
                   multiline
                   numberOfLines={4}
                   maxLength={4000}
-                  placeholder="Tell clients about your coaching background..."
+                  placeholder="Giới thiệu kinh nghiệm huấn luyện của bạn..."
                   placeholderTextColor={themeColors.textSecondary}
                   value={editBio}
                   onChangeText={(val) => {
@@ -1066,11 +1065,11 @@ export function TrainerProfileScreen() {
               {/* Years of Experience */}
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>
-                  Years of Coaching Experience
+                  Số năm kinh nghiệm huấn luyện
                 </Text>
                 <TextInput
                   testID="trainer-profile-experience-input"
-                  accessibilityLabel="Years of Coaching Experience"
+                  accessibilityLabel="Số năm kinh nghiệm huấn luyện"
                   keyboardType="decimal-pad"
                   placeholder="e.g. 5"
                   placeholderTextColor={themeColors.textSecondary}
@@ -1103,15 +1102,15 @@ export function TrainerProfileScreen() {
               <View style={styles.switchRow}>
                 <View style={styles.switchInfo}>
                   <Text style={[styles.switchLabel, { color: themeColors.textPrimary }]}>
-                    Accepting New Students
+                    Đang nhận học viên mới
                   </Text>
                   <Text style={[styles.switchDescription, { color: themeColors.textSecondary }]}>
-                    Open to coaching assignments once verified.
+                    Sẵn sàng nhận học viên sau khi được xác minh.
                   </Text>
                 </View>
                 <Switch
                   testID="trainer-profile-accepting-switch"
-                  accessibilityLabel="Accepting New Students"
+                  accessibilityLabel="Đang nhận học viên mới"
                   value={editAccepting}
                   onValueChange={setEditAccepting}
                   trackColor={{ false: colors.neutral[300], true: themeColors.primary }}
@@ -1123,39 +1122,39 @@ export function TrainerProfileScreen() {
             <View style={styles.detailRows}>
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>
-                  Public Handle
+                  Định danh công khai
                 </Text>
                 <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
-                  {profile?.publicSlug ? `@${profile.publicSlug}` : 'None specified'}
+                  {profile?.publicSlug ? `@${profile.publicSlug}` : unspecified}
                 </Text>
               </View>
 
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>
-                  Experience
+                  Kinh nghiệm
                 </Text>
                 <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
                   {profile?.yearsExperience != null
-                    ? `${profile.yearsExperience} years`
-                    : 'Not specified'}
+                    ? `${profile.yearsExperience} năm`
+                    : unspecified}
                 </Text>
               </View>
 
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>
-                  Accepting Students
+                  Nhận học viên
                 </Text>
                 <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
-                  {profile?.acceptingStudents ? 'Yes' : 'No'}
+                  {profile?.acceptingStudents ? 'Có' : 'Không'}
                 </Text>
               </View>
 
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>
-                  Bio
+                  Giới thiệu
                 </Text>
                 <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
-                  {profile?.bio || 'No bio provided.'}
+                  {profile?.bio || 'Chưa có giới thiệu.'}
                 </Text>
               </View>
             </View>
@@ -1163,6 +1162,7 @@ export function TrainerProfileScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

@@ -1,6 +1,9 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { TrainerProfileScreen } from '@/features/trainer/TrainerProfileScreen';
+import { layout } from '@/design-system/tokens/spacing';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { TrainerProfileResponse } from '@/types/trainer';
 import { ApiError } from '@/types/auth';
@@ -74,6 +77,25 @@ describe('TrainerProfileScreen Component', () => {
     });
   });
 
+  it('places Overview navigation in the safe area and keeps its route during edit', async () => {
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(mockProfile);
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValueOnce(null);
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => { tree = renderer.create(<TrainerProfileScreen />); });
+    const root = tree.root;
+    const safeArea = root.findByType(SafeAreaView);
+    expect(safeArea.props.edges).toEqual(['top', 'bottom']);
+    const overview = safeArea.findByProps({ testID: 'trainer-profile-back-button' });
+    expect(overview.props.accessibilityRole).toBe('button');
+    expect(StyleSheet.flatten(overview.props.style).minHeight).toBe(layout.minimumTouchTarget);
+    renderer.act(() => { overview.props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)');
+    renderer.act(() => { root.findByProps({ testID: 'trainer-profile-edit-button' }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: 'trainer-profile-back-button' }).props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledTimes(2);
+    expect(mockReplace).toHaveBeenLastCalledWith('/(app)');
+  }, 15000);
+
   it('renders loading state initially and then displays loaded trainer profile details', async () => {
     (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(mockProfile);
 
@@ -89,7 +111,7 @@ describe('TrainerProfileScreen Component', () => {
 
     const verificationNode = root.findByProps({ testID: 'trainer-profile-verification-status' });
     expect(
-      verificationNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('PENDING')).length
+      verificationNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('Đang chờ xác minh')).length
     ).toBeGreaterThan(0);
   });
 
@@ -265,7 +287,7 @@ describe('TrainerProfileScreen Component', () => {
     });
 
     const errorField = root.findAll((n) =>
-      typeof n.props.children === 'string' && n.props.children.includes('already in use')
+      typeof n.props.children === 'string' && n.props.children.includes('đã được dùng')
     );
     expect(errorField.length).toBeGreaterThan(0);
   });
@@ -286,7 +308,7 @@ describe('TrainerProfileScreen Component', () => {
         const text = Array.isArray(n.props.children)
           ? n.props.children.join('')
           : String(n.props.children ?? '');
-        return text.includes('Unavailable');
+        return text.includes('Chưa được cấp');
       }).length
     ).toBeGreaterThan(0);
   });
@@ -313,7 +335,7 @@ describe('TrainerProfileScreen Component', () => {
         const text = Array.isArray(n.props.children)
           ? n.props.children.join('')
           : String(n.props.children ?? '');
-        return text.includes('Unavailable');
+        return text.includes('Chưa được cấp');
       }).length
     ).toBeGreaterThan(0);
   });
@@ -597,7 +619,7 @@ describe('TrainerProfileScreen Component', () => {
     expect(trainerApplicationApi.uploadDocument).not.toHaveBeenCalled();
     const errorNode = root.findByProps({ testID: 'trainer-document-upload-error' });
     expect(
-      errorNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('10 MB limit')).length
+      errorNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('giới hạn 10 MB')).length
     ).toBeGreaterThan(0);
   });
 });

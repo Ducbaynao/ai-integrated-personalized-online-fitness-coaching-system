@@ -25,11 +25,11 @@ export function validatePublicSlug(slug?: string): string | null {
 
   const trimmed = slug.trim();
   if (trimmed.length > 100) {
-    return 'Public slug cannot exceed 100 characters.';
+    return 'Đường dẫn công khai không được quá 100 ký tự.';
   }
 
   if (!PUBLIC_SLUG_REGEX.test(trimmed)) {
-    return 'Public slug must contain only lowercase letters, numbers, and hyphens without consecutive hyphens.';
+    return 'Đường dẫn công khai chỉ được gồm chữ thường, số và dấu gạch nối; không dùng hai dấu gạch nối liên tiếp.';
   }
 
   return null;
@@ -44,7 +44,7 @@ export function validateBio(bio?: string): string | null {
   }
 
   if (bio.length > 4000) {
-    return 'Bio cannot exceed 4000 characters.';
+    return 'Giới thiệu không được quá 4.000 ký tự.';
   }
 
   return null;
@@ -60,15 +60,15 @@ export function validateYearsExperience(val?: string): string | null {
 
   const num = Number(val.trim());
   if (isNaN(num)) {
-    return 'Years of experience must be a valid number.';
+    return 'Số năm kinh nghiệm phải là số hợp lệ.';
   }
 
   if (num < 0) {
-    return 'Years of experience cannot be negative.';
+    return 'Số năm kinh nghiệm không được âm.';
   }
 
   if (num > 99.99) {
-    return 'Years of experience cannot exceed 99.99.';
+    return 'Số năm kinh nghiệm không được quá 99,99.';
   }
 
   return null;

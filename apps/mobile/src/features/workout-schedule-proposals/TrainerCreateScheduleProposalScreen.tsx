@@ -11,6 +11,7 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
 import { ApiError } from '@/types/auth';
+import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displayLabels';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { CreateWorkoutScheduleProposalRequest } from '@/types/workoutScheduleProposal';
 import { proposalErrorMessage } from './proposalPresentation';
@@ -101,7 +102,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
     for (const entry of entries) {
       const { session } = entry;
       if (!['SELF_ALLOWED', 'COACH_PREFERRED', 'COACH_REQUIRED'].includes(session.supervisionRequirement)) return `Buổi ${session.name} thiếu metadata giám sát hợp lệ.`;
-      if (session.supervisionRequirement === 'COACH_REQUIRED' && !entry.appointmentId) return `Chọn lịch hẹn CONFIRMED cho ${session.name}.`;
+      if (session.supervisionRequirement === 'COACH_REQUIRED' && !entry.appointmentId) return `Chọn lịch hẹn đã xác nhận cho ${session.name}.`;
       if (!isInSessionWeek(anchor, session.weekNumber, entry.localStart)) return `Ngày bắt đầu của ${session.name} phải nằm trong tuần ${session.weekNumber} tính từ thứ Hai đã chọn.`;
       const starts = validProposalOffsets(timezone, entry.localStart);
       const ends = validProposalOffsets(timezone, entry.localEnd);
@@ -156,7 +157,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       const itemMessages = reason instanceof ApiError ? reason.errorResponse?.itemErrors?.map((item) => {
         const index = pending?.body.items.findIndex((entry) => entry.clientItemId === item.clientItemId) ?? -1;
         const name = index >= 0 ? entries[index]?.session.name : undefined;
-        return `${name || 'Buổi trong đề xuất'}${item.field ? ` (${item.field})` : ''}: ${item.message}`;
+        return `${name || 'Buổi trong đề xuất'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${localizedServerMessage(item.message, 'Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại.')}`;
       }) ?? [] : [];
       setError([proposalErrorMessage(reason), ...itemMessages].join('\n'));
       if (reason instanceof ApiError && reason.status === 409) {
@@ -180,7 +181,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
     <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên sẽ chấp nhận hoặc từ chối toàn bộ. Tạo đề xuất chưa tạo buổi tập hay giữ chỗ trên lịch.</Text>
     {planQuery.isPending || versionQuery.isPending ? <WorkoutState busy title="Đang tải kế hoạch" message="Vui lòng chờ." /> : null}
     {planQuery.isError || versionQuery.isError ? <WorkoutState title="Không thể tải kế hoạch" message={proposalErrorMessage(planQuery.error ?? versionQuery.error)} onRetry={() => { planQuery.refetch(); versionQuery.refetch(); }} /> : null}
-    {!planQuery.isPending && !versionQuery.isPending && !sourceReady ? <WorkoutState title="Chưa có phiên bản phù hợp" message="Cần kế hoạch ACTIVE với phiên bản đã xuất bản và đang hiệu lực. Không thể dùng bản nháp hoặc phiên bản cũ." /> : null}
+    {!planQuery.isPending && !versionQuery.isPending && !sourceReady ? <WorkoutState title="Chưa có phiên bản phù hợp" message="Cần kế hoạch đang hoạt động với phiên bản đã xuất bản và đang hiệu lực. Không thể dùng bản nháp hoặc phiên bản cũ." /> : null}
     {sourceReady && plan ? <WorkoutCard>
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{plan.name}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {version?.versionNumber} · {sessions.length} buổi · Học viên: {relationship?.counterparty.displayName}</Text>
@@ -253,8 +254,8 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       {validation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>{validation}</Text> : null}
       {preview && !validation ? <WorkoutCard testID="proposal-preview">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận tạo đề xuất</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {plan?.name} · Phiên bản {version?.versionNumber} · Múi giờ Trainer chọn: {timezone} · Tuần bắt đầu: {anchor}</Text>
-        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Có lịch hẹn CONFIRMED được chọn' : ''}</Text>)}
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {plan?.name} · Phiên bản {version?.versionNumber} · Múi giờ huấn luyện viên chọn: {timezone} · Tuần bắt đầu: {anchor}</Text>
+        {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Có lịch hẹn đã xác nhận được chọn' : ''}</Text>)}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên sẽ xem múi giờ, thời gian từng buổi rồi chấp nhận hoặc từ chối toàn bộ. Không buổi nào được tạo khi chỉ gửi đề xuất.</Text>
         <WorkoutButton testID="confirm-create-proposal" label="Gửi đề xuất cho học viên" busy={mutation.isPending} disabled={mutation.isPending || stale} onPress={create} />
       </WorkoutCard> : null}

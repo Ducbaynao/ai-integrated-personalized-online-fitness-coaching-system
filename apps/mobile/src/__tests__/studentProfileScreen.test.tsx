@@ -1,6 +1,9 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StudentProfileScreen } from '@/features/student/StudentProfileScreen';
+import { layout } from '@/design-system/tokens/spacing';
 import { studentProfileApi } from '@/services/studentProfileApi';
 import { ApiError } from '@/types/auth';
 import { StudentProfileResponse } from '@/types/student';
@@ -40,6 +43,46 @@ describe('StudentProfileScreen', () => {
     jest.clearAllMocks();
   });
 
+  it('keeps Home reachable inside the safe area while loading, viewing, and editing', async () => {
+    let resolveProfile!: (profile: StudentProfileResponse) => void;
+    (studentProfileApi.getMyStudentProfile as jest.Mock).mockReturnValueOnce(
+      new Promise((resolve) => { resolveProfile = resolve; })
+    );
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<StudentProfileScreen />); });
+    const root = tree.root;
+    const safeArea = root.findByType(SafeAreaView);
+    expect(safeArea.props.edges).toEqual(['top', 'bottom']);
+    expect(root.findByProps({ testID: 'profile-loading' })).toBeDefined();
+
+    const home = safeArea.findByProps({ testID: 'back-button' });
+    expect(home.props.accessibilityRole).toBe('button');
+    expect(home.props.accessibilityLabel).toBe('Về Trang chủ');
+    expect(StyleSheet.flatten(home.props.style({ pressed: false }))).toEqual(
+      expect.objectContaining({ minHeight: layout.minimumTouchTarget, minWidth: layout.minimumTouchTarget })
+    );
+    renderer.act(() => { home.props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)');
+
+    await renderer.act(async () => { resolveProfile(sampleProfile); });
+    expect(root.findByProps({ testID: 'view-dob' })).toBeDefined();
+    renderer.act(() => { root.findByProps({ testID: 'edit-button' }).props.onPress(); });
+    expect(root.findByProps({ testID: 'edit-dob-input' })).toBeDefined();
+    renderer.act(() => { root.findByProps({ testID: 'back-button' }).props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledTimes(2);
+    expect(mockReplace).toHaveBeenLastCalledWith('/(app)');
+  });
+
+  it('keeps Home reachable when loading fails', async () => {
+    (studentProfileApi.getMyStudentProfile as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => { tree = renderer.create(<StudentProfileScreen />); });
+    expect(tree.root.findByProps({ testID: 'profile-error' })).toBeDefined();
+    renderer.act(() => { tree.root.findByType(SafeAreaView).findByProps({ testID: 'back-button' }).props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)');
+  });
+
   it('displays loading state initially and renders profile details on load', async () => {
     (studentProfileApi.getMyStudentProfile as jest.Mock).mockResolvedValueOnce(sampleProfile);
 
@@ -51,11 +94,11 @@ describe('StudentProfileScreen', () => {
 
     expect(studentProfileApi.getMyStudentProfile).toHaveBeenCalledTimes(1);
     expect(root.findByProps({ testID: 'view-dob' }).props.children).toBe('1995-06-15');
-    expect(root.findByProps({ testID: 'view-gender' }).props.children).toBe('MALE');
-    expect(root.findByProps({ testID: 'view-level' }).props.children).toBe('INTERMEDIATE');
-    expect(root.findByProps({ testID: 'view-months' }).props.children).toBe('18 months');
-    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('4 days');
-    expect(root.findByProps({ testID: 'view-minutes' }).props.children).toBe('60 minutes');
+    expect(root.findByProps({ testID: 'view-gender' }).props.children).toBe('Nam');
+    expect(root.findByProps({ testID: 'view-level' }).props.children).toBe('Trung cấp');
+    expect(root.findByProps({ testID: 'view-months' }).props.children).toBe('18 tháng');
+    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('4 ngày');
+    expect(root.findByProps({ testID: 'view-minutes' }).props.children).toBe('60 phút');
   });
 
   it('renders error state and retries successfully', async () => {
@@ -121,7 +164,7 @@ describe('StudentProfileScreen', () => {
     });
 
     // View should now display 5 days
-    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('5 days');
+    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('5 ngày');
   });
 
   it('sends null when a nullable field is cleared in edit mode', async () => {
@@ -185,7 +228,7 @@ describe('StudentProfileScreen', () => {
 
     expect(studentProfileApi.updateMyStudentProfile).not.toHaveBeenCalled();
     // Back to view mode
-    expect(root.findByProps({ testID: 'view-months' }).props.children).toBe('18 months');
+    expect(root.findByProps({ testID: 'view-months' }).props.children).toBe('18 tháng');
   });
 
   it('prevents duplicate PATCH calls when save button is pressed repeatedly before resolve', async () => {
@@ -232,6 +275,6 @@ describe('StudentProfileScreen', () => {
       });
     });
 
-    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('5 days');
+    expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('5 ngày');
   });
 });

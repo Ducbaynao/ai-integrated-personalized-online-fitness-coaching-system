@@ -55,7 +55,7 @@ export function TrainerProgramScreen({ relationshipId }: { relationshipId: strin
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Quyền chương trình</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch hiện tại: {canManage ? 'Quản lý' : canView ? 'Chỉ xem' : 'Không được chia sẻ'}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch sử kế hoạch: {canViewHistory ? 'Được xem' : 'Không được chia sẻ'}</Text>
-      {relationship.status === 'PAUSED' ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Quan hệ đang tạm dừng. Backend sẽ xác minh lại quyền hiện tại trước mọi thao tác.</Text> : null}
+      {relationship.status === 'PAUSED' ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Quan hệ đang tạm dừng. Hệ thống sẽ xác minh lại quyền hiện tại trước mọi thao tác.</Text> : null}
     </CoachingCard>
     {!canView ? <CoachingState testID="program-denied" title="Chưa có quyền xem kế hoạch" message="Học viên cần cấp ít nhất quyền Xem cho Kế hoạch tập luyện." /> : null}
     {canView && relationshipCurrent ? <CoachingButton testID="open-trainer-schedule-proposals" label="Đề xuất lịch tập" secondary onPress={() => router.push(`/coaching/${relationshipId}/schedule-proposals` as never)} /> : null}

@@ -534,7 +534,7 @@ function WorkoutExecutionContent({
 
   const substitutionMutation = useMutation({
     mutationFn: (variationId: string) => {
-      if (!substitutionTarget) throw new Error('Missing exercise target');
+      if (!substitutionTarget) throw new Error('Chưa có chỉ tiêu bài tập');
       return workoutExecutionApi.substitute(
         detail.execution.executionId,
         substitutionTarget.exerciseExecutionId,
@@ -749,7 +749,7 @@ function WorkoutExecutionContent({
         <ExecutionCard>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Kết thúc buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
-            Backend sẽ xác định kết quả hoàn thành hoặc hoàn thành một phần từ các hiệp đã ghi.
+            Hệ thống sẽ xác định kết quả hoàn thành hoặc hoàn thành một phần từ các hiệp đã ghi.
           </Text>
           <View style={styles.row}>
             <ExecutionButton testID="complete-workout-button" label="Hoàn thành buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('complete')} />

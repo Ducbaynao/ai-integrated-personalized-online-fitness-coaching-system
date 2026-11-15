@@ -18,6 +18,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { FitnessGoal, FitnessGoalVersion, GoalProposal, ProposalDecision } from '@/types/goal';
+import { apiErrorMessage, goalProposalStatusLabels } from '@/localization/displayLabels';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { ApiError } from '@/services/apiClient';
 import { GoalScreenSkeleton } from '@/features/goal/components/GoalScreenSkeleton';
@@ -120,10 +121,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
       } catch (err: any) {
         if (requestId === requestSeqRef.current) {
           if (!options?.suppressErrorScreen) {
-            const message =
-              err?.errorResponse?.message ||
-              err?.message ||
-              'Failed to load goal proposal details.';
+            const message = apiErrorMessage(err, 'Không thể tải chi tiết đề xuất mục tiêu.');
             setLoadError({ proposalId, message });
           }
         }
@@ -169,7 +167,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
     }
 
     if (pendingDecision === 'REJECT' && !decisionNote.trim()) {
-      setNoteError('A rejection note is required so your coach understands your reasoning.');
+      setNoteError('Vui lòng nêu lý do từ chối để huấn luyện viên hiểu quyết định của bạn.');
       return;
     }
 
@@ -188,44 +186,42 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
       );
       setDecisionModalVisible(false);
       Alert.alert(
-        'Proposal Updated',
-        `The proposal has been successfully ${
-          pendingDecision === 'ACCEPT' ? 'accepted' : 'rejected'
-        }.`
+        'Đã cập nhật đề xuất',
+        pendingDecision === 'ACCEPT' ? 'Đã chấp nhận đề xuất.' : 'Đã từ chối đề xuất.'
       );
     } catch (err: any) {
       let isTerminalConflict = false;
       let terminalReason: string | null = null;
       let isConflict = false;
-      let msg = 'Failed to submit decision.';
+      let msg = 'Không thể gửi quyết định.';
       if (err instanceof ApiError) {
         const errorCode = err.errorResponse?.errorCode;
         if (errorCode === 'GOAL_PROPOSAL_ALREADY_DECIDED') {
           isTerminalConflict = true;
-          terminalReason = 'This proposal has already been decided by another request and cannot be decided again.';
+          terminalReason = 'Đề xuất đã được xử lý ở một yêu cầu khác và không thể xử lý lại.';
           msg = terminalReason;
         } else if (errorCode === 'GOAL_PROPOSAL_EXPIRED') {
           isTerminalConflict = true;
-          terminalReason = 'This proposal has expired and can no longer be decided.';
+          terminalReason = 'Đề xuất đã hết hạn và không thể xử lý.';
           msg = terminalReason;
         } else if (errorCode === 'STALE_GOAL_PROPOSAL') {
           isTerminalConflict = true;
-          terminalReason = 'The base goal version has changed. This proposal is outdated and cannot be applied. Please refresh to see the latest goal.';
+          terminalReason = 'Phiên bản mục tiêu gốc đã thay đổi. Đề xuất này không còn hiệu lực. Vui lòng tải lại mục tiêu.';
           msg = terminalReason;
         } else if (errorCode === 'GOAL_VERSION_NO_CHANGES') {
           isTerminalConflict = true;
-          terminalReason = 'The proposal contains no effective changes from the current active version.';
+          terminalReason = 'Đề xuất không có thay đổi so với phiên bản đang hoạt động.';
           msg = terminalReason;
         } else if (err.status === 409) {
           isConflict = true;
-          msg = err.errorResponse?.message || 'A conflict occurred while processing your decision. Please refresh.';
-        } else if (err.errorResponse?.message) {
-          msg = err.errorResponse.message;
+          msg = 'Có xung đột khi xử lý quyết định. Vui lòng tải lại.';
+        } else {
+          msg = 'Không thể xử lý quyết định. Vui lòng thử lại.';
         }
       }
 
       setDecisionModalVisible(false);
-      Alert.alert('Decision Failed', msg);
+      Alert.alert('Không thể xử lý quyết định', msg);
 
       if (isTerminalConflict && terminalReason) {
         setBlockedState({ proposalId: proposal.id, reason: terminalReason });
@@ -253,23 +249,23 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
             <Pressable
               testID="proposal-error-retry-button"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading proposal"
+              accessibilityLabel="Thử tải lại đề xuất"
               disabled={isLoading}
               style={[styles.primaryButton, { backgroundColor: themeColors.primary }]}
               onPress={() => loadData({ showLoading: true })}>
-              <Text style={styles.primaryButtonText}>Retry</Text>
+              <Text style={styles.primaryButtonText}>Thử lại</Text>
             </Pressable>
             <Pressable
               testID="proposal-error-back-button"
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel="Quay lại"
               style={[
                 styles.secondaryButton,
                 { borderColor: themeColors.border, backgroundColor: themeColors.surface },
               ]}
               onPress={() => router.back()}>
               <Text style={[styles.secondaryButtonText, { color: themeColors.textPrimary }]}>
-                Go Back
+                Quay lại
               </Text>
             </Pressable>
           </View>
@@ -297,15 +293,15 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
           <Text
             testID="proposal-error-message"
             style={[styles.errorTitle, { color: themeColors.dangerText }]}>
-            Proposal not found.
+            Không tìm thấy đề xuất.
           </Text>
           <Pressable
             testID="proposal-error-back-button"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel="Quay lại"
             style={[styles.primaryButton, { backgroundColor: themeColors.primary }]}
             onPress={() => router.back()}>
-            <Text style={styles.primaryButtonText}>Go Back</Text>
+            <Text style={styles.primaryButtonText}>Quay lại</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -315,7 +311,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
   const effectiveBlockedReason =
     decisionBlockedReason ||
     (isExpiredByDate
-      ? 'This proposal has expired and can no longer be decided.'
+      ? 'Đề xuất đã hết hạn và không thể xử lý.'
       : null);
 
   const isPending =
@@ -330,13 +326,13 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
         <Pressable
           testID="proposal-screen-back-button"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel="Quay lại"
           style={styles.backButton}
           onPress={() => router.back()}>
-          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>← Back</Text>
+          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>← Quay lại</Text>
         </Pressable>
         <Text style={[styles.screenTitle, { color: themeColors.textPrimary }]}>
-          Goal Proposal
+          Đề xuất mục tiêu
         </Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -359,7 +355,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                 styles.bannerTitle,
                 { color: themeColors.dangerText },
               ]}>
-              {`Decision Unavailable: ${effectiveBlockedReason}`}
+              {`Không thể xử lý quyết định: ${effectiveBlockedReason}`}
             </Text>
           </View>
         )}
@@ -397,18 +393,18 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                       : themeColors.textPrimary,
                 },
               ]}>
-              Status: {proposal.status}
+              Trạng thái: {goalProposalStatusLabels[proposal.status]}
             </Text>
             <Text style={[styles.sourceBadge, { color: themeColors.textSecondary }]}>
-              Source: {proposal.source}
+              Nguồn: {proposal.source}
             </Text>
           </View>
           <Text style={[styles.reasonText, { color: themeColors.textPrimary }]}>
-            Proposal Reason: {proposal.reason}
+            Lý do đề xuất: {proposal.reason}
           </Text>
           {proposal.decisionNote && (
             <Text style={[styles.decisionNoteText, { color: themeColors.textSecondary }]}>
-              Decision Note: {proposal.decisionNote}
+              Ghi chú quyết định: {proposal.decisionNote}
             </Text>
           )}
         </View>
@@ -420,23 +416,23 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            Current vs Proposed Comparison
+            So sánh hiện tại và đề xuất
           </Text>
 
           {/* Title Comparison */}
           <View style={styles.comparisonRow}>
             <View style={styles.comparisonCol}>
               <Text style={[styles.columnLabel, { color: themeColors.textSecondary }]}>
-                Current Version
+                Phiên bản hiện tại
               </Text>
               <Text style={[styles.columnValue, { color: themeColors.textPrimary }]}>
-                {baseVersion?.title || currentGoal?.title || 'No active title'}
+                {baseVersion?.title || currentGoal?.title || 'Chưa có tiêu đề đang hoạt động'}
               </Text>
             </View>
             <View style={styles.dividerCol} />
             <View style={styles.comparisonCol}>
               <Text style={[styles.columnLabel, { color: themeColors.textSecondary }]}>
-                Proposed Update
+                Đề xuất cập nhật
               </Text>
               <Text
                 testID="proposal-proposed-title"
@@ -451,7 +447,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                     fontWeight: proposal.proposedTitle ? '700' : '400',
                   },
                 ]}>
-                {proposal.proposedTitle || baseVersion?.title || currentGoal?.title || 'Unchanged'}
+                {proposal.proposedTitle || baseVersion?.title || currentGoal?.title || 'Không đổi'}
               </Text>
             </View>
           </View>
@@ -460,17 +456,17 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
           <View style={[styles.comparisonRow, styles.borderedRow, { borderColor: themeColors.border }]}>
             <View style={styles.comparisonCol}>
               <Text style={[styles.columnLabel, { color: themeColors.textSecondary }]}>
-                Current Duration / Target
+                Thời hạn / Chỉ tiêu hiện tại
               </Text>
               <Text style={[styles.columnValue, { color: themeColors.textPrimary }]}>
-                {baseVersion?.durationDays ? `${baseVersion.durationDays} days` : 'No duration set'}
-                {baseVersion?.targetDate ? ` (End: ${baseVersion.targetDate})` : ''}
+                {baseVersion?.durationDays ? `${baseVersion.durationDays} ngày` : 'Chưa đặt thời hạn'}
+                {baseVersion?.targetDate ? ` (Kết thúc: ${baseVersion.targetDate})` : ''}
               </Text>
             </View>
             <View style={styles.dividerCol} />
             <View style={styles.comparisonCol}>
               <Text style={[styles.columnLabel, { color: themeColors.textSecondary }]}>
-                Proposed Duration / Target
+                Thời hạn / Chỉ tiêu đề xuất
               </Text>
               <Text
                 style={[
@@ -487,11 +483,11 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                   },
                 ]}>
                 {proposal.proposedDurationDays
-                  ? `${proposal.proposedDurationDays} days`
+                  ? `${proposal.proposedDurationDays} ngày`
                   : baseVersion?.durationDays
-                  ? `${baseVersion.durationDays} days`
-                  : 'Unchanged'}
-                {proposal.proposedTargetDate ? ` (End: ${proposal.proposedTargetDate})` : ''}
+                  ? `${baseVersion.durationDays} ngày`
+                  : 'Không đổi'}
+                {proposal.proposedTargetDate ? ` (Kết thúc: ${proposal.proposedTargetDate})` : ''}
               </Text>
             </View>
           </View>
@@ -504,11 +500,11 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            Proposed Objectives ({proposal.objectives.length})
+            Loại mục tiêu đề xuất ({proposal.objectives.length})
           </Text>
           {proposal.objectives.length === 0 ? (
             <Text style={[styles.emptySectionText, { color: themeColors.textSecondary }]}>
-              No objective changes proposed.
+              Không có thay đổi loại mục tiêu được đề xuất.
             </Text>
           ) : (
             proposal.objectives.map((obj, idx) => (
@@ -567,11 +563,11 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
           <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-            Proposed Targets ({proposal.targets.length})
+            Chỉ tiêu đề xuất ({proposal.targets.length})
           </Text>
           {proposal.targets.length === 0 ? (
             <Text style={[styles.emptySectionText, { color: themeColors.textSecondary }]}>
-              No target changes proposed.
+              Không có thay đổi chỉ tiêu được đề xuất.
             </Text>
           ) : (
             proposal.targets.map((tgt, idx) => (
@@ -591,7 +587,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                 <View style={styles.targetGrid}>
                   <View style={styles.targetGridItem}>
                     <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                      Start Value
+                      Giá trị bắt đầu
                     </Text>
                     <Text style={[styles.metaVal, { color: themeColors.textPrimary }]}>
                       {tgt.startValue !== null && tgt.startValue !== undefined
@@ -601,7 +597,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                   </View>
                   <View style={styles.targetGridItem}>
                     <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                      Target Value
+                      Giá trị mục tiêu
                     </Text>
                     <Text
                       style={[
@@ -618,7 +614,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                   {tgt.targetDate && (
                     <View style={styles.targetGridItem}>
                       <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                        Target Date
+                        Ngày mục tiêu
                       </Text>
                       <Text style={[styles.metaVal, { color: themeColors.textPrimary }]}>
                         {tgt.targetDate}
@@ -642,16 +638,16 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
             <Pressable
               testID="accept-proposal-button"
               accessibilityRole="button"
-              accessibilityLabel="Accept Proposal"
+              accessibilityLabel="Chấp nhận đề xuất"
               style={[styles.acceptButton, { backgroundColor: themeColors.primary }]}
               onPress={() => handleOpenDecision('ACCEPT')}>
-              <Text style={styles.acceptButtonText}>Accept Proposal</Text>
+              <Text style={styles.acceptButtonText}>Chấp nhận đề xuất</Text>
             </Pressable>
 
             <Pressable
               testID="reject-proposal-button"
               accessibilityRole="button"
-              accessibilityLabel="Reject Proposal"
+              accessibilityLabel="Từ chối đề xuất"
               style={[
                 styles.rejectButton,
                 {
@@ -661,7 +657,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
               ]}
               onPress={() => handleOpenDecision('REJECT')}>
               <Text style={[styles.rejectButtonText, { color: themeColors.dangerText }]}>
-                Reject Proposal
+                Từ chối đề xuất
               </Text>
             </Pressable>
           </View>
@@ -684,22 +680,22 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
               },
             ]}>
             <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
-              {pendingDecision === 'ACCEPT' ? 'Accept Proposal' : 'Reject Proposal'}
+              {pendingDecision === 'ACCEPT' ? 'Chấp nhận đề xuất' : 'Từ chối đề xuất'}
             </Text>
 
             <Text
               testID="proposal-modal-desc"
               style={[styles.modalDesc, { color: themeColors.textSecondary }]}>
               {pendingDecision === 'ACCEPT'
-                ? 'Accepting applies the approved changes. Depending on the proposed primary goal, this may create a new version of your current goal or start a new goal journey. Your fitness history will remain preserved.'
-                : 'Rejecting this proposal will keep your current goal version unchanged. Please provide a reason so your coach can adjust.'}
+                ? 'Chấp nhận sẽ áp dụng các thay đổi được đề xuất. Tùy mục tiêu chính, hệ thống sẽ tạo phiên bản mới hoặc bắt đầu hành trình mục tiêu mới. Lịch sử tập luyện được giữ lại.'
+                : 'Từ chối sẽ giữ nguyên phiên bản mục tiêu hiện tại. Vui lòng nêu lý do để huấn luyện viên điều chỉnh.'}
             </Text>
 
             <View style={styles.noteHeaderRow}>
               <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>
                 {pendingDecision === 'ACCEPT'
                   ? 'Note / Comments (Optional)'
-                  : 'Rejection Reason (Required)'}
+                  : 'Lý do từ chối (bắt buộc)'}
               </Text>
               <Text
                 testID="proposal-note-char-count"
@@ -720,8 +716,8 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
               testID="proposal-decision-note-input"
               accessibilityLabel={
                 pendingDecision === 'ACCEPT'
-                  ? 'Optional note for your decision'
-                  : 'Mandatory reason for rejecting proposal'
+                  ? 'Ghi chú cho quyết định (không bắt buộc)'
+                  : 'Lý do từ chối đề xuất (bắt buộc)'
               }
               style={[
                 styles.noteInput,
@@ -733,8 +729,8 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
               ]}
               placeholder={
                 pendingDecision === 'ACCEPT'
-                  ? 'Add an optional comment for your coach...'
-                  : 'Explain why you are rejecting this proposal...'
+                  ? 'Thêm lời nhắn cho huấn luyện viên (không bắt buộc)...'
+                  : 'Nêu lý do bạn từ chối đề xuất...'
               }
               placeholderTextColor={themeColors.textSecondary}
               multiline
@@ -760,19 +756,19 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
               <Pressable
                 testID="modal-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel="Hủy"
                 style={[styles.modalCancelBtn, { borderColor: themeColors.border }]}
                 onPress={() => setDecisionModalVisible(false)}
                 disabled={isSubmitting}>
                 <Text style={[styles.modalCancelText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
 
               <Pressable
                 testID="modal-confirm-button"
                 accessibilityRole="button"
-                accessibilityLabel={`Confirm ${pendingDecision === 'ACCEPT' ? 'Accept' : 'Reject'}`}
+                accessibilityLabel={`Xác nhận ${pendingDecision === 'ACCEPT' ? 'chấp nhận' : 'từ chối'}`}
                 accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
                 style={[
                   styles.modalConfirmBtn,
@@ -789,7 +785,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                   <ActivityIndicator color={themeColors.textOnPrimary} />
                 ) : (
                   <Text style={styles.modalConfirmText}>
-                    Confirm {pendingDecision === 'ACCEPT' ? 'Accept' : 'Reject'}
+                    Xác nhận {pendingDecision === 'ACCEPT' ? 'chấp nhận' : 'từ chối'}
                   </Text>
                 )}
               </Pressable>

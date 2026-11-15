@@ -83,7 +83,7 @@ describe('Student Onboarding Flow', () => {
 
     expect(studentProfileApi.createStudentProfile).not.toHaveBeenCalled();
     const dobError = root.findAll((node) =>
-      typeof node.props.children === 'string' && node.props.children.includes('cannot be in the future')
+      typeof node.props.children === 'string' && node.props.children.includes('không được ở tương lai')
     );
     expect(dobError.length).toBeGreaterThan(0);
   });
@@ -156,7 +156,7 @@ describe('Student Onboarding Flow', () => {
     const root = tree!.root;
 
     const skipBtn = root.findByProps({ testID: 'skip-button' });
-    expect(skipBtn.props.accessibilityLabel).toBe('Continue without details');
+    expect(skipBtn.props.accessibilityLabel).toBe('Tiếp tục mà chưa nhập thông tin');
 
     await renderer.act(async () => {
       skipBtn.props.onPress();
@@ -235,7 +235,7 @@ describe('Student Onboarding Flow', () => {
     expect(mockReplace).not.toHaveBeenCalled();
     const errorBanner = root.findAll((node) =>
       typeof node.props.children === 'string' &&
-      node.props.children.includes('An unexpected error occurred')
+      node.props.children.includes('Có lỗi xảy ra')
     );
     expect(errorBanner.length).toBeGreaterThan(0);
   });
@@ -293,7 +293,7 @@ describe('Student Onboarding Flow', () => {
     });
 
     const errorField = root.findAll((node) =>
-      typeof node.props.children === 'string' && node.props.children.includes('Date cannot be in the future')
+      typeof node.props.children === 'string' && node.props.children.includes('Giá trị chưa hợp lệ')
     );
     expect(errorField.length).toBeGreaterThan(0);
   });

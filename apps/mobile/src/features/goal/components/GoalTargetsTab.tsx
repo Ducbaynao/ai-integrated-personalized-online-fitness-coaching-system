@@ -26,10 +26,10 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
           },
         ]}>
         <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
-          No Measurable Targets
+          Không có mục tiêu có thể đo lường được
         </Text>
         <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
-          This goal has no target metric measurements configured.
+          Mục tiêu này chưa có chỉ tiêu đo lường.
         </Text>
       </View>
     );
@@ -53,14 +53,14 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
     if (target.targetMaxValue !== null && target.targetMaxValue !== undefined) {
       return `≤ ${target.targetMaxValue} ${target.unitSymbol}`;
     }
-    return 'Unknown';
+    return 'Chưa rõ';
   };
 
   const formatStartValue = (target: GoalTarget): string => {
     if (target.startValue !== null && target.startValue !== undefined) {
       return `${target.startValue} ${target.unitSymbol}`;
     }
-    return 'Not recorded';
+    return 'Chưa ghi nhận';
   };
 
   return (
@@ -94,7 +94,7 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
           <View style={styles.grid}>
             <View style={styles.gridItem}>
               <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                Baseline
+                Thông tin ban đầu
               </Text>
               <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
                 {formatStartValue(target)}
@@ -103,7 +103,7 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
 
             <View style={styles.gridItem}>
               <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                Goal Target
+                Chỉ tiêu mục tiêu
               </Text>
               <Text
                 style={[
@@ -118,10 +118,10 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
           {target.targetRepetitions !== null && target.targetRepetitions !== undefined && (
             <View style={styles.row}>
               <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                Target Repetitions:
+                Số lần lặp mục tiêu:
               </Text>
               <Text style={[styles.rowValue, { color: themeColors.textPrimary }]}>
-                {target.targetRepetitions} reps
+                {target.targetRepetitions} lần
               </Text>
             </View>
           )}
@@ -129,7 +129,7 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
           {target.targetDate && (
             <View style={styles.row}>
               <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                Target Date:
+                Ngày mục tiêu:
               </Text>
               <Text style={[styles.rowValue, { color: themeColors.textPrimary }]}>
                 {target.targetDate}
@@ -139,7 +139,7 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
 
           {target.notes && (
             <Text style={[styles.notes, { color: themeColors.textSecondary }]}>
-              Note: {target.notes}
+              Lưu ý: {target.notes}
             </Text>
           )}
         </View>

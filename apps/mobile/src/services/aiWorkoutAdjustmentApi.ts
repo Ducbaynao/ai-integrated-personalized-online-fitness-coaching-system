@@ -1,4 +1,5 @@
 import { request } from '@/services/apiClient';
+import { localizedServerMessage } from '@/localization/displayLabels';
 import { createCommandKey } from '@/services/coachingApi';
 import {
   WorkoutAdjustmentApiRequest,
@@ -16,7 +17,7 @@ export function getWorkoutAdjustmentFieldErrors(error: unknown): Record<string, 
     const map: Record<string, string> = {};
     for (const fe of error.errorResponse.fieldErrors) {
       if (fe.field && fe.message) {
-        map[fe.field] = fe.message;
+        map[fe.field] = localizedServerMessage(fe.message, 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
       }
     }
     return map;

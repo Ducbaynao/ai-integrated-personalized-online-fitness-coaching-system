@@ -27,7 +27,7 @@ export function validateDateOfBirth(dobStr?: string): string | null {
   const trimmed = dobStr.trim();
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(trimmed)) {
-    return 'Date of birth must be in YYYY-MM-DD format.';
+    return 'Ngày sinh phải theo định dạng YYYY-MM-DD.';
   }
 
   const [yearStr, monthStr, dayStr] = trimmed.split('-');
@@ -41,14 +41,14 @@ export function validateDateOfBirth(dobStr?: string): string | null {
     parsed.getMonth() !== month - 1 ||
     parsed.getDate() !== day
   ) {
-    return 'Invalid calendar date.';
+    return 'Ngày sinh không hợp lệ.';
   }
 
   // Compare against today's date in local time
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   if (parsed > today) {
-    return 'Date of birth cannot be in the future.';
+    return 'Ngày sinh không được ở tương lai.';
   }
 
   return null;
@@ -64,11 +64,11 @@ export function validateTrainingExperienceMonths(val?: string): string | null {
 
   const num = Number(val.trim());
   if (isNaN(num)) {
-    return 'Experience months must be a valid number.';
+    return 'Số tháng kinh nghiệm phải là số hợp lệ.';
   }
 
   if (num < 0) {
-    return 'Training experience months cannot be negative.';
+    return 'Số tháng kinh nghiệm không được âm.';
   }
 
   return null;
@@ -84,11 +84,11 @@ export function validateAvailableDaysPerWeek(val?: string): string | null {
 
   const num = Number(val.trim());
   if (isNaN(num) || !Number.isInteger(num)) {
-    return 'Available days must be an integer between 1 and 7.';
+    return 'Số ngày tập mỗi tuần phải là số nguyên từ 1 đến 7.';
   }
 
   if (num < 1 || num > 7) {
-    return 'Available days per week must be between 1 and 7.';
+    return 'Số ngày tập mỗi tuần phải từ 1 đến 7.';
   }
 
   return null;
@@ -104,11 +104,11 @@ export function validatePreferredSessionMinutes(val?: string): string | null {
 
   const num = Number(val.trim());
   if (isNaN(num) || !Number.isInteger(num)) {
-    return 'Session duration must be an integer between 5 and 480.';
+    return 'Thời lượng buổi tập phải là số nguyên từ 5 đến 480 phút.';
   }
 
   if (num < 5 || num > 480) {
-    return 'Preferred session minutes must be between 5 and 480.';
+    return 'Thời lượng buổi tập phải từ 5 đến 480 phút.';
   }
 
   return null;

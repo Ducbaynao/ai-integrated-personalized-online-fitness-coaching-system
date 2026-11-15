@@ -66,7 +66,7 @@ function RecurrenceList({ allowed, title, items, pending, error, hasNext, loadin
   return <ScrollView testID="recurrence-list-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
     <WorkoutButton label="Quay lại" secondary onPress={() => router.back()} />
-    {!allowed ? <WorkoutState title="Không thể xem lịch lặp" message="Quyền xem Student hoặc kế hoạch không còn hiệu lực." /> : <>
+    {!allowed ? <WorkoutState title="Không thể xem lịch lặp" message="Quyền xem học viên hoặc kế hoạch không còn hiệu lực." /> : <>
       {create ? <WorkoutButton testID="recurrence-new-proposal" label="Đề xuất series mới" onPress={create} /> : null}
       {setStatus ? <View style={styles.row}>{([undefined, 'PENDING', 'ACTIVE', 'PAUSED_SOURCE', 'STOPPED', 'REJECTED', 'WITHDRAWN'] as const)
         .map(value => <WorkoutButton key={value ?? 'ALL'} label={value ? recurrenceStatus[value] : 'Tất cả'} secondary={status !== value} onPress={() => setStatus(value)} />)}</View> : null}

@@ -38,10 +38,10 @@ async function deviceKey(): Promise<string> {
 }
 
 async function registerDevice(): Promise<void> {
-  if (Constants.appOwnership === 'expo') throw new Error('Push cần bản dựng phát triển; Expo Go không hỗ trợ nhận push trên Android.');
-  if (!Device.isDevice || Platform.OS === 'web') throw new Error('Push cần thiết bị Android/iOS thật.');
+  if (Constants.appOwnership === 'expo') throw new Error('Thông báo đẩy cần bản dựng phát triển; Expo Go không hỗ trợ nhận thông báo đẩy trên Android.');
+  if (!Device.isDevice || Platform.OS === 'web') throw new Error('Thông báo đẩy cần thiết bị Android/iOS thật.');
   const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
-  if (!projectId) throw new Error('Chưa cấu hình EAS project ID cho push trên bản dựng này.');
+  if (!projectId) throw new Error('Chưa cấu hình mã dự án EAS cho thông báo đẩy trên bản dựng này.');
   // Do not evaluate native push code while Expo Go is loading the rest of the app.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Notifications = require('expo-notifications') as typeof import('expo-notifications');

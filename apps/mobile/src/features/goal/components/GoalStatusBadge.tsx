@@ -5,6 +5,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { GoalLifecycleStatus, ProposalStatus } from '@/types/goal';
+import { goalProposalStatusLabels, goalStatusLabels } from '@/localization/displayLabels';
 
 interface GoalStatusBadgeProps {
   status: GoalLifecycleStatus | ProposalStatus;
@@ -19,38 +20,38 @@ export function GoalStatusBadge({ status, testID }: GoalStatusBadgeProps) {
         return {
           bg: colors.success[100],
           text: colors.success[600],
-          label: status === 'ACTIVE' ? 'Active' : 'Accepted',
+          label: status === 'ACTIVE' ? goalStatusLabels.ACTIVE : goalProposalStatusLabels.ACCEPTED,
         };
       case 'PAUSED':
         return {
           bg: colors.warning[100],
           text: colors.warning[600],
-          label: 'Paused',
+          label: goalStatusLabels.PAUSED,
         };
       case 'PENDING':
         return {
           bg: colors.brand[50],
           text: colors.brand[700],
-          label: 'Pending Approval',
+          label: goalProposalStatusLabels.PENDING,
         };
       case 'REJECTED':
       case 'ABANDONED':
         return {
           bg: colors.danger[100],
           text: colors.danger[600],
-          label: status === 'REJECTED' ? 'Rejected' : 'Abandoned',
+          label: status === 'REJECTED' ? goalProposalStatusLabels.REJECTED : goalStatusLabels.ABANDONED,
         };
       case 'COMPLETED':
         return {
           bg: colors.brand[100],
           text: colors.brand[700],
-          label: 'Completed',
+          label: goalStatusLabels.COMPLETED,
         };
       case 'DRAFT':
         return {
           bg: colors.neutral[100],
           text: colors.neutral[700],
-          label: 'Draft',
+          label: goalStatusLabels.DRAFT,
         };
       case 'ENDED':
       case 'REPLACED':
@@ -60,13 +61,15 @@ export function GoalStatusBadge({ status, testID }: GoalStatusBadgeProps) {
         return {
           bg: colors.neutral[200],
           text: colors.neutral[700],
-          label: status.charAt(0) + status.slice(1).toLowerCase(),
+          label: status in goalStatusLabels
+            ? goalStatusLabels[status as GoalLifecycleStatus]
+            : goalProposalStatusLabels[status as ProposalStatus],
         };
       default:
         return {
           bg: colors.neutral[100],
           text: colors.neutral[700],
-          label: status,
+          label: 'Chưa rõ trạng thái',
         };
     }
   };
@@ -77,7 +80,7 @@ export function GoalStatusBadge({ status, testID }: GoalStatusBadgeProps) {
     <View
       testID={testID ?? `status-badge-${status.toLowerCase()}`}
       accessibilityRole="text"
-      accessibilityLabel={`Status: ${config.label}`}
+      accessibilityLabel={`Trạng thái: ${config.label}`}
       style={[styles.badge, { backgroundColor: config.bg }]}>
       <Text style={[styles.text, { color: config.text }]}>{config.label}</Text>
     </View>

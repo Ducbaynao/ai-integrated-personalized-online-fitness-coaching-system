@@ -77,7 +77,7 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
 
   const commandMutation = useMutation({
     mutationFn: async (target: PendingCommand) => {
-      if (!plan) throw new Error('Missing plan');
+      if (!plan) throw new Error('Không tìm thấy kế hoạch');
       const key = commandKey.current ?? createCommandKey(); commandKey.current = key;
       return target === 'ACTIVATE' ? workoutPlanApi.activate(plan.id, plan.aggregateVersion, key) : workoutPlanApi.transition(plan.id, plan.aggregateVersion, target, null, key);
     },
@@ -97,7 +97,7 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
 
   const successorMutation = useMutation({
     mutationFn: async () => {
-      if (!plan || !currentVersion) throw new Error('Missing source');
+      if (!plan || !currentVersion) throw new Error('Không tìm thấy nguồn dữ liệu');
       const key = successorKey.current ?? createCommandKey(); successorKey.current = key;
       return workoutPlanApi.successor(plan.id, currentVersion.id, successorName, key);
     },
@@ -143,7 +143,7 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
     {commandMutation.isError ? <WorkoutState testID="plan-command-error" title="Chưa thể cập nhật kế hoạch" message={workoutPlanErrorMessage(commandMutation.error)} /> : null}
 
     <Modal visible={pendingCommand !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeCommand}>
-      <View style={{ flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#00000066' }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thao tác</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingCommand ? labels[pendingCommand] : ''} sẽ được backend kiểm tra lại với trạng thái và phiên bản mới nhất.</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={commandMutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={commandMutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={commandMutation.isPending} disabled={commandMutation.isPending} danger={pendingCommand === 'ARCHIVED'} onPress={() => pendingCommand && commandMutation.mutate(pendingCommand)} /></View></WorkoutCard></View>
+      <View style={{ flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: '#00000066' }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thao tác</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingCommand ? labels[pendingCommand] : ''} sẽ được hệ thống kiểm tra lại với trạng thái và phiên bản mới nhất.</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={commandMutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={commandMutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={commandMutation.isPending} disabled={commandMutation.isPending} danger={pendingCommand === 'ARCHIVED'} onPress={() => pendingCommand && commandMutation.mutate(pendingCommand)} /></View></WorkoutCard></View>
     </Modal>
 
     <Modal visible={successorOpen} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeSuccessor}>

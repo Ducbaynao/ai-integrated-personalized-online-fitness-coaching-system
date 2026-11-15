@@ -38,8 +38,8 @@ export function PauseResumeGoalModal({
 
   const themeColors = getSemanticColors(isDark);
   const isPause = action === 'pause';
-  const titleText = isPause ? 'Pause Fitness Goal' : 'Resume Fitness Goal';
-  const actionButtonText = isPause ? 'Pause Goal' : 'Resume Goal';
+  const titleText = isPause ? 'Tạm dừng mục tiêu thể chất' : 'Tiếp tục mục tiêu thể chất';
+  const actionButtonText = isPause ? 'Tạm dừng mục tiêu' : 'Tiếp tục mục tiêu';
 
   const trimmedReason = reason.trim();
   const charCount = trimmedReason.length;
@@ -49,11 +49,11 @@ export function PauseResumeGoalModal({
 
   const handleInitialSubmit = () => {
     if (isBlank) {
-      setValidationError('Reason is required to update status.');
+      setValidationError('Vui lòng nêu lý do thay đổi trạng thái.');
       return;
     }
     if (isTooLong) {
-      setValidationError('Reason must not exceed 1000 characters.');
+      setValidationError('Lý do không được quá 1.000 ký tự.');
       return;
     }
     setValidationError(null);
@@ -95,24 +95,24 @@ export function PauseResumeGoalModal({
             },
           ]}>
           <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-            {showConfirm ? 'Confirm Action' : titleText}
+            {showConfirm ? 'Xác nhận thao tác' : titleText}
           </Text>
 
           <Text style={[styles.goalName, { color: themeColors.textSecondary }]}>
-            Goal: {goalTitle}
+            Mục tiêu: {goalTitle}
           </Text>
 
           {!showConfirm ? (
             <>
               <Text style={[styles.instruction, { color: themeColors.textSecondary }]}>
                 {isPause
-                  ? 'Pausing will freeze active goal training time without resetting your history or moving your target date. Please state why you are pausing:'
-                  : 'Resuming will reactivate your training journey. Historical pause duration remains recorded in your progress timeline. Please state why you are resuming:'}
+                  ? 'Tạm dừng sẽ ngưng tính thời gian tập của mục tiêu, giữ nguyên lịch sử và ngày đích. Vui lòng nêu lý do tạm dừng:'
+                  : 'Tiếp tục sẽ kích hoạt lại hành trình tập luyện. Thời gian tạm dừng vẫn được ghi trong lịch sử tiến độ. Vui lòng nêu lý do tiếp tục:'}
               </Text>
 
               <TextInput
                 testID="pause-resume-reason-input"
-                accessibilityLabel="Reason for status change"
+                accessibilityLabel="Lý do thay đổi trạng thái"
                 style={[
                   styles.input,
                   {
@@ -121,7 +121,7 @@ export function PauseResumeGoalModal({
                     backgroundColor: themeColors.surfaceSubtle,
                   },
                 ]}
-                placeholder="Enter mandatory reason (max 1000 chars)..."
+                placeholder="Nhập lý do bắt buộc (tối đa 1000 ký tự)..."
                 placeholderTextColor={themeColors.textSecondary}
                 multiline
                 numberOfLines={4}
@@ -155,12 +155,12 @@ export function PauseResumeGoalModal({
                 <Pressable
                   testID="pause-resume-cancel-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel"
+                  accessibilityLabel="Hủy"
                   style={[styles.cancelButton, { borderColor: themeColors.border }]}
                   onPress={handleClose}
                   disabled={isSubmitting}>
                   <Text style={[styles.cancelButtonText, { color: themeColors.textSecondary }]}>
-                    Cancel
+                    Hủy
                   </Text>
                 </Pressable>
 
@@ -181,7 +181,7 @@ export function PauseResumeGoalModal({
                   ]}
                   onPress={handleInitialSubmit}
                   disabled={isSubmitting}>
-                  <Text style={styles.submitButtonText}>Continue</Text>
+                  <Text style={styles.submitButtonText}>Tiếp tục</Text>
                 </Pressable>
               </View>
             </>
@@ -189,8 +189,8 @@ export function PauseResumeGoalModal({
             <>
               <Text style={[styles.confirmText, { color: themeColors.textPrimary }]}>
                 {isPause
-                  ? 'Are you sure you want to pause this goal? You can resume it anytime when you are ready to train again.'
-                  : 'Are you sure you want to resume this goal? Make sure you do not have another active fitness goal running.'}
+                  ? 'Bạn có chắc muốn tạm dừng mục tiêu? Bạn có thể tiếp tục khi sẵn sàng tập lại.'
+                  : 'Bạn có chắc muốn tiếp tục mục tiêu? Hãy đảm bảo bạn không có mục tiêu thể chất khác đang hoạt động.'}
               </Text>
 
               <View
@@ -202,7 +202,7 @@ export function PauseResumeGoalModal({
                   },
                 ]}>
                 <Text style={[styles.reasonLabel, { color: themeColors.textSecondary }]}>
-                  Recorded reason:
+                  Lý do được ghi lại:
                 </Text>
                 <Text style={[styles.reasonValue, { color: themeColors.textPrimary }]}>
                   {`"${trimmedReason}"`}
@@ -213,19 +213,19 @@ export function PauseResumeGoalModal({
                 <Pressable
                   testID="pause-resume-back-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Back to edit reason"
+                  accessibilityLabel="Quay lại chỉnh sửa lý do"
                   style={[styles.cancelButton, { borderColor: themeColors.border }]}
                   onPress={() => setShowConfirm(false)}
                   disabled={isSubmitting}>
                   <Text style={[styles.cancelButtonText, { color: themeColors.textSecondary }]}>
-                    Back
+                    Quay lại
                   </Text>
                 </Pressable>
 
                 <Pressable
                   testID="pause-resume-confirm-button"
                   accessibilityRole="button"
-                  accessibilityLabel={`Confirm ${actionButtonText}`}
+                  accessibilityLabel={`Xác nhận ${actionButtonText}`}
                   accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
                   style={[
                     styles.submitButton,
@@ -240,7 +240,7 @@ export function PauseResumeGoalModal({
                   {isSubmitting ? (
                     <ActivityIndicator color={themeColors.textOnPrimary} />
                   ) : (
-                    <Text style={styles.submitButtonText}>Confirm & {actionButtonText}</Text>
+                    <Text style={styles.submitButtonText}>Xác nhận và {actionButtonText}</Text>
                   )}
                 </Pressable>
               </View>

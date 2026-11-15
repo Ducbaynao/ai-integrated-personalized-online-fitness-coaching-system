@@ -59,21 +59,21 @@ export function CreateGoalTransitionModal({
   const handleSubmit = async () => {
     const trimmedReason = transitionReason.trim();
     if (!trimmedReason) {
-      setValidationError('Transition reason is required to start a new journey.');
+      setValidationError('Vui lòng nêu lý do bắt đầu hành trình mục tiêu mới.');
       return;
     }
     if (trimmedReason.length > 100) {
-      setValidationError('Transition reason must not exceed 100 characters.');
+      setValidationError('Lý do chuyển mục tiêu không được quá 100 ký tự.');
       return;
     }
 
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      setValidationError('New goal title is required.');
+      setValidationError('Vui lòng nhập tên mục tiêu mới.');
       return;
     }
     if (trimmedTitle.length > 200) {
-      setValidationError('Goal title must not exceed 200 characters.');
+      setValidationError('Tên mục tiêu không được quá 200 ký tự.');
       return;
     }
 
@@ -81,7 +81,7 @@ export function CreateGoalTransitionModal({
     if (durationDays.trim()) {
       const num = parseInt(durationDays.trim(), 10);
       if (isNaN(num) || num <= 0) {
-        setValidationError('Duration must be a positive number of days.');
+        setValidationError('Thời hạn phải là số ngày dương.');
         return;
       }
       parsedDuration = num;
@@ -120,11 +120,10 @@ export function CreateGoalTransitionModal({
           ]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-              Transition to New Journey
+              Chuyển sang hành trình mới
             </Text>
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-              Conclude your current goal journey and begin a fresh journey from Day 1. Complete
-              historical progress is preserved.
+              Kết thúc mục tiêu hiện tại và bắt đầu mục tiêu mới từ ngày đầu tiên. Toàn bộ lịch sử tiến độ vẫn được giữ nguyên.
             </Text>
 
             {validationError && (
@@ -143,11 +142,11 @@ export function CreateGoalTransitionModal({
             {/* Transition Reason (Mandatory) */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Transition Reason * (Max 100 chars)
+                Lý do chuyển đổi * (Tối đa 100 ký tự)
               </Text>
               <TextInput
                 testID="goal-transition-reason-input"
-                accessibilityLabel="Transition reason"
+                accessibilityLabel="Lý do chuyển đổi"
                 style={[
                   styles.input,
                   {
@@ -161,7 +160,7 @@ export function CreateGoalTransitionModal({
                   setTransitionReason(val);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="e.g. Completed cut, starting lean bulking journey"
+                placeholder="Ví dụ: Hoàn thành giai đoạn giảm mỡ, bắt đầu tăng cơ nạc"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={100}
                 editable={!isSubmitting}
@@ -171,11 +170,11 @@ export function CreateGoalTransitionModal({
             {/* New Goal Title (Mandatory) */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                New Goal Title *
+                Tiêu đề mục tiêu mới *
               </Text>
               <TextInput
                 testID="goal-transition-title-input"
-                accessibilityLabel="New goal title"
+                accessibilityLabel="Tiêu đề mục tiêu mới"
                 style={[
                   styles.input,
                   {
@@ -189,7 +188,7 @@ export function CreateGoalTransitionModal({
                   setTitle(val);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="e.g. 16-Week Muscle Hypertrophy Phase"
+                placeholder="Ví dụ: Giai đoạn tăng cơ 16 tuần"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
                 editable={!isSubmitting}
@@ -199,7 +198,7 @@ export function CreateGoalTransitionModal({
             {/* New Goal Type */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                New Objective Type *
+                Loại mục tiêu mới *
               </Text>
               <View style={styles.typeOptionsContainer} testID="goal-transition-type-select">
                 {GOAL_TYPE_OPTIONS.map((opt) => {
@@ -239,11 +238,11 @@ export function CreateGoalTransitionModal({
             {/* Duration Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Duration (Days)
+                Thời hạn (ngày)
               </Text>
               <TextInput
                 testID="goal-transition-duration-input"
-                accessibilityLabel="New goal duration in days"
+                accessibilityLabel="Thời lượng mục tiêu mới tính bằng ngày"
                 style={[
                   styles.input,
                   {
@@ -264,11 +263,11 @@ export function CreateGoalTransitionModal({
             {/* Notes Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Transition Notes (Optional)
+                Ghi chú chuyển tiếp (Tùy chọn)
               </Text>
               <TextInput
                 testID="goal-transition-notes-input"
-                accessibilityLabel="Transition notes"
+                accessibilityLabel="Ghi chú chuyển tiếp"
                 style={[
                   styles.textArea,
                   {
@@ -279,7 +278,7 @@ export function CreateGoalTransitionModal({
                 ]}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Notes on the transition, previous accomplishments..."
+                placeholder="Ghi chú về quá trình chuyển đổi, thành tích trước đó..."
                 placeholderTextColor={themeColors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -293,19 +292,19 @@ export function CreateGoalTransitionModal({
               <Pressable
                 testID="goal-transition-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel transition"
+                accessibilityLabel="Hủy chuyển đổi"
                 disabled={isSubmitting}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
 
               <Pressable
                 testID="goal-transition-submit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Submit transition"
+                accessibilityLabel="Gửi chuyển đổi"
                 disabled={isSubmitting}
                 onPress={handleSubmit}
                 style={[
@@ -319,7 +318,7 @@ export function CreateGoalTransitionModal({
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Start New Journey</Text>
+                  <Text style={styles.primaryButtonText}>Bắt đầu hành trình mới</Text>
                 )}
               </Pressable>
             </View>

@@ -15,11 +15,11 @@ import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 
 export const GOAL_TYPE_OPTIONS = [
-  { code: 'FAT_LOSS', label: 'Fat Loss (Giảm mỡ)' },
-  { code: 'MUSCLE_GAIN', label: 'Muscle Gain (Tăng cơ)' },
-  { code: 'STRENGTH', label: 'Strength (Sức mạnh)' },
-  { code: 'FITNESS_IMPROVEMENT', label: 'Fitness Improvement (Thể lực)' },
-  { code: 'MAINTENANCE', label: 'Maintenance (Duy trì)' },
+  { code: 'FAT_LOSS', label: 'Giảm mỡ' },
+  { code: 'MUSCLE_GAIN', label: 'Tăng cơ' },
+  { code: 'STRENGTH', label: 'Tăng sức mạnh' },
+  { code: 'FITNESS_IMPROVEMENT', label: 'Cải thiện thể lực' },
+  { code: 'MAINTENANCE', label: 'Duy trì thể lực' },
 ];
 
 interface CreateGoalModalProps {
@@ -63,11 +63,11 @@ export function CreateGoalModal({
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      setValidationError('Goal title is required.');
+      setValidationError('Vui lòng nhập tên mục tiêu.');
       return;
     }
     if (trimmedTitle.length > 200) {
-      setValidationError('Goal title must not exceed 200 characters.');
+      setValidationError('Tên mục tiêu không được quá 200 ký tự.');
       return;
     }
 
@@ -75,7 +75,7 @@ export function CreateGoalModal({
     if (durationDays.trim()) {
       const num = parseInt(durationDays.trim(), 10);
       if (isNaN(num) || num <= 0) {
-        setValidationError('Timeline duration must be a positive number of days.');
+        setValidationError('Thời hạn phải là số ngày dương.');
         return;
       }
       parsedDuration = num;
@@ -113,10 +113,10 @@ export function CreateGoalModal({
           ]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-              Create Fitness Goal
+              Tạo mục tiêu thể chất
             </Text>
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-              Establish your primary fitness journey. You can adjust targets or transition later.
+              Thiết lập hành trình tập luyện chính của bạn. Bạn có thể điều chỉnh mục tiêu hoặc chuyển đổi sau này.
             </Text>
 
             {validationError && (
@@ -135,11 +135,11 @@ export function CreateGoalModal({
             {/* Title Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Goal Title *
+                Tiêu đề mục tiêu *
               </Text>
               <TextInput
                 testID="create-goal-title-input"
-                accessibilityLabel="Goal title"
+                accessibilityLabel="Tiêu đề mục tiêu"
                 style={[
                   styles.input,
                   {
@@ -153,7 +153,7 @@ export function CreateGoalModal({
                   setTitle(val);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="e.g. 12-Week Fat Loss & Strength"
+                placeholder="Ví dụ: Giảm mỡ và tăng sức mạnh trong 12 tuần"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
                 editable={!isSubmitting}
@@ -163,7 +163,7 @@ export function CreateGoalModal({
             {/* Goal Type Picker */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Primary Objective Type *
+                Loại mục tiêu chính *
               </Text>
               <View style={styles.typeOptionsContainer} testID="create-goal-type-select">
                 {GOAL_TYPE_OPTIONS.map((opt) => {
@@ -172,7 +172,7 @@ export function CreateGoalModal({
                     <Pressable
                       key={opt.code}
                       accessibilityRole="button"
-                      accessibilityLabel={`Select ${opt.label}`}
+                      accessibilityLabel={`Chọn ${opt.label}`}
                       onPress={() => setSelectedGoalType(opt.code)}
                       style={[
                         styles.typeChip,
@@ -204,11 +204,11 @@ export function CreateGoalModal({
             {/* Duration Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Duration (Days)
+                Thời hạn (ngày)
               </Text>
               <TextInput
                 testID="create-goal-duration-input"
-                accessibilityLabel="Duration in days"
+                accessibilityLabel="Thời hạn tính bằng ngày"
                 style={[
                   styles.input,
                   {
@@ -229,11 +229,11 @@ export function CreateGoalModal({
             {/* Notes Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Personal Notes (Optional)
+                Ghi chú cá nhân (không bắt buộc)
               </Text>
               <TextInput
                 testID="create-goal-notes-input"
-                accessibilityLabel="Goal notes"
+                accessibilityLabel="Ghi chú mục tiêu"
                 style={[
                   styles.textArea,
                   {
@@ -244,7 +244,7 @@ export function CreateGoalModal({
                 ]}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Specific motivations, target benchmarks, or reminders..."
+                placeholder="Động lực cụ thể, điểm chuẩn mục tiêu hoặc lời nhắc nhở..."
                 placeholderTextColor={themeColors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -258,19 +258,19 @@ export function CreateGoalModal({
               <Pressable
                 testID="create-goal-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel goal creation"
+                accessibilityLabel="Hủy việc tạo mục tiêu"
                 disabled={isSubmitting}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
 
               <Pressable
                 testID="create-goal-submit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Submit new goal"
+                accessibilityLabel="Gửi mục tiêu mới"
                 disabled={isSubmitting}
                 onPress={handleSubmit}
                 style={[
@@ -284,7 +284,7 @@ export function CreateGoalModal({
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Create Goal</Text>
+                  <Text style={styles.primaryButtonText}>Tạo mục tiêu</Text>
                 )}
               </Pressable>
             </View>

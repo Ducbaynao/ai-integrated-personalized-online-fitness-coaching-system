@@ -122,7 +122,7 @@ describe('Authentication Flows', () => {
 
       await expect(
         authApi.confirmEmail({ token: 'bad-token' })
-      ).rejects.toThrow('Verification token has expired or is invalid');
+      ).rejects.toThrow('Mã xác minh không hợp lệ hoặc đã hết hạn.');
     });
   });
 
@@ -192,7 +192,7 @@ describe('Authentication Flows', () => {
 
       await expect(
         authApi.login({ email: 'login@example.com', password: 'wrongPassword' })
-      ).rejects.toThrow('Bad credentials');
+      ).rejects.toThrow('Email hoặc mật khẩu không đúng.');
 
       // Tokens should not be stored
       expect(await tokenStorage.getTokens()).toBeNull();

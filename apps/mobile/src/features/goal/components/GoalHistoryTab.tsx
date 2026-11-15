@@ -75,9 +75,9 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
       } catch (err: any) {
         if (reqId !== versionsSeqRef.current) return;
         if (isAppend) {
-          setVersionsLoadMoreError(err?.message || 'Failed to load more versions.');
+          setVersionsLoadMoreError(err?.message || 'Không thể tải thêm phiên bản.');
         } else {
-          setVersionsError(err?.message || 'Failed to load goal versions.');
+          setVersionsError(err?.message || 'Không thể tải các phiên bản mục tiêu.');
         }
       } finally {
         if (reqId === versionsSeqRef.current) {
@@ -102,7 +102,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
       setTransitions(res);
     } catch (err: any) {
       if (reqId !== transitionsSeqRef.current) return;
-      setTransitionsError(err?.message || 'Failed to load goal transitions.');
+      setTransitionsError(err?.message || 'Không thể tải lịch sử chuyển mục tiêu.');
     } finally {
       if (reqId === transitionsSeqRef.current) {
         setIsTransitionsLoading(false);
@@ -145,7 +145,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
         <Pressable
           testID="subtab-versions-button"
           accessibilityRole="tab"
-          accessibilityLabel="Goal Versions Tab"
+          accessibilityLabel="Thẻ phiên bản mục tiêu"
           accessibilityState={{ selected: activeSubTab === 'versions' }}
           style={[
             styles.subTab,
@@ -166,14 +166,14 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                 fontWeight: activeSubTab === 'versions' ? '700' : '500',
               },
             ]}>
-            Goal Versions ({versions.length})
+            Phiên bản mục tiêu ({versions.length})
           </Text>
         </Pressable>
 
         <Pressable
           testID="subtab-transitions-button"
           accessibilityRole="tab"
-          accessibilityLabel="Goal Transitions Tab"
+          accessibilityLabel="Thẻ chuyển đổi mục tiêu"
           accessibilityState={{ selected: activeSubTab === 'transitions' }}
           style={[
             styles.subTab,
@@ -194,7 +194,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                 fontWeight: activeSubTab === 'transitions' ? '700' : '500',
               },
             ]}>
-            Transitions ({transitions.length})
+            Chuyển tiếp ({transitions.length})
           </Text>
         </Pressable>
       </View>
@@ -202,8 +202,8 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
       {/* Description Explaining Semantic Distinction */}
       <Text style={[styles.conceptDescription, { color: themeColors.textSecondary }]}>
         {activeSubTab === 'versions'
-          ? 'Goal Versions preserve strategic milestones and adjustments within this same goal journey.'
-          : 'Goal Transitions record cross-journey transitions when switching from a previous goal to a new journey.'}
+          ? 'Các phiên bản ghi lại mốc và điều chỉnh trong cùng một hành trình mục tiêu.'
+          : 'Lịch sử chuyển mục tiêu ghi lại việc chuyển sang hành trình mục tiêu mới.'}
       </Text>
 
       {/* Goal Versions List */}
@@ -213,7 +213,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={themeColors.primary} />
               <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
-                Loading versions...
+                Đang tải phiên bản...
               </Text>
             </View>
           ) : versionsError ? (
@@ -229,10 +229,10 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
               <Pressable
                 testID="retry-versions-button"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading versions"
+                accessibilityLabel="Thử tải lại các phiên bản"
                 onPress={() => loadVersions(0, false)}
                 style={[styles.retryButton, { backgroundColor: themeColors.primary }]}>
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <Text style={styles.retryButtonText}>Thử lại</Text>
               </Pressable>
             </View>
           ) : versions.length === 0 ? (
@@ -243,7 +243,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                 { backgroundColor: themeColors.surface, borderColor: themeColors.border },
               ]}>
               <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                No version records found.
+                Không tìm thấy bản ghi phiên bản nào.
               </Text>
             </View>
           ) : (
@@ -261,7 +261,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   ]}>
                   <View style={styles.cardHeader}>
                     <Text style={[styles.versionTitle, { color: themeColors.textPrimary }]}>
-                      Version {ver.versionNumber}: {ver.title || 'Untitled'}
+                      Phiên bản {ver.versionNumber}: {ver.title || 'Chưa có tiêu đề'}
                     </Text>
                     {ver.isCurrent && (
                       <View
@@ -270,7 +270,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                           { backgroundColor: themeColors.brandSoft },
                         ]}>
                         <Text style={[styles.currentBadgeText, { color: themeColors.primary }]}>
-                          CURRENT
+                          HIỆN TẠI
                         </Text>
                       </View>
                     )}
@@ -278,12 +278,12 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
 
                   <View style={styles.row}>
                     <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                      Effective:
+                      Có hiệu lực:
                     </Text>
                     <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
-                      {new Date(ver.effectiveFrom).toLocaleDateString()}
+                      {new Date(ver.effectiveFrom).toLocaleDateString('vi-VN')}
                       {ver.effectiveUntil
-                        ? ` – ${new Date(ver.effectiveUntil).toLocaleDateString()}`
+                        ? ` – ${new Date(ver.effectiveUntil).toLocaleDateString('vi-VN')}`
                         : ' (Present)'}
                     </Text>
                   </View>
@@ -291,7 +291,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   {ver.changeReason && (
                     <View style={styles.row}>
                       <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                        Change Reason:
+                        Lý do thay đổi:
                       </Text>
                       <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
                         {ver.changeReason}
@@ -308,7 +308,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   {ver.lockReason && (
                     <View style={styles.row}>
                       <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                        Lock Reason:
+                        Lý do khóa:
                       </Text>
                       <Text style={[styles.metaValue, { color: themeColors.textSecondary }]}>
                         {ver.lockReason}
@@ -326,10 +326,10 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   <Pressable
                     testID="retry-load-more-versions-button"
                     accessibilityRole="button"
-                    accessibilityLabel="Retry loading more versions"
+                    accessibilityLabel="Thử tải lại phiên bản khác"
                     style={[styles.retrySmallButton, { backgroundColor: themeColors.primary }]}
                     onPress={handleLoadMoreVersions}>
-                    <Text style={styles.retryButtonText}>Retry</Text>
+                    <Text style={styles.retryButtonText}>Thử lại</Text>
                   </Pressable>
                 </View>
               )}
@@ -338,7 +338,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                 <Pressable
                   testID="load-more-versions-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Load more versions"
+                  accessibilityLabel="Tải thêm phiên bản"
                   disabled={isVersionsLoadingMore}
                   style={[
                     styles.loadMoreButton,
@@ -349,7 +349,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>
-                      Load More Versions ({versions.length} shown)
+                      Tải thêm phiên bản ({versions.length} hiển thị)
                     </Text>
                   )}
                 </Pressable>
@@ -366,7 +366,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={themeColors.primary} />
               <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
-                Loading transitions...
+                Đang tải chuyển tiếp...
               </Text>
             </View>
           ) : transitionsError ? (
@@ -382,10 +382,10 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
               <Pressable
                 testID="retry-transitions-button"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading transitions"
+                accessibilityLabel="Thử tải lại quá trình chuyển đổi"
                 onPress={loadTransitions}
                 style={[styles.retryButton, { backgroundColor: themeColors.primary }]}>
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <Text style={styles.retryButtonText}>Thử lại</Text>
               </Pressable>
             </View>
           ) : transitions.length === 0 ? (
@@ -396,7 +396,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                 { backgroundColor: themeColors.surface, borderColor: themeColors.border },
               ]}>
               <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                No goal transition records found for this goal.
+                Không tìm thấy bản ghi chuyển đổi mục tiêu nào cho mục tiêu này.
               </Text>
             </View>
           ) : (
@@ -412,27 +412,27 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   },
                 ]}>
                 <Text style={[styles.versionTitle, { color: themeColors.textPrimary }]}>
-                  Transition: {trans.transitionReason}
+                  Chuyển tiếp: {trans.transitionReason}
                 </Text>
 
                 <View style={styles.row}>
                   <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                    Date:
+                    Ngày:
                   </Text>
                   <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
-                    {new Date(trans.transitionedAt).toLocaleDateString()}
+                    {new Date(trans.transitionedAt).toLocaleDateString('vi-VN')}
                   </Text>
                 </View>
 
                 {trans.notes && (
                   <Text style={[styles.summaryText, { color: themeColors.textSecondary }]}>
-                    Notes: {trans.notes}
+                    Ghi chú: {trans.notes}
                   </Text>
                 )}
 
                 <View style={styles.row}>
                   <Text style={[styles.metaLabel, { color: themeColors.textSecondary }]}>
-                    Initiated by:
+                    Người khởi xướng:
                   </Text>
                   <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
                     {trans.initiatedBy}

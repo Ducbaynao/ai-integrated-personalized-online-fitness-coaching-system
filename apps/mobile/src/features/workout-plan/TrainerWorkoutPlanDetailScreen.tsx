@@ -81,7 +81,7 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
 
   const mutation = useMutation({
     mutationFn: async (target: WorkoutPlanStatus | 'ACTIVATE') => {
-      if (!plan) throw new Error('Missing workout plan');
+      if (!plan) throw new Error('Không tìm thấy kế hoạch tập');
       const key = commandKey.current ?? createCommandKey(); commandKey.current = key;
       return target === 'ACTIVATE' ? workoutPlanApi.activate(plan.id, plan.aggregateVersion, key) : workoutPlanApi.transition(plan.id, plan.aggregateVersion, target, null, key);
     },
@@ -166,7 +166,7 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
     />
 
     <Modal visible={pendingTarget !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeCommand}>
-      <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thay đổi</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingTarget === 'ACTIVATE' ? 'Kích hoạt sẽ khóa phiên bản đầu tiên. Kế hoạch đang áp dụng khác của Học viên có thể gây xung đột.' : 'Backend sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.'}</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={mutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={mutation.isPending} disabled={mutation.isPending} danger={pendingTarget === 'ARCHIVED'} onPress={() => pendingTarget && mutation.mutate(pendingTarget)} /></View></WorkoutCard></View>
+      <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thay đổi</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingTarget === 'ACTIVATE' ? 'Kích hoạt sẽ khóa phiên bản đầu tiên. Kế hoạch đang áp dụng khác của Học viên có thể gây xung đột.' : 'Hệ thống sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.'}</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={mutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={mutation.isPending} disabled={mutation.isPending} danger={pendingTarget === 'ARCHIVED'} onPress={() => pendingTarget && mutation.mutate(pendingTarget)} /></View></WorkoutCard></View>
     </Modal>
   </ScrollView>;
 }

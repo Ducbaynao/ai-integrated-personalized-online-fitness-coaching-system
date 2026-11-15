@@ -64,7 +64,7 @@ describe('B07 nutrition strategy Mobile', () => {
     renderer.act(() => { tree = renderer.create(<NutritionStrategyScreen />); });
     type(tree, 'Tên mục tiêu', 'Cân bằng');
     chooseRadio(tree, 'Cân bằng');
-    type(tree, 'Múi giờ IANA của lịch target', 'Asia/Ho_Chi_Minh');
+    type(tree, 'Múi giờ IANA của lịch chỉ tiêu', 'Asia/Ho_Chi_Minh');
     type(tree, 'Có hiệu lực từ ngày (YYYY-MM-DD)', '2026-10-17');
     type(tree, 'Energy · Ngày mặc định (kcal)', '1800');
     renderer.act(() => press(tree, 'Xem trước toàn bộ mục tiêu'));
@@ -124,11 +124,11 @@ describe('B07 nutrition strategy Mobile', () => {
     renderer.act(() => press(tree, 'Xem ngày theo múi giờ đã chọn'));
     expect(JSON.stringify(tree.toJSON())).toContain('gốc');
     expect(JSON.stringify(tree.toJSON())).toContain('2000');
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Sửa target nutrient 41' }).props.onPress());
-    type(tree, 'Target sau correction', '1700');
-    type(tree, 'Lý do correction', 'Đánh giá lại');
-    renderer.act(() => press(tree, 'Xem lại correction target đã chốt'));
-    await renderer.act(async () => { press(tree, 'Xác nhận correction'); });
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Sửa chỉ tiêu chất dinh dưỡng 41' }).props.onPress());
+    type(tree, 'Chỉ tiêu sau điều chỉnh', '1700');
+    type(tree, 'Lý do điều chỉnh', 'Đánh giá lại');
+    renderer.act(() => press(tree, 'Xem lại điều chỉnh chỉ tiêu đã chốt'));
+    await renderer.act(async () => { press(tree, 'Xác nhận điều chỉnh'); });
     expect(nutritionApi.correctFrozenTarget).toHaveBeenCalledWith('2026-10-16',
       expect.objectContaining({ nutrientId: 41, targetAmount: 1700, expectedVersion: 1,
         reason: 'Đánh giá lại', commandKey: 'stable-key' }));

@@ -191,7 +191,7 @@ describe('GoalProposalDetailScreen', () => {
     // Validation error must appear
     const noteError = root.findByProps({ testID: 'proposal-note-error' });
     expect(noteError).toBeDefined();
-    expect(noteError.props.children).toContain('rejection note is required');
+    expect(noteError.props.children).toContain('Vui lòng nêu lý do từ chối');
 
     // Now type a whitespace note and confirm - should still fail
     renderer.act(() => {
@@ -308,15 +308,15 @@ describe('GoalProposalDetailScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      'This proposal has already been decided by another request and cannot be decided again.'
+      'Không thể xử lý quyết định',
+      'Đề xuất đã được xử lý ở một yêu cầu khác và không thể xử lý lại.'
     );
 
     expect(fitnessGoalApi.getGoalProposal).toHaveBeenCalledTimes(2);
     expect(root.findAllByProps({ testID: 'accept-proposal-button' }).length).toBe(0);
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'This proposal has already been decided'
+      'Đề xuất đã được xử lý'
     );
   });
 
@@ -347,14 +347,14 @@ describe('GoalProposalDetailScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      'The base goal version has changed. This proposal is outdated and cannot be applied. Please refresh to see the latest goal.'
+      'Không thể xử lý quyết định',
+      'Phiên bản mục tiêu gốc đã thay đổi. Đề xuất này không còn hiệu lực. Vui lòng tải lại mục tiêu.'
     );
     expect(fitnessGoalApi.getGoalProposal).toHaveBeenCalledTimes(2);
     expect(root.findAllByProps({ testID: 'accept-proposal-button' }).length).toBe(0);
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'The base goal version has changed'
+      'Phiên bản mục tiêu gốc đã thay đổi'
     );
   });
 
@@ -385,13 +385,13 @@ describe('GoalProposalDetailScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      'This proposal has expired and can no longer be decided.'
+      'Không thể xử lý quyết định',
+      'Đề xuất đã hết hạn và không thể xử lý.'
     );
     expect(root.findAllByProps({ testID: 'accept-proposal-button' }).length).toBe(0);
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'This proposal has expired and can no longer be decided'
+      'Đề xuất đã hết hạn và không thể xử lý'
     );
   });
 
@@ -422,13 +422,13 @@ describe('GoalProposalDetailScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      'The proposal contains no effective changes from the current active version.'
+      'Không thể xử lý quyết định',
+      'Đề xuất không có thay đổi so với phiên bản đang hoạt động.'
     );
     expect(root.findAllByProps({ testID: 'accept-proposal-button' }).length).toBe(0);
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'The proposal contains no effective changes'
+      'Đề xuất không có thay đổi'
     );
   });
 
@@ -449,7 +449,7 @@ describe('GoalProposalDetailScreen', () => {
     expect(root.findAllByProps({ testID: 'reject-proposal-button' }).length).toBe(0);
     expect(root.findByProps({ testID: 'proposal-blocked-banner' })).toBeDefined();
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'This proposal has expired'
+      'Đề xuất đã hết hạn'
     );
   });
 
@@ -497,7 +497,7 @@ describe('GoalProposalDetailScreen', () => {
     expect(root.findByProps({ testID: 'reject-proposal-button' })).toBeDefined();
   });
 
-  it('generic 409 keeps server message and does NOT lock buttons if reloaded proposal remains PENDING', async () => {
+  it('generic 409 shows Vietnamese conflict message and does not lock buttons if reloaded proposal remains PENDING', async () => {
     (fitnessGoalApi.getGoalProposal as jest.Mock).mockResolvedValueOnce(pendingProposal);
     const conflictError = new ApiError(409, 'Conflict', {
       errorCode: 'TEMPORARY_CONCURRENCY_LOCK',
@@ -524,8 +524,8 @@ describe('GoalProposalDetailScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      'Resource is temporarily locked by maintenance'
+      'Không thể xử lý quyết định',
+      'Có xung đột khi xử lý quyết định. Vui lòng tải lại.'
     );
     expect(root.findAllByProps({ testID: 'proposal-blocked-banner' }).length).toBe(0);
     expect(root.findByProps({ testID: 'accept-proposal-button' })).toBeDefined();
@@ -603,11 +603,11 @@ describe('GoalProposalDetailScreen', () => {
     expect(descText).not.toContain('will create a new Goal Version and lock');
 
     // Assert: describes both updating current goal version and starting a new goal journey
-    expect(descText).toContain('create a new version of your current goal');
-    expect(descText).toContain('start a new goal journey');
+    expect(descText).toContain('tạo phiên bản mới');
+    expect(descText).toContain('bắt đầu hành trình mục tiêu mới');
 
     // Assert: explicitly confirms history preservation
-    expect(descText).toContain('fitness history will remain preserved');
+    expect(descText).toContain('Lịch sử tập luyện được giữ lại');
   });
 
   it('prevents stale proposal A from displaying or submitting when switching to proposal B with deferred promise', async () => {
@@ -688,7 +688,7 @@ describe('GoalProposalDetailScreen', () => {
 
     // Error message must be rendered
     const errorMsg = root.findByProps({ testID: 'proposal-error-message' });
-    expect(errorMsg.props.children).toBe('Failed to load proposal details');
+    expect(errorMsg.props.children).toBe('Không thể tải chi tiết đề xuất mục tiêu.');
 
     // Action buttons must NOT exist
     expect(root.findAllByProps({ testID: 'accept-proposal-button' }).length).toBe(0);
@@ -766,7 +766,7 @@ describe('GoalProposalDetailScreen', () => {
 
     // Error for Proposal B is displayed
     const errorMsg = root.findByProps({ testID: 'proposal-error-message' });
-    expect(errorMsg.props.children).toBe('Proposal B network timeout');
+    expect(errorMsg.props.children).toBe('Không thể tải chi tiết đề xuất mục tiêu.');
 
     // Proposal A data and actions must still NOT be displayed
     expect(root.findAllByProps({ testID: 'proposal-proposed-title' }).length).toBe(0);
@@ -787,7 +787,7 @@ describe('GoalProposalDetailScreen', () => {
 
     // Proposal A error is displayed
     expect(root.findByProps({ testID: 'proposal-error-message' }).props.children).toBe(
-      'Proposal A failed to load'
+      'Không thể tải chi tiết đề xuất mục tiêu.'
     );
 
     // Switch to Proposal B with deferred promise
@@ -856,8 +856,8 @@ describe('GoalProposalDetailScreen', () => {
 
     // Alert for decision failed was shown
     expect(Alert.alert).toHaveBeenCalledWith(
-      'Decision Failed',
-      expect.stringContaining('The base goal version has changed')
+      'Không thể xử lý quyết định',
+      expect.stringContaining('Phiên bản mục tiêu gốc đã thay đổi')
     );
 
     // Full screen error must NOT be shown!
@@ -866,7 +866,7 @@ describe('GoalProposalDetailScreen', () => {
     // Terminal conflict banner remains visible
     expect(root.findByProps({ testID: 'proposal-blocked-banner' })).toBeDefined();
     expect(root.findByProps({ testID: 'proposal-blocked-message' }).props.children).toContain(
-      'The base goal version has changed'
+      'Phiên bản mục tiêu gốc đã thay đổi'
     );
 
     // Action buttons remain locked/hidden

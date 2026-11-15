@@ -143,20 +143,20 @@ describe('aiProgressSummaryApi', () => {
 
     it('returns timeout message on actual timeout error', () => {
       const timeoutError = new Error('Request timeout after 15000ms');
-      expect(getAiProgressSummaryErrorMessage(timeoutError)).toContain('quá thời gian chờ (timeout)');
+      expect(getAiProgressSummaryErrorMessage(timeoutError)).toContain('quá thời gian chờ');
     });
 
     it('returns distinct messages for 502 Bad Gateway and 503 Service Unavailable', () => {
       const err502 = new ApiError(502, 'Bad Gateway');
-      expect(getAiProgressSummaryErrorMessage(err502)).toContain('Bad Gateway');
+      expect(getAiProgressSummaryErrorMessage(err502)).toContain('Không thể kết nối đến dịch vụ phân tích AI');
 
       const err503 = new ApiError(503, 'Service Unavailable');
-      expect(getAiProgressSummaryErrorMessage(err503)).toContain('Service Unavailable');
+      expect(getAiProgressSummaryErrorMessage(err503)).toContain('tạm thời không khả dụng');
     });
 
     it('returns server timeout message on 504 Gateway Timeout', () => {
       const err = new ApiError(504, 'Gateway Timeout');
-      expect(getAiProgressSummaryErrorMessage(err)).toContain('Gateway Timeout');
+      expect(getAiProgressSummaryErrorMessage(err)).toContain('quá thời gian chờ');
     });
 
     it('returns access denied message on 403 ApiError', () => {
@@ -189,7 +189,7 @@ describe('aiProgressSummaryApi', () => {
         requestId: 'req-3',
         fieldErrors: [{ field: 'fromDate', message: 'fromDate cannot be after toDate', code: 'INVALID' }],
       });
-      expect(getAiProgressSummaryErrorMessage(err)).toContain('fromDate cannot be after toDate');
+      expect(getAiProgressSummaryErrorMessage(err)).toContain('Vui lòng kiểm tra các trường đã nhập');
     });
 
     it('returns contract validation failure message on 422', () => {

@@ -21,12 +21,12 @@ describe('Student Profile Validation', () => {
     });
 
     it('rejects invalid calendar dates', () => {
-      expect(validateDateOfBirth('2023-02-30')).toContain('Invalid calendar date');
-      expect(validateDateOfBirth('2023-04-31')).toContain('Invalid calendar date');
+      expect(validateDateOfBirth('2023-02-30')).toContain('Ngày sinh không hợp lệ');
+      expect(validateDateOfBirth('2023-04-31')).toContain('Ngày sinh không hợp lệ');
     });
 
     it('rejects future dates', () => {
-      expect(validateDateOfBirth('2099-12-31')).toContain('cannot be in the future');
+      expect(validateDateOfBirth('2099-12-31')).toContain('không được ở tương lai');
     });
 
     it('accepts valid past dates', () => {
@@ -42,12 +42,12 @@ describe('Student Profile Validation', () => {
     });
 
     it('rejects non-numeric input', () => {
-      expect(validateTrainingExperienceMonths('twelve')).toContain('valid number');
+      expect(validateTrainingExperienceMonths('twelve')).toContain('số hợp lệ');
     });
 
     it('rejects negative months', () => {
-      expect(validateTrainingExperienceMonths('-1')).toContain('cannot be negative');
-      expect(validateTrainingExperienceMonths('-0.5')).toContain('cannot be negative');
+      expect(validateTrainingExperienceMonths('-1')).toContain('không được âm');
+      expect(validateTrainingExperienceMonths('-0.5')).toContain('không được âm');
     });
 
     it('accepts 0 and positive numbers', () => {
@@ -64,13 +64,13 @@ describe('Student Profile Validation', () => {
     });
 
     it('rejects values outside 1 to 7', () => {
-      expect(validateAvailableDaysPerWeek('0')).toContain('between 1 and 7');
-      expect(validateAvailableDaysPerWeek('8')).toContain('between 1 and 7');
-      expect(validateAvailableDaysPerWeek('-2')).toContain('between 1 and 7');
+      expect(validateAvailableDaysPerWeek('0')).toContain('từ 1 đến 7');
+      expect(validateAvailableDaysPerWeek('8')).toContain('từ 1 đến 7');
+      expect(validateAvailableDaysPerWeek('-2')).toContain('từ 1 đến 7');
     });
 
     it('rejects non-integers', () => {
-      expect(validateAvailableDaysPerWeek('3.5')).toContain('integer between 1 and 7');
+      expect(validateAvailableDaysPerWeek('3.5')).toContain('số nguyên từ 1 đến 7');
     });
 
     it('accepts integers between 1 and 7', () => {
@@ -87,13 +87,13 @@ describe('Student Profile Validation', () => {
     });
 
     it('rejects values outside 5 to 480', () => {
-      expect(validatePreferredSessionMinutes('4')).toContain('between 5 and 480');
-      expect(validatePreferredSessionMinutes('481')).toContain('between 5 and 480');
-      expect(validatePreferredSessionMinutes('0')).toContain('between 5 and 480');
+      expect(validatePreferredSessionMinutes('4')).toContain('từ 5 đến 480 phút');
+      expect(validatePreferredSessionMinutes('481')).toContain('từ 5 đến 480 phút');
+      expect(validatePreferredSessionMinutes('0')).toContain('từ 5 đến 480 phút');
     });
 
     it('rejects non-integers', () => {
-      expect(validatePreferredSessionMinutes('45.5')).toContain('integer between 5 and 480');
+      expect(validatePreferredSessionMinutes('45.5')).toContain('số nguyên từ 5 đến 480 phút');
     });
 
     it('accepts valid session durations in 5..480', () => {

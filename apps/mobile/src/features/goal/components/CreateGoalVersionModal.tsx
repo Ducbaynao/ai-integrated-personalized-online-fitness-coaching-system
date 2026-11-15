@@ -60,11 +60,11 @@ export function CreateGoalVersionModal({
   const handleSubmit = async () => {
     const trimmedReason = changeReason.trim();
     if (!trimmedReason) {
-      setValidationError('Change reason is required to create a new goal version.');
+      setValidationError('Vui lòng nêu lý do tạo phiên bản mục tiêu mới.');
       return;
     }
     if (trimmedReason.length > 100) {
-      setValidationError('Change reason must not exceed 100 characters.');
+      setValidationError('Lý do thay đổi không được quá 100 ký tự.');
       return;
     }
 
@@ -72,7 +72,7 @@ export function CreateGoalVersionModal({
     if (durationDays.trim()) {
       const num = parseInt(durationDays.trim(), 10);
       if (isNaN(num) || num <= 0) {
-        setValidationError('Duration must be a positive number of days.');
+        setValidationError('Thời hạn phải là số ngày dương.');
         return;
       }
       parsedDuration = num;
@@ -111,11 +111,10 @@ export function CreateGoalVersionModal({
           ]}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: themeColors.textPrimary }]}>
-              Adjust Goal (New Version)
+              Điều chỉnh mục tiêu (Phiên bản mới)
             </Text>
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-              Create a new version to adjust your targets or timeline while preserving complete
-              earlier history.
+              Tạo phiên bản mới để điều chỉnh chỉ tiêu hoặc thời hạn, đồng thời giữ nguyên toàn bộ lịch sử trước đó.
             </Text>
 
             {validationError && (
@@ -134,11 +133,11 @@ export function CreateGoalVersionModal({
             {/* Change Reason Input (Mandatory) */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Change Reason * (Max 100 chars)
+                Lý do thay đổi * (Tối đa 100 ký tự)
               </Text>
               <TextInput
                 testID="goal-version-reason-input"
-                accessibilityLabel="Change reason"
+                accessibilityLabel="Lý do thay đổi"
                 style={[
                   styles.input,
                   {
@@ -152,7 +151,7 @@ export function CreateGoalVersionModal({
                   setChangeReason(val);
                   if (validationError) setValidationError(null);
                 }}
-                placeholder="e.g. Schedule adjustment, progressed faster than expected"
+                placeholder="Ví dụ: Điều chỉnh lịch, tiến triển nhanh hơn dự kiến"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={100}
                 editable={!isSubmitting}
@@ -162,11 +161,11 @@ export function CreateGoalVersionModal({
             {/* Change Summary Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Change Summary / Context (Optional)
+                Tóm tắt thay đổi / Bối cảnh (không bắt buộc)
               </Text>
               <TextInput
                 testID="goal-version-summary-input"
-                accessibilityLabel="Change summary"
+                accessibilityLabel="Tóm tắt thay đổi"
                 style={[
                   styles.textArea,
                   {
@@ -177,7 +176,7 @@ export function CreateGoalVersionModal({
                 ]}
                 value={changeSummary}
                 onChangeText={setChangeSummary}
-                placeholder="Describe what adjustments were made in this version..."
+                placeholder="Mô tả những điều chỉnh đã được thực hiện trong phiên bản này..."
                 placeholderTextColor={themeColors.textSecondary}
                 multiline
                 numberOfLines={3}
@@ -189,11 +188,11 @@ export function CreateGoalVersionModal({
             {/* Updated Title Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Goal Title
+                Tiêu đề mục tiêu
               </Text>
               <TextInput
                 testID="goal-version-title-input"
-                accessibilityLabel="Updated goal title"
+                accessibilityLabel="Tên mục tiêu đã cập nhật"
                 style={[
                   styles.input,
                   {
@@ -204,7 +203,7 @@ export function CreateGoalVersionModal({
                 ]}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Goal title"
+                placeholder="Tiêu đề mục tiêu"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
                 editable={!isSubmitting}
@@ -214,7 +213,7 @@ export function CreateGoalVersionModal({
             {/* Objective Type Selection */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Objective Type
+                Loại mục tiêu
               </Text>
               <View style={styles.typeOptionsContainer}>
                 {GOAL_TYPE_OPTIONS.map((opt) => {
@@ -254,11 +253,11 @@ export function CreateGoalVersionModal({
             {/* Duration Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Adjusted Duration (Days)
+                Thời hạn điều chỉnh (ngày)
               </Text>
               <TextInput
                 testID="goal-version-duration-input"
-                accessibilityLabel="Adjusted duration in days"
+                accessibilityLabel="Thời hạn điều chỉnh tính bằng ngày"
                 style={[
                   styles.input,
                   {
@@ -281,19 +280,19 @@ export function CreateGoalVersionModal({
               <Pressable
                 testID="goal-version-cancel-button"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel goal adjustment"
+                accessibilityLabel="Hủy điều chỉnh mục tiêu"
                 disabled={isSubmitting}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                  Cancel
+                  Hủy
                 </Text>
               </Pressable>
 
               <Pressable
                 testID="goal-version-submit-button"
                 accessibilityRole="button"
-                accessibilityLabel="Save adjusted version"
+                accessibilityLabel="Lưu phiên bản đã điều chỉnh"
                 disabled={isSubmitting}
                 onPress={handleSubmit}
                 style={[
@@ -307,7 +306,7 @@ export function CreateGoalVersionModal({
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Save New Version</Text>
+                  <Text style={styles.primaryButtonText}>Lưu phiên bản mới</Text>
                 )}
               </Pressable>
             </View>

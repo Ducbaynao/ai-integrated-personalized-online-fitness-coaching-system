@@ -19,6 +19,7 @@ import { typography } from '@/design-system/tokens/typography';
 import { useRelationshipDetail } from './coachingQueries';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { FitnessGoal, GoalProposal } from '@/types/goal';
+import { goalProposalStatusLabels, goalStatusLabels } from '@/localization/displayLabels';
 import { ApiError } from '@/types/auth';
 import { CreateGoalProposalModal } from '../goal/components/CreateGoalProposalModal';
 
@@ -109,7 +110,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
       await loadData();
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 409) {
-        Alert.alert('Xung đột', err.errorResponse?.message || 'Không thể gửi đề xuất do mục tiêu đã thay đổi trạng thái.');
+        Alert.alert('Xung đột', 'Không thể gửi đề xuất do mục tiêu đã thay đổi trạng thái.');
       } else {
         Alert.alert('Gửi đề xuất thất bại', err?.message || 'Đã có lỗi xảy ra.');
       }
@@ -197,7 +198,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
                           goal.status === 'ACTIVE' ? theme.successText : theme.warningText,
                       },
                     ]}>
-                    {goal.status}
+                    {goalStatusLabels[goal.status]}
                   </Text>
                 </View>
               </View>
@@ -304,7 +305,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
                                   : theme.warningText,
                             },
                           ]}>
-                          {prop.status}
+                          {goalProposalStatusLabels[prop.status]}
                         </Text>
                       </View>
                     </View>

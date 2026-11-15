@@ -27,8 +27,8 @@ export function WorkoutPlanVersionContent({ title, detail, isPending, isError, e
       {session.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {session.focus}</Text> : null}
       {session.prescriptions.map((item) => <View key={item.id}>
         <Text style={[styles.body, { color: theme.textPrimary }]}>{item.sequenceNumber}. {item.exercise.exerciseName ?? 'Bài tập không khả dụng'}{item.exercise.variationName ? ` · ${item.exercise.variationName}` : ''}</Text>
-        <Text style={[styles.body, { color: item.exercise.state === 'ACTIVE' ? theme.textSecondary : theme.warningText }]}>{workoutExerciseStateLabels[item.exercise.state]}{item.targetSets !== null ? ` · ${item.targetSets} hiệp` : ''}{item.targetRepsMin !== null ? ` · ${item.targetRepsMin}${item.targetRepsMax !== null ? `–${item.targetRepsMax}` : ''} reps` : ''}</Text>
-        {item.exercise.canonicalExerciseName ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bài canonical hiện tại: {item.exercise.canonicalExerciseName} — tham khảo, không thay thế bản ghi gốc.</Text> : null}
+        <Text style={[styles.body, { color: item.exercise.state === 'ACTIVE' ? theme.textSecondary : theme.warningText }]}>{workoutExerciseStateLabels[item.exercise.state]}{item.targetSets !== null ? ` · ${item.targetSets} hiệp` : ''}{item.targetRepsMin !== null ? ` · ${item.targetRepsMin}${item.targetRepsMax !== null ? `–${item.targetRepsMax}` : ''} lần` : ''}</Text>
+        {item.exercise.canonicalExerciseName ? <Text style={[styles.body, { color: theme.textSecondary }]}>Tên bài tập chuẩn hiện tại: {item.exercise.canonicalExerciseName} — tham khảo, không thay thế bản ghi gốc.</Text> : null}
       </View>)}
     </View>)}
   </WorkoutCard>;
