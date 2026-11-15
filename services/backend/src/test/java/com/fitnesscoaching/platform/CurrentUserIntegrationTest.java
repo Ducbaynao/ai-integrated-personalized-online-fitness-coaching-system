@@ -250,7 +250,11 @@ class CurrentUserIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("AUDIT_VIEW_TEST", "CATALOG_MANAGE"))));
+                .andExpect(jsonPath("$.permissions", is(List.of(
+                        "AUDIT_VIEW", "AUDIT_VIEW_TEST", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE",
+                        "MODERATION_MANAGE", "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE",
+                        "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
+                ))));
     }
 
     @Test
@@ -260,9 +264,8 @@ class CurrentUserIntegrationTest {
         assignRole(userId, "ADMIN");
         jdbcTemplate.update("""
                 DELETE FROM fitness.role_permissions rp
-                USING fitness.roles r, fitness.permissions p
-                WHERE rp.role_id = r.id AND rp.permission_id = p.id
-                  AND r.code = 'ADMIN' AND p.code = 'CATALOG_MANAGE'
+                USING fitness.roles r
+                WHERE rp.role_id = r.id AND r.code = 'ADMIN'
                 """);
 
         try {
@@ -273,6 +276,15 @@ class CurrentUserIntegrationTest {
                     .andExpect(jsonPath("$.permissions", is(List.of())));
         } finally {
             grantPermission("ADMIN", "CATALOG_MANAGE");
+            grantPermission("ADMIN", "USER_SUSPEND");
+            grantPermission("ADMIN", "USER_DISABLE");
+            grantPermission("ADMIN", "USER_ROLE_MANAGE");
+            grantPermission("ADMIN", "SESSION_REVOKE");
+            grantPermission("ADMIN", "SUPPORT_MANAGE");
+            grantPermission("ADMIN", "MODERATION_MANAGE");
+            grantPermission("ADMIN", "AUDIT_VIEW");
+            grantPermission("ADMIN", "PRIVILEGED_ACCESS_MANAGE");
+            grantPermission("ADMIN", "DATA_CORRECTION_EXECUTE");
         }
     }
 
@@ -328,7 +340,11 @@ class CurrentUserIntegrationTest {
 
         mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions", is(List.of("CATALOG_MANAGE"))));
+                .andExpect(jsonPath("$.permissions", is(List.of(
+                        "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
+                        "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
+                        "USER_ROLE_MANAGE", "USER_SUSPEND"
+                ))));
 
         revokeRole(userId, "ADMIN");
 

@@ -44,6 +44,11 @@ export interface F04ProgressSummaryResponse {
   correlationId?: string;
   studentId: string;
   actorId: string;
+  fromDate?: string;
+  toDate?: string;
+  timezone?: string;
+  requestedMetricCodes?: string[];
+  metricScope?: 'ALL' | 'SELECTED' | 'UNKNOWN_LEGACY';
   runStatus: F04RunStatus;
   resultType: F04ResultType;
   reasonCode?: string;

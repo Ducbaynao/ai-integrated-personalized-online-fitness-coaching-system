@@ -49,6 +49,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         JacksonConfig.class
 })
 class AiWorkoutProposalControllerUnitTest {
+    @MockitoBean
+    private com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery;
+
 
     @Autowired
     private MockMvc mockMvc;

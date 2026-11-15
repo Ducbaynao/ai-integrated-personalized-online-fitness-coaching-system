@@ -557,6 +557,11 @@ class AdminExerciseCatalogIntegrationTest {
                 VALUES (?, ?, 'fixture-hash', 'Catalog reader', 'ACTIVE'::fitness.account_status)
                 ON CONFLICT (id) DO NOTHING
                 """, userId, userId + "@example.com");
+        jdbcTemplate.update("""
+                INSERT INTO fitness.user_roles(user_id, role_id)
+                SELECT ?, id FROM fitness.roles WHERE code = ?
+                ON CONFLICT (user_id, role_id) DO NOTHING
+                """, userId, role);
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder().issuer(jwtProperties.getIssuer())
                 .subject(userId.toString()).issuedAt(now).expiresAt(now.plus(15, ChronoUnit.MINUTES))

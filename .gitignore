@@ -33,4 +33,6 @@ Thumbs.db
 infrastructure/data/
 uploads/
 reports/evaluation/runs/
+database/backup/backups/
+*.dump
 *.log

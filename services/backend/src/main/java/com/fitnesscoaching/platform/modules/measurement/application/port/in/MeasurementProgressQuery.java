@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,6 +42,10 @@ public interface MeasurementProgressQuery {
             Instant asOf
     ) {
         return query(actorId, studentId, (Set<String>) null, fromDate, toDate, timezone, asOf);
+    }
+
+    default Optional<Instant> getEarliestObservationTime(UUID actorId, UUID studentId) {
+        return Optional.empty();
     }
 
     record MeasurementProgressSnapshot(

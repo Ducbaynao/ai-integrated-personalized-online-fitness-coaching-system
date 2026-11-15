@@ -1,0 +1,41 @@
+﻿{
+    "runId":  "5951cec5-3c97-48d3-9e31-937715b75513",
+    "correlationId":  "ec37e0bd-da26-4b07-a3e9-fbe959415406",
+    "studentId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "actorId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "runStatus":  "SUCCEEDED",
+    "resultType":  "INSUFFICIENT_DATA",
+    "reasonCode":  "INSUFFICIENT_DATA",
+    "summary":  "KhÃ´ng cÃ³ Äá»§ dá»¯ liá»u táº­p luyá»n hoáº·c Äo lÆ°á»ng ÄÆ°á»£c ghi nháº­n trong chu ká»³ ÄÆ°á»£c chá»n Äá» xÃ¡c láº­p xu hÆ°á»ng tiáº¿n Äá».",
+    "workoutProgressSummary":  {
+                                   "completionEvaluation":  "KhÃ´ng cÃ³ buá»i táº­p nÃ o hoÃ n thÃ nh trong ká»³.",
+                                   "adherenceEvaluation":  "KhÃ´ng cÃ³ lá»ch táº­p káº¿ hoáº¡ch Äáº¿n háº¡n trong ká»³.",
+                                   "volumeEvaluation":  "Khá»i lÆ°á»£ng táº­p trong ká»³ lÃ  0 kg."
+                               },
+    "measurementProgressSummary":  null,
+    "continuityEvaluation":  {
+                                 "state":  "UNKNOWN_HISTORY",
+                                 "message":  "ChÆ°a cÃ³ Äá»§ dá»¯ liá»u lá»ch sá»­ Äá» ÄÃ¡nh giÃ¡ tÃ­nh liÃªn tá»¥c táº­p luyá»n.",
+                                 "hasSafetyAlert":  false
+                             },
+    "limitations":  [
+
+                    ],
+    "missingData":  [
+                        "workout",
+                        "measurement"
+                    ],
+    "factsReferenced":  [
+                            "continuity.state:UNKNOWN_HISTORY"
+                        ],
+    "asOf":  "2026-11-14T07:02:34.918180300Z",
+    "sourceWatermark":  "d5029daf0602309eb4135fd34ff3449ae5129fb03cfd6907f313940190787054",
+    "usage":  {
+                  "promptTokens":  280,
+                  "completionTokens":  150,
+                  "totalTokens":  430
+              },
+    "isStale":  false,
+    "needsRefresh":  false,
+    "currentWatermark":  "d5029daf0602309eb4135fd34ff3449ae5129fb03cfd6907f313940190787054"
+}

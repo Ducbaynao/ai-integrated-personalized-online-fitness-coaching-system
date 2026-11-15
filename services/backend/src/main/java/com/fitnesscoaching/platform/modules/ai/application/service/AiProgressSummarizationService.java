@@ -36,9 +36,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -109,6 +113,11 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
             throw new AiFeatureDisabledException("AI progress summarization is currently disabled by administrator configuration.");
         }
 
+        // Validate requested metric codes: empty list is an invalid selection and must not be silently turned into ALL
+        if (request.metricCodes() != null && request.metricCodes().isEmpty()) {
+            throw new IllegalArgumentException("metricCodes must not be empty when provided. Omit or pass null for ALL metrics.");
+        }
+
         UUID requestId = UUID.randomUUID();
         UUID correlationId = request.correlationId() != null ? request.correlationId() : UUID.randomUUID();
 
@@ -122,7 +131,7 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
         F04InternalContextEnvelope envelope = contextResult.envelope();
 
         // 2. Transaction 1: Create initial AI Run and persist Context Snapshot
-        AiRun run = createInitialAiRun(actorId, envelope);
+        AiRun run = createInitialAiRun(actorId, envelope, request);
 
         // 3. Transaction 2: Transition from QUEUED to RUNNING
         Instant startedAt = Instant.now(clock);
@@ -208,6 +217,15 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
                 serviceResponse = null;
             } else {
                 terminalStatus = AiRunStatus.SUCCEEDED;
+                String metricScope = (request.metricCodes() != null && !request.metricCodes().isEmpty()) ? "SELECTED" : "ALL";
+                Set<String> requestedMetricCodes = (request.metricCodes() != null && !request.metricCodes().isEmpty()) ? request.metricCodes() : null;
+                serviceResponse = serviceResponse.withScope(
+                        request.fromDate(),
+                        request.toDate(),
+                        request.timezone(),
+                        requestedMetricCodes,
+                        metricScope
+                );
 
                 // 5e. Check if source changed while generating summary
                 boolean isStale = false;
@@ -245,9 +263,49 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
                     String origContinuity = envelope.context().continuity() != null ? envelope.context().continuity().state() : null;
                     String currentContinuity = latestSnapshot.continuity() != null && latestSnapshot.continuity().state() != null
                             ? latestSnapshot.continuity().state().name() : null;
-                    boolean continuityChanged = !Objects.equals(origContinuity, currentContinuity);
+                    boolean continuityStateChanged = !Objects.equals(origContinuity, currentContinuity);
 
-                    if (workoutChanged || measChanged || continuityChanged) {
+                    Integer origDaysSince = envelope.context().continuity() != null ? envelope.context().continuity().daysSinceLastWorkout() : null;
+                    Integer currentDaysSince = latestSnapshot.continuity() != null ? latestSnapshot.continuity().daysSinceLastWorkout() : null;
+                    boolean continuityDaysChanged = !Objects.equals(origDaysSince, currentDaysSince);
+
+                    String origLastWorkoutDate = envelope.context().continuity() != null && envelope.context().continuity().lastWorkoutDate() != null
+                            ? envelope.context().continuity().lastWorkoutDate().toString() : null;
+                    String currentLastWorkoutDate = latestSnapshot.continuity() != null && latestSnapshot.continuity().lastWorkoutDate() != null
+                            ? latestSnapshot.continuity().lastWorkoutDate().toString() : null;
+                    boolean continuityDateChanged = !Objects.equals(origLastWorkoutDate, currentLastWorkoutDate);
+
+                    List<String> origSafetyFlags = envelope.context().continuity() != null && envelope.context().continuity().safetyFlags() != null
+                            ? envelope.context().continuity().safetyFlags() : List.of();
+                    List<String> currentSafetyFlags = latestSnapshot.continuity() != null && latestSnapshot.continuity().safetyFlags() != null
+                            ? latestSnapshot.continuity().safetyFlags() : List.of();
+                    boolean safetyFlagsChanged = !Objects.equals(origSafetyFlags, currentSafetyFlags);
+
+                    String origRationale = envelope.context().continuity() != null ? envelope.context().continuity().rationale() : null;
+                    String currentRationale = latestSnapshot.continuity() != null ? latestSnapshot.continuity().rationale() : null;
+                    boolean rationaleChanged = !Objects.equals(origRationale, currentRationale);
+
+                    boolean continuityChanged = continuityStateChanged || continuityDaysChanged || continuityDateChanged || safetyFlagsChanged || rationaleChanged;
+
+                    boolean origHasLimits = envelope.context().historicalLimits() != null && Boolean.TRUE.equals(envelope.context().historicalLimits().hasHistoricalLimits());
+                    boolean currentHasLimits = latestSnapshot.historicalLimits() != null && latestSnapshot.historicalLimits().hasHistoricalLimits();
+                    boolean hasLimitsChanged = origHasLimits != currentHasLimits;
+
+                    boolean origWorkoutLimits = envelope.context().historicalLimits() != null && Boolean.TRUE.equals(envelope.context().historicalLimits().workoutLimits());
+                    boolean currentWorkoutLimits = latestSnapshot.historicalLimits() != null && latestSnapshot.historicalLimits().workoutLimits();
+                    boolean workoutLimitsChanged = origWorkoutLimits != currentWorkoutLimits;
+
+                    boolean origMeasLimits = envelope.context().historicalLimits() != null && Boolean.TRUE.equals(envelope.context().historicalLimits().measurementLimits());
+                    boolean currentMeasLimits = latestSnapshot.historicalLimits() != null && latestSnapshot.historicalLimits().measurementLimits();
+                    boolean measLimitsChanged = origMeasLimits != currentMeasLimits;
+
+                    String origExplanation = envelope.context().historicalLimits() != null ? envelope.context().historicalLimits().explanation() : null;
+                    String currentExplanation = latestSnapshot.historicalLimits() != null ? latestSnapshot.historicalLimits().explanation() : null;
+                    boolean explanationChanged = !Objects.equals(origExplanation, currentExplanation);
+
+                    boolean limitsChanged = hasLimitsChanged || workoutLimitsChanged || measLimitsChanged || explanationChanged;
+
+                    if (workoutChanged || measChanged || continuityChanged || limitsChanged) {
                         isStale = true;
                         needsRefresh = true;
                         currentWatermark = latestSnapshot.compositeWatermark();
@@ -379,63 +437,186 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
         boolean needsRefresh = false;
         String currentWatermark = baseResponse.sourceWatermark();
 
+        LocalDate resolvedFromDate = baseResponse.fromDate();
+        LocalDate resolvedToDate = baseResponse.toDate();
+        ZoneId resolvedTimezone = baseResponse.timezone() != null ? ZoneId.of(baseResponse.timezone()) : null;
+        Set<String> resolvedMetricCodes = baseResponse.requestedMetricCodes();
+        String resolvedMetricScope = baseResponse.metricScope();
+
+        String snapshotMetaScope = null;
+        Set<String> snapshotMetaCodes = null;
+        JsonNode ctxNode = null;
+
         var snapshotOpt = provenanceRepository.findSnapshotByRunId(runId);
         if (snapshotOpt.isPresent()) {
             try {
-                JsonNode rootNode = objectMapper.readTree(snapshotOpt.get().contextPayload());
-                JsonNode ctxNode = rootNode.has("context") ? rootNode.path("context") : rootNode;
-                JsonNode dwNode = ctxNode.path("dateWindow");
-                if (!dwNode.isMissingNode()) {
-                    LocalDate fromDate = LocalDate.parse(dwNode.path("fromDate").asText());
-                    LocalDate toDate = LocalDate.parse(dwNode.path("toDate").asText());
-                    ZoneId timezone = ZoneId.of(dwNode.path("timezone").asText("Asia/Ho_Chi_Minh"));
-
-                    Set<String> metricCodes = new HashSet<>();
-                    JsonNode deltas = ctxNode.path("measurement").path("metricDeltas");
-                    if (deltas.isArray()) {
-                        for (JsonNode delta : deltas) {
-                            String code = delta.path("metricCode").asText();
-                            if (code != null && !code.isBlank()) {
-                                metricCodes.add(code);
+                // Check snapshot metadata (dataQualitySummary) to recover scope fields if missing or unverified
+                String dqs = snapshotOpt.get().dataQualitySummary();
+                if (dqs != null && !dqs.isBlank() && !dqs.equals("{}")) {
+                    try {
+                        JsonNode metaNode = objectMapper.readTree(dqs);
+                        if (metaNode.has("metricScope") && !metaNode.path("metricScope").isNull()) {
+                            snapshotMetaScope = metaNode.path("metricScope").asText();
+                            if (resolvedMetricScope == null || (!"ALL".equals(resolvedMetricScope) && !"SELECTED".equals(resolvedMetricScope))) {
+                                if ("ALL".equals(snapshotMetaScope) || "SELECTED".equals(snapshotMetaScope)) {
+                                    resolvedMetricScope = snapshotMetaScope;
+                                }
                             }
                         }
-                    }
-                    Set<String> queryMetricCodes = metricCodes.isEmpty() ? null : metricCodes;
-
-                    // Re-query progress engine to get current watermark and current source permissions
-                    ProgressEngineQuery.ProgressSnapshot currentSnapshot;
-                    try {
-                        currentSnapshot = progressEngineQuery.query(
-                                actorId,
-                                studentId,
-                                queryMetricCodes,
-                                fromDate,
-                                toDate,
-                                timezone,
-                                Instant.now(clock)
-                        );
-                    } catch (com.fitnesscoaching.platform.modules.progress.domain.ProgressFailure pf) {
-                        if (pf.error() == com.fitnesscoaching.platform.modules.progress.domain.ProgressError.PROGRESS_ACCESS_DENIED) {
-                            throw new AiRunAccessDeniedException("Actor no longer has authority to access progress data for student: " + studentId, pf);
+                        if (metaNode.has("requestedMetricCodes") && metaNode.path("requestedMetricCodes").isArray()) {
+                            Set<String> codes = new LinkedHashSet<>();
+                            for (JsonNode codeNode : metaNode.path("requestedMetricCodes")) {
+                                if (!codeNode.isNull() && !codeNode.asText().isBlank()) {
+                                    codes.add(codeNode.asText().trim());
+                                }
+                            }
+                            if (!codes.isEmpty()) {
+                                snapshotMetaCodes = codes;
+                                if (resolvedMetricCodes == null || resolvedMetricCodes.isEmpty()) {
+                                    resolvedMetricCodes = codes;
+                                }
+                            }
                         }
-                        throw pf;
+                        if (resolvedFromDate == null && metaNode.has("fromDate") && !metaNode.path("fromDate").isNull()) {
+                            resolvedFromDate = LocalDate.parse(metaNode.path("fromDate").asText());
+                        }
+                        if (resolvedToDate == null && metaNode.has("toDate") && !metaNode.path("toDate").isNull()) {
+                            resolvedToDate = LocalDate.parse(metaNode.path("toDate").asText());
+                        }
+                        if (resolvedTimezone == null && metaNode.has("timezone") && !metaNode.path("timezone").isNull()) {
+                            resolvedTimezone = ZoneId.of(metaNode.path("timezone").asText());
+                        }
+                    } catch (Exception ex) {
+                        log.debug("Could not parse dataQualitySummary scope metadata: {}", ex.getMessage());
                     }
+                }
 
-                    boolean workoutRestricted = currentSnapshot.workout() != null && currentSnapshot.workout().availability() == ProgressEngineQuery.SourceAvailability.RESTRICTED;
-                    boolean measurementRestricted = currentSnapshot.measurement() != null && currentSnapshot.measurement().availability() == ProgressEngineQuery.SourceAvailability.RESTRICTED;
-
-                    if (workoutRestricted && measurementRestricted) {
-                        throw new AiRunAccessDeniedException("Actor no longer has authority to access workout or measurement data for student: " + studentId);
+                JsonNode rootNode = objectMapper.readTree(snapshotOpt.get().contextPayload());
+                ctxNode = rootNode.has("context") ? rootNode.path("context") : rootNode;
+                JsonNode dwNode = ctxNode.path("dateWindow");
+                if (!dwNode.isMissingNode()) {
+                    if (resolvedFromDate == null && dwNode.has("fromDate") && !dwNode.path("fromDate").isNull()) {
+                        resolvedFromDate = LocalDate.parse(dwNode.path("fromDate").asText());
                     }
-
-                    if (workoutRestricted && baseResponse.workoutProgressSummary() != null) {
-                        baseResponse = baseResponse.withMaskedWorkout();
+                    if (resolvedToDate == null && dwNode.has("toDate") && !dwNode.path("toDate").isNull()) {
+                        resolvedToDate = LocalDate.parse(dwNode.path("toDate").asText());
                     }
-
-                    if (measurementRestricted && baseResponse.measurementProgressSummary() != null) {
-                        baseResponse = baseResponse.withMaskedMeasurement();
+                    if (resolvedTimezone == null && dwNode.has("timezone") && !dwNode.path("timezone").isNull()) {
+                        resolvedTimezone = ZoneId.of(dwNode.path("timezone").asText("Asia/Ho_Chi_Minh"));
                     }
+                }
+            } catch (Exception ex) {
+                log.debug("Could not parse snapshot context payload: {}", ex.getMessage());
+            }
+        }
 
+        // Scope normalization & validation:
+        // - "ALL" is accepted ONLY when metadata explicitly specifies "ALL".
+        // - "SELECTED" requires a valid, non-empty set of metric codes.
+        // - If SELECTED lacks codes or codes is empty, it is inconsistent metadata:
+        //   Do NOT convert it to ALL; normalize to UNKNOWN_LEGACY with null codes.
+        // - If resolvedMetricScope is null or unsupported (not ALL and not SELECTED):
+        //   Check if valid non-empty requestedMetricCodes exists to recover as SELECTED;
+        //   otherwise set resolvedMetricScope = "UNKNOWN_LEGACY", resolvedMetricCodes = null.
+        boolean wasSelectedWithoutCodes = false;
+        boolean isLegacyRun = false;
+
+        if ("SELECTED".equals(resolvedMetricScope) || "SELECTED".equals(snapshotMetaScope)) {
+            if (resolvedMetricCodes != null && !resolvedMetricCodes.isEmpty()) {
+                resolvedMetricScope = "SELECTED";
+            } else {
+                resolvedMetricScope = "UNKNOWN_LEGACY";
+                resolvedMetricCodes = null;
+                wasSelectedWithoutCodes = true;
+            }
+        } else if ("ALL".equals(resolvedMetricScope) || "ALL".equals(snapshotMetaScope)) {
+            resolvedMetricScope = "ALL";
+            resolvedMetricCodes = null;
+        } else {
+            if (resolvedMetricCodes != null && !resolvedMetricCodes.isEmpty()) {
+                resolvedMetricScope = "SELECTED";
+            } else {
+                resolvedMetricScope = "UNKNOWN_LEGACY";
+                resolvedMetricCodes = null;
+                if (baseResponse.metricScope() == null && snapshotMetaScope == null) {
+                    isLegacyRun = true;
+                }
+            }
+        }
+
+        baseResponse = baseResponse.withScope(
+                resolvedFromDate,
+                resolvedToDate,
+                resolvedTimezone != null ? resolvedTimezone.getId() : (baseResponse.timezone() != null ? baseResponse.timezone() : "Asia/Ho_Chi_Minh"),
+                resolvedMetricCodes,
+                resolvedMetricScope
+        );
+
+        boolean isSelf = actorId.equals(studentId);
+
+        // Fail-closed guard: A Trainer must have verifiable metadata to revalidate source permissions
+        if (!isSelf && (resolvedFromDate == null || resolvedToDate == null || snapshotOpt.isEmpty())) {
+            throw new AiRunAccessDeniedException("Cannot verify trainer source permissions due to missing or corrupted metadata for run: " + runId);
+        }
+
+        if (wasSelectedWithoutCodes) {
+            isStale = true;
+            needsRefresh = true;
+        }
+
+        // Query ProgressEngine if:
+        // - Actor is Trainer (must always verify current source permissions)
+        // - OR Actor is Student with valid scope and metadata (for freshness check)
+        boolean shouldQueryProgressEngine = !isSelf
+                || (!wasSelectedWithoutCodes && resolvedFromDate != null && resolvedToDate != null && snapshotOpt.isPresent());
+
+        if (shouldQueryProgressEngine) {
+            try {
+                // If wasSelectedWithoutCodes is true, query with null metric codes ONLY for authority checking;
+                // do NOT use it to re-evaluate ALL metrics for domain freshness.
+                Set<String> queryMetricCodes = (!wasSelectedWithoutCodes && "SELECTED".equals(resolvedMetricScope))
+                        ? resolvedMetricCodes
+                        : null;
+
+                // Re-query progress engine to get current watermark and current source permissions
+                ProgressEngineQuery.ProgressSnapshot currentSnapshot;
+                try {
+                    currentSnapshot = progressEngineQuery.query(
+                            actorId,
+                            studentId,
+                            queryMetricCodes,
+                            resolvedFromDate,
+                            resolvedToDate,
+                            resolvedTimezone != null ? resolvedTimezone : ZoneId.of("Asia/Ho_Chi_Minh"),
+                            Instant.now(clock)
+                    );
+                } catch (com.fitnesscoaching.platform.modules.progress.domain.ProgressFailure pf) {
+                    if (pf.error() == com.fitnesscoaching.platform.modules.progress.domain.ProgressError.PROGRESS_ACCESS_DENIED) {
+                        throw new AiRunAccessDeniedException("Actor no longer has authority to access progress data for student: " + studentId, pf);
+                    }
+                    throw pf;
+                }
+
+                boolean workoutRestricted = currentSnapshot.workout() != null && currentSnapshot.workout().availability() == ProgressEngineQuery.SourceAvailability.RESTRICTED;
+                boolean measurementRestricted = currentSnapshot.measurement() != null && currentSnapshot.measurement().availability() == ProgressEngineQuery.SourceAvailability.RESTRICTED;
+
+                if (workoutRestricted && measurementRestricted) {
+                    throw new AiRunAccessDeniedException("Actor no longer has authority to access workout or measurement data for student: " + studentId);
+                }
+
+                if (workoutRestricted && baseResponse.workoutProgressSummary() != null) {
+                    baseResponse = baseResponse.withMaskedWorkout();
+                }
+
+                if (measurementRestricted && baseResponse.measurementProgressSummary() != null) {
+                    baseResponse = baseResponse.withMaskedMeasurement();
+                }
+
+                if (wasSelectedWithoutCodes) {
+                    isStale = true;
+                    needsRefresh = true;
+                    currentWatermark = currentSnapshot.compositeWatermark();
+                } else if (ctxNode != null) {
                     String origWorkoutAvail = ctxNode.path("workout").path("availability").asText(null);
                     String currentWorkoutAvail = currentSnapshot.workout() != null ? currentSnapshot.workout().availability().name() : null;
                     boolean workoutAvailChanged = !Objects.equals(origWorkoutAvail, currentWorkoutAvail);
@@ -457,9 +638,56 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
                     String origContinuity = ctxNode.path("continuity").path("state").asText(null);
                     String currentContinuity = currentSnapshot.continuity() != null && currentSnapshot.continuity().state() != null
                             ? currentSnapshot.continuity().state().name() : null;
-                    boolean continuityChanged = !Objects.equals(origContinuity, currentContinuity);
+                    boolean continuityStateChanged = !Objects.equals(origContinuity, currentContinuity);
 
-                    boolean dataChanged = workoutChanged || measChanged || continuityChanged;
+                    Integer origDaysSince = ctxNode.path("continuity").has("daysSinceLastWorkout") && !ctxNode.path("continuity").path("daysSinceLastWorkout").isNull()
+                            ? ctxNode.path("continuity").path("daysSinceLastWorkout").asInt() : null;
+                    Integer currentDaysSince = currentSnapshot.continuity() != null ? currentSnapshot.continuity().daysSinceLastWorkout() : null;
+                    boolean continuityDaysChanged = !Objects.equals(origDaysSince, currentDaysSince);
+
+                    String origLastWorkoutDate = ctxNode.path("continuity").path("lastWorkoutDate").asText(null);
+                    String currentLastWorkoutDate = currentSnapshot.continuity() != null && currentSnapshot.continuity().lastWorkoutDate() != null
+                            ? currentSnapshot.continuity().lastWorkoutDate().toString() : null;
+                    boolean continuityDateChanged = !Objects.equals(origLastWorkoutDate, currentLastWorkoutDate);
+
+                    List<String> origSafetyFlags = new ArrayList<>();
+                    JsonNode flagsNode = ctxNode.path("continuity").path("safetyFlags");
+                    if (flagsNode.isArray()) {
+                        for (JsonNode f : flagsNode) {
+                            origSafetyFlags.add(f.asText());
+                        }
+                    }
+                    List<String> currentSafetyFlags = currentSnapshot.continuity() != null && currentSnapshot.continuity().safetyFlags() != null
+                            ? currentSnapshot.continuity().safetyFlags() : List.of();
+                    boolean safetyFlagsChanged = !Objects.equals(origSafetyFlags, currentSafetyFlags);
+
+                    String origRationale = ctxNode.path("continuity").has("rationale") && !ctxNode.path("continuity").path("rationale").isNull()
+                            ? ctxNode.path("continuity").path("rationale").asText() : null;
+                    String currentRationale = currentSnapshot.continuity() != null ? currentSnapshot.continuity().rationale() : null;
+                    boolean rationaleChanged = !Objects.equals(origRationale, currentRationale);
+
+                    boolean continuityChanged = continuityStateChanged || continuityDaysChanged || continuityDateChanged || safetyFlagsChanged || rationaleChanged;
+
+                    boolean origHasLimits = ctxNode.path("historicalLimits").path("hasHistoricalLimits").asBoolean(false);
+                    boolean currentHasLimits = currentSnapshot.historicalLimits() != null && currentSnapshot.historicalLimits().hasHistoricalLimits();
+                    boolean hasLimitsChanged = origHasLimits != currentHasLimits;
+
+                    boolean origWorkoutLimits = ctxNode.path("historicalLimits").path("workoutLimits").asBoolean(false);
+                    boolean currentWorkoutLimits = currentSnapshot.historicalLimits() != null && currentSnapshot.historicalLimits().workoutLimits();
+                    boolean workoutLimitsChanged = origWorkoutLimits != currentWorkoutLimits;
+
+                    boolean origMeasLimits = ctxNode.path("historicalLimits").path("measurementLimits").asBoolean(false);
+                    boolean currentMeasLimits = currentSnapshot.historicalLimits() != null && currentSnapshot.historicalLimits().measurementLimits();
+                    boolean measLimitsChanged = origMeasLimits != currentMeasLimits;
+
+                    String origExplanation = ctxNode.path("historicalLimits").has("explanation") && !ctxNode.path("historicalLimits").path("explanation").isNull()
+                            ? ctxNode.path("historicalLimits").path("explanation").asText() : null;
+                    String currentExplanation = currentSnapshot.historicalLimits() != null ? currentSnapshot.historicalLimits().explanation() : null;
+                    boolean explanationChanged = !Objects.equals(origExplanation, currentExplanation);
+
+                    boolean limitsChanged = hasLimitsChanged || workoutLimitsChanged || measLimitsChanged || explanationChanged;
+
+                    boolean dataChanged = workoutChanged || measChanged || continuityChanged || limitsChanged;
                     boolean isMockedTest = !ctxNode.has("workout") && !ctxNode.has("measurement");
                     // Also support mocked test scenarios where compositeWatermark is explicitly changed in unit test
                     if (!dataChanged && isMockedTest
@@ -479,6 +707,10 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
             } catch (AiRunAccessDeniedException ex) {
                 throw ex;
             } catch (Exception ex) {
+                if (!isSelf) {
+                    log.error("Failed to verify source permissions for trainer readback on run {}: {}", runId, ex.getMessage(), ex);
+                    throw new AiRunAccessDeniedException("Failed to verify source permissions for run: " + runId, ex);
+                }
                 log.warn("Could not verify freshness or source permissions for run {}: {}", runId, ex.getMessage());
             }
         }
@@ -488,6 +720,11 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
 
     @Transactional
     protected AiRun createInitialAiRun(UUID actorId, F04InternalContextEnvelope envelope) {
+        return createInitialAiRun(actorId, envelope, null);
+    }
+
+    @Transactional
+    protected AiRun createInitialAiRun(UUID actorId, F04InternalContextEnvelope envelope, F04ProgressSummaryApiRequest request) {
         String inputPayloadJson;
         try {
             inputPayloadJson = objectMapper.writeValueAsString(envelope);
@@ -510,6 +747,28 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
 
         AiRun savedRun = runRepository.create(run);
 
+        // Build scope metadata for dataQualitySummary
+        String dataQualitySummary = "{}";
+        try {
+            Map<String, Object> scopeMeta = new LinkedHashMap<>();
+            if (request != null) {
+                String metricScope = (request.metricCodes() != null && !request.metricCodes().isEmpty()) ? "SELECTED" : "ALL";
+                scopeMeta.put("metricScope", metricScope);
+                scopeMeta.put("requestedMetricCodes", request.metricCodes());
+                scopeMeta.put("fromDate", request.fromDate() != null ? request.fromDate().toString() : null);
+                scopeMeta.put("toDate", request.toDate() != null ? request.toDate().toString() : null);
+                scopeMeta.put("timezone", request.timezone() != null ? request.timezone() : "Asia/Ho_Chi_Minh");
+            } else if (envelope.context() != null && envelope.context().dateWindow() != null) {
+                scopeMeta.put("metricScope", "ALL");
+                scopeMeta.put("fromDate", envelope.context().dateWindow().fromDate() != null ? envelope.context().dateWindow().fromDate().toString() : null);
+                scopeMeta.put("toDate", envelope.context().dateWindow().toDate() != null ? envelope.context().dateWindow().toDate().toString() : null);
+                scopeMeta.put("timezone", envelope.context().dateWindow().timezone() != null ? envelope.context().dateWindow().timezone() : "Asia/Ho_Chi_Minh");
+            }
+            dataQualitySummary = objectMapper.writeValueAsString(scopeMeta);
+        } catch (Exception ex) {
+            log.warn("Failed to serialize scope metadata into snapshot dataQualitySummary for run {}", savedRun.id(), ex);
+        }
+
         // Save context snapshot in ai_context_snapshots
         String watermark = envelope.context().compositeWatermark();
         String contextHash = computeSha256(watermark != null ? watermark : envelope.requestId().toString());
@@ -520,7 +779,7 @@ public class AiProgressSummarizationService implements AiProgressSummarizationUs
                 "v1.0",
                 inputPayloadJson,
                 "{}",
-                "{}",
+                dataQualitySummary,
                 "{}",
                 contextHash,
                 Instant.now(clock)

@@ -2,6 +2,7 @@ package com.fitnesscoaching.platform.common.config;
 
 import com.fitnesscoaching.platform.common.security.RestAccessDeniedHandler;
 import com.fitnesscoaching.platform.common.security.RestAuthenticationEntryPoint;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +11,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -17,7 +20,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Configuration
 @EnableWebSecurity
@@ -30,13 +36,24 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
-        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+    public JwtAuthenticationConverter jwtAuthenticationConverter(UserRoleQuery userRoleQuery) {
+        JwtGrantedAuthoritiesConverter fallbackConverter = new JwtGrantedAuthoritiesConverter();
+        fallbackConverter.setAuthoritiesClaimName("roles");
+        fallbackConverter.setAuthorityPrefix("ROLE_");
 
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            try {
+                UUID userId = UUID.fromString(jwt.getSubject());
+                List<String> activeRoles = userRoleQuery.getActiveRoles(userId);
+                return activeRoles.stream()
+                        .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role))
+                        .toList();
+            } catch (Exception ignored) {
+                Collection<GrantedAuthority> fallback = fallbackConverter.convert(jwt);
+                return fallback != null ? fallback : List.of();
+            }
+        });
         return converter;
     }
 

@@ -89,6 +89,9 @@ export default function AppLayout() {
       <Stack.Screen name="progress-summary/index" />
       <Stack.Screen name="progress-summary/[runId]" />
       <Stack.Screen name="coaching/[relationshipId]/progress-summary" />
+      <Stack.Screen name="measurements/index" />
+      <Stack.Screen name="progress/index" />
+      <Stack.Screen name="coaching/[relationshipId]/progress" />
     </Stack>
   );
 }

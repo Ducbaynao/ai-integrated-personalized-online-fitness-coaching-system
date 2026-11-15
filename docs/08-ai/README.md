@@ -69,6 +69,11 @@ flowchart TB
 
 See [context, rules, and RAG](context-rules-rag.md) and [recommendation lifecycle](recommendation-lifecycle.md).
 
+## P2-M4 feature milestones and checkpoints
+
+- **F03 Workout Adjustment:** [F03 closure checklist](p2-m4-f03-closure-checklist.md) & [F03 Mobile acceptance report](f03-mobile-acceptance-report-20261103.md).
+- **F04 Progress Summarization:** [F04 readiness report](f04-progress-readiness-report.md) & [F04 closure checklist](p2-m4-f04-closure-checklist.md) — *Checkpoint status:* **OPEN / UNDER VERIFICATION (CHƯA ĐÓNG CHECKPOINT)** (128 Backend tests PASS across 9 Surefire XML reports, 57 Mobile tests PASS across 4 targeted suites, 9 FastAPI tests PASS, 40 contract fixtures PASS, 13 live Android runtime screenshots including verified GUI backend connection disruption & retry recovery, decoupled readback source authority verification with fail-closed security, strict timezone preservation on refresh, and PostgreSQL mutation freshness evidence; awaiting D06/OD-3 specialist review).
+
 ## Result boundaries
 
 INFORMATION has no application action. A validated PROPOSAL becomes a recommendation with the domain's responsible decision maker. ESTIMATE remains a Nutrition draft and uses Food Confirmation, not recommendation Apply. Operational Run state is separate from result type and reason code; see matrix section 1.6. These result labels are the Phase 2 approved design vocabulary, not additional database enum values.

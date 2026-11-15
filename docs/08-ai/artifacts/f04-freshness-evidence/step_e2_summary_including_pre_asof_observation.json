@@ -1,0 +1,53 @@
+﻿{
+    "runId":  "b582e1d6-48ae-48ed-b95e-1aa6984912fa",
+    "correlationId":  "abc0f8f5-f884-4fc6-bccf-26436ace609f",
+    "studentId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "actorId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "runStatus":  "SUCCEEDED",
+    "resultType":  "INFORMATION",
+    "reasonCode":  "NONE",
+    "summary":  "Vá» táº­p luyá»n: HoÃ n thÃ nh 0/1 buá»i táº­p káº¿ hoáº¡ch (0,0%), bá» lá»¡ 1 buá»i. 0 buá»i ÄÃºng lá»ch, 0 buá»i lá»ch lá»ch; tá»· lá» tuÃ¢n thá»§ ÄÃºng lá»ch Äáº¡t 0,0%. Vá» sá» Äo thá» cháº¥t: Chá» sá» Weight chÆ°a Äá»§ quan sÃ¡t Äá» xÃ¡c Äá»nh xu hÆ°á»ng.",
+    "workoutProgressSummary":  {
+                                   "completionEvaluation":  "HoÃ n thÃ nh 0/1 buá»i táº­p káº¿ hoáº¡ch (0,0%), bá» lá»¡ 1 buá»i.",
+                                   "adherenceEvaluation":  "0 buá»i ÄÃºng lá»ch, 0 buá»i lá»ch lá»ch; tá»· lá» tuÃ¢n thá»§ ÄÃºng lá»ch Äáº¡t 0,0%.",
+                                   "volumeEvaluation":  "Tá»ng khá»i lÆ°á»£ng táº­p Äáº¡t 0 kg vá»i 0 hiá»p chÃ­nh hoÃ n thÃ nh."
+                               },
+    "measurementProgressSummary":  {
+                                       "metricsEvaluations":  [
+                                                                  {
+                                                                      "metricCode":  "WEIGHT",
+                                                                      "trendDirection":  "INSUFFICIENT_DATA",
+                                                                      "message":  "Chá» sá» Weight chÆ°a Äá»§ quan sÃ¡t Äá» xÃ¡c Äá»nh xu hÆ°á»ng."
+                                                                  }
+                                                              ]
+                                   },
+    "continuityEvaluation":  {
+                                 "state":  "UNKNOWN_HISTORY",
+                                 "message":  "ChÆ°a cÃ³ Äá»§ dá»¯ liá»u lá»ch sá»­ Äá» ÄÃ¡nh giÃ¡ tÃ­nh liÃªn tá»¥c táº­p luyá»n.",
+                                 "hasSafetyAlert":  false
+                             },
+    "limitations":  [
+                        "Biáº¿n thiÃªn cÃ¢n náº·ng khÃ´ng pháº£n Ã¡nh thÃ nh pháº§n má»¡ hoáº·c cÆ¡ thá» do thiáº¿u chá» sá» Body Fat %."
+                    ],
+    "missingData":  [
+
+                    ],
+    "factsReferenced":  [
+                            "continuity.state:UNKNOWN_HISTORY",
+                            "workout.adherence.scheduledDueCount:1",
+                            "workout.adherence.completedDueCount:0",
+                            "workout.adherence.rawCompletionRate:0,0000",
+                            "workout.adherence.onTimeAdherenceRate:0,0000",
+                            "measurement.WEIGHT.trend:INSUFFICIENT_DATA"
+                        ],
+    "asOf":  "2026-11-14T07:02:35.864202500Z",
+    "sourceWatermark":  "8f004720db95adcd298d7cfe6409693ffaab26a3a8f90d88104c9dc9698c7777",
+    "usage":  {
+                  "promptTokens":  280,
+                  "completionTokens":  150,
+                  "totalTokens":  430
+              },
+    "isStale":  false,
+    "needsRefresh":  false,
+    "currentWatermark":  "8f004720db95adcd298d7cfe6409693ffaab26a3a8f90d88104c9dc9698c7777"
+}

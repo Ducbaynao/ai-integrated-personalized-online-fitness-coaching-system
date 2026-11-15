@@ -78,6 +78,10 @@ export function ProgressSummaryScreen({
   const isSubmittingRef = useRef(false);
   const isMountedRef = useRef(true);
   const currentStudentIdRef = useRef(targetStudentId);
+  const lastFailedActionRef = useRef<(() => void) | null>(null);
+  const loadRunByIdRef = useRef<((runId: string) => AbortController) | null>(null);
+  const handleGenerateSummaryRef = useRef<(() => Promise<void>) | null>(null);
+  const handleRefreshSavedSummaryRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -103,43 +107,77 @@ export function ProgressSummaryScreen({
       setErrorMessage(null);
       setIsSubmitting(false);
       isSubmittingRef.current = false;
+      lastFailedActionRef.current = null;
     }
   }, [targetStudentId]);
 
   // Load initial run if requested via prop
-  useEffect(() => {
-    if (initialRunId) {
-      const controller = new AbortController();
-      queueMicrotask(() => {
+  const loadRunById = useCallback((runIdToLoad: string) => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setIsLoadingRun(true);
+        setErrorMessage(null);
+      }
+    });
+
+    aiProgressSummaryApi
+      .getSummary(runIdToLoad, controller.signal)
+      .then((data) => {
         if (isMountedRef.current && !controller.signal.aborted) {
-          setIsLoadingRun(true);
-          setErrorMessage(null);
+          setResult(data);
+          if (data.fromDate) {
+            setFromDate(data.fromDate);
+          }
+          if (data.toDate) {
+            setToDate(data.toDate);
+          }
+          if (
+            data.metricScope === 'SELECTED' &&
+            Array.isArray(data.requestedMetricCodes) &&
+            data.requestedMetricCodes.length > 0
+          ) {
+            setSelectedMetrics(data.requestedMetricCodes);
+          } else if (data.metricScope === 'ALL') {
+            setSelectedMetrics([]);
+          }
+          if (data.fromDate && data.toDate) {
+            const today = moment().format('YYYY-MM-DD');
+            const daysDiff = moment(data.toDate).diff(moment(data.fromDate), 'days');
+            if (data.toDate === today && (daysDiff === 7 || daysDiff === 14 || daysDiff === 30)) {
+              setPreset(daysDiff as PresetDays);
+            } else {
+              setPreset('CUSTOM');
+            }
+          }
+          lastFailedActionRef.current = null;
+        }
+      })
+      .catch((err) => {
+        if (isMountedRef.current && !controller.signal.aborted) {
+          setErrorMessage(getAiProgressSummaryErrorMessage(err));
+          lastFailedActionRef.current = () => {
+            loadRunByIdRef.current?.(runIdToLoad);
+          };
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current && !controller.signal.aborted) {
+          setIsLoadingRun(false);
         }
       });
 
-      aiProgressSummaryApi
-        .getSummary(initialRunId, controller.signal)
-        .then((data) => {
-          if (isMountedRef.current && !controller.signal.aborted) {
-            setResult(data);
-          }
-        })
-        .catch((err) => {
-          if (isMountedRef.current && !controller.signal.aborted) {
-            setErrorMessage(getAiProgressSummaryErrorMessage(err));
-          }
-        })
-        .finally(() => {
-          if (isMountedRef.current && !controller.signal.aborted) {
-            setIsLoadingRun(false);
-          }
-        });
+    return controller;
+  }, []);
 
+  useEffect(() => {
+    if (initialRunId) {
+      const controller = loadRunById(initialRunId);
       return () => {
         controller.abort();
       };
     }
-  }, [initialRunId]);
+  }, [initialRunId, loadRunById]);
 
   // Handle Preset selection
   const handleSelectPreset = (days: PresetDays) => {
@@ -218,6 +256,16 @@ export function ProgressSummaryScreen({
         activeRequestIdRef.current === reqId
       ) {
         setResult(response);
+        lastFailedActionRef.current = null;
+        if (response.fromDate) {
+          setFromDate(response.fromDate);
+        }
+        if (response.toDate) {
+          setToDate(response.toDate);
+        }
+        if (response.requestedMetricCodes && response.requestedMetricCodes.length > 0) {
+          setSelectedMetrics(response.requestedMetricCodes);
+        }
       }
     } catch (err) {
       if (controller.signal.aborted) {
@@ -229,6 +277,9 @@ export function ProgressSummaryScreen({
         activeRequestIdRef.current === reqId
       ) {
         setErrorMessage(getAiProgressSummaryErrorMessage(err));
+        lastFailedActionRef.current = () => {
+          handleGenerateSummaryRef.current?.();
+        };
       }
     } finally {
       if (activeRequestIdRef.current === reqId && isMountedRef.current) {
@@ -238,6 +289,160 @@ export function ProgressSummaryScreen({
       }
     }
   }, [targetStudentId, fromDate, toDate, user, selectedMetrics, validationError]);
+
+  // Refresh handler attached strictly to the stale saved summary
+  // Preserves original scope: Student, fromDate, toDate, timezone, and requested metric codes
+  const handleRefreshSavedSummary = useCallback(async () => {
+    if (isSubmittingRef.current) {
+      return; // Anti-double submit
+    }
+    if (!result) {
+      return;
+    }
+
+    const legacyScopeMessage =
+      'Bản tóm tắt cũ không có đủ thông tin phạm vi lưu trữ. Vui lòng kiểm tra phạm vi ngày và chỉ số trong biểu mẫu rồi bấm "Cập nhật lại tóm tắt".';
+
+    // 1. Validate date window
+    if (!result.fromDate || !result.toDate) {
+      setErrorMessage(legacyScopeMessage);
+      lastFailedActionRef.current = null;
+      return;
+    }
+
+    // 2. Validate studentId
+    const callingStudentId = result.studentId || targetStudentId;
+    if (!callingStudentId) {
+      setErrorMessage(legacyScopeMessage);
+      lastFailedActionRef.current = null;
+      return;
+    }
+
+    // 3. Validate timezone: must strictly use stored timezone, never silently fallback to user profile/device
+    if (!result.timezone || typeof result.timezone !== 'string' || result.timezone.trim().length === 0) {
+      setErrorMessage(
+        'Bản tóm tắt cũ không có đủ thông tin múi giờ lưu trữ. Vui lòng kiểm tra múi giờ, phạm vi ngày và chỉ số trong biểu mẫu rồi bấm "Cập nhật lại tóm tắt".'
+      );
+      lastFailedActionRef.current = null;
+      return;
+    }
+    const refreshTimezone = result.timezone.trim();
+
+    // 4. Validate metricScope strictly:
+    // - ALL is accepted ONLY when metricScope is explicitly 'ALL'
+    // - SELECTED is accepted ONLY when metricScope is explicitly 'SELECTED' AND requestedMetricCodes is a valid non-empty array
+    // - Any missing/undefined/null/UNKNOWN_LEGACY or unsupported scope, or SELECTED without codes:
+    //   MUST NOT automatically refresh and MUST NOT guess as ALL or use form chips.
+    let refreshMetrics: string[] | undefined = undefined;
+
+    if (result.metricScope === 'ALL') {
+      refreshMetrics = undefined; // Explicitly ALL metrics
+    } else if (result.metricScope === 'SELECTED') {
+      if (
+        Array.isArray(result.requestedMetricCodes) &&
+        result.requestedMetricCodes.length > 0 &&
+        result.requestedMetricCodes.every((c) => typeof c === 'string' && c.trim().length > 0)
+      ) {
+        refreshMetrics = Array.from(result.requestedMetricCodes.map((c) => c.trim()));
+      } else {
+        // SELECTED but missing or empty codes: inconsistent metadata, block auto-refresh!
+        setErrorMessage(
+          'Bản tóm tắt thiếu danh sách chỉ số đã chọn hợp lệ. Vui lòng kiểm tra các chỉ số trong biểu mẫu rồi bấm "Cập nhật lại tóm tắt".'
+        );
+        lastFailedActionRef.current = null;
+        return;
+      }
+    } else {
+      // metricScope is undefined, null, 'UNKNOWN_LEGACY', or an unsupported string
+      setErrorMessage(legacyScopeMessage);
+      lastFailedActionRef.current = null;
+      return;
+    }
+
+    const refreshFromDate = result.fromDate;
+    const refreshToDate = result.toDate;
+
+    // Sync form state back to the validated original scope of this summary
+    setFromDate(refreshFromDate);
+    setToDate(refreshToDate);
+    setSelectedMetrics(refreshMetrics || []);
+    const today = moment().format('YYYY-MM-DD');
+    const daysDiff = moment(refreshToDate).diff(moment(refreshFromDate), 'days');
+    if (refreshToDate === today && (daysDiff === 7 || daysDiff === 14 || daysDiff === 30)) {
+      setPreset(daysDiff as PresetDays);
+    } else {
+      setPreset('CUSTOM');
+    }
+
+    const reqId = ++activeRequestIdRef.current;
+    if (inFlightAbortRef.current) {
+      inFlightAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    inFlightAbortRef.current = controller;
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await aiProgressSummaryApi.generate(
+        {
+          studentId: callingStudentId,
+          fromDate: refreshFromDate,
+          toDate: refreshToDate,
+          timezone: refreshTimezone,
+          metricCodes: refreshMetrics,
+        },
+        controller.signal
+      );
+
+      if (
+        isMountedRef.current &&
+        currentStudentIdRef.current === callingStudentId &&
+        activeRequestIdRef.current === reqId
+      ) {
+        setResult(response);
+        lastFailedActionRef.current = null;
+      }
+    } catch (err) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (
+        isMountedRef.current &&
+        currentStudentIdRef.current === callingStudentId &&
+        activeRequestIdRef.current === reqId
+      ) {
+        setErrorMessage(getAiProgressSummaryErrorMessage(err));
+        lastFailedActionRef.current = () => {
+          handleRefreshSavedSummaryRef.current?.();
+        };
+      }
+    } finally {
+      if (activeRequestIdRef.current === reqId && isMountedRef.current) {
+        setIsSubmitting(false);
+        isSubmittingRef.current = false;
+        inFlightAbortRef.current = null;
+      }
+    }
+  }, [result, targetStudentId]);
+
+  // Keep references to handlers updated for safe retry invocation outside render
+  useEffect(() => {
+    loadRunByIdRef.current = loadRunById;
+    handleGenerateSummaryRef.current = handleGenerateSummary;
+    handleRefreshSavedSummaryRef.current = handleRefreshSavedSummary;
+  }, [loadRunById, handleGenerateSummary, handleRefreshSavedSummary]);
+
+  // Unified retry handler retrying the exact failed operation (initial load, generate, or refresh)
+  const handleRetry = useCallback(() => {
+    if (lastFailedActionRef.current) {
+      lastFailedActionRef.current();
+    } else {
+      handleGenerateSummary();
+    }
+  }, [handleGenerateSummary]);
 
   const handleBack = () => {
     if (onBack) {
@@ -479,10 +684,10 @@ export function ProgressSummaryScreen({
               <Text style={[styles.errorTitle, { color: theme.dangerText }]}>Chưa thể tạo bản tóm tắt</Text>
               <Text style={[styles.errorMessage, { color: theme.dangerText }]}>{errorMessage}</Text>
               <Pressable
-                testID="retry-generate-button"
+                testID="retry-summary-button"
                 accessibilityRole="button"
                 accessibilityLabel="Thử lại"
-                onPress={handleGenerateSummary}
+                onPress={handleRetry}
                 style={[styles.retryButton, { borderColor: theme.dangerText }]}>
                 <Text style={[styles.retryButtonText, { color: theme.dangerText }]}>Thử lại</Text>
               </Pressable>
@@ -508,7 +713,7 @@ export function ProgressSummaryScreen({
                 accessibilityRole="button"
                 accessibilityLabel="Làm mới tóm tắt"
                 disabled={isSubmitting}
-                onPress={handleGenerateSummary}
+                onPress={handleRefreshSavedSummary}
                 style={[styles.refreshButton, { backgroundColor: colors.warning[600] }]}>
                 <Text style={styles.refreshButtonText}>Làm mới ngay</Text>
               </Pressable>

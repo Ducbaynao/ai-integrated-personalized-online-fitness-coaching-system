@@ -191,6 +191,24 @@ export function HomeScreen() {
               </Pressable>
 
               <Pressable
+                testID="view-progress-dashboard-button"
+                accessibilityRole="button"
+                accessibilityLabel="Xem bảng điều khiển tiến độ"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/progress' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Bảng điều khiển tiến độ →</Text>
+              </Pressable>
+
+              <Pressable
+                testID="view-measurements-button"
+                accessibilityRole="button"
+                accessibilityLabel="Xem nhật ký số đo cơ thể"
+                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
+                onPress={() => router.push('/measurements' as any)}>
+                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Nhật ký số đo cơ thể →</Text>
+              </Pressable>
+
+              <Pressable
                 testID="view-ai-knowledge-button"
                 accessibilityRole="button"
                 accessibilityLabel="Tra cứu kiến thức thể hình AI"

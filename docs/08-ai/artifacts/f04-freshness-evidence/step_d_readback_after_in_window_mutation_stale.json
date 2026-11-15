@@ -1,0 +1,41 @@
+﻿{
+    "runId":  "9044d8a5-52fc-4de5-a12e-272c273a7051",
+    "correlationId":  "00871b08-ef56-43f3-88de-5ba12dba2129",
+    "studentId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "actorId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "runStatus":  "SUCCEEDED",
+    "resultType":  "INSUFFICIENT_DATA",
+    "reasonCode":  "INSUFFICIENT_DATA",
+    "summary":  "KhÃ´ng cÃ³ Äá»§ dá»¯ liá»u táº­p luyá»n hoáº·c Äo lÆ°á»ng ÄÆ°á»£c ghi nháº­n trong chu ká»³ ÄÆ°á»£c chá»n Äá» xÃ¡c láº­p xu hÆ°á»ng tiáº¿n Äá».",
+    "workoutProgressSummary":  {
+                                   "completionEvaluation":  "KhÃ´ng cÃ³ buá»i táº­p nÃ o hoÃ n thÃ nh trong ká»³.",
+                                   "adherenceEvaluation":  "KhÃ´ng cÃ³ lá»ch táº­p káº¿ hoáº¡ch Äáº¿n háº¡n trong ká»³.",
+                                   "volumeEvaluation":  "Khá»i lÆ°á»£ng táº­p trong ká»³ lÃ  0 kg."
+                               },
+    "measurementProgressSummary":  null,
+    "continuityEvaluation":  {
+                                 "state":  "UNKNOWN_HISTORY",
+                                 "message":  "ChÆ°a cÃ³ Äá»§ dá»¯ liá»u lá»ch sá»­ Äá» ÄÃ¡nh giÃ¡ tÃ­nh liÃªn tá»¥c táº­p luyá»n.",
+                                 "hasSafetyAlert":  false
+                             },
+    "limitations":  [
+
+                    ],
+    "missingData":  [
+                        "workout",
+                        "measurement"
+                    ],
+    "factsReferenced":  [
+                            "continuity.state:UNKNOWN_HISTORY"
+                        ],
+    "asOf":  "2026-11-14T06:52:19.320150500Z",
+    "sourceWatermark":  "d2a63921c481ab3ba72676d8e757ef43a41e4be62a8284f918b4516767504fe7",
+    "usage":  {
+                  "promptTokens":  280,
+                  "completionTokens":  150,
+                  "totalTokens":  430
+              },
+    "isStale":  true,
+    "needsRefresh":  true,
+    "currentWatermark":  "11634bcacbacb766665906520c501a4d453b10a1d4e45067da0f687f398862a5"
+}

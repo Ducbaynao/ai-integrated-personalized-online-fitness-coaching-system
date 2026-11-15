@@ -1,0 +1,41 @@
+﻿{
+    "runId":  "acec8689-2549-4868-97df-67e137e9be82",
+    "correlationId":  "aa9d5008-ac63-468f-9cee-185f39eb7690",
+    "studentId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "actorId":  "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "runStatus":  "SUCCEEDED",
+    "resultType":  "INSUFFICIENT_DATA",
+    "reasonCode":  "INSUFFICIENT_DATA",
+    "summary":  "KhÃ´ng cÃ³ Äá»§ dá»¯ liá»u táº­p luyá»n hoáº·c Äo lÆ°á»ng ÄÆ°á»£c ghi nháº­n trong chu ká»³ ÄÆ°á»£c chá»n Äá» xÃ¡c láº­p xu hÆ°á»ng tiáº¿n Äá».",
+    "workoutProgressSummary":  {
+                                   "completionEvaluation":  "KhÃ´ng cÃ³ buá»i táº­p nÃ o hoÃ n thÃ nh trong ká»³.",
+                                   "adherenceEvaluation":  "KhÃ´ng cÃ³ lá»ch táº­p káº¿ hoáº¡ch Äáº¿n háº¡n trong ká»³.",
+                                   "volumeEvaluation":  "Khá»i lÆ°á»£ng táº­p trong ká»³ lÃ  0 kg."
+                               },
+    "measurementProgressSummary":  null,
+    "continuityEvaluation":  {
+                                 "state":  "UNKNOWN_HISTORY",
+                                 "message":  "ChÆ°a cÃ³ Äá»§ dá»¯ liá»u lá»ch sá»­ Äá» ÄÃ¡nh giÃ¡ tÃ­nh liÃªn tá»¥c táº­p luyá»n.",
+                                 "hasSafetyAlert":  false
+                             },
+    "limitations":  [
+
+                    ],
+    "missingData":  [
+                        "workout",
+                        "measurement"
+                    ],
+    "factsReferenced":  [
+                            "continuity.state:UNKNOWN_HISTORY"
+                        ],
+    "asOf":  "2026-11-13T09:55:22.126172300Z",
+    "sourceWatermark":  "803e160a3476041985f6d153b71aface4505435e322dc864523a600adc5d34bb",
+    "usage":  {
+                  "promptTokens":  280,
+                  "completionTokens":  150,
+                  "totalTokens":  430
+              },
+    "isStale":  false,
+    "needsRefresh":  false,
+    "currentWatermark":  "803e160a3476041985f6d153b71aface4505435e322dc864523a600adc5d34bb"
+}

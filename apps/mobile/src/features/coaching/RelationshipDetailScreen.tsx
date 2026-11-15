@@ -112,6 +112,14 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
           onPress={() => router.push(`/coaching/${relationship.id}/attention` as never)} /> : null}
     {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? (
       <CoachingButton
+        testID="open-student-progress-button"
+        label="Tiến độ và số đo học viên"
+        secondary
+        onPress={() => router.push(`/coaching/${relationship.id}/progress` as never)}
+      />
+    ) : null}
+    {activeCapability === 'TRAINER' && relationship.trainerId === user?.id && relationship.status === 'ACTIVE' ? (
+      <CoachingButton
         testID="open-student-progress-summary-button"
         label="Tóm tắt tiến độ học viên (AI)"
         secondary

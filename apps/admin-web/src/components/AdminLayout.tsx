@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContextValue.ts'
+import { PrivilegedAccessBanner } from '../features/privileged-access/PrivilegedAccessBanner.tsx'
 
 export function AdminLayout() {
   const auth = useAuth()
@@ -14,6 +15,25 @@ export function AdminLayout() {
   const canManageTrainers =
     (auth.user?.roles.includes('ADMIN') ?? false) ||
     (auth.user?.permissions.includes('TRAINER_VERIFY') ?? false)
+  const canManageUsers =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('USER_SUSPEND') ?? false) ||
+    (auth.user?.permissions.includes('USER_ROLE_MANAGE') ?? false)
+  const canManageSupport =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('SUPPORT_MANAGE') ?? false)
+  const canManageModeration =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('MODERATION_MANAGE') ?? false)
+  const canManageCorrection =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('DATA_CORRECTION_EXECUTE') ?? false)
+  const canViewAudit =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('AUDIT_VIEW') ?? false)
+  const canManagePrivileged =
+    (auth.user?.roles.includes('ADMIN') ?? false) ||
+    (auth.user?.permissions.includes('PRIVILEGED_ACCESS_MANAGE') ?? false)
 
   return (
     <div className="app-shell">
@@ -31,13 +51,20 @@ export function AdminLayout() {
       <div className="app-body">
         <nav className="sidebar" aria-label="Điều hướng quản trị">
           <NavLink to="/" end>Trang tổng quan</NavLink>
+          {canManageUsers ? <NavLink to="/users">Người dùng</NavLink> : null}
           {canManageTrainers ? <NavLink to="/trainer-applications">Hồ sơ HLV</NavLink> : null}
+          {canManageSupport ? <NavLink to="/support-cases">Hỗ trợ</NavLink> : null}
+          {canManageModeration ? <NavLink to="/moderation-cases">Kiểm duyệt</NavLink> : null}
+          {canManageCorrection ? <NavLink to="/data-corrections">Hiệu chỉnh dữ liệu</NavLink> : null}
+          {canManagePrivileged ? <NavLink to="/privileged-access">Quyền đặc quyền</NavLink> : null}
+          {canViewAudit ? <NavLink to="/audit-logs">Nhật ký kiểm toán</NavLink> : null}
           {canManageCatalog ? <NavLink to="/exercises">Bài tập</NavLink> : null}
           {canManageCatalog ? <NavLink to="/nutrition/catalog">Danh mục thực phẩm</NavLink> : null}
           {canManageKnowledge ? <NavLink to="/knowledge">Cơ sở tri thức</NavLink> : null}
           {canManageAi ? <NavLink to="/ai/operations">Vận hành AI</NavLink> : null}
         </nav>
         <main className="main-content">
+          <PrivilegedAccessBanner />
           <Outlet />
         </main>
       </div>

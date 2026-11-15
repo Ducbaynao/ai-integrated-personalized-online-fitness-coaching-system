@@ -14,6 +14,15 @@ import { AiOperationsPage } from './features/ai/AiOperationsPage.tsx'
 import { AiRunDetailPage } from './features/ai/AiRunDetailPage.tsx'
 import { TrainerApplicationListPage } from './features/trainer-applications/TrainerApplicationListPage.tsx'
 import { TrainerApplicationDetailPage } from './features/trainer-applications/TrainerApplicationDetailPage.tsx'
+import { UserListPage } from './features/users/UserListPage.tsx'
+import { UserDetailPage } from './features/users/UserDetailPage.tsx'
+import { SupportCaseListPage } from './features/support/SupportCaseListPage.tsx'
+import { SupportCaseDetailPage } from './features/support/SupportCaseDetailPage.tsx'
+import { ModerationCaseListPage } from './features/moderation/ModerationCaseListPage.tsx'
+import { ModerationCaseDetailPage } from './features/moderation/ModerationCaseDetailPage.tsx'
+import { PrivilegedAccessPage } from './features/privileged-access/PrivilegedAccessPage.tsx'
+import { DataCorrectionListPage } from './features/data-correction/DataCorrectionListPage.tsx'
+import { AuditLogListPage } from './features/audit/AuditLogListPage.tsx'
 
 function App() {
   return (
@@ -113,6 +122,78 @@ function App() {
             element={
               <ProtectedRoute>
                 <TrainerApplicationDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute>
+                <UserListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="users/:userId"
+            element={
+              <ProtectedRoute>
+                <UserDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="support-cases"
+            element={
+              <ProtectedRoute>
+                <SupportCaseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="support-cases/:caseId"
+            element={
+              <ProtectedRoute>
+                <SupportCaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="moderation-cases"
+            element={
+              <ProtectedRoute>
+                <ModerationCaseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="moderation-cases/:caseId"
+            element={
+              <ProtectedRoute>
+                <ModerationCaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="privileged-access"
+            element={
+              <ProtectedRoute>
+                <PrivilegedAccessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="data-corrections"
+            element={
+              <ProtectedRoute>
+                <DataCorrectionListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogListPage />
               </ProtectedRoute>
             }
           />

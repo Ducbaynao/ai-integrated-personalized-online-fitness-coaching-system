@@ -33,9 +33,15 @@ public class MeasurementAccessPolicy {
     }
 
     public MeasurementAccessDecision evaluateAccess(UUID actorId, UUID studentId) {
+        return evaluateAccess(actorId, studentId, DataScope.BODY_METRICS);
+    }
+
+    public MeasurementAccessDecision evaluateAccess(UUID actorId, UUID studentId, DataScope dataScope) {
         if (actorId == null || studentId == null) {
             throw new MeasurementFailure(MeasurementError.VALIDATION_FAILED, "Actor ID and Student ID must not be null");
         }
+
+        DataScope scope = dataScope != null ? dataScope : DataScope.BODY_METRICS;
 
         AccountStatus actorStatus = accounts.getAccountStatus(actorId).orElse(null);
         if (actorStatus != AccountStatus.ACTIVE) {
@@ -52,15 +58,60 @@ public class MeasurementAccessPolicy {
         }
 
         AuthorityDecision decision = coaching.evaluateCurrent(
-                new AuthorityRequest(actorId, studentId, DataScope.BODY_METRICS, DataAccessLevel.VIEW)
+                new AuthorityRequest(actorId, studentId, scope, DataAccessLevel.VIEW)
         );
 
         if (!decision.allowed()) {
             throw new MeasurementFailure(MeasurementError.MEASUREMENT_ACCESS_DENIED,
-                    "Access denied to measurement progress data for student " + studentId);
+                    "Access denied to " + scope.name().toLowerCase() + " data for student " + studentId);
         }
 
         return new MeasurementAccessDecision(true, false, decision.historyFrom(), decision.historyUntil());
+    }
+
+    public MeasurementAccessDecision evaluateWriteAccess(UUID actorId, UUID studentId) {
+        return evaluateWriteAccess(actorId, studentId, DataScope.BODY_METRICS);
+    }
+
+    public MeasurementAccessDecision evaluateWriteAccess(UUID actorId, UUID studentId, DataScope dataScope) {
+        if (actorId == null || studentId == null) {
+            throw new MeasurementFailure(MeasurementError.VALIDATION_FAILED, "Actor ID and Student ID must not be null");
+        }
+
+        DataScope scope = dataScope != null ? dataScope : DataScope.BODY_METRICS;
+
+        AccountStatus actorStatus = accounts.getAccountStatus(actorId).orElse(null);
+        if (actorStatus != AccountStatus.ACTIVE) {
+            throw new MeasurementFailure(MeasurementError.MEASUREMENT_ACCESS_DENIED, "Actor account is not active");
+        }
+
+        if (!students.hasProfile(studentId)) {
+            throw new MeasurementFailure(MeasurementError.MEASUREMENT_NOT_FOUND, "Student profile not found for ID: " + studentId);
+        }
+
+        boolean isSelf = actorId.equals(studentId);
+        if (isSelf) {
+            return new MeasurementAccessDecision(true, true, null, null);
+        }
+
+        AuthorityDecision decision = coaching.evaluateCurrent(
+                new AuthorityRequest(actorId, studentId, scope, DataAccessLevel.CONTRIBUTE)
+        );
+
+        if (!decision.allowed()) {
+            throw new MeasurementFailure(MeasurementError.MEASUREMENT_ACCESS_DENIED,
+                    "Write access denied to " + scope.name().toLowerCase() + " data for student " + studentId);
+        }
+
+        return new MeasurementAccessDecision(true, false, decision.historyFrom(), decision.historyUntil());
+    }
+
+    public MeasurementAccessDecision evaluatePhotoAccess(UUID actorId, UUID studentId) {
+        return evaluateAccess(actorId, studentId, DataScope.PROGRESS_PHOTOS);
+    }
+
+    public MeasurementAccessDecision evaluatePhotoWriteAccess(UUID actorId, UUID studentId) {
+        return evaluateWriteAccess(actorId, studentId, DataScope.PROGRESS_PHOTOS);
     }
 
     public record MeasurementAccessDecision(

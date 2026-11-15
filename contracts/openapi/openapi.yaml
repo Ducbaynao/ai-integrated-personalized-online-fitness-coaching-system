@@ -68,6 +68,12 @@ tags:
       Progress summarization, signal explanation, and review support grounded in verified Progress Engine facts.
       Spring Boot validates authority, builds minimal context, invokes FastAPI summarization, and returns an INFORMATION projection.
       Supports readback with real-time authority revalidation and source watermark freshness detection.
+  - name: Measurements
+    description: Student and Trainer manual measurements, canonical metrics catalog, and correction history.
+  - name: Progress Photos
+    description: Student progress photos upload, list, download, and soft deletion.
+  - name: Progress Dashboard
+    description: Deterministic multi-dimensional progress tracking (Current Goal and Lifetime) independent from AI.
 
 paths:
   /review-timezone/me:
@@ -2494,6 +2500,748 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /admin/users:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminUsers
+      summary: List, search, and filter user accounts for administration
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search pattern for email, display name, or phone number
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by account status (ACTIVE, SUSPENDED, DISABLED, PENDING_VERIFICATION)
+        - name: role
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by role code (STUDENT, TRAINER, ADMIN, CONTENT_ADMIN)
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Page of user summaries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /admin/users/{userId}:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminUserDetail
+      summary: Get full user account detail including profiles, roles, and status history
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Detailed user account information
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/users/{userId}/suspend:
+    post:
+      tags: [Admin User Governance]
+      operationId: suspendUser
+      summary: Suspend user account with mandatory reason and step-up authentication
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User suspended successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition or last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/restore:
+    post:
+      tags: [Admin User Governance]
+      operationId: restoreUser
+      summary: Restore suspended user account to active state
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User restored successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/disable:
+    post:
+      tags: [Admin User Governance]
+      operationId: disableUser
+      summary: Disable user account permanently with mandatory reason and step-up authentication
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User disabled successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition or last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/force-logout:
+    post:
+      tags: [Admin User Governance]
+      operationId: forceLogoutUser
+      summary: Force logout user by immediately revoking all active access tokens and refresh tokens
+      description: Atomically revokes all active refresh tokens and records an ALL_SESSIONS revocation event. All existing access tokens are immediately rejected on subsequent requests (HTTP 401). Fresh logins remain permitted. Requires SESSION_REVOKE permission and step-up authentication.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserActionRequest' }
+      responses:
+        '200':
+          description: User sessions revoked successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForceLogoutResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/users/{userId}/roles:
+    post:
+      tags: [Admin User Governance]
+      operationId: changeUserRole
+      summary: Assign or revoke user role with audit and step-up authentication
+      description: Assigns or revokes a system role. When revoking the ADMIN role, last admin protection and self-action rules are enforced; all active sessions (access tokens and refresh tokens) of the target user are immediately revoked, blocking admin endpoints across the platform. Requires USER_ROLE_MANAGE permission and step-up authentication.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeUserRoleRequest' }
+      responses:
+        '200':
+          description: User roles updated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetailResponse' }
+        '400': { description: Self-action or validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Step-up required or forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: User not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Last admin protection, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/auth/step-up:
+    post:
+      tags: [Admin User Governance]
+      operationId: issueAdminStepUp
+      summary: Verify administrator password and issue step-up authorization token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpRequest' }
+      responses:
+        '200':
+          description: Step-up verified and issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StepUpResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { description: Invalid password, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /admin/dashboard/summary:
+    get:
+      tags: [Admin User Governance]
+      operationId: getAdminDashboardSummary
+      summary: Retrieve action required counts and platform user status summary
+      responses:
+        '200':
+          description: Administrative dashboard summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminDashboardSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AccountUnavailable' }
+
+  /admin/support-cases:
+    get:
+      tags: [Admin Support]
+      operationId: searchSupportCases
+      summary: Search and list support cases with filtering and pagination
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priority
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Support case page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCasePageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Support]
+      operationId: createSupportCase
+      summary: Create a new support case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSupportCaseRequest' }
+      responses:
+        '201':
+          description: Support case created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}:
+    get:
+      tags: [Admin Support]
+      operationId: getSupportCaseDetail
+      summary: Get support case detail including event history
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Support case detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/status:
+    post:
+      tags: [Admin Support]
+      operationId: updateSupportCaseStatus
+      summary: Update support case status
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSupportCaseStatusRequest' }
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Invalid lifecycle transition, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/assign:
+    post:
+      tags: [Admin Support]
+      operationId: assignSupportCase
+      summary: Assign support case to an administrator
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignSupportCaseRequest' }
+      responses:
+        '200':
+          description: Case assigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/support-cases/{caseId}/notes:
+    post:
+      tags: [Admin Support]
+      operationId: addSupportCaseNote
+      summary: Add internal note to support case
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddSupportCaseNoteRequest' }
+      responses:
+        '200':
+          description: Note added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Support case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases:
+    get:
+      tags: [Admin Moderation]
+      operationId: searchModerationCases
+      summary: Search and list moderation cases
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priority
+          in: query
+          schema: { type: string }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Moderation case page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCasePageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Moderation]
+      operationId: createModerationCase
+      summary: Create a moderation case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateModerationCaseRequest' }
+      responses:
+        '201':
+          description: Moderation case created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}:
+    get:
+      tags: [Admin Moderation]
+      operationId: getModerationCaseDetail
+      summary: Get moderation case detail and action history
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Moderation case detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}/status:
+    post:
+      tags: [Admin Moderation]
+      operationId: updateModerationStatus
+      summary: Update moderation case status
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateModerationStatusRequest' }
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseDetailResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/moderation-cases/{caseId}/actions:
+    post:
+      tags: [Admin Moderation]
+      operationId: performModerationAction
+      summary: Perform an append-only moderation action
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PerformModerationActionRequest' }
+      responses:
+        '201':
+          description: Moderation action recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationActionResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Moderation case not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: searchPrivilegedAccessRequests
+      summary: Search privileged data access requests
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: targetUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Privileged access request page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Privileged Access]
+      operationId: requestPrivilegedAccess
+      summary: Request and activate privileged data access with step-up verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestPrivilegedAccessDto' }
+      responses:
+        '201':
+          description: Privileged access request created and active
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/active:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: getActivePrivilegedAccess
+      summary: Get active privileged access for current administrator and optional target user
+      parameters:
+        - name: targetUserId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Active privileged access
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '204':
+          description: No active privileged access session
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/{requestId}:
+    get:
+      tags: [Admin Privileged Access]
+      operationId: getPrivilegedAccessDetail
+      summary: Get privileged access request detail
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Privileged access detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Privileged access not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/privileged-access/{requestId}/revoke:
+    post:
+      tags: [Admin Privileged Access]
+      operationId: revokePrivilegedAccess
+      summary: Revoke active privileged data access session
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevokePrivilegedAccessDto' }
+      responses:
+        '200':
+          description: Privileged access revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Privileged access not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/data-corrections:
+    get:
+      tags: [Admin Data Correction]
+      operationId: searchDataCorrections
+      summary: Search and list governed data correction actions
+      parameters:
+        - name: supportCaseId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Data correction page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    post:
+      tags: [Admin Data Correction]
+      operationId: executeDataCorrection
+      summary: Execute governed data correction with step-up authentication and privileged access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExecuteDataCorrectionRequest' }
+      responses:
+        '201':
+          description: Data correction executed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: Conflict, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/data-corrections/{correctionId}:
+    get:
+      tags: [Admin Data Correction]
+      operationId: getDataCorrectionDetail
+      summary: Get data correction detail
+      parameters:
+        - name: correctionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Data correction detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Data correction not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin Audit]
+      operationId: searchAuditLogs
+      summary: Search and query audit logs with secret redaction
+      parameters:
+        - name: actorUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: actorRole
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: targetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Audit log page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /admin/audit-logs/{id}:
+    get:
+      tags: [Admin Audit]
+      operationId: getAuditLogDetail
+      summary: Get audit log entry detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Audit log detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogEntryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: Forbidden, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '404': { description: Audit log not found, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
   /fitness-goals:
     get:
       tags: [Fitness Goal]
@@ -4587,6 +5335,289 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /metrics:
+    get:
+      tags: [Measurements]
+      operationId: getMetricDefinitions
+      summary: List all active metric definitions with canonical units and bounds
+      responses:
+        '200':
+          description: Metric definitions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetricDefinitionResponse'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /measurements:
+    get:
+      tags: [Measurements]
+      operationId: getMeasurementsHistory
+      summary: Query paginated measurement time series with optional metric, date range, and sorting
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: metricCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200':
+          description: Paginated measurements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+    post:
+      tags: [Measurements]
+      operationId: recordMeasurement
+      summary: Record a new body measurement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordMeasurementRequest' }
+      responses:
+        '201':
+          description: Measurement recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+  /measurements/{id}:
+    get:
+      tags: [Measurements]
+      operationId: getMeasurementById
+      summary: Fetch single measurement by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Measurement details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /measurements/{id}/correction:
+    post:
+      tags: [Measurements]
+      operationId: correctMeasurement
+      summary: Correct an erroneous measurement preserving history and audit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CorrectMeasurementRequest' }
+      responses:
+        '200':
+          description: Corrected measurement created and old superseded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeasurementResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+        '409':
+          description: Measurement already corrected and superseded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /measurements/progress-photos:
+    get:
+      tags: [Progress Photos]
+      operationId: listProgressPhotos
+      summary: Query paginated progress photo metadata
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: fromDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: viewType
+          in: query
+          required: false
+          schema: { type: string, enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER] }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated progress photos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressPhotoPageResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
+    post:
+      tags: [Progress Photos]
+      operationId: uploadProgressPhoto
+      summary: Upload a new progress photo with antivirus scan and validation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                viewType:
+                  type: string
+                  enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER]
+                weightAtTime:
+                  type: number
+                weightUnitCode:
+                  type: string
+                takenAt:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressPhotoResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '503':
+          description: Antivirus scanner or object storage unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /measurements/progress-photos/{id}:
+    delete:
+      tags: [Progress Photos]
+      operationId: deleteProgressPhoto
+      summary: Soft-delete progress photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Photo deleted
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /measurements/progress-photos/{id}/file:
+    get:
+      tags: [Progress Photos]
+      operationId: downloadProgressPhotoFile
+      summary: Stream authorized progress photo binary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Photo binary stream
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+        '404': { $ref: '#/components/responses/MeasurementNotFound' }
+
+  /progress/summary:
+    get:
+      tags: [Progress Dashboard]
+      operationId: getProgressDashboardSummary
+      summary: Get deterministic workout and measurement progress snapshot
+      parameters:
+        - name: studentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [CURRENT_GOAL, LIFETIME]
+            default: CURRENT_GOAL
+        - name: fromDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Composite progress snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressDashboardSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/MeasurementForbidden' }
+
   /admin/content/knowledge/import:
     post:
       tags: [Admin Content Knowledge]
@@ -5489,6 +6520,16 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     AIForbidden:
       description: User lacks capability or account access for AI general knowledge inquiries
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MeasurementForbidden:
+      description: Actor lacks student ownership or active trainer coaching scope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MeasurementNotFound:
+      description: Measurement, metric, or progress photo not found
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -8395,6 +9436,448 @@ components:
         totalItems: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
 
+    AdminUserSummaryResponse:
+      type: object
+      required: [id, email, displayName, status, roles, hasStudentProfile, hasTrainerProfile, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        phoneNumber: { type: [string, 'null'] }
+        status: { type: string, enum: [PENDING_VERIFICATION, ACTIVE, SUSPENDED, DISABLED, DELETION_PENDING, DELETED] }
+        roles:
+          type: array
+          items: { type: string }
+        hasStudentProfile: { type: boolean }
+        hasTrainerProfile: { type: boolean }
+        trainerVerificationStatus: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+
+    AdminUserPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUserSummaryResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    StudentProfileDto:
+      type: object
+      required: [onboardingCompleted]
+      properties:
+        dateOfBirth: { type: [string, 'null'], format: date }
+        gender: { type: [string, 'null'] }
+        trainingExperienceLevel: { type: [string, 'null'] }
+        trainingExperienceMonths: { type: [number, 'null'] }
+        availableDaysPerWeek: { type: [integer, 'null'] }
+        preferredSessionMinutes: { type: [integer, 'null'] }
+        onboardingCompleted: { type: boolean }
+
+    TrainerProfileDto:
+      type: object
+      required: [verificationStatus, activityStatus, isAcceptingStudents, isActive]
+      properties:
+        publicSlug: { type: [string, 'null'] }
+        bio: { type: [string, 'null'] }
+        yearsExperience: { type: [number, 'null'] }
+        verificationStatus: { type: string }
+        activityStatus: { type: string }
+        verifiedAt: { type: [string, 'null'], format: date-time }
+        verifiedBy: { type: [string, 'null'], format: uuid }
+        isAcceptingStudents: { type: boolean }
+        isActive: { type: boolean }
+
+    AccountStatusHistoryDto:
+      type: object
+      required: [id, toStatus, reason, changedAt]
+      properties:
+        id: { type: string, format: uuid }
+        fromStatus: { type: [string, 'null'] }
+        toStatus: { type: string }
+        changedBy: { type: [string, 'null'], format: uuid }
+        changedByName: { type: [string, 'null'] }
+        reason: { type: string }
+        changedAt: { type: string, format: date-time }
+
+    AdminUserDetailResponse:
+      type: object
+      required: [id, email, displayName, status, roles, permissions, statusHistory, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        phoneNumber: { type: [string, 'null'] }
+        status: { type: string }
+        preferredLocale: { type: string }
+        timezone: { type: string }
+        emailVerifiedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        studentProfile: { $ref: '#/components/schemas/StudentProfileDto' }
+        trainerProfile: { $ref: '#/components/schemas/TrainerProfileDto' }
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/AccountStatusHistoryDto' }
+
+    AdminUserActionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 2000 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ChangeUserRoleRequest:
+      type: object
+      required: [roleCode, action, reason]
+      properties:
+        roleCode: { type: string }
+        action: { type: string, enum: [ASSIGN, REVOKE] }
+        reason: { type: string, minLength: 5, maxLength: 2000 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ForceLogoutResponse:
+      type: object
+      required: [revokedSessionCount, message]
+      properties:
+        revokedSessionCount: { type: integer }
+        message: { type: string }
+
+    StepUpRequest:
+      type: object
+      required: [actionCode, password]
+      properties:
+        actionCode: { type: string }
+        password: { type: string }
+
+    StepUpResponse:
+      type: object
+      required: [stepUpAuthenticationId, expiresAt]
+      properties:
+        stepUpAuthenticationId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    AdminDashboardSummaryResponse:
+      type: object
+      required: [pendingTrainerApplications, totalUsers, activeUsers, suspendedUsers, disabledUsers, pendingVerificationUsers]
+      properties:
+        pendingTrainerApplications: { type: integer }
+        totalUsers: { type: integer }
+        activeUsers: { type: integer }
+        suspendedUsers: { type: integer }
+        disabledUsers: { type: integer }
+        pendingVerificationUsers: { type: integer }
+
+    # Support
+    CreateSupportCaseRequest:
+      type: object
+      required: [requesterId, subject, description]
+      properties:
+        requesterId: { type: string, format: uuid }
+        subject: { type: string, minLength: 3, maxLength: 255 }
+        description: { type: string, minLength: 3, maxLength: 4000 }
+        priority: { type: string, default: MEDIUM }
+        category: { type: string }
+
+    UpdateSupportCaseStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: string }
+
+    AssignSupportCaseRequest:
+      type: object
+      required: [assignedToAdminId]
+      properties:
+        assignedToAdminId: { type: string, format: uuid }
+
+    AddSupportCaseNoteRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 2000 }
+
+    SupportCaseSummaryResponse:
+      type: object
+      required: [id, caseNumber, requesterId, requesterName, subject, status, priority, openedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        caseNumber: { type: string }
+        requesterId: { type: string, format: uuid }
+        requesterName: { type: string }
+        assignedToAdminId: { type: [string, 'null'], format: uuid }
+        assignedToAdminName: { type: [string, 'null'] }
+        subject: { type: string }
+        category: { type: [string, 'null'] }
+        status: { type: string }
+        priority: { type: string }
+        openedAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        closedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SupportCaseEventResponse:
+      type: object
+      required: [id, eventType, notes, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventType: { type: string }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorName: { type: [string, 'null'] }
+        notes: { type: string }
+        payloadJson: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
+    SupportCaseDetailResponse:
+      type: object
+      required: [summary, events]
+      properties:
+        summary: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/SupportCaseEventResponse' }
+
+    SupportCasePageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/SupportCaseSummaryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Moderation
+    CreateModerationCaseRequest:
+      type: object
+      required: [targetType, targetId, reason]
+      properties:
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        reason: { type: string }
+        priority: { type: string, default: MEDIUM }
+        notes: { type: string }
+
+    UpdateModerationStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        notes: { type: string }
+
+    PerformModerationActionRequest:
+      type: object
+      required: [actionType, reason]
+      properties:
+        actionType: { type: string }
+        targetUserId: { type: string, format: uuid }
+        reason: { type: string }
+        metadata: { type: object }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    ModerationCaseSummaryResponse:
+      type: object
+      required: [id, targetType, targetId, status, priority, openedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        targetDisplayName: { type: [string, 'null'] }
+        assignedToAdminId: { type: [string, 'null'], format: uuid }
+        assignedToAdminName: { type: [string, 'null'] }
+        status: { type: string }
+        priority: { type: string }
+        createdReason: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+        openedAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ModerationActionResponse:
+      type: object
+      required: [id, actionType, reason, performedAt]
+      properties:
+        id: { type: string, format: uuid }
+        actionType: { type: string }
+        targetUserId: { type: [string, 'null'], format: uuid }
+        targetUserName: { type: [string, 'null'] }
+        performedByAdminId: { type: [string, 'null'], format: uuid }
+        performedByAdminName: { type: [string, 'null'] }
+        reason: { type: string }
+        metadataJson: { type: [string, 'null'] }
+        performedAt: { type: string, format: date-time }
+
+    ModerationCaseDetailResponse:
+      type: object
+      required: [summary, actions]
+      properties:
+        summary: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/ModerationActionResponse' }
+
+    ModerationCasePageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ModerationCaseSummaryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Privileged Access
+    RequestPrivilegedAccessDto:
+      type: object
+      required: [targetUserId, purpose, accessScope, reason]
+      properties:
+        targetUserId: { type: string, format: uuid }
+        purpose: { type: string }
+        accessScope: { type: string }
+        reason: { type: string }
+        relatedSupportCaseId: { type: string, format: uuid }
+        durationMinutes: { type: integer, default: 60 }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    RevokePrivilegedAccessDto:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string }
+
+    PrivilegedAccessResponse:
+      type: object
+      required: [id, targetUserId, purpose, reason, status, requestedAt, currentlyActive]
+      properties:
+        id: { type: string, format: uuid }
+        requestedByAdminId: { type: [string, 'null'], format: uuid }
+        requestedByAdminName: { type: [string, 'null'] }
+        approvedByAdminId: { type: [string, 'null'], format: uuid }
+        approvedByAdminName: { type: [string, 'null'] }
+        targetUserId: { type: string, format: uuid }
+        targetUserName: { type: [string, 'null'] }
+        purpose: { type: string }
+        accessScopeJson: { type: [string, 'null'] }
+        reason: { type: string }
+        relatedSupportCaseId: { type: [string, 'null'], format: uuid }
+        supportCaseNumber: { type: [string, 'null'] }
+        status: { type: string }
+        requestedAt: { type: string, format: date-time }
+        approvedAt: { type: [string, 'null'], format: date-time }
+        openedAt: { type: [string, 'null'], format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        currentlyActive: { type: boolean }
+
+    PrivilegedAccessPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/PrivilegedAccessResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Data Correction
+    ExecuteDataCorrectionRequest:
+      type: object
+      required: [supportCaseId, targetType, targetId, reason, proposedData, privilegedAccessRequestId]
+      properties:
+        supportCaseId: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        reason: { type: string }
+        proposedData: { type: object }
+        privilegedAccessRequestId: { type: string, format: uuid }
+        stepUpPassword: { type: string }
+        stepUpAuthenticationId: { type: string, format: uuid }
+
+    DataCorrectionResponse:
+      type: object
+      required: [id, supportCaseId, targetType, targetId, beforeDataJson, proposedDataJson, appliedDataJson, validationResultJson, requestedBy, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        supportCaseId: { type: string, format: uuid }
+        caseNumber: { type: [string, 'null'] }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        beforeDataJson: { type: string }
+        proposedDataJson: { type: string }
+        appliedDataJson: { type: string }
+        validationResultJson: { type: string }
+        requestedBy: { type: string, format: uuid }
+        requestedByName: { type: [string, 'null'] }
+        appliedBy: { type: [string, 'null'], format: uuid }
+        appliedByName: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        appliedAt: { type: [string, 'null'], format: date-time }
+
+    DataCorrectionPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/DataCorrectionResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
+    # Audit Logs
+    AuditLogEntryResponse:
+      type: object
+      required: [id, actorRole, action, targetType, targetId, occurredAt]
+      properties:
+        id: { type: string }
+        actorUserId: { type: [string, 'null'], format: uuid }
+        actorRole: { type: string }
+        actorName: { type: [string, 'null'] }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        beforeDataJson: { type: [string, 'null'] }
+        afterDataJson: { type: [string, 'null'] }
+        metadataJson: { type: [string, 'null'] }
+        ipAddress: { type: [string, 'null'] }
+        userAgent: { type: [string, 'null'] }
+        occurredAt: { type: string, format: date-time }
+
+    AuditLogPageResponse:
+      type: object
+      required: [content, totalElements, totalPages, number, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AuditLogEntryResponse' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }
+
     TrainerDocumentUploadResponse:
       type: object
       required: [id, originalFilename, contentType, sizeBytes, scanStatus, createdAt]
@@ -10414,6 +11897,26 @@ components:
         actorId:
           type: string
           format: uuid
+        fromDate:
+          type: string
+          format: date
+          description: Start date of the summary window (inclusive).
+        toDate:
+          type: string
+          format: date
+          description: End date of the summary window (inclusive).
+        timezone:
+          type: string
+          description: Timezone identifier used for day boundaries.
+        requestedMetricCodes:
+          type: array
+          items:
+            type: string
+          description: Metric codes explicitly requested in the summary query.
+        metricScope:
+          type: string
+          enum: [ALL, SELECTED, UNKNOWN_LEGACY]
+          description: Scope of metrics requested (ALL for all metrics, SELECTED for specific metrics, UNKNOWN_LEGACY for older summaries without scope metadata).
         runStatus:
           type: string
           enum: [SUCCEEDED, FAILED, REJECTED_BY_VALIDATOR]
@@ -10483,6 +11986,153 @@ components:
           type: boolean
         currentWatermark:
           type: string
+
+    MetricDefinitionResponse:
+      type: object
+      required: [id, code, displayName, valueType, defaultUnitId, defaultUnitCode, defaultUnitSymbol, defaultDimension]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        displayName: { type: string }
+        description: { type: string, nullable: true }
+        valueType: { type: string, enum: [NUMERIC, TEXT, BOOLEAN] }
+        defaultUnitId: { type: integer, nullable: true }
+        defaultUnitCode: { type: string, nullable: true }
+        defaultUnitSymbol: { type: string, nullable: true }
+        defaultDimension: { type: string, nullable: true }
+        validMin: { type: number, nullable: true }
+        validMax: { type: number, nullable: true }
+        displayPrecision: { type: integer, nullable: true }
+        isActive: { type: boolean }
+
+    RecordMeasurementRequest:
+      type: object
+      required: [metricCode, measuredAt]
+      properties:
+        studentId: { type: string, format: uuid, nullable: true }
+        metricCode: { type: string }
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitCode: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time }
+        methodCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    CorrectMeasurementRequest:
+      type: object
+      required: [reason]
+      properties:
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitCode: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time, nullable: true }
+        notes: { type: string, nullable: true }
+        reason: { type: string }
+
+    MeasurementResponse:
+      type: object
+      required: [id, studentId, metricDefinitionId, metricCode, metricDisplayName, measuredAt, enteredBy, validationStatus, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        metricDefinitionId: { type: integer }
+        metricCode: { type: string }
+        metricDisplayName: { type: string }
+        numericValue: { type: number, nullable: true }
+        textValue: { type: string, nullable: true }
+        booleanValue: { type: boolean, nullable: true }
+        unitId: { type: integer, nullable: true }
+        unitCode: { type: string, nullable: true }
+        unitSymbol: { type: string, nullable: true }
+        measuredAt: { type: string, format: date-time }
+        sourceCode: { type: string, nullable: true }
+        sourceName: { type: string, nullable: true }
+        sourceKind: { type: string, nullable: true }
+        methodCode: { type: string, nullable: true }
+        methodName: { type: string, nullable: true }
+        enteredBy: { type: string, format: uuid }
+        confidenceScore: { type: number, nullable: true }
+        qualityScore: { type: number, nullable: true }
+        validationStatus: { type: string, enum: [PENDING, VALID, SUSPECT, REJECTED, SUPERSEDED] }
+        supersededById: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    MeasurementPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasMore]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/MeasurementResponse' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        hasMore: { type: boolean }
+
+    ProgressPhotoResponse:
+      type: object
+      required: [id, studentId, mediaFileId, takenAt, viewType, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        mediaFileId: { type: string, format: uuid }
+        takenAt: { type: string, format: date }
+        viewType: { type: string, enum: [FRONT, BACK, SIDE_LEFT, SIDE_RIGHT, OTHER] }
+        weightAtTime: { type: number, nullable: true }
+        weightUnitCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    ProgressPhotoPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasMore]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/ProgressPhotoResponse' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        hasMore: { type: boolean }
+
+    ProgressDashboardSummaryResponse:
+      type: object
+      required: [studentId, scope, windowStart, windowEnd, referenceTime, asOf, workout, measurement, continuity, historicalLimits, compositeWatermark]
+      properties:
+        studentId: { type: string, format: uuid }
+        scope: { type: string, enum: [CURRENT_GOAL, LIFETIME] }
+        windowStart: { type: string, format: date-time }
+        windowEnd: { type: string, format: date-time }
+        referenceTime: { type: string, format: date-time }
+        asOf: { type: string, format: date-time }
+        goal:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+            status: { type: string }
+            startDate: { type: string, format: date }
+            targetDate: { type: string, format: date }
+            durationDays: { type: integer }
+            targets:
+              type: array
+              items:
+                type: object
+                properties:
+                  metricCode: { type: string }
+                  targetNumericValue: { type: number }
+                  unitCode: { type: string }
+        workout: { type: object, additionalProperties: true }
+        measurement: { type: object, additionalProperties: true }
+        continuity: { type: object, additionalProperties: true }
+        historicalLimits: { type: object, additionalProperties: true }
+        compositeWatermark: { type: string }
 
 security:
   - bearerAuth: []
