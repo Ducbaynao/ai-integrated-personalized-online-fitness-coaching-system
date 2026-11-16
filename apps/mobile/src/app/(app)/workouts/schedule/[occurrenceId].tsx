@@ -6,9 +6,10 @@ import { StudentWorkoutScheduleDetailScreen } from '@/features/workout-schedule/
 
 export default function PlannedWorkoutDetailRoute() {
   const { user, isLoading } = useAuth();
-  const { occurrenceId } = useLocalSearchParams<{ occurrenceId: string }>();
+  const { occurrenceId, recommendationId } = useLocalSearchParams<{ occurrenceId: string; recommendationId?: string }>();
   if (isLoading) return null;
   if (!canAccessWorkoutPlans(user)) return <Redirect href="/(app)" />;
   const id = typeof occurrenceId === 'string' ? occurrenceId : '';
-  return <StudentWorkoutScheduleDetailScreen key={`${user?.id}:${id}`} occurrenceId={id} />;
+  const recId = typeof recommendationId === 'string' ? recommendationId : undefined;
+  return <StudentWorkoutScheduleDetailScreen key={`${user?.id}:${id}`} occurrenceId={id} initialRecommendationId={recId} />;
 }

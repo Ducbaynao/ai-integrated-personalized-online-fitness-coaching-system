@@ -111,15 +111,21 @@ public class SimulatedF03AiServiceClient implements F03AiServiceClient {
 
             } else if (request.requestedChangeType() == ChangeType.LOAD_ADJUSTMENT) {
                 BigDecimal beforeLoad = base.targetLoad() != null ? base.targetLoad() : BigDecimal.valueOf(20.0);
+                String beforeUnit = base.loadUnit() != null ? base.loadUnit() : "KG";
+                Integer beforeUnitId = base.loadUnitId();
                 Map<String, Object> before = new LinkedHashMap<>();
                 before.put("targetLoad", beforeLoad);
-                before.put("loadUnit", "KG");
-                before.put("loadUnitId", 1);
+                before.put("loadUnit", beforeUnit);
+                if (beforeUnitId != null) {
+                    before.put("loadUnitId", beforeUnitId);
+                }
                 change.put("before", before);
 
                 Map<String, Object> after = new LinkedHashMap<>();
-                after.put("loadUnit", "KG");
-                after.put("loadUnitId", 1);
+                after.put("loadUnit", beforeUnit);
+                if (beforeUnitId != null) {
+                    after.put("loadUnitId", beforeUnitId);
+                }
 
                 if (request.allowLoadIncrease()) {
                     BigDecimal delta = BigDecimal.valueOf(2.5);

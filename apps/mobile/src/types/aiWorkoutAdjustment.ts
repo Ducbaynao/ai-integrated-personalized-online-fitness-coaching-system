@@ -161,7 +161,9 @@ export interface RejectAdjustmentApiResponse {
 
 export interface AiWorkoutAdjustmentDetail {
   id: string;
+  recommendationId?: string;
   aiRunId: string;
+  runId?: string;
   studentId: string;
   coachingPeriodId: string | null;
   recommendationType: string;
@@ -180,6 +182,62 @@ export interface AiWorkoutAdjustmentDetail {
   lastModifiedBy: string | null;
   createdAt: string;
   updatedAt: string;
-  payload: F03WorkoutAdjustmentPayload;
+  structuredPayload: F03WorkoutAdjustmentPayload;
+  payload?: F03WorkoutAdjustmentPayload;
   originalPayload: F03WorkoutAdjustmentPayload | null;
+  sharedWithStudent?: boolean;
+  sharedRevision?: number | null;
+  sharedAt?: string | null;
+  sharedBy?: string | null;
+}
+
+export interface F03FieldDiff {
+  field: string;
+  changeType?: string;
+  originalValue?: string | null;
+  customizedValue?: string | null;
+  description?: string;
+  before?: unknown;
+  after?: unknown;
+  delta?: number | null;
+}
+
+export interface F03DraftDiff {
+  hasChanges: boolean;
+  changeType?: string;
+  summary?: string;
+  fieldDiffs: F03FieldDiff[];
+}
+
+export interface UpdateAdjustmentDraftApiRequest {
+  expectedRevision: number;
+  title?: string;
+  explanation?: string;
+  structuredPayload: F03WorkoutAdjustmentPayload | Record<string, unknown>;
+}
+
+export interface UpdateAdjustmentDraftApiResponse {
+  recommendationId: string;
+  revision: number;
+  isCustomized: boolean;
+  status: AdjustmentRecommendationStatus;
+  title: string;
+  explanation: string;
+  updatedAt: string;
+  structuredPayload: F03WorkoutAdjustmentPayload;
+  originalPayload: F03WorkoutAdjustmentPayload | null;
+  diff?: F03DraftDiff | null;
+}
+
+export interface ShareAdjustmentDraftApiRequest {
+  expectedRevision: number;
+  shareNote?: string;
+}
+
+export interface ShareAdjustmentDraftApiResponse {
+  recommendationId: string;
+  sharedWithStudent: boolean;
+  sharedRevision: number;
+  sharedAt: string;
+  sharedBy: string;
 }

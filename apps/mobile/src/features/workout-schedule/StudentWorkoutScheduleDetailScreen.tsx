@@ -25,7 +25,13 @@ const EMPTY_DESTINATION: WorkoutScheduleChangeDestination = {
   timezone: '', localStart: '', localEnd: '', startUtcOffset: '', endUtcOffset: '',
 };
 
-export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenceId: string }) {
+export function StudentWorkoutScheduleDetailScreen({
+  occurrenceId,
+  initialRecommendationId,
+}: {
+  occurrenceId: string;
+  initialRecommendationId?: string;
+}) {
   const { user, activeCapability } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
@@ -44,7 +50,8 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
   const [retryCommand, setRetryCommand] = useState<Command | null>(null);
   const [needsReview, setNeedsReview] = useState(false);
   const submitting = useRef(false);
-  const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(false);
+  const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(Boolean(initialRecommendationId));
+  const [activeRecommendationId, setActiveRecommendationId] = useState<string | undefined>(initialRecommendationId);
 
   const planId = item?.planSummary?.planId ?? '';
   const planVersionId = item?.planSummary?.planVersionId ?? '';
@@ -250,6 +257,7 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
         visible={isAdjustmentModalVisible}
         studentId={studentId}
         initialScope="ONE_MATERIALIZED_OCCURRENCE"
+        initialRecommendationId={activeRecommendationId}
         occurrenceContext={{
           plannedWorkoutId: occurrenceId,
           occurrenceVersion: item.occurrenceVersion,
@@ -266,9 +274,13 @@ export function StudentWorkoutScheduleDetailScreen({ occurrenceId }: { occurrenc
               }
             : undefined
         }
-        onClose={() => setIsAdjustmentModalVisible(false)}
+        onClose={() => {
+          setIsAdjustmentModalVisible(false);
+          setActiveRecommendationId(undefined);
+        }}
         onAdjustmentApplied={async () => {
           setIsAdjustmentModalVisible(false);
+          setActiveRecommendationId(undefined);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
           if (planId) {
             await client.invalidateQueries({ queryKey: workoutPlanQueryKeys.detail(studentId, planId) });

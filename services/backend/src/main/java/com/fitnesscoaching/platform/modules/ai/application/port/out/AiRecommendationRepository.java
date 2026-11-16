@@ -34,6 +34,16 @@ public interface AiRecommendationRepository {
             UUID lastModifiedBy
     );
 
+    void shareDraft(
+            UUID id,
+            int sharedRevision,
+            String sharedTitle,
+            String sharedExplanation,
+            String sharedPayload,
+            UUID sharedBy,
+            Instant sharedAt
+    );
+
     AiRecommendationApplication saveApplication(AiRecommendationApplication application);
 
     Optional<AiRecommendationApplication> findApplicationByRecommendationId(UUID recommendationId);

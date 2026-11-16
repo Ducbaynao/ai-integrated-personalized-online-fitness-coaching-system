@@ -11,6 +11,10 @@ import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AcceptAdjustme
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AiRecommendationDetailApiResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectAdjustmentApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectAdjustmentApiResponse;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiResponse;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.WorkoutAdjustmentApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.WorkoutAdjustmentApiResponse;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutAdjustmentUseCase;
@@ -21,8 +25,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -124,8 +130,51 @@ public class AiWorkoutAdjustmentController {
                 rec.createdAt(),
                 rec.updatedAt(),
                 payload,
-                origPayload
+                origPayload,
+                rec.sharedWithStudent(),
+                rec.sharedRevision(),
+                rec.sharedAt(),
+                rec.sharedBy()
         ));
+    }
+
+    @PutMapping("/workout-adjustments/{recommendationId}/draft")
+    public ResponseEntity<UpdateAdjustmentDraftApiResponse> updateWorkoutAdjustmentDraft(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID recommendationId,
+            @RequestBody UpdateAdjustmentDraftApiRequest request
+    ) {
+        UUID actorId = extractActor(jwt);
+        if (request == null || request.expectedRevision() == null) {
+            throw new AiRunValidationException("expectedRevision is required to update recommendation draft.");
+        }
+        if (request.structuredPayload() == null) {
+            throw new AiRunValidationException("structuredPayload is required to update recommendation draft.");
+        }
+
+        UpdateAdjustmentDraftApiResponse response = adjustmentUseCase.updateDraft(actorId, recommendationId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/workout-adjustments/{recommendationId}")
+    public ResponseEntity<UpdateAdjustmentDraftApiResponse> patchWorkoutAdjustment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID recommendationId,
+            @RequestBody UpdateAdjustmentDraftApiRequest request
+    ) {
+        return updateWorkoutAdjustmentDraft(jwt, recommendationId, request);
+    }
+
+    @PostMapping("/workout-adjustments/{recommendationId}/share")
+    public ResponseEntity<ShareAdjustmentDraftApiResponse> shareWorkoutAdjustmentDraft(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID recommendationId,
+            @RequestBody(required = false) ShareAdjustmentDraftApiRequest request
+    ) {
+        UUID actorId = extractActor(jwt);
+        ShareAdjustmentDraftApiRequest req = request != null ? request : new ShareAdjustmentDraftApiRequest(null, null);
+        ShareAdjustmentDraftApiResponse response = adjustmentUseCase.shareDraft(actorId, recommendationId, req);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/workout-adjustments/{recommendationId}/accept")

@@ -26,7 +26,14 @@ public record AiRecommendation(
         UUID lastModifiedBy,
         String sourceSnapshot,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean sharedWithStudent,
+        Integer sharedRevision,
+        Instant sharedAt,
+        UUID sharedBy,
+        String sharedTitle,
+        String sharedExplanation,
+        String sharedPayload
 ) {
     public static Builder builder() {
         return new Builder();
@@ -34,6 +41,54 @@ public record AiRecommendation(
 
     public boolean isExpired(Instant now) {
         return expiresAt != null && now.isAfter(expiresAt);
+    }
+
+    public AiRecommendation withSharedView(int rev, String sharedTitle, String sharedExplanation, String payload, Instant sharedAt, UUID sharedBy) {
+        boolean customized = rev > 1;
+        return withSharedView(rev, sharedTitle, sharedExplanation, payload, sharedAt, sharedBy, customized);
+    }
+
+    public AiRecommendation withSharedView(
+            int rev,
+            String sharedTitle,
+            String sharedExplanation,
+            String payload,
+            Instant sharedAt,
+            UUID sharedBy,
+            boolean isCustomized
+    ) {
+        return new AiRecommendation(
+                id,
+                aiRunId,
+                studentId,
+                coachingPeriodId,
+                recommendationType,
+                sharedTitle,
+                sharedExplanation,
+                payload,
+                status,
+                decisionAuthority,
+                targetEntityType,
+                targetEntityId,
+                decidedBy,
+                decidedAt,
+                decisionNote,
+                expiresAt,
+                rev,
+                originalPayload,
+                isCustomized,
+                sharedBy,
+                sourceSnapshot,
+                createdAt,
+                sharedAt,
+                sharedWithStudent,
+                rev,
+                sharedAt,
+                sharedBy,
+                sharedTitle,
+                sharedExplanation,
+                payload
+        );
     }
 
     public static class Builder {
@@ -60,6 +115,13 @@ public record AiRecommendation(
         private String sourceSnapshot;
         private Instant createdAt;
         private Instant updatedAt;
+        private boolean sharedWithStudent = false;
+        private Integer sharedRevision;
+        private Instant sharedAt;
+        private UUID sharedBy;
+        private String sharedTitle;
+        private String sharedExplanation;
+        private String sharedPayload;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder aiRunId(UUID aiRunId) { this.aiRunId = aiRunId; return this; }
@@ -84,6 +146,13 @@ public record AiRecommendation(
         public Builder sourceSnapshot(String sourceSnapshot) { this.sourceSnapshot = sourceSnapshot; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(Instant updatedAt) { this.updatedAt = updatedAt; return this; }
+        public Builder sharedWithStudent(boolean sharedWithStudent) { this.sharedWithStudent = sharedWithStudent; return this; }
+        public Builder sharedRevision(Integer sharedRevision) { this.sharedRevision = sharedRevision; return this; }
+        public Builder sharedAt(Instant sharedAt) { this.sharedAt = sharedAt; return this; }
+        public Builder sharedBy(UUID sharedBy) { this.sharedBy = sharedBy; return this; }
+        public Builder sharedTitle(String sharedTitle) { this.sharedTitle = sharedTitle; return this; }
+        public Builder sharedExplanation(String sharedExplanation) { this.sharedExplanation = sharedExplanation; return this; }
+        public Builder sharedPayload(String sharedPayload) { this.sharedPayload = sharedPayload; return this; }
 
         public AiRecommendation build() {
             String orig = originalPayload != null ? originalPayload : structuredPayload;
@@ -110,7 +179,14 @@ public record AiRecommendation(
                     lastModifiedBy,
                     sourceSnapshot,
                     createdAt != null ? createdAt : Instant.now(),
-                    updatedAt != null ? updatedAt : Instant.now()
+                    updatedAt != null ? updatedAt : Instant.now(),
+                    sharedWithStudent,
+                    sharedRevision,
+                    sharedAt,
+                    sharedBy,
+                    sharedTitle,
+                    sharedExplanation,
+                    sharedPayload
             );
         }
     }

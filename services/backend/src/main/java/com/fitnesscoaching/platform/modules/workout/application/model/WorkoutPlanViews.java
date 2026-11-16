@@ -45,9 +45,18 @@ public final class WorkoutPlanViews {
     public record PrescriptionView(
             UUID id, UUID exerciseVariationId, int sequenceNumber,
             Integer targetSets, Integer targetRepsMin, Integer targetRepsMax,
-            BigDecimal targetLoad, Integer restSeconds, Integer durationSeconds, String instructions,
+            BigDecimal targetLoad, Short loadUnitId, Integer restSeconds, Integer durationSeconds, String instructions,
             ExercisePresentation exercise
-    ) {}
+    ) {
+        public PrescriptionView(
+                UUID id, UUID exerciseVariationId, int sequenceNumber,
+                Integer targetSets, Integer targetRepsMin, Integer targetRepsMax,
+                BigDecimal targetLoad, Integer restSeconds, Integer durationSeconds, String instructions,
+                ExercisePresentation exercise
+        ) {
+            this(id, exerciseVariationId, sequenceNumber, targetSets, targetRepsMin, targetRepsMax, targetLoad, null, restSeconds, durationSeconds, instructions, exercise);
+        }
+    }
 
     public record ExercisePresentation(
             UUID variationId, UUID exerciseId, String exerciseName, String variationName,

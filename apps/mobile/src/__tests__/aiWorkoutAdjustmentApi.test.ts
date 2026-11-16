@@ -117,12 +117,64 @@ describe('aiWorkoutAdjustmentApi', () => {
     const result = await aiWorkoutAdjustmentApi.reject('rec-123', {
       reason: 'Không phù hợp',
     });
-
     expect(request).toHaveBeenCalledWith('/ai/workout-adjustments/rec-123/reject', {
       method: 'POST',
       body: { reason: 'Không phù hợp' },
     });
     expect(result).toEqual(mockReject);
+  });
+
+  it('updateDraft calls PUT /ai/workout-adjustments/{id}/draft with body', async () => {
+    const mockUpdateResponse = {
+      recommendationId: 'rec-123',
+      revision: 2,
+      isCustomized: true,
+      status: 'PENDING',
+      title: 'Tiêu đề đã sửa',
+      explanation: 'Giải thích đã sửa',
+      updatedAt: '2026-11-15T12:00:00Z',
+      structuredPayload: { changes: [] },
+      originalPayload: { changes: [] },
+      diff: { hasChanges: true, fieldDiffs: [] },
+    };
+    (request as jest.Mock).mockResolvedValueOnce(mockUpdateResponse);
+
+    const body = {
+      expectedRevision: 1,
+      title: 'Tiêu đề đã sửa',
+      explanation: 'Giải thích đã sửa',
+      structuredPayload: { changes: [] } as any,
+    };
+    const result = await aiWorkoutAdjustmentApi.updateDraft('rec-123', body);
+
+    expect(request).toHaveBeenCalledWith('/ai/workout-adjustments/rec-123/draft', {
+      method: 'PUT',
+      body,
+    });
+    expect(result).toEqual(mockUpdateResponse);
+  });
+
+  it('shareDraft calls POST /ai/workout-adjustments/{id}/share with expectedRevision', async () => {
+    const mockShareResponse = {
+      recommendationId: 'rec-123',
+      sharedWithStudent: true,
+      sharedRevision: 2,
+      sharedAt: '2026-11-15T12:05:00Z',
+      sharedBy: 'trainer-1',
+    };
+    (request as jest.Mock).mockResolvedValueOnce(mockShareResponse);
+
+    const body = {
+      expectedRevision: 2,
+      shareNote: 'Em xem đề xuất này nhé',
+    };
+    const result = await aiWorkoutAdjustmentApi.shareDraft('rec-123', body);
+
+    expect(request).toHaveBeenCalledWith('/ai/workout-adjustments/rec-123/share', {
+      method: 'POST',
+      body,
+    });
+    expect(result).toEqual(mockShareResponse);
   });
 
   describe('getWorkoutAdjustmentErrorMessage', () => {
@@ -169,6 +221,26 @@ describe('aiWorkoutAdjustmentApi', () => {
     it('maps AI_RUN_LIFECYCLE_CONFLICT for Idempotency conflict', () => {
       const err = makeError(409, 'Idempotency conflict detected', 'AI_RUN_LIFECYCLE_CONFLICT');
       expect(getWorkoutAdjustmentErrorMessage(err)).toContain('Xung đột thao tác');
+    });
+
+    it('maps AI_RUN_LIFECYCLE_CONFLICT for Revision conflict', () => {
+      const err = makeError(409, 'Revision conflict: expected revision 1 but was 2', 'AI_RUN_LIFECYCLE_CONFLICT');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('xung đột phiên bản');
+    });
+
+    it('maps AI_RUN_LIFECYCLE_CONFLICT for snapshot corrupted/missing', () => {
+      const err = makeError(409, 'Shared draft snapshot data is missing or corrupted', 'AI_RUN_LIFECYCLE_CONFLICT');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('thiếu hoặc hỏng dữ liệu snapshot');
+    });
+
+    it('maps 403 / AI_FORBIDDEN for private unshared trainer draft', () => {
+      const err = makeError(403, 'Access denied: Private trainer draft has not been shared with the student.', 'AI_FORBIDDEN');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('chưa được chia sẻ cho học viên');
+    });
+
+    it('maps 403 for share draft in SELF_DIRECTED', () => {
+      const err = makeError(403, 'Cannot share draft in SELF_DIRECTED coaching mode.', 'AI_FORBIDDEN');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('tự tập luyện (SELF_DIRECTED)');
     });
 
     it('maps 403 / AI_RUN_ACCESS_DENIED to authority explanation', () => {

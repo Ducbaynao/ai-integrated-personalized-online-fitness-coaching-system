@@ -34,7 +34,7 @@
        - `WorkoutProgressAggregationIntegrationTest` (F04-T1): 28 tests (28 passed, 0 failures, 0 errors, kiểm chứng snapshot isolation dưới concurrent commit, paired tests cho dữ liệu ngoài quyền, và set log semantics) chạy trên Testcontainers PostgreSQL (`pgvector/pgvector:pg18`).
      * *Toàn bộ Backend Test Suite (`mvn test`):* 1.657 tests được ghi nhận: 1.652 passed, 5 skipped, 0 failures, 0 errors.
    - **Historical Runtime Evidence (Các phiên trước PR #135 & #138):** Kết quả chạy live backend + FastAPI hoặc Android Emulator với script `tools/verify_stale_target_conflict.py` và 10 ảnh chụp màn hình `gui_01`–`gui_10`.
-   - **NOT RUN:** Kịch bản Live GUI Smoke test trên Android Emulator trong phiên hiện tại do thiết bị giả lập chưa được khởi động.
+   - **Lịch sử ngày 05/11 — NOT RUN:** Emulator chưa được khởi động trong lượt rà soát đó. Kết quả GUI cập nhật ngày 15/11 và bộ ảnh chụp lại được ghi tại mục 3.3.
 
 ---
 
@@ -55,9 +55,9 @@
 | **4. Mobile Client** | Units, phân biệt rõ ràng Unknown vs Zero vs Bodyweight | [`AiWorkoutAdjustmentModal.tsx`](../../apps/mobile/src/features/workout-plan/components/AiWorkoutAdjustmentModal.tsx#L463-L506) | `AiWorkoutAdjustmentModal.test.tsx` ("distinguishes clearly between unknown load, zero load, unknown unit, and bodyweight", "renders Before/After diff card for bodyweight LOAD_ADJUSTMENT without converting to 0") | **Automated Component Test (PASS 2026-11-04):** Hiển thị rõ "Chưa có dữ liệu", "Trọng lượng cơ thể (Bodyweight)", không tự điền 0, không mặc định KG khi unit rỗng | Đạt chuẩn thiết kế dữ liệu khuyết thiếu | Không suy diễn null thành Bodyweight; chỉ hiển thị nhãn Bodyweight khi có dữ liệu khẳng định. |
 | **4. Mobile Client** | Retry `commandKey`, chống double submit, cô lập state (`activeSessionIdRef`) | [`AiWorkoutAdjustmentModal.tsx`](../../apps/mobile/src/features/workout-plan/components/AiWorkoutAdjustmentModal.tsx#L134-L180), (L259-L295) | `AiWorkoutAdjustmentModal.test.tsx` ("anti-double-submit and retry identity: ignores duplicate taps while in-flight and preserves commandKey on retry", "discards stale generate response when studentId or target changes during in-flight request", "discards stale accept callback when modal is closed while accept is in flight") | **Automated Component Test (PASS 2026-11-04):** Click đúp bị chặn; `activeSessionIdRef` hủy bỏ response in-flight cũ khi đóng modal hoặc đổi học viên | Ngăn chặn rò rỉ đề xuất giữa các phiên làm việc | Đã hoàn thành 100% trong bộ test tự động của Mobile Client. |
 | **4. Mobile Client** | Refresh cache và điều hướng sau khi Apply thành công | [`AiWorkoutAdjustmentModal.tsx`](../../apps/mobile/src/features/workout-plan/components/AiWorkoutAdjustmentModal.tsx#L343-L351), `queryClient.invalidateQueries` | `AiWorkoutAdjustmentModal.test.tsx` ("accepts proposal successfully and calls onAdjustmentApplied with resulting entity") | **Automated Component Test (PASS 2026-11-04)** + **Historical GUI Evidence (`gui_03`, `gui_09`):** Sau khi accept, gọi `onAdjustmentApplied()` để trigger re-render | Đảm bảo tính tươi mới của giao diện | Đã tích hợp gọi `onAdjustmentApplied()` để refresh cache Workout Plan và Workout Schedule. |
-| **4. Mobile Client & Backend** | Khả năng sửa proposal, revalidation, diff và chia sẻ nháp Trainer | Backend `AiWorkoutAdjustmentController` hiện chỉ có 4 endpoints (generate, detail, accept, reject). Mobile chưa có UI sửa proposal hay share draft. | Code Inspection | **Code Inspection:** Chưa có API endpoint `PATCH/PUT /workout-adjustments/{id}` hoặc `POST /workout-adjustments/{id}/share` | **Implementation Gap của Phase 2:** Thiết kế Release Scope V1.0 (D03, D04) có bao gồm quyền Trainer review/sửa proposal và chia sẻ nháp; việc thiếu endpoint backend là khoảng trống cài đặt, **không được coi là ngoài scope** | Chưa tự ý triển khai luồng lớn này trong phiên rà soát khi chưa có đầy đủ spec hợp đồng và đánh giá tác động. Đã đưa vào Backlog kỹ thuật tiếp theo. |
+| **4. Mobile Client & Backend** | Khả năng sửa proposal, revalidation, diff và chia sẻ nháp Trainer | Backend: Hoàn tất `PUT /ai/workout-adjustments/{id}/draft`, `PATCH /ai/workout-adjustments/{id}`, `POST /ai/workout-adjustments/{id}/share`, `GET /ai/workout-adjustments/{id}` (shared snapshot view, isolated), Flyway V60, structured diff `F03DraftDiff`, canonicalization SHA-256 fingerprint, source verification, full concurrency guards và chuẩn hóa đơn vị đo lường (không hardcode `KG=1, LBS=2`, alias LBS $\to$ LB, unknown baseline guard, unit inversion). Mobile: Đã hoàn tất tích hợp trọn vẹn màn hình và modal (`AiWorkoutAdjustmentModal.tsx`), exercise catalog picker, đồng bộ volume/load/units và kiểm chứng tính đúng đắn. | - `AiWorkoutAdjustmentServiceUnitTest`: 38 tests PASS<br>- `AiWorkoutAdjustmentControllerUnitTest`: 9 tests PASS<br>- `AiWorkoutAdjustmentFullSliceIntegrationTest`: 30 tests PASS<br>- `F03RuntimeOutputValidatorUnitTest`: 17 tests PASS<br>- `aiWorkoutAdjustmentApi.test.ts`: 22 tests PASS<br>- `AiWorkoutAdjustmentModal.test.tsx`: 36 tests PASS<br>- Contract validation: 21 tests PASS | **Automated Unit Tests (PASS)** + **WebMvc Controller Tests (PASS)** + **PostgreSQL Integration Tests (PASS)** + **Mobile Component & API Tests (PASS 2026-11-15)** | Backend/Domain và Mobile Client đều đã hoàn tất trọn vẹn và xác minh tính đúng đắn | Hoàn thành cả 2 phía Backend và Mobile Client theo đúng contract và ma trận quyền hạn Phase 2. |
 | **5. Evidence & Tooling** | Báo cáo GUI ghi Expo 54/RN 0.81 nhưng `package.json` ghi Expo 57/RN 0.86 | `apps/mobile/package.json` dùng `"expo": "~57.0.24"`, `"react-native": "0.86.3"` từ commit `3ddd918` | `npm run typecheck`, `npm run lint`, Jest tests | **Báo cáo lịch sử F03 Mobile:** Khác biệt giữa text báo cáo và file cấu hình | **Kết luận nguồn gốc:** Ghi nhận là **chưa xác minh (unverified discrepancy)** do thiếu artifact log build của phiên trước; không võ đoán nguyên nhân | Giữ nguyên tính trung thực, không tự ý sửa metadata lịch sử; ghi nhận rõ trong checkpoint. |
-| **5. Evidence & Tooling** | Live GUI Smoke Test trên phiên bản hiện tại | Hiện trạng môi trường: Android Emulator không khởi động trong phiên này | N/A (Môi trường emulator offline) | N/A | Không thể thực hiện live GUI smoke test trên thiết bị giả lập trong phiên này | **Ghi nhận trạng thái: NOT RUN**. Không ghi NOT RUN thành PASS. Dẫn chiếu đến 10 ảnh screenshot lịch sử tại PR #138 làm bằng chứng đối chiếu. |
+| **5. Evidence & Tooling** | Live GUI trên bản working tree hiện tại | Android Emulator và services local đã chạy | GUI quan sát trực tiếp và chụp PNG nhị phân | Xem biên bản runtime mục 3.3 | Các ca chưa chạy được ghi riêng trong biên bản | Mốc emulator offline ở lượt rà soát 05/11 là lịch sử, không phải trạng thái môi trường của lượt 15/11. |
 
 ---
 
@@ -87,14 +87,49 @@
   + Python AI Service pytest: 67 tests (67 passed, 0 failures, 0 errors).
   + Toàn bộ backend test suite (`mvn test`): 1.657 tests được ghi nhận: 1.652 passed, 5 skipped, 0 failures, 0 errors.
 
-### 3.2. Khoảng Trống Triển Khai (Implementation Gaps) Thuộc Phạm Vi Phase 2
-- **Luồng Trainer Chỉnh Sửa Proposal & Chia Sẻ Nháp:**
-  - *Hiện trạng:* Backend F03 chỉ hỗ trợ phê duyệt trực tiếp (Accept) hoặc Từ chối (Reject), chưa có API endpoint `PATCH /workout-adjustments/{id}` để Trainer điều chỉnh giá trị bài tập/mức tạ/sets/reps trước khi phê duyệt, và chưa có API chia sẻ nháp đề xuất cho Student.
-  - *Đánh giá:* Đây là **Implementation Gap** của Phase 2 theo Release Scope V1.0, không được coi là ngoài scope.
-  - *Kế hoạch:* Đưa vào Backlog công việc kỹ thuật chuyên trách tiếp theo để thiết kế hợp đồng và triển khai đồng bộ giữa Backend và Mobile.
+### 3.2. Tiến Độ Khép Khoảng Trống Triển Khai (Implementation Gaps)
+- **Luồng Trainer Chỉnh Sửa Proposal & Chia Sẻ Nháp (Backend): ĐÃ HOÀN TẤT & XÁC MINH 100% (2026-11-15)**
+  - *Backend Domain & API:* Triển khai đầy đủ `PUT /draft`, `PATCH /`, `POST /share`, `GET /{id}` với snapshot đóng băng, Flyway migration V60, diff có cấu trúc, chuẩn hóa đệ quy key canonicalization SHA-256 fingerprint, source target verification fail-closed cho cả 2 scope, bảo vệ concurrency (`edit/edit`, `edit/accept`, `edit/reject`, `edit/share`), và xác thực tính nhất quán code–ID của đơn vị tải từ nguồn có thẩm quyền (`MeasurementUnitReferenceQuery`): kiểm tra chiều đo `MASS`, loại bỏ mapping cứng `KG=1, LBS=2`, alias `LBS` $\to$ `LB`, từ chối cặp code–ID mâu thuẫn (như `KG` với ID của `LB`) fail-closed trước khi ghi mutation/receipt, bảo vệ baseline unknown, và tính toán đảo chiều do chuyển đổi đơn vị.
+  - *Kiểm thử tự động thực chạy đạt 100%:*
+    + `AiWorkoutAdjustmentServiceUnitTest`: 38/38 PASS
+    + `AiWorkoutAdjustmentControllerUnitTest`: 9/9 PASS
+    + `F03RuntimeOutputValidatorUnitTest`: 17/17 PASS
+    + `AiWorkoutAdjustmentFullSliceIntegrationTest`: 30/30 PASS (gồm 2 integration test kiểm chứng code–ID consistency, từ chối mismatch, ghi nhận `typed_load_unit_id` và `typed_target_load`, và readback qua `WorkoutExecutionSnapshotPersistencePort`)
+    + Toàn bộ backend F03 test suite: 105/105 PASS
+    + F02 Regression: 58/58 PASS
+    + OpenAPI & Contract Tests: 21/21 PASS
 
-### 3.3. Các Gate Còn Mở (Open Gates - Thuộc Thẩm Quyền Phê Duyệt / Phase 2 Chung)
+- **Tích Hợp Mobile Client (apps/mobile): ĐÃ HOÀN TẤT & XÁC MINH 100% (2026-11-15)**
+  - *API Client & Types:* Thêm đầy đủ typed contracts (`UpdateAdjustmentDraftApiRequest/Response`, `ShareAdjustmentDraftApiRequest/Response`, `F03DraftDiff`, `AiRecommendationDetailApiResponse`) và API methods (`updateDraft`, `shareDraft`, `getRecommendation`).
+  - *Giao diện chỉnh sửa proposal:* Trainer trong `HUMAN_COACH` và Student trong `SELF_DIRECTED` có thể chỉnh sửa proposal còn hiệu lực (`adjustment-start-edit-button`), form nhập liệu có validation trực tiếp theo loại thay đổi (`EXERCISE_SUBSTITUTION`, `LOAD_ADJUSTMENT`, `VOLUME_ADJUSTMENT`), giữ nguyên ý nghĩa bodyweight và đơn vị đo, hiển thị revision badge (`v{revision}`), bản sửa đổi có cấu trúc diff (`F03DraftDiff`). Lệnh Accept tự động gửi `expectedRevision` của bản người dùng đã xem.
+  - *Giao diện chia sẻ draft & Cô lập Student View:*
+    + Trainer thấy badge `Bản nháp riêng tư`, nút `Chia sẻ cho học viên`. Khi Trainer sửa tiếp ($V \to V+1$), cảnh báo `Có chỉnh sửa mới chưa chia sẻ` xuất hiện cùng nút `Chia sẻ lại cho học viên`.
+    + Student trong `HUMAN_COACH` chỉ đọc snapshot đã chia sẻ (badge `Bản chia sẻ (v{sharedRevision})` và banner `Đề xuất từ Huấn luyện viên (Bản nháp tham khảo)`). Tuyệt đối ẩn 100% các nút thao tác chỉnh sửa, chia sẻ, chấp thuận, từ chối (`canUserDecide = false`, `canUserEdit = false`, `canUserShare = false`).
+  - *Độ chính xác đơn vị tải (Authoritative Unit Resolution):* Tự động phân giải ID khớp với đơn vị đang chọn từ `unitReferences`, `prescriptions`, proposal changes và `measurementApi.getMetricDefinitions()`. Khi đổi đơn vị, loại bỏ ID cũ; nếu không phân giải được, chặn lưu và hiển thị lỗi trường `adjustment-edit-load-unit-error`.
+  - *Xử lý lỗi, concurrency & retry identity:* Xử lý 409 xung đột phiên bản với hướng dẫn tải lại dữ liệu mới nhất (`adjustment-reload-conflict-button`); xử lý 403 `AI_FORBIDDEN` khi xem bản nháp riêng tư chưa được chia sẻ; chống double submit qua refs; bảo tồn `commandKey` cho retry cùng ý định; cô lập session (`activeSessionIdRef`) loại bỏ async race conditions.
+  - *Discovery & Điều hướng:* Hỗ trợ tìm kiếm theo Recommendation ID (`adjustment-lookup-input`), hỗ trợ query param `recommendationId` trên route `StudentWorkoutScheduleDetailScreen`.
+  - *Kiểm thử tự động Mobile thực chạy đạt 100%:*
+    + `aiWorkoutAdjustmentApi.test.ts`: 22/22 PASS
+    + `AiWorkoutAdjustmentModal.test.tsx`: 36/36 PASS (gồm 6 test cho edit/diff, share/reshare, student read-only isolation, self-directed authority, 403 forbidden unshared lookup, 409 conflict reload; và 14 regression tests kiểm chứng tính đúng đắn: exercise catalog picker modal, trùng bài tập gốc bị chặn, volume integer/reps range & delta recalculation, load increase/decrease/units synchronization, load giữ nguyên bị từ chối, A → B ID navigation switch, in-flight competing operations block, unit IDs khác 1/2, chuẩn hóa alias LBS, chặn tăng tải từ unknown baseline, đảo chiều do chuyển đổi đơn vị, và phân giải đơn vị có thẩm quyền chặn lưu khi chưa resolve được)
+    + Toàn bộ test suite Mobile (`npm test`): **93/93 test suites PASS, 792/792 tests PASS**
+    + Typecheck (`npm run typecheck`): PASS (0 errors)
+    + Linter (`npm run lint`): PASS (0 problems)
+
+### 3.3. Kiểm chứng runtime và khôi phục bằng chứng ngày 15/11/2026
+
+Môi trường local gồm Android Emulator Pixel_8, Spring Boot dev tại 8080, Metro tại 8081 và provider simulated. Base commit `6716f563db3e33ae126c926d62880eba209eba47` cùng working tree chưa commit.
+
+Sáu ảnh cũ bị chuyển qua encoding văn bản và không decode được. Bộ ảnh hiện tại được chụp lại bằng `adb shell screencap -p /sdcard/<file>.png` rồi `adb pull`, kiểm tra cấu trúc PNG và mở trực tiếp để xác minh. [Biên bản runtime, phạm vi GUI và manifest](artifacts/f03-mobile-runtime-acceptance-20261115/verification.md).
+
+Trong lượt này đã tái hiện lỗi revision diff hiển thị `null → null`, bổ sung regression test với response Backend `originalValue/customizedValue`, sửa Mobile mapping và kiểm tra ảnh sau sửa hiển thị `17.5 → 15`, `-2.5 → -5`. Header và các hàng diff có wrap để vừa màn hình.
+
+`scratch/run_full_live_test.py` là script HTTP/API và database. Báo cáo trước ghi 13/13 bước đạt. Kết quả đó được giữ làm bằng chứng của lượt chạy trước, độc lập với thao tác GUI và các ảnh chụp lại.
+
+Các kiểm tra chạy lại trong lượt sửa evidence gồm 89/89 tests của `AiWorkoutAdjustmentModal`, `aiWorkoutAdjustmentApi` và `ProgressSummaryScreen`, Mobile typecheck và lint. Các XML Backend hiện có ghi 105 F03, 58 F02 và 47 Workout Plan tests đạt, chưa chạy lại Backend trong lượt này.
+
+### 3.4. Các Gate Còn Mở (Open Gates - Thuộc Thẩm Quyền Phê Duyệt / Phase 2 Chung)
+- **F04 Checkpoint OPEN:** PR #157 đã merge vào main đạt 6/6 jobs CI, tuy nhiên checkpoint F04 tiếp tục duy trì trạng thái OPEN chờ hoàn tất đánh giá tổng thể milestone.
+- **F04 Student A → Student B → Student A:** `ProgressSummaryScreen.test.tsx` đã chạy lại và đạt các ca response/rejection đến muộn. Android GUI với response đảo thứ tự vẫn **NOT RUN**. Đây là kịch bản chuyển học viên. Exercise Catalog Picker được theo dõi riêng. Công cụ E2E cụ thể được chọn theo môi trường và yêu cầu kiểm chứng.
 - **Hội đồng Thể hình Chuyên môn D06 / OD-3:** Thẩm định danh mục bài tập tương đương; phê duyệt văn bản tiêu chí phân loại minor vs significant và quy tắc giới hạn thể tích (ngưỡng 20% là unapproved proposal).
 - **Đo lường LLM thực tế:** Toàn bộ kiểm thử hiện dùng Simulated Provider ($0.00 chi phí), chưa đo lường live tokens với OpenAI/Anthropic/Gemini trả phí.
-- **Live GUI Smoke Test trên Emulator:** Hiện trạng phiên làm việc ghi nhận **NOT RUN** đối với live GUI smoke test trên thiết bị giả lập.
 - **Ký duyệt Nghiệm thu Milestone P2-M4 / Phase 2:** Thuộc thẩm quyền của Project Owner và Tech Lead; tài liệu này cung cấp căn cứ kỹ thuật chính xác, không tự nhận là đã hoàn thành nghiệm thu toàn bộ.
