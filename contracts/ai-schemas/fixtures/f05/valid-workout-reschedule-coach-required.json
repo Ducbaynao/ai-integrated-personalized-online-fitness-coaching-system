@@ -1,0 +1,31 @@
+{
+  "recommendationType": "WORKOUT_RESCHEDULE_PROPOSAL",
+  "summary": "Reschedule missed COACH_REQUIRED session to coordinated trainer slot.",
+  "reasoning": [
+    "Coaching supervision COACH_REQUIRED preserved.",
+    "Proposed slot aligns with coach availability."
+  ],
+  "usedData": [
+    "occurrenceId: 33333333-3333-4333-8333-333333333333",
+    "supervisionRequirement: COACH_REQUIRED"
+  ],
+  "missingData": [],
+  "limitations": [
+    "Requires schedule change workflow approval."
+  ],
+  "confidence": 0.9,
+  "reschedule": {
+    "occurrenceId": "33333333-3333-4333-8333-333333333333",
+    "previousPlannedStartAt": "2026-11-16T08:00:00Z",
+    "supervisionRequirement": "COACH_REQUIRED",
+    "destination": {
+      "localStart": "2026-11-18T15:00:00",
+      "localEnd": "2026-11-18T16:00:00",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "startUtcOffset": "+07:00",
+      "endUtcOffset": "+07:00",
+      "proposedStartAt": "2026-11-18T08:00:00Z",
+      "proposedEndAt": "2026-11-18T09:00:00Z"
+    }
+  }
+}

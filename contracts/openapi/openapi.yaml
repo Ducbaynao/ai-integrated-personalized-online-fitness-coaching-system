@@ -5404,6 +5404,154 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /ai/workout-reschedules:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: generateWorkoutReschedule
+      summary: Generate AI workout rescheduling recommendation (F05)
+      description: >-
+        Proposes an optimal next slot to reschedule an unfinished or missed Planned Workout occurrence.
+        Preserves recovery intervals, supervision requirement, and timezone constraints.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkoutRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Reschedule recommendation generated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutRescheduleApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Planned workout occurrence not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Occurrence version or lifecycle conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}:
+    get:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: getWorkoutRescheduleDetail
+      summary: Get workout reschedule recommendation detail (F05)
+      description: >-
+        Retrieves recommendation details, structured payload, and source snapshot metadata.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recommendation retrieved successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiRecommendationDetailApiResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}/accept:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: acceptWorkoutReschedule
+      summary: Accept and apply workout reschedule recommendation (F05)
+      description: >-
+        Atomically transitions the recommendation status to APPLIED and executes the reschedule
+        via WorkoutScheduleChangeUseCase within a single transaction.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcceptRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Workout reschedule applied successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptRescheduleApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Conflict (expired recommendation, occurrence version conflict, or duplicate reschedule)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}/reject:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: rejectWorkoutReschedule
+      summary: Reject workout reschedule recommendation (F05)
+      description: >-
+        Rejects a PENDING workout reschedule recommendation with optional decision note and audit record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Workout reschedule rejected successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectRescheduleApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Recommendation not PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /ai/progress/summary:
     post:
       tags: [AI Progress Summarization (F04)]
@@ -11986,6 +12134,122 @@ components:
           format: uuid
         reason:
           type: string
+        rejectedAt:
+          type: string
+          format: date-time
+
+    WorkoutRescheduleApiRequest:
+      type: object
+      required: [occurrenceId, commandKey]
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        occurrenceId:
+          type: string
+          format: uuid
+        expectedOccurrenceVersion:
+          type: integer
+          format: int64
+        commandKey:
+          type: string
+        reason:
+          type: string
+        preferredTimeOfDay:
+          type: string
+
+    WorkoutRescheduleApiResponse:
+      type: object
+      required: [recommendationId, runId, status, decisionAuthority, title, expiresAt, createdAt, structuredPayload]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED, APPLIED, EXPIRED, CANCELLED]
+        decisionAuthority:
+          type: string
+          enum: [STUDENT, TRAINER]
+        title:
+          type: string
+        explanation:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        structuredPayload:
+          type: object
+
+    AcceptRescheduleApiRequest:
+      type: object
+      required: [commandKey]
+      properties:
+        commandKey:
+          type: string
+        decisionNote:
+          type: string
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedOccurrenceVersion:
+          type: integer
+          format: int64
+        expectedAppointmentVersion:
+          type: integer
+          format: int64
+        expectedAppointmentId:
+          type: string
+          format: uuid
+
+    AcceptRescheduleApiResponse:
+      type: object
+      required: [recommendationId, status, appliedBy, resultingEntityType, resultingEntityId, appliedAt, replayed]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [APPLIED]
+        appliedBy:
+          type: string
+          format: uuid
+        resultingEntityType:
+          type: string
+        resultingEntityId:
+          type: string
+          format: uuid
+        appliedAt:
+          type: string
+          format: date-time
+        replayed:
+          type: boolean
+        changeResult:
+          type: object
+
+    RejectRescheduleApiRequest:
+      type: object
+      properties:
+        decisionNote:
+          type: string
+
+    RejectRescheduleApiResponse:
+      type: object
+      required: [recommendationId, status, rejectedAt]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [REJECTED]
         rejectedAt:
           type: string
           format: date-time

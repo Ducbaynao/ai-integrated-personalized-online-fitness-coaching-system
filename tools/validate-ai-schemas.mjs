@@ -244,6 +244,44 @@ if (fs.existsSync(f04FixturesDir)) {
   }
 }
 
+// 6. F05 fixtures verification
+const f05FixturesDir = path.join(schemasDir, 'fixtures', 'f05');
+if (fs.existsSync(f05FixturesDir)) {
+  const f05RescheduleValidator = compiledSchemas.get('f05-workout-reschedule.schema.json');
+  const f05TestCases = [
+    { file: 'valid-workout-reschedule.json', validator: f05RescheduleValidator, expectValid: true, desc: 'Valid F05 workout reschedule recommendation' },
+    { file: 'valid-workout-reschedule-coach-required.json', validator: f05RescheduleValidator, expectValid: true, desc: 'Valid F05 reschedule preserving COACH_REQUIRED' },
+    { file: 'invalid-missing-destination.json', validator: f05RescheduleValidator, expectValid: false, desc: 'Invalid F05 missing destination' },
+    { file: 'invalid-missing-occurrence-id.json', validator: f05RescheduleValidator, expectValid: false, desc: 'Invalid F05 missing occurrenceId' },
+    { file: 'invalid-bad-offset.json', validator: f05RescheduleValidator, expectValid: false, desc: 'Invalid F05 malformed UTC offset' },
+    { file: 'invalid-recommendation-type.json', validator: f05RescheduleValidator, expectValid: false, desc: 'Invalid F05 wrong recommendationType' },
+  ];
+
+  for (const tc of f05TestCases) {
+    const fixturePath = path.join(f05FixturesDir, tc.file);
+    if (!fs.existsSync(fixturePath)) {
+      failures.push(`F05 Fixture missing: ${tc.file}`);
+      continue;
+    }
+    try {
+      const data = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+      if (!tc.validator) {
+        failures.push(`Validator not found for fixture: ${tc.file}`);
+        continue;
+      }
+      const isValid = tc.validator(data);
+      fixtureCount++;
+      if (tc.expectValid && !isValid) {
+        failures.push(`Fixture failed unexpectedly [${tc.desc}]: ${ajv.errorsText(tc.validator.errors)}`);
+      } else if (!tc.expectValid && isValid) {
+        failures.push(`Fixture passed but was expected to fail [${tc.desc}] (${tc.file})`);
+      }
+    } catch (err) {
+      failures.push(`Fixture parse error [${tc.file}]: ${err.message}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI schema and contract validation failed:');
   for (const failure of failures) {
