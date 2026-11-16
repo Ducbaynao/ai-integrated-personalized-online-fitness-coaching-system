@@ -1,5 +1,6 @@
 package com.fitnesscoaching.platform.modules.ai.application.port.out;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fitnesscoaching.platform.modules.ai.domain.F05SourceSnapshot;
 
 import java.util.UUID;
@@ -27,6 +28,6 @@ public interface F05AiServiceClient {
             String continuityState,
             boolean hasLinkedAppointment,
             UUID appointmentId,
-            F05SourceSnapshot sourceSnapshot
+            @JsonIgnore F05SourceSnapshot sourceSnapshot
     ) {}
 }

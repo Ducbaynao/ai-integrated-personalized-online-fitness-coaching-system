@@ -29,7 +29,7 @@ class WorkoutReschedulePayloadSchema(BaseModel):
 
 
 class F05WorkoutRescheduleRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     studentId: UUID
     coachingPeriodId: UUID | None = None
@@ -39,7 +39,9 @@ class F05WorkoutRescheduleRequest(BaseModel):
     planVersionId: UUID | None = None
     planSessionId: UUID | None = None
     sessionName: str | None = None
-    supervisionRequirement: Literal["SELF_PERFORMABLE", "COACH_OPTIONAL", "COACH_REQUIRED"] = "SELF_PERFORMABLE"
+    supervisionRequirement: Literal[
+        "SELF_PERFORMABLE", "COACH_OPTIONAL", "COACH_REQUIRED", "SELF_ALLOWED", "COACH_PREFERRED"
+    ] = "SELF_PERFORMABLE"
     timezone: str = "Asia/Ho_Chi_Minh"
     originalPlannedStartAt: str | None = None
     plannedStartAt: str

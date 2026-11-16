@@ -1,0 +1,156 @@
+{
+  "timestamp" : "2026-11-16T12:18:20.161878700Z",
+  "flow" : "HTTP MockMvc -> Spring Boot -> Real FastAPI -> Spring Boot -> Domain -> PostgreSQL",
+  "fastApiPort" : 50354,
+  "studentId" : "526e1cd8-6e02-4968-a27e-cc6289ad3129",
+  "originalOccurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+  "replacementOccurrenceId" : "f24cab2c-53fa-424d-a809-a9937f6ea044",
+  "recommendationId" : "ff7d8a64-1719-457a-8bd6-3a7d8f353d87",
+  "generateResponse" : {
+    "recommendationId" : "ff7d8a64-1719-457a-8bd6-3a7d8f353d87",
+    "runId" : "2229bb43-560a-498d-8623-c16cbedb49bd",
+    "status" : "PENDING",
+    "decisionAuthority" : "STUDENT",
+    "title" : "Reschedule workout to 2026-11-19 09:00 (Asia/Ho_Chi_Minh)",
+    "explanation" : "[\"Session Chest & Back was missed or requested for reschedule.\",\"Next available slot on 2026-11-19 at 09:00 preserves recovery intervals.\",\"Supervision requirement SELF_PERFORMABLE is preserved.\"]",
+    "expiresAt" : "2026-11-16T12:48:19.791502Z",
+    "createdAt" : "2026-11-16T12:18:19.791502Z",
+    "structuredPayload" : {
+      "recommendationType" : "WORKOUT_RESCHEDULE_PROPOSAL",
+      "summary" : "Reschedule workout to 2026-11-19 09:00 (Asia/Ho_Chi_Minh)",
+      "reasoning" : [ "Session Chest & Back was missed or requested for reschedule.", "Next available slot on 2026-11-19 at 09:00 preserves recovery intervals.", "Supervision requirement SELF_PERFORMABLE is preserved." ],
+      "usedData" : [ "occurrenceId: b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2", "previousPlannedStartAt: 2026-11-18T03:00:00Z", "supervisionRequirement: SELF_PERFORMABLE", "coachingMode: SELF_DIRECTED", "continuityState: RECENT_CONSISTENT" ],
+      "missingData" : [ ],
+      "limitations" : [ "Reschedules one occurrence at a time (Phase 2 release scope baseline).", "Proposal expires in 30 minutes." ],
+      "confidence" : 0.95,
+      "reschedule" : {
+        "occurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+        "planSessionId" : "9437e2c1-067f-434e-8164-d6ef8ad952ae",
+        "sessionName" : "Chest & Back",
+        "previousPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "originalPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "supervisionRequirement" : "SELF_PERFORMABLE",
+        "destination" : {
+          "localStart" : "2026-11-19T09:00:00",
+          "localEnd" : "2026-11-19T10:00:00",
+          "timezone" : "Asia/Ho_Chi_Minh",
+          "startUtcOffset" : "+07:00",
+          "endUtcOffset" : "+07:00",
+          "proposedStartAt" : "2026-11-19T02:00:00Z",
+          "proposedEndAt" : "2026-11-19T03:00:00Z"
+        }
+      }
+    }
+  },
+  "readResponse" : {
+    "id" : "ff7d8a64-1719-457a-8bd6-3a7d8f353d87",
+    "runId" : "2229bb43-560a-498d-8623-c16cbedb49bd",
+    "studentId" : "526e1cd8-6e02-4968-a27e-cc6289ad3129",
+    "coachingPeriodId" : null,
+    "recommendationType" : "WORKOUT_RESCHEDULE_PROPOSAL",
+    "title" : "Reschedule workout to 2026-11-19 09:00 (Asia/Ho_Chi_Minh)",
+    "explanation" : "[\"Session Chest & Back was missed or requested for reschedule.\",\"Next available slot on 2026-11-19 at 09:00 preserves recovery intervals.\",\"Supervision requirement SELF_PERFORMABLE is preserved.\"]",
+    "status" : "PENDING",
+    "decisionAuthority" : "STUDENT",
+    "targetEntityType" : "WORKOUT_OCCURRENCE",
+    "targetEntityId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+    "decidedBy" : null,
+    "decidedAt" : null,
+    "decisionNote" : null,
+    "expiresAt" : "2026-11-16T12:48:19.791502Z",
+    "revision" : 1,
+    "isCustomized" : false,
+    "lastModifiedBy" : "526e1cd8-6e02-4968-a27e-cc6289ad3129",
+    "createdAt" : "2026-11-16T12:18:19.791502Z",
+    "updatedAt" : "2026-11-16T12:18:19.791502Z",
+    "structuredPayload" : {
+      "summary" : "Reschedule workout to 2026-11-19 09:00 (Asia/Ho_Chi_Minh)",
+      "usedData" : [ "occurrenceId: b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2", "previousPlannedStartAt: 2026-11-18T03:00:00Z", "supervisionRequirement: SELF_PERFORMABLE", "coachingMode: SELF_DIRECTED", "continuityState: RECENT_CONSISTENT" ],
+      "reasoning" : [ "Session Chest & Back was missed or requested for reschedule.", "Next available slot on 2026-11-19 at 09:00 preserves recovery intervals.", "Supervision requirement SELF_PERFORMABLE is preserved." ],
+      "confidence" : 0.95,
+      "reschedule" : {
+        "destination" : {
+          "localEnd" : "2026-11-19T10:00:00",
+          "timezone" : "Asia/Ho_Chi_Minh",
+          "localStart" : "2026-11-19T09:00:00",
+          "endUtcOffset" : "+07:00",
+          "proposedEndAt" : "2026-11-19T03:00:00Z",
+          "startUtcOffset" : "+07:00",
+          "proposedStartAt" : "2026-11-19T02:00:00Z"
+        },
+        "sessionName" : "Chest & Back",
+        "occurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+        "planSessionId" : "9437e2c1-067f-434e-8164-d6ef8ad952ae",
+        "originalPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "previousPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "supervisionRequirement" : "SELF_PERFORMABLE"
+      },
+      "limitations" : [ "Reschedules one occurrence at a time (Phase 2 release scope baseline).", "Proposal expires in 30 minutes." ],
+      "missingData" : [ ],
+      "recommendationType" : "WORKOUT_RESCHEDULE_PROPOSAL"
+    },
+    "originalPayload" : {
+      "summary" : "Reschedule workout to 2026-11-19 09:00 (Asia/Ho_Chi_Minh)",
+      "usedData" : [ "occurrenceId: b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2", "previousPlannedStartAt: 2026-11-18T03:00:00Z", "supervisionRequirement: SELF_PERFORMABLE", "coachingMode: SELF_DIRECTED", "continuityState: RECENT_CONSISTENT" ],
+      "reasoning" : [ "Session Chest & Back was missed or requested for reschedule.", "Next available slot on 2026-11-19 at 09:00 preserves recovery intervals.", "Supervision requirement SELF_PERFORMABLE is preserved." ],
+      "confidence" : 0.95,
+      "reschedule" : {
+        "destination" : {
+          "localEnd" : "2026-11-19T10:00:00",
+          "timezone" : "Asia/Ho_Chi_Minh",
+          "localStart" : "2026-11-19T09:00:00",
+          "endUtcOffset" : "+07:00",
+          "proposedEndAt" : "2026-11-19T03:00:00Z",
+          "startUtcOffset" : "+07:00",
+          "proposedStartAt" : "2026-11-19T02:00:00Z"
+        },
+        "sessionName" : "Chest & Back",
+        "occurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+        "planSessionId" : "9437e2c1-067f-434e-8164-d6ef8ad952ae",
+        "originalPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "previousPlannedStartAt" : "2026-11-18T03:00:00Z",
+        "supervisionRequirement" : "SELF_PERFORMABLE"
+      },
+      "limitations" : [ "Reschedules one occurrence at a time (Phase 2 release scope baseline).", "Proposal expires in 30 minutes." ],
+      "missingData" : [ ],
+      "recommendationType" : "WORKOUT_RESCHEDULE_PROPOSAL"
+    },
+    "sharedWithStudent" : false,
+    "sharedRevision" : null,
+    "sharedAt" : null,
+    "sharedBy" : null,
+    "aiRunId" : "2229bb43-560a-498d-8623-c16cbedb49bd",
+    "recommendationId" : "ff7d8a64-1719-457a-8bd6-3a7d8f353d87"
+  },
+  "acceptResponse" : {
+    "recommendationId" : "ff7d8a64-1719-457a-8bd6-3a7d8f353d87",
+    "status" : "APPLIED",
+    "appliedBy" : "526e1cd8-6e02-4968-a27e-cc6289ad3129",
+    "resultingEntityType" : "WORKOUT_OCCURRENCE",
+    "resultingEntityId" : "f24cab2c-53fa-424d-a809-a9937f6ea044",
+    "appliedAt" : "2026-11-16T12:18:19.983841500Z",
+    "replayed" : false,
+    "changeResult" : {
+      "changeType" : "RESCHEDULE",
+      "previousOccurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+      "previousOccurrenceVersion" : 1,
+      "previousStatus" : "RESCHEDULED",
+      "originalPlannedStartAt" : "2026-11-18T03:00:00Z",
+      "oldPlannedStartAt" : "2026-11-18T03:00:00Z",
+      "oldPlannedEndAt" : "2026-11-18T04:00:00Z",
+      "replacementOccurrenceId" : "f24cab2c-53fa-424d-a809-a9937f6ea044",
+      "replacementOccurrenceVersion" : 0,
+      "newPlannedStartAt" : "2026-11-19T02:00:00Z",
+      "newPlannedEndAt" : "2026-11-19T03:00:00Z",
+      "rescheduledFromOccurrenceId" : "b1ec8cfe-eb92-44c6-9fc9-4758a99ec4b2",
+      "effectiveAt" : "2026-11-16T12:18:20.037917Z",
+      "replayed" : false
+    }
+  },
+  "domainReadback" : {
+    "auditRecorded" : true,
+    "applicationRecorded" : true,
+    "oldOccurrenceStatus" : "RESCHEDULED",
+    "newOccurrenceStatus" : "SCHEDULED"
+  }
+}

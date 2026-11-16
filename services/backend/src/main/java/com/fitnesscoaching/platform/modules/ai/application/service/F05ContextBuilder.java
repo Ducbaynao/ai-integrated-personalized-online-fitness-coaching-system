@@ -140,9 +140,10 @@ public class F05ContextBuilder {
 
         Instant asOf = Instant.now(clock);
 
-        String supervision = (occurrence.sessionSummary() != null && occurrence.sessionSummary().supervisionRequirement() != null)
+        String rawSupervision = (occurrence.sessionSummary() != null && occurrence.sessionSummary().supervisionRequirement() != null)
                 ? occurrence.sessionSummary().supervisionRequirement()
-                : "SELF_PERFORMABLE";
+                : null;
+        String supervision = mapSupervisionToAiContract(rawSupervision);
 
         UUID planId = occurrence.planSummary() != null ? occurrence.planSummary().planId() : null;
         UUID planVersionId = occurrence.planSummary() != null ? occurrence.planSummary().planVersionId() : null;
@@ -199,5 +200,16 @@ public class F05ContextBuilder {
         );
 
         return new ContextEnvelopeResult(serviceRequest, sourceSnapshot, decisionAuthority, studentId, coaching.periodId());
+    }
+
+    private String mapSupervisionToAiContract(String dbSupervision) {
+        if (dbSupervision == null) {
+            return "SELF_PERFORMABLE";
+        }
+        return switch (dbSupervision) {
+            case "COACH_REQUIRED" -> "COACH_REQUIRED";
+            case "COACH_PREFERRED", "COACH_OPTIONAL" -> "COACH_OPTIONAL";
+            default -> "SELF_PERFORMABLE";
+        };
     }
 }

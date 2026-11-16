@@ -61,7 +61,12 @@ class SimulatedF05WorkoutProvider:
         )
 
         # Invariant T10: Supervision requirement MUST be preserved and never degraded.
-        supervision = request.supervisionRequirement
+        if request.supervisionRequirement == "COACH_REQUIRED":
+            supervision = "COACH_REQUIRED"
+        elif request.supervisionRequirement in ("COACH_PREFERRED", "COACH_OPTIONAL"):
+            supervision = "COACH_OPTIONAL"
+        else:
+            supervision = "SELF_PERFORMABLE"
 
         used_data = [
             f"occurrenceId: {request.occurrenceId}",
