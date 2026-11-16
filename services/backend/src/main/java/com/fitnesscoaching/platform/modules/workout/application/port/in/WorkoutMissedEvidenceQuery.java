@@ -10,5 +10,11 @@ public interface WorkoutMissedEvidenceQuery {
     List<Evidence> candidates(Instant cutoff);
     Optional<Evidence> find(UUID occurrenceId);
     record Evidence(UUID occurrenceId, UUID studentId, long occurrenceVersion,
-                    Instant plannedStartAt, Instant plannedEndAt, boolean eligible) {}
+                    Instant plannedStartAt, Instant plannedEndAt, boolean eligible) {
+        public boolean canRescheduleAt(Instant now) {
+            return eligible && (plannedStartAt.isAfter(now)
+                    || plannedEndAt != null && plannedEndAt.isAfter(plannedStartAt)
+                    && !plannedEndAt.isAfter(now));
+        }
+    }
 }

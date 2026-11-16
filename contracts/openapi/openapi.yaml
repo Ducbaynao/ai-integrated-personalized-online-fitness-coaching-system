@@ -4469,8 +4469,10 @@ paths:
       summary: Propose rescheduling or cancelling one occurrence
       description: >-
         Only a Trainer with a current effective Coaching Period and current WORKOUT_PLAN CONTRIBUTE or MANAGE
-        may propose a change to this Student's SCHEDULED, unsealed occurrence before its old planned start.
-        RESCHEDULE also requires preserved source version/session and local-time intent. A linked
+        may propose a change to this Student's SCHEDULED, unsealed occurrence. CANCEL proposal creation
+        requires a future source start. RESCHEDULE permits a future source start or a known valid source
+        interval that has ended, with no linked Actual Workout log, and also requires preserved source
+        version/session and local-time intent. A linked
         Appointment permits RESCHEDULE only within that same confirmed interval; CANCEL leaves the
         Appointment confirmed and releases the active occurrence dependency. Creation stores an immutable
         proposal snapshot but does not mutate an occurrence or reserve the target time. Student decision is final.
@@ -4660,8 +4662,10 @@ paths:
       operationId: rescheduleMyPlannedWorkoutOccurrence
       summary: Student replaces one unstarted Planned Workout occurrence
       description: >-
-        Only its Student may replace a SCHEDULED, unsealed occurrence whose old plannedStartAt is still in the
-        future, including when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
+        Only its Student may replace a SCHEDULED, unsealed occurrence with no linked Actual Workout log.
+        The source must either start in the future or have a known valid planned end at or before
+        authoritative PostgreSQL time. A source still within its original slot, or past-start with unknown
+        end, is blocked. This also applies when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
         version/session/prescription and plan-week coordinates are retained even if the target moves to another
         day or week; no current plan publication is selected. Missing legacy source version/session or local
         intent blocks replacement. A linked Appointment permits replacement only when its same confirmed
@@ -5390,6 +5394,157 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RejectAdjustmentResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Recommendation not PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: generateWorkoutReschedule
+      summary: Generate AI workout rescheduling recommendation (F05)
+      description: >-
+        Proposes a next slot for an unstarted Planned Workout occurrence. The source must be SCHEDULED,
+        have no execution seal or linked Actual Workout log, and either start in the future or have
+        a known valid planned end that has passed. Eligibility and source version are checked at
+        generation and rechecked by the Workout domain during atomic apply.
+        Preserves recovery intervals, supervision requirement, and timezone constraints.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkoutRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Reschedule recommendation generated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkoutRescheduleApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Planned workout occurrence not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Occurrence version or lifecycle conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}:
+    get:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: getWorkoutRescheduleDetail
+      summary: Get workout reschedule recommendation detail (F05)
+      description: >-
+        Retrieves recommendation details, structured payload, and source snapshot metadata.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recommendation retrieved successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiRecommendationDetailApiResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}/accept:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: acceptWorkoutReschedule
+      summary: Accept and apply workout reschedule recommendation (F05)
+      description: >-
+        Atomically transitions the recommendation status to APPLIED and executes the reschedule
+        via WorkoutScheduleChangeUseCase within a single transaction.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcceptRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Workout reschedule applied successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptRescheduleApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Conflict (expired recommendation, occurrence version conflict, or duplicate reschedule)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-reschedules/{recommendationId}/reject:
+    post:
+      tags: [AI Workout Rescheduling (F05)]
+      operationId: rejectWorkoutReschedule
+      summary: Reject workout reschedule recommendation (F05)
+      description: >-
+        Rejects a PENDING workout reschedule recommendation with optional decision note and audit record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectRescheduleApiRequest' }
+      responses:
+        '200':
+          description: Workout reschedule rejected successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectRescheduleApiResponse' }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/AIForbidden' }
@@ -6552,8 +6707,11 @@ components:
         WORKOUT_SCHEDULE_OVERLAP, WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN, and
         WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT. An unknown end on another SCHEDULED occurrence blocks
         replacement creation, without disclosing that row's ID or timing.
-        WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED compares the occurrence being changed's current
-        plannedStartAt with authoritative PostgreSQL time, not its chain-wide originalPlannedStartAt.
+        For RESCHEDULE, WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED means the source has started its planned
+        interval but its known valid end has not passed, or the end is unknown. The backend compares the
+        current planned interval with authoritative PostgreSQL time. A past interval with no execution
+        or linked Actual Workout log is eligible for rescheduling. Trainer CANCEL proposal creation still
+        requires a future source start. The chain-wide originalPlannedStartAt remains historical evidence.
         Same actor, command type,
         commandKey, and logical payload replay one committed effect after current visibility/authority
         checks; a different payload conflicts. A committed authorized replay does not reapply mutation
@@ -11986,6 +12144,122 @@ components:
           format: uuid
         reason:
           type: string
+        rejectedAt:
+          type: string
+          format: date-time
+
+    WorkoutRescheduleApiRequest:
+      type: object
+      required: [occurrenceId, commandKey]
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        occurrenceId:
+          type: string
+          format: uuid
+        expectedOccurrenceVersion:
+          type: integer
+          format: int64
+        commandKey:
+          type: string
+        reason:
+          type: string
+        preferredTimeOfDay:
+          type: string
+
+    WorkoutRescheduleApiResponse:
+      type: object
+      required: [recommendationId, runId, status, decisionAuthority, title, expiresAt, createdAt, structuredPayload]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED, APPLIED, EXPIRED, CANCELLED]
+        decisionAuthority:
+          type: string
+          enum: [STUDENT, TRAINER]
+        title:
+          type: string
+        explanation:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        structuredPayload:
+          type: object
+
+    AcceptRescheduleApiRequest:
+      type: object
+      required: [commandKey]
+      properties:
+        commandKey:
+          type: string
+        decisionNote:
+          type: string
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedOccurrenceVersion:
+          type: integer
+          format: int64
+        expectedAppointmentVersion:
+          type: integer
+          format: int64
+        expectedAppointmentId:
+          type: string
+          format: uuid
+
+    AcceptRescheduleApiResponse:
+      type: object
+      required: [recommendationId, status, appliedBy, resultingEntityType, resultingEntityId, appliedAt, replayed]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [APPLIED]
+        appliedBy:
+          type: string
+          format: uuid
+        resultingEntityType:
+          type: string
+        resultingEntityId:
+          type: string
+          format: uuid
+        appliedAt:
+          type: string
+          format: date-time
+        replayed:
+          type: boolean
+        changeResult:
+          type: object
+
+    RejectRescheduleApiRequest:
+      type: object
+      properties:
+        decisionNote:
+          type: string
+
+    RejectRescheduleApiResponse:
+      type: object
+      required: [recommendationId, status, rejectedAt]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [REJECTED]
         rejectedAt:
           type: string
           format: date-time

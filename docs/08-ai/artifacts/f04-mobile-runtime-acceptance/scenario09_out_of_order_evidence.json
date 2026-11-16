@@ -1,0 +1,80 @@
+{
+  "scenario": "Scenario 9: Student Switch (A -> B -> A) & Race Condition Handling with Out-of-Order Responses",
+  "verificationLevel": "Android GUI Runtime (Pixel 8 Emulator, WHPX, Android 16)",
+  "status": "PASS",
+  "testedAt": "2026-11-16 17:07:23 (UTC+7)",
+  "clientPlatform": "Expo Go / React Native",
+  "backendMode": "Spring Boot Modular Monolith (dev profile, port 8082)",
+  "proxyInterceptionPort": 8080,
+  "actorIds": {
+    "studentA": "5c6f49c6-f4f6-4941-b217-2574b3830395",
+    "studentB": "3fb728a6-f277-47a7-952b-545ac791118a"
+  },
+  "requestsTimeline": [
+    {
+      "step": "A1_SENT",
+      "req_index": 1,
+      "student": "Student A",
+      "student_id": "5c6f49c6-f4f6-4941-b217-2574b3830395",
+      "time": "17:06:31",
+      "action": "Request A1 intercepted and HELD by proxy"
+    },
+    {
+      "step": "B_SENT",
+      "req_index": 2,
+      "student": "Student B",
+      "student_id": "3fb728a6-f277-47a7-952b-545ac791118a",
+      "time": "17:06:36",
+      "action": "Request B intercepted and HELD by proxy"
+    },
+    {
+      "step": "A2_SENT",
+      "req_index": 3,
+      "student": "Student A",
+      "student_id": "5c6f49c6-f4f6-4941-b217-2574b3830395",
+      "time": "17:06:43",
+      "action": "Request A2 intercepted and HELD by proxy"
+    },
+    {
+      "step": "A2_RESOLVED_FIRST",
+      "req_index": 3,
+      "student": "Student A",
+      "time": "17:06:43",
+      "action": "Delivered response A2 to client first"
+    },
+    {
+      "step": "A1_RESOLVED_LATE",
+      "req_index": 1,
+      "student": "Student A",
+      "time": "17:06:48",
+      "action": "Delivered late response A1 to client (must be discarded by activeRequestIdRef)"
+    },
+    {
+      "step": "B_RESOLVED_LAST",
+      "req_index": 2,
+      "student": "Student B",
+      "time": "17:06:55",
+      "action": "Delivered late response B to client (must be discarded by currentStudentIdRef)"
+    },
+    {
+      "step": "LATE_REJECTION_DISCARDED",
+      "req_index": 4,
+      "time": "17:07:23",
+      "action": "Delivered 500 rejection for B2; cleanly discarded by client without error banner"
+    }
+  ],
+  "capturedScreenshots": [
+    "android_runtime_screen_scenario09_a2_rendered.png",
+    "android_runtime_screen_scenario09_after_late_a1.png",
+    "android_runtime_screen_scenario09_after_late_b.png",
+    "android_runtime_screen_scenario09_after_late_rejection.png"
+  ],
+  "invariantsVerified": [
+    "1. Request cancellation via AbortController on studentId change",
+    "2. Monotonic activeRequestId sequence tracking (guards against A -> B -> A)",
+    "3. Out-of-order resolution protection: late response A1 cannot overwrite A2",
+    "4. Student identity isolation: late response B cannot leak confidential data to Student A",
+    "5. Late rejection tolerance: delayed errors from prior requests do not trigger false error banners",
+    "6. Preservation of date range, timezone and metricScope without mixing across students"
+  ]
+}

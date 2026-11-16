@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedW
 import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery.Linked;
 import com.fitnesscoaching.platform.modules.notification.LifecycleNotificationWriter;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutPlanPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleChangePersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleChangePersistencePort.Occurrence;
@@ -35,14 +36,17 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final LifecycleNotificationWriter notifications;
+    private final WorkoutMissedEvidenceQuery missedEvidence;
 
     public WorkoutScheduleChangeService(WorkoutPlanPersistencePort plans, WorkoutScheduleChangePersistencePort changes,
                                         WorkoutExecutionAccessPolicy access, LinkedWorkoutAppointmentQuery appointments,
                                         AuditService audit, ObjectMapper mapper,
-                                        LifecycleNotificationWriter notifications) {
+                                        LifecycleNotificationWriter notifications,
+                                        WorkoutMissedEvidenceQuery missedEvidence) {
         this.plans = plans; this.changes = changes; this.access = access;
         this.appointments = appointments; this.audit = audit; this.mapper = mapper;
         this.notifications = notifications;
+        this.missedEvidence = missedEvidence;
     }
 
     @Override public void lockStudentAndActor(UUID studentId, UUID actorId) {
@@ -62,7 +66,8 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         Occurrence old = changes.lockOccurrence(occurrenceId);
         Instant at = changes.databaseNow();
         checkMutable(old, expectedOccurrenceVersion);
-        if (!old.plannedStartAt().isAfter(at)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
+        if ("RESCHEDULE".equals(changeType)) requireReschedulableSource(old, at);
+        else if (!old.plannedStartAt().isAfter(at)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
         List<Linked> links = appointments.lockLinkedForChange(old.id());
         if (links.size() > 1) throw fail("WORKOUT_SCHEDULE_APPOINTMENT_LINKED", 409);
         if (changes.hasSuccessor(old.id())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
@@ -111,7 +116,7 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         Occurrence old = changes.lockOccurrence(c.occurrenceId());
         Instant at = changes.databaseNow();
         checkMutable(old, c.expectedOccurrenceVersion());
-        if (!old.plannedStartAt().isAfter(at)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
+        requireReschedulableSource(old, at);
         if (old.sessionId() == null || old.planVersionId() == null || old.localStart() == null
                 || old.localEnd() == null || old.timezone() == null || old.startUtcOffset() == null
                 || old.endUtcOffset() == null)
@@ -217,6 +222,12 @@ public class WorkoutScheduleChangeService implements WorkoutScheduleChangeUseCas
         if (old.version() != expected) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_VERSION_CONFLICT", 409);
         if (old.executionStartedAt() != null) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_SEALED", 409);
         if (!"SCHEDULED".equals(old.status())) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409);
+    }
+    private void requireReschedulableSource(Occurrence old, Instant now) {
+        var evidence = missedEvidence.find(old.id())
+                .orElseThrow(() -> fail("WORKOUT_SCHEDULE_OCCURRENCE_NOT_CHANGEABLE", 409));
+        if (!evidence.eligible()) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_SEALED", 409);
+        if (!evidence.canRescheduleAt(now)) throw fail("WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED", 409);
     }
     private ChangeResult replay(WorkoutScheduleChangePersistencePort.Receipt receipt, String command, String hash) {
         if (!command.equals(receipt.commandName()) || !hash.equals(receipt.payloadHash()))

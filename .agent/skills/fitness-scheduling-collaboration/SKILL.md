@@ -19,6 +19,7 @@ Appointment states include `SCHEDULED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, a
 - Before create or accepted change, check Trainer conflicts and any applicable availability/capacity rules.
 - Store instants consistently and render in each user's timezone.
 - Keep immutable change history.
+- For Planned Workout rescheduling, use Workout-owned evidence. A SCHEDULED source must be unsealed with no linked Actual Workout log. Its start must be future or its known valid interval must have ended. Recheck under mutation locks and retain the original anchor and predecessor history. See the 2026-11-16 extension in `docs/07-development/features/06-schedule.md`.
 
 Both Student and Trainer may initiate a reschedule request. Store appointment, initiator, current/proposed time, reason, state, creation, and response timestamps. Use `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELLED`, and `EXPIRED`.
 

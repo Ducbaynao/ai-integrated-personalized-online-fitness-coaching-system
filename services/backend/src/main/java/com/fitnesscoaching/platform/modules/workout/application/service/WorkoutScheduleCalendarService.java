@@ -1,6 +1,7 @@
 package com.fitnesscoaching.platform.modules.workout.application.service;
 
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionBaselineQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleCalendarReadPort;
 import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutScheduleCalendarReadPort.SessionSummary;
@@ -31,6 +32,7 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
     private final CoachingAuthorityQuery coaching;
     private final WorkoutScheduleChangePersistencePort changes;
     private final LinkedWorkoutAppointmentQuery appointments;
+    private final WorkoutMissedEvidenceQuery missedEvidence;
 
     public WorkoutScheduleCalendarService(WorkoutScheduleCalendarReadPort store,
                                           WorkoutExecutionAccessPolicy access,
@@ -38,9 +40,11 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
                                           WorkoutExecutionBaselineQuery baselines,
                                           CoachingAuthorityQuery coaching,
                                           WorkoutScheduleChangePersistencePort changes,
-                                          LinkedWorkoutAppointmentQuery appointments) {
+                                          LinkedWorkoutAppointmentQuery appointments,
+                                          WorkoutMissedEvidenceQuery missedEvidence) {
         this.store = store; this.access = access; this.actions = actions; this.baselines = baselines;
         this.coaching = coaching; this.changes = changes; this.appointments = appointments;
+        this.missedEvidence = missedEvidence;
     }
 
     @Override @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -118,7 +122,8 @@ public class WorkoutScheduleCalendarService implements WorkoutScheduleCalendarQu
             if (includeStudentActions && "SCHEDULED".equals(row.status())
                     && row.executionStartedAt() == null && activeLinks.size() <= 1
                     && !changes.hasSuccessor(row.occurrenceId())) {
-                if (row.plannedStartAt().isAfter(now) && row.planSummary() != null && row.sessionSummary() != null
+                if (missedEvidence.find(row.occurrenceId()).filter(e -> e.canRescheduleAt(now)).isPresent()
+                        && row.planSummary() != null && row.sessionSummary() != null
                         && row.timezone() != null && row.localStart() != null && row.localEnd() != null
                         && row.startUtcOffset() != null && row.endUtcOffset() != null
                         && (activeLink == null || "CONFIRMED".equals(activeLink.status()))

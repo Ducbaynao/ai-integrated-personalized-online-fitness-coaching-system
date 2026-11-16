@@ -227,6 +227,17 @@ Query và document embeddings phải thuộc cùng không gian embedding đã đ
 **Giới hạn:** một Planned Workout mỗi lần; không tự đổi cả recurring series. Khi cần đổi Appointment, tạo/mở change request riêng; chờ được chấp nhận rồi revalidate đề xuất workout. Không dùng một giao dịch nửa hoàn tất để giả định hai đối tượng đã đồng bộ.  
 **Nghiệm thu:** không sửa ngày performed của Actual Workout; cancel hẹn không cancel workout tự tập; không bypass COACH_REQUIRED; accept lại phải kiểm tra conflict.
 
+### F05 source eligibility extension approved 2026-11-16
+
+The project owner approved missed-workout rescheduling in the working session on
+2026-11-16. A SCHEDULED source must be unsealed and have no linked Actual Workout
+log. It may start in the future or its known valid planned interval may have
+ended. An interval still in progress and a past-start source with unknown end
+are blocked. Workout-owned evidence is checked at generation and under the apply
+transaction locks. Preserve the old interval, original anchor, predecessor and
+successor history, and audit. See section 19 of
+[Schedule decisions](../07-development/features/06-schedule.md).
+
 ## 7. F06 — Nhập thực phẩm bằng văn bản
 
 | Câu hỏi | Hợp đồng thiết kế |
