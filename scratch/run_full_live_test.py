@@ -1,3 +1,5 @@
+import os
+import sys
 import json
 import time
 import base64
@@ -8,8 +10,13 @@ import urllib.request
 import urllib.error
 import subprocess
 
-JWT_SECRET = "dev-only-jwt-secret-change-before-production-1234567890"
-API_BASE = "http://localhost:8080/api/v1"
+JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("AUTH_JWT_SECRET")
+if not JWT_SECRET:
+    print("ERROR: Environment variable JWT_SECRET (or AUTH_JWT_SECRET) is required but not set.", file=sys.stderr)
+    print("Example: export JWT_SECRET=\"<placeholder_jwt_secret>\"", file=sys.stderr)
+    sys.exit(1)
+
+API_BASE = os.environ.get("API_BASE", "http://localhost:8080/api/v1")
 
 def base64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
