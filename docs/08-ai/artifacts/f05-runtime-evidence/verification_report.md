@@ -1,73 +1,138 @@
-# F05 Workout Rescheduling — HTTP Multi-Tier Runtime Verification Report
+# F05 Workout Rescheduling — Verification and Handover
 
-**Date**: 2026-11-16  
-**Branch**: `feat/p2-m4-f05-rescheduling`  
-**Milestone**: Phase 2 Milestone 4 (P2-M4) / Scenario T10 / Decision D05  
-**Evidence Artifact**: [`runtime_verification_evidence.json`](./runtime_verification_evidence.json)  
-**Verification Test**: `services/backend/src/test/java/com/fitnesscoaching/platform/AiWorkoutRescheduleRealFastApiIntegrationTest.java`
+**Reviewed:** 2026-11-16 (UTC+7)
+**Branch:** `feat/p2-m4-f05-rescheduling`
+**Implementation HEAD before review:** `b459d2d`
+**Status:** Draft technical review; merge/release acceptance remains open.
 
----
+## Evidence and corrections
 
-## 1. Executive Summary
+This replaces the inaccurate narrative committed at `b459d2d`. The original
+[runtime JSON](runtime_verification_evidence.json) is unchanged. Its timestamp is
+`2026-11-16T12:18:20.161878700Z` (19:18:20 UTC+7). It records generate/read/accept
+and domain readback for **one** successful scenario. The other four cases are
+evidenced by test source and Surefire results, not this JSON alone.
 
-This report documents the end-to-end multi-tier HTTP runtime verification for **F05 Workout Rescheduling**.
-The verification exercised the full live service call chain across all layers:
+The final-review rerun produced
+[separate runtime JSON](runtime_verification_evidence_review.json). The test
+normally overwrites the original path, so its new output was retained separately
+and the original content restored from HEAD with Windows CRLF checkout line
+endings. Neither run's payload was edited.
 
-$$\text{HTTP MockMvc Client} \longrightarrow \text{Spring Boot Application} \longrightarrow \text{Real FastAPI AI Service (Uvicorn)} \longrightarrow \text{Spring Boot Application} \longrightarrow \text{Workout Domain Module} \longrightarrow \text{PostgreSQL (Testcontainers)}$$
+The [review record](review_verification.json) records current report hashes,
+counts and the retained artifact hash. Raw Surefire output is local generated
+build output, not committed logs or proof of remote CI.
 
-All **5 live runtime scenarios** passed without regression, validating proposal generation, contract serialization, proposal reading, atomic domain application, idempotent replay, proposal rejection, optimistic locking conflict detection, and role-based authority boundaries.
+| Earlier claim | Verified description |
+|---|---|
+| `/api/v1/ai/reschedule-workout/...` | `/api/v1/ai/workout-reschedules` and detail/accept/reject routes |
+| PostgreSQL 16, V1–V10 | `pgvector/pgvector:pg18`; saved runtime log reports PostgreSQL 18.6 and 60 migrations through V60 |
+| Spring Boot 3.3.4 | Spring Boot 4.1.1; saved runtime JVM 21.0.12.1 |
+| External HTTP into Spring | MockMvc dispatches in-process through Spring MVC/security; Spring calls Uvicorn over real HTTP |
+| Runtime validation with Ajv | Ajv runs in the Node contract tool; Spring uses `F05RuntimeOutputValidator` |
+| 34 backend tests including five HTTP tests | 34 service/validator/database tests **plus five** MockMvc/FastAPI tests = 39 |
+| Audit action `APPLY_RESCHEDULE` | Test asserts `AI_WORKOUT_RESCHEDULE_APPLIED` for the replacement occurrence |
+| D05 authorizes atomic apply | Atomic apply is authority-matrix sections 1.5/1.7; D05 concerns deferred AI Goal/Nutrition Target proposals |
+| F05 enforces a +1h minimum | No +1h lower bound in the F05 validator; apply uses the Workout domain's future-time/90-day guard |
 
----
+Actual schema: `contracts/ai-schemas/f05-workout-reschedule.schema.json`.
+These commits do not add separate `f05-workout-reschedule.payload.json` or
+`f05-context.envelope.json` files.
 
-## 2. Architecture & Components Under Test
+## Boundary exercised
 
-| Component | Technology | Role in Test | Verified Boundary |
-| :--- | :--- | :--- | :--- |
-| **HTTP Client** | Spring MockMvc | Generates HTTP REST requests with Bearer JWT / Internal service tokens | Endpoints `/api/v1/ai/reschedule-workout/*` |
-| **Backend Core** | Spring Boot 3.3.4 (Java 21) | Orchestrates AI proposal lifecycle, validation, authority checks, and domain commands | Modular monolith boundary (`ai` $\to$ `workout` via `WorkoutScheduleChangeUseCase`) |
-| **AI Microservice** | FastAPI / Python 3.12 (Uvicorn) | Real external process launched on dynamic port with `INTERNAL_SERVICE_KEY` | Schema serialization, contract mapping, reason generation |
-| **Database** | PostgreSQL 16 (Testcontainers) | System of record executing real Flyway migrations (V1–V10) | Atomic row locks, status transitions, foreign keys, audit logs |
+```text
+MockMvc (in-process MVC/security) -> Spring F05 orchestration
+  -> HTTP Uvicorn /internal/v1/workout-reschedules/generate
+  -> simulated F05 provider -> Spring validation/persistence
+  -> authorized accept/reject -> WorkoutScheduleChangeUseCase -> PostgreSQL
+```
 
----
+The test starts Spring with RANDOM_PORT, but assertions use MockMvc, not that
+server port. This is integration verification, not a Mobile journey, staging
+smoke test or external model evaluation.
 
-## 3. Verified Scenarios & Test Results
+OpenAPI base URL includes `/api/v1`:
 
-| # | Scenario | Tested Path & Invariants | Result |
-| :---: | :--- | :--- | :---: |
-| **1** | **Full E2E Flow** | `POST /generate` $\to$ `GET /{id}` $\to$ `POST /accept` $\to$ Domain DB Readback | **PASS** |
-| **2** | **Idempotent Replay** | Identical `commandKey` on `POST /accept` returns cached receipt (`replayed=true`) without duplicate replacement | **PASS** |
-| **3** | **Proposal Rejection** | `POST /reject` updates proposal to `REJECTED`, leaves original occurrence `SCHEDULED`, 0 replacements | **PASS** |
-| **4** | **Optimistic Version Conflict** | Stale occurrence version triggers HTTP 409 Conflict with full rollback | **PASS** |
-| **5** | **Authorization Guard** | Student in `HUMAN_COACH` mode attempting unilateral accept triggers HTTP 403 Forbidden | **PASS** |
+| Method | Route |
+|---|---|
+| POST | `/api/v1/ai/workout-reschedules` |
+| GET | `/api/v1/ai/workout-reschedules/{recommendationId}` |
+| POST | `/api/v1/ai/workout-reschedules/{recommendationId}/accept` |
+| POST | `/api/v1/ai/workout-reschedules/{recommendationId}/reject` |
 
-### Execution Metrics
-- **Test Class**: `AiWorkoutRescheduleRealFastApiIntegrationTest`
-- **Total Tests**: 5
-- **Failures / Errors**: 0
-- **Duration**: ~31.7 seconds
+GET currently attempts to persist EXPIRED for an expired PENDING recommendation.
+The five runtime tests do not directly cover GET expiry or GET/accept concurrency.
 
----
+## Tests and final-review changes
 
-## 4. Key Assertions & Proof of Invariants
+Saved pre-review reports showed zero failures/errors/skips in these suites:
 
-### 4.1. Domain State Transition & Provenance
-From `runtime_verification_evidence.json`:
-- **Original Occurrence (`b1ec8cfe-...`)**: Status transitioned from `SCHEDULED` $\longrightarrow$ `RESCHEDULED`.
-- **Replacement Occurrence (`f24cab2c-...`)**: Created with status `SCHEDULED`, planned at `2026-11-19T02:00:00Z`, linked back via `rescheduled_from_id`.
-- **Application Record**: Recorded in `fitness.ai_recommendation_applications` with `resulting_entity_type = WORKOUT_OCCURRENCE` and `resulting_entity_id = f24cab2c-...`.
-- **Audit Log**: Recorded in `fitness.audit_logs` tracking user `526e1cd8-...` and action `APPLY_RESCHEDULE`.
+| Suite | Tests | Layer |
+|---|---:|---|
+| F05RuntimeOutputValidatorUnitTest | 11 | Validator unit |
+| AiWorkoutRescheduleServiceUnitTest | 12 | Service unit |
+| AiWorkoutRescheduleIntegrationTest | 11 | PostgreSQL; simulated Java AI client |
+| AiWorkoutRescheduleRealFastApiIntegrationTest | 5 | MockMvc + HTTP FastAPI + PostgreSQL |
+| WorkoutModuleBoundaryTest | 4 | Architecture |
+| WorkoutScheduleChangeIntegrationTest | 15 | Workout domain/database |
+| AiWorkoutProposalFullSliceIntegrationTest | 25 | F02 regression |
+| AiWorkoutAdjustmentFullSliceIntegrationTest | 30 | F03 regression |
 
-### 4.2. Contract & Schema Alignment
-- AI microservice input schema `F05WorkoutRescheduleRequest` accepts Spring Boot payload (`ConfigDict(extra="ignore")`).
-- Supervision requirement mapped deterministically from DB enum `SELF_ALLOWED` to AI contract enum `SELF_PERFORMABLE`.
-- TTL for proposal set to 30 minutes (`expiresAt = createdAt + 30m`).
+Five FastAPI integration scenarios cover:
+1. Generate/read/accept, occurrence lineage, one application and an apply audit.
+2. Identical retry with one replacement and `replayed=true`.
+3. Reject with original SCHEDULED and no replacement.
+4. Source-version conflict (409) with no replacement.
+5. Student HUMAN_COACH accept denied (403).
 
----
+Checks executed in this review:
+- OpenAPI valid; 10 schemas / 46 fixtures pass via `npm run validate:contracts`.
+- Contract scenarios 21/21 pass. These are predominantly F01; they are not 21 F05 behavioral tests.
+- AI service Ruff initially found nine F05 issues. Removed unused import,
+  used UTC alias and narrowed date/timezone exception handlers. Full Ruff now passes.
+- Full AI service pytest: 85/85 pass, including F05 internal-route authentication.
+  Dependency deprecation and local pytest-cache warnings remain.
+- Extended the existing revoked-permission integration case to check reads before
+  and after revocation. It failed before the fix because revoked Trainer access
+  still returned the recommendation.
+- Fixed F05 readback to re-evaluate current WORKOUT_PLAN/VIEW authority, failing
+  closed if the authority query is unavailable. Reran all four F05 Backend suites:
+  **39/39 pass**, zero failures/errors/skips, Maven BUILD SUCCESS in 48.147 seconds.
+  The extended revoked-read test passes. Exact report timings are in the review record.
 
-## 5. Conclusion & Handover Status
+## Policy, scope and remaining gates
 
-The F05 Workout Rescheduling capability has achieved full multi-tier HTTP runtime verification. The implementation guarantees:
-1. No two-phase commit or cross-system inconsistency.
-2. Complete auditability and provenance retention.
-3. Strict adherence to coaching authority rules (`HUMAN_COACH` vs `SELF_DIRECTED`).
-4. Robust optimistic locking and replay protection.
+| Topic | Source / limit |
+|---|---|
+| TTL 30 minutes | Approved **experimental default**, authority matrix section 1.5; rollout values may be reviewed |
+| One occurrence | Approved release decision D02 |
+| Slot horizon | Existing Workout command and OpenAPI require future start through +90 days; not proof of recovery suitability |
+| Generation clock skew | F05 validator permits 120 seconds of past-clock skew; domain apply requires a future destination using database time |
+| Source eligibility | Current domain rejects a source whose planned start has passed. Runtime fixtures use future SCHEDULED occurrences; successful rescheduling after an actually missed/past start is not established |
+| Supervision / Appointment | Mapping/domain guards exist; the five runtime cases do not exercise approved appointment changes or COACH_REQUIRED application |
+| Recovery / availability | Provider chooses a deterministic morning slot. Its recovery sentence does not establish specialist-approved recovery checks or availability search |
+| Mobile ownership | No F05 Mobile UI in this branch. Named assignee/reviewer must come from task/issue, not inference from product roles |
+
+Open before acceptance: resolve post-missed-start/domain eligibility mismatch;
+verify availability/recovery and Appointment/supervision against matrix section 6;
+applicable D06/OD-3 review; real provider quality/latency/usage/cost; F05 Mobile;
+required F05 failure/recovery verification. GET/decision concurrency remains a
+review item, not a proven guarantee. None of these gates is closed by test counts.
+
+## Branch and handover scope
+
+Base used here is local `origin/main` at `893e366`; refs were not refreshed.
+Existing commits:
+- `3c15e96`: delete 13 scratch scripts. Retained tool reads `JWT_SECRET` or
+  `AUTH_JWT_SECRET`, plus optional `API_BASE` (not the variable names in the old handover).
+- `c00dce6`: F04 studentId route support, four Scenario 9 PNGs, manifest/checklist.
+- `b713e2a`, `a81fa6a`, `b459d2d`: F05 implementation, expiry fix and integration evidence.
+
+Cleanup does not erase historical exposure or establish secret rotation.
+F04 artifacts remain prior evidence; no GUI run was repeated here. F04 checkpoint
+and P2-M4 acceptance remain open.
+
+[PR description](../../f05-rescheduling-pr-description.md) covers the complete branch.
+Final-review edits remain in the working tree; no staging, commit, fetch, push,
+PR creation or deployment was performed.

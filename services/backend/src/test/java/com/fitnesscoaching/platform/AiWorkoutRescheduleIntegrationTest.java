@@ -539,7 +539,7 @@ class AiWorkoutRescheduleIntegrationTest {
     }
 
     @Test
-    @DisplayName("Trainer data sharing permission revoked before accept blocks execution with 403")
+    @DisplayName("Trainer data sharing permission revoked blocks both read and accept")
     void trainerPermissionRevoked_blocksAccept() {
         TestFixture f = createFixture(false);
         UUID trainerId = UUID.randomUUID();
@@ -553,9 +553,15 @@ class AiWorkoutRescheduleIntegrationTest {
         );
         WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
 
+        assertThat(rescheduleService.getReschedule(trainerId, proposal.recommendationId()).id())
+                .isEqualTo(proposal.recommendationId());
+
         // Student revokes WORKOUT_PLAN permission
         jdbc.update("UPDATE fitness.data_sharing_permissions SET revoked_at=clock_timestamp(), revoke_reason='STUDENT_REVOKED', version=version+1 WHERE student_id=? AND data_scope='WORKOUT_PLAN'::fitness.data_scope_code",
                 f.studentId());
+
+        assertThatThrownBy(() -> rescheduleService.getReschedule(trainerId, proposal.recommendationId()))
+                .isInstanceOf(AiRunAccessDeniedException.class);
 
         var trainerAcceptReq = new AcceptRescheduleApiRequest("trainer-key-revoked", "Trying to apply", 1, 0L, null, null);
         assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq))

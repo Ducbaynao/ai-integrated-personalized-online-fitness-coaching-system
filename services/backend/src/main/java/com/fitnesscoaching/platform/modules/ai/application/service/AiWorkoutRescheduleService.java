@@ -308,6 +308,11 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
         var coaching = coachingContextQuery.findEffectiveContext(rec.studentId(), false);
         if (coaching.isPresent() && "HUMAN_COACH".equals(coaching.get().mode() != null ? coaching.get().mode().name() : null)) {
             if (actorId.equals(coaching.get().trainerId())) {
+                if (coachingAuthorityQuery == null || !coachingAuthorityQuery.evaluateCurrent(new AuthorityRequest(
+                        actorId, rec.studentId(), DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW
+                )).allowed()) {
+                    throw new AiRunAccessDeniedException("Trainer coaching or data sharing authority is no longer valid.");
+                }
                 return rec;
             }
         }

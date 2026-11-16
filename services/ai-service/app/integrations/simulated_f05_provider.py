@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import UTC, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.schemas.f05_schemas import (
     F05WorkoutRescheduleRequest,
@@ -15,11 +15,11 @@ class SimulatedF05WorkoutProvider:
     async def generate_reschedule(self, request: F05WorkoutRescheduleRequest) -> F05WorkoutRescheduleResponse:
         # Determine base time from plannedStartAt or now
         try:
-            planned_dt = datetime.fromisoformat(request.plannedStartAt.replace("Z", "+00:00"))
-        except Exception:
-            planned_dt = datetime.now(timezone.utc)
+            planned_dt = datetime.fromisoformat(request.plannedStartAt)
+        except ValueError:
+            planned_dt = datetime.now(UTC)
 
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         # Advance by 1 day or enough to be in the future
         candidate_dt = planned_dt + timedelta(days=1)
         if candidate_dt <= now_utc:
@@ -29,10 +29,10 @@ class SimulatedF05WorkoutProvider:
         tz_name = request.timezone or "Asia/Ho_Chi_Minh"
         try:
             tz = ZoneInfo(tz_name)
-        except Exception:
+        except (ZoneInfoNotFoundError, ValueError):
             try:
                 tz = ZoneInfo("Asia/Ho_Chi_Minh")
-            except Exception:
+            except (ZoneInfoNotFoundError, ValueError):
                 tz = timezone(timedelta(hours=7))
             tz_name = "Asia/Ho_Chi_Minh"
 
@@ -47,8 +47,8 @@ class SimulatedF05WorkoutProvider:
         start_offset_formatted = f"{start_offset[:3]}:{start_offset[3:]}" if len(start_offset) == 5 else "+07:00"
         end_offset_formatted = f"{end_offset[:3]}:{end_offset[3:]}" if len(end_offset) == 5 else "+07:00"
 
-        utc_start = local_start.astimezone(timezone.utc)
-        utc_end = local_end.astimezone(timezone.utc)
+        utc_start = local_start.astimezone(UTC)
+        utc_end = local_end.astimezone(UTC)
 
         destination = RescheduleDestinationSchema(
             localStart=local_start.strftime("%Y-%m-%dT%H:%M:%S"),
