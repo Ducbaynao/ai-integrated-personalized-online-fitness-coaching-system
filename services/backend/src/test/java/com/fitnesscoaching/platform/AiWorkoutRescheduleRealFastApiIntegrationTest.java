@@ -17,6 +17,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -44,6 +46,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -288,12 +291,31 @@ class AiWorkoutRescheduleRealFastApiIntegrationTest {
                 """, relId, studentId, trainerId, studentId);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("Complete HTTP E2E Flow: Generate (Real FastAPI) -> Read -> Accept -> Domain Readback & Audit")
-    void completeE2EFlow_generateReadAccept_domainReadback() throws Exception {
+    void completeE2EFlow_generateReadAccept_domainReadback(boolean missed) throws Exception {
         TestFixture f = createFixture(false);
         LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(10, 0);
-        UUID occurrenceId = createOccurrence(f, baseStart);
+        UUID occurrenceId;
+        if (missed) {
+            Instant start = Instant.now().minus(Duration.ofDays(2));
+            Instant end = start.plusSeconds(3600);
+            occurrenceId = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO fitness.planned_workouts
+                    (id,student_id,workout_plan_session_id,planned_start_at,planned_end_at,original_planned_start_at,
+                     created_by,schedule_local_start,schedule_local_end,schedule_timezone,schedule_start_utc_offset,schedule_end_utc_offset)
+                    VALUES (?,?,?,?,?,?,?, ?,?,'Asia/Ho_Chi_Minh','+07:00','+07:00')
+                    """, occurrenceId, f.studentId(), f.sessionId(), Timestamp.from(start), Timestamp.from(end),
+                    Timestamp.from(start), f.studentId(),
+                    LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)).toString(),
+                    LocalDateTime.ofInstant(end, ZoneOffset.ofHours(7)).toString());
+        } else {
+            occurrenceId = createOccurrence(f, baseStart);
+        }
+        Timestamp originalAnchor = jdbc.queryForObject(
+                "SELECT original_planned_start_at FROM fitness.planned_workouts WHERE id=?", Timestamp.class, occurrenceId);
         String studentToken = generateToken(f.studentId(), "STUDENT");
 
         // 1. Generate Proposal via HTTP POST -> calls Real FastAPI
@@ -359,6 +381,10 @@ class AiWorkoutRescheduleRealFastApiIntegrationTest {
         UUID newLinkedSource = jdbc.queryForObject(
                 "SELECT rescheduled_from_id FROM fitness.planned_workouts WHERE id=?", UUID.class, replacementId);
         assertThat(newLinkedSource).isEqualTo(occurrenceId);
+        assertThat(jdbc.queryForObject("SELECT original_planned_start_at FROM fitness.planned_workouts WHERE id=?",
+                Timestamp.class, replacementId)).isEqualTo(originalAnchor);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                Integer.class, occurrenceId)).isZero();
 
         // Verify Recommendation Application Receipt
         Integer applicationCount = jdbc.queryForObject(
@@ -372,9 +398,11 @@ class AiWorkoutRescheduleRealFastApiIntegrationTest {
                 Integer.class, replacementId);
         assertThat(auditCount).isOne();
 
-        // 5. Export sanitized JSON evidence for repository documentation
+        // 5. Export sanitized evidence into generated build output for review.
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("timestamp", Instant.now().toString());
+        evidence.put("sourceKind", missed ? "MISSED_UNSTARTED" : "UPCOMING_UNSTARTED");
+        evidence.put("originalPlannedStartAt", originalAnchor.toInstant().toString());
         evidence.put("flow", "HTTP MockMvc -> Spring Boot -> Real FastAPI -> Spring Boot -> Domain -> PostgreSQL");
         evidence.put("fastApiPort", fastApiPort);
         evidence.put("studentId", f.studentId().toString());
@@ -391,9 +419,9 @@ class AiWorkoutRescheduleRealFastApiIntegrationTest {
                 "auditRecorded", true
         ));
 
-        Path evidenceDir = Paths.get("../../docs/08-ai/artifacts/f05-runtime-evidence");
+        Path evidenceDir = Paths.get("target/f05-runtime-evidence");
         Files.createDirectories(evidenceDir);
-        Files.writeString(evidenceDir.resolve("runtime_verification_evidence.json"),
+        Files.writeString(evidenceDir.resolve(missed ? "runtime_verification_evidence_missed.json" : "runtime_verification_evidence.json"),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(evidence));
     }
 

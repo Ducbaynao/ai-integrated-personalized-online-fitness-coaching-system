@@ -11,6 +11,9 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutScheduleFailur
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutExecutionFailure;
 import com.fitnesscoaching.platform.modules.workout.adapter.out.persistence.JdbcWorkoutScheduleChangeAdapter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.fitnesscoaching.platform.modules.audit.AuditService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -36,6 +39,8 @@ import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.reset;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -71,10 +76,13 @@ class WorkoutScheduleChangeIntegrationTest {
     @Autowired tools.jackson.databind.ObjectMapper mapper;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoSpyBean JdbcWorkoutScheduleChangeAdapter changeAdapter;
+    @MockitoSpyBean AuditService audit;
 
-    @Test void startWinningSealsOccurrenceAndRejectsRescheduleWithoutEffects() throws Exception {
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void startWinningSealsOccurrenceAndRejectsRescheduleWithoutEffects(boolean missed) throws Exception {
         Fixture f = startableFixture();
-        UUID source = confirmed(f, "start-wins-source");
+        UUID source = missed ? timedOccurrence(f, Instant.now().minusSeconds(172800), Instant.now().minusSeconds(169200))
+                : confirmed(f, "start-wins-source");
         String moveKey = "start-wins-move-" + source;
         CountDownLatch effectReady = new CountDownLatch(1), releaseCommit = new CountDownLatch(1);
         CountDownLatch moveInvoked = new CountDownLatch(1);
@@ -109,9 +117,11 @@ class WorkoutScheduleChangeIntegrationTest {
                 Integer.class, f.student(), moveKey)).isZero();
     }
 
-    @Test void rescheduleWinningRejectsStartWithoutExecution() throws Exception {
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void rescheduleWinningRejectsStartWithoutExecution(boolean missed) throws Exception {
         Fixture f = startableFixture();
-        UUID source = confirmed(f, "move-wins-source");
+        UUID source = missed ? timedOccurrence(f, Instant.now().minusSeconds(172800), Instant.now().minusSeconds(169200))
+                : confirmed(f, "move-wins-source");
         CountDownLatch effectReady = new CountDownLatch(1), releaseCommit = new CountDownLatch(1);
         CountDownLatch startSnapshotReady = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -424,6 +434,92 @@ class WorkoutScheduleChangeIntegrationTest {
                         Integer.class, source)).isBetween(0, 1);
             }
         }
+    }
+
+    @Test void missedSourceReschedulesWithHistoryAndReplay() {
+        Fixture f = fixture();
+        UUID source = timedOccurrence(f, Instant.now().minusSeconds(172800), Instant.now().minusSeconds(169200));
+        var before = calendar.detail(f.student(), source);
+        assertThat(before.availableActions()).contains("RESCHEDULE");
+        Destination target = destination(localStart());
+        assertThat(changes.inspectProposalCreation(f.student(), source, 0, "RESCHEDULE", target)
+                .plannedStartAt()).isEqualTo(before.plannedStartAt());
+        Reschedule command = new Reschedule(source, f.student(), 0, target, "Missed workout", "missed-move");
+        ChangeResult result = changes.reschedule(command);
+        assertThat(changes.reschedule(command).asReplay()).isEqualTo(result.asReplay());
+        var old = calendar.detail(f.student(), source);
+        var replacement = calendar.detail(f.student(), result.replacementOccurrenceId());
+        assertThat(old.status()).isEqualTo("RESCHEDULED");
+        assertThat(old.plannedStartAt()).isEqualTo(before.plannedStartAt());
+        assertThat(replacement.originalPlannedStartAt()).isEqualTo(before.originalPlannedStartAt());
+        assertThat(replacement.rescheduledFromOccurrenceId()).isEqualTo(source);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_occurrence_changes WHERE previous_occurrence_id=?",
+                Integer.class, source)).isOne();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id=?",
+                Integer.class, source)).isZero();
+    }
+
+    @Test void sourceStillWithinSlotOrWithoutKnownEndCannotReschedule() {
+        for (Instant end : new Instant[]{Instant.now().plusSeconds(3600), null}) {
+            Fixture f = fixture();
+            UUID source = timedOccurrence(f, Instant.now().minusSeconds(3600), end);
+            assertThat(calendar.detail(f.student(), source).availableActions()).doesNotContain("RESCHEDULE");
+            assertCode(() -> changes.inspectProposalCreation(f.student(), source, 0, "RESCHEDULE", destination(localStart())),
+                    "WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED");
+            assertCode(() -> changes.reschedule(reschedule(f, source, "blocked-window", localStart())),
+                    "WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED");
+        }
+    }
+
+    @Test void historicalExecutionWithoutSealBlocksMissedReschedule() {
+        for (String state : List.of("IN_PROGRESS", "COMPLETED", "PARTIALLY_COMPLETED", "ABORTED")) {
+            Fixture f = fixture();
+            Instant start = Instant.now().minusSeconds(172800).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            UUID source = timedOccurrence(f, start, start.plusSeconds(3600));
+            UUID log = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO fitness.workout_session_logs
+                    (id,student_id,planned_workout_id,performed_start_at,performed_end_at,status,logged_by)
+                    VALUES (?,?,?,?,?,?::fitness.actual_workout_status,?)
+                    """, log, f.student(), source, Timestamp.from(start),
+                    "IN_PROGRESS".equals(state) ? null : Timestamp.from(start.plusSeconds(1800)), state, f.student());
+            assertThat(calendar.detail(f.student(), source).availableActions()).doesNotContain("RESCHEDULE");
+            assertCode(() -> changes.reschedule(reschedule(f, source, "historical-log", localStart())),
+                    "WORKOUT_SCHEDULE_OCCURRENCE_SEALED");
+            assertThat(jdbc.queryForObject("SELECT performed_start_at FROM fitness.workout_session_logs WHERE id=?",
+                    Timestamp.class, log).toInstant()).isEqualTo(start.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        }
+    }
+
+    @Test void missedRescheduleAuditFailureRollsBackHistoryAndReplacement() {
+        Fixture f = fixture();
+        UUID source = timedOccurrence(f, Instant.now().minusSeconds(172800), Instant.now().minusSeconds(169200));
+        doThrow(new IllegalStateException("forced audit failure")).when(audit).recordAudit(
+                argThat(record -> "PLANNED_WORKOUT_RESCHEDULED".equals(record.action())));
+        try {
+            assertThatThrownBy(() -> changes.reschedule(reschedule(f, source, "failed-audit", localStart())))
+                    .isInstanceOf(IllegalStateException.class).hasMessage("forced audit failure");
+        } finally {
+            reset(audit);
+        }
+        assertThat(calendar.detail(f.student(), source).status()).isEqualTo("SCHEDULED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?",
+                Integer.class, source)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_schedule_occurrence_changes WHERE previous_occurrence_id=?",
+                Integer.class, source)).isZero();
+    }
+
+    private UUID timedOccurrence(Fixture f, Instant start, Instant end) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,workout_plan_session_id,planned_start_at,planned_end_at,original_planned_start_at,
+                 created_by,schedule_local_start,schedule_local_end,schedule_timezone,schedule_start_utc_offset,schedule_end_utc_offset)
+                VALUES (?,?,?,?,?,?,?, ?,?,'Etc/UTC','+00:00','+00:00')
+                """, id, f.student(), f.session(), Timestamp.from(start), end == null ? null : Timestamp.from(end),
+                Timestamp.from(start), f.student(), LocalDateTime.ofInstant(start, ZoneOffset.UTC).toString(),
+                end == null ? null : LocalDateTime.ofInstant(end, ZoneOffset.UTC).toString());
+        return id;
     }
 
     private String compete(Fixture f, UUID source, String key, CountDownLatch ready, CountDownLatch go)

@@ -20,6 +20,9 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutS
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -80,6 +83,7 @@ class AiWorkoutRescheduleIntegrationTest {
     @Autowired private WorkoutScheduleBatchUseCase batches;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private WorkoutExecutionCommandUseCase execution;
 
     private record TestFixture(UUID studentId, UUID planId, UUID versionId, UUID sessionId) {}
 
@@ -140,6 +144,62 @@ class AiWorkoutRescheduleIntegrationTest {
                         start, start.plusHours(1), "+07:00", "+07:00")),
                 "confirm-" + UUID.randomUUID()
         )).items().getFirst().occurrenceId();
+    }
+
+    private UUID missedOccurrence(TestFixture f) {
+        Instant start = Instant.now().minus(2, ChronoUnit.DAYS);
+        return timedOccurrence(f, start, start.plus(1, ChronoUnit.HOURS));
+    }
+
+    private UUID timedOccurrence(TestFixture f, Instant start, Instant end) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,workout_plan_session_id,planned_start_at,planned_end_at,original_planned_start_at,
+                 created_by,schedule_local_start,schedule_local_end,schedule_timezone,schedule_start_utc_offset,schedule_end_utc_offset)
+                VALUES (?,?,?,?,?,?,?, ?,?,'Asia/Ho_Chi_Minh','+07:00','+07:00')
+                """, id, f.studentId(), f.sessionId(), Timestamp.from(start), end == null ? null : Timestamp.from(end),
+                Timestamp.from(start), f.studentId(),
+                LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)).toString(),
+                end == null ? null : LocalDateTime.ofInstant(end, ZoneOffset.ofHours(7)).toString());
+        return id;
+    }
+
+    @Test
+    void missedWorkoutStartedAfterGenerationCannotBeApplied() {
+        TestFixture f = createFixture(false);
+        UUID source = missedOccurrence(f);
+        var proposal = rescheduleService.generateReschedule(f.studentId(),
+                new WorkoutRescheduleApiRequest(f.studentId(), source, 0L, "missed-before-start", "Missed", null));
+        var actual = execution.start(new WorkoutExecutionCommandUseCase.StartCommand(source, f.studentId(), 0, "late-start"));
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(),
+                new AcceptRescheduleApiRequest("after-start", null, 1, 0L, null, null)))
+                .isInstanceOf(AiRunLifecycleConflictException.class);
+        assertThat(recommendationRepository.findById(proposal.recommendationId()).orElseThrow().status())
+                .isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?",
+                Integer.class, source)).isZero();
+        assertThat(jdbc.queryForObject("SELECT performed_start_at FROM fitness.workout_session_logs WHERE id=?",
+                Timestamp.class, actual.id()).toInstant()).isEqualTo(actual.performedStartedAt());
+    }
+
+    @Test
+    void generationRejectsUnfinishedWindowUnknownEndAndStartedSources() {
+        TestFixture f = createFixture(false);
+        Instant start = Instant.now().minus(1, ChronoUnit.HOURS);
+        for (Instant end : new Instant[]{Instant.now().plus(1, ChronoUnit.HOURS), null}) {
+            UUID source = timedOccurrence(f, start, end);
+            assertThatThrownBy(() -> rescheduleService.generateReschedule(f.studentId(),
+                    new WorkoutRescheduleApiRequest(f.studentId(), source, 0L, "invalid-" + source, "Missed", null)))
+                    .isInstanceOf(AiRunLifecycleConflictException.class);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendations WHERE target_entity_id=?",
+                    Integer.class, source)).isZero();
+        }
+        UUID source = missedOccurrence(f);
+        execution.start(new WorkoutExecutionCommandUseCase.StartCommand(source, f.studentId(), 0, "started-before-generation"));
+        assertThatThrownBy(() -> rescheduleService.generateReschedule(f.studentId(),
+                new WorkoutRescheduleApiRequest(f.studentId(), source, 1L, "blocked-started", "Missed", null)))
+                .isInstanceOf(AiRunLifecycleConflictException.class);
     }
 
     private void setupCoachingPeriod(UUID studentId, UUID trainerId, String mode) {
@@ -330,12 +390,13 @@ class AiWorkoutRescheduleIntegrationTest {
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("T06/T25: Idempotent replay returns cached receipt; differing parameters throw conflict")
-    void idempotentAcceptRetry_replaysReceipt_T06_T25() {
+    void idempotentAcceptRetry_replaysReceipt_T06_T25(boolean missed) {
         TestFixture f = createFixture(false);
         LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
-        UUID occurrenceId = createOccurrence(f, baseStart);
+        UUID occurrenceId = missed ? missedOccurrence(f) : createOccurrence(f, baseStart);
 
         var generateReq = new WorkoutRescheduleApiRequest(
                 f.studentId(), occurrenceId, 0L, "gen-key-idem", "Conflict", null
@@ -394,12 +455,13 @@ class AiWorkoutRescheduleIntegrationTest {
         assertThat(rec.status()).isEqualTo(AiRecommendationStatus.EXPIRED);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("Concurrent double accept with different keys: exactly one succeeds, other gets conflict")
-    void concurrentDoubleAccept_differentKeys_onlyOneSucceeds() throws Exception {
+    void concurrentDoubleAccept_differentKeys_onlyOneSucceeds(boolean missed) throws Exception {
         TestFixture f = createFixture(false);
         LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
-        UUID occurrenceId = createOccurrence(f, baseStart);
+        UUID occurrenceId = missed ? missedOccurrence(f) : createOccurrence(f, baseStart);
 
         var generateReq = new WorkoutRescheduleApiRequest(
                 f.studentId(), occurrenceId, 0L, "gen-key-conc", "Conflict", null
@@ -449,12 +511,13 @@ class AiWorkoutRescheduleIntegrationTest {
         assertThat(count).isOne();
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("Concurrent accept and reject: serialized consistently, exactly one transition wins")
-    void concurrentAcceptAndReject_serializedConsistently() throws Exception {
+    void concurrentAcceptAndReject_serializedConsistently(boolean missed) throws Exception {
         TestFixture f = createFixture(false);
         LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
-        UUID occurrenceId = createOccurrence(f, baseStart);
+        UUID occurrenceId = missed ? missedOccurrence(f) : createOccurrence(f, baseStart);
 
         var generateReq = new WorkoutRescheduleApiRequest(
                 f.studentId(), occurrenceId, 0L, "gen-key-ar", "Conflict", null

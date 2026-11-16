@@ -4469,8 +4469,10 @@ paths:
       summary: Propose rescheduling or cancelling one occurrence
       description: >-
         Only a Trainer with a current effective Coaching Period and current WORKOUT_PLAN CONTRIBUTE or MANAGE
-        may propose a change to this Student's SCHEDULED, unsealed occurrence before its old planned start.
-        RESCHEDULE also requires preserved source version/session and local-time intent. A linked
+        may propose a change to this Student's SCHEDULED, unsealed occurrence. CANCEL proposal creation
+        requires a future source start. RESCHEDULE permits a future source start or a known valid source
+        interval that has ended, with no linked Actual Workout log, and also requires preserved source
+        version/session and local-time intent. A linked
         Appointment permits RESCHEDULE only within that same confirmed interval; CANCEL leaves the
         Appointment confirmed and releases the active occurrence dependency. Creation stores an immutable
         proposal snapshot but does not mutate an occurrence or reserve the target time. Student decision is final.
@@ -4660,8 +4662,10 @@ paths:
       operationId: rescheduleMyPlannedWorkoutOccurrence
       summary: Student replaces one unstarted Planned Workout occurrence
       description: >-
-        Only its Student may replace a SCHEDULED, unsealed occurrence whose old plannedStartAt is still in the
-        future, including when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
+        Only its Student may replace a SCHEDULED, unsealed occurrence with no linked Actual Workout log.
+        The source must either start in the future or have a known valid planned end at or before
+        authoritative PostgreSQL time. A source still within its original slot, or past-start with unknown
+        end, is blocked. This also applies when its source plan is PAUSED, COMPLETED, or ARCHIVED. The original source plan
         version/session/prescription and plan-week coordinates are retained even if the target moves to another
         day or week; no current plan publication is selected. Missing legacy source version/session or local
         intent blocks replacement. A linked Appointment permits replacement only when its same confirmed
@@ -5410,7 +5414,10 @@ paths:
       operationId: generateWorkoutReschedule
       summary: Generate AI workout rescheduling recommendation (F05)
       description: >-
-        Proposes an optimal next slot to reschedule an unfinished or missed Planned Workout occurrence.
+        Proposes a next slot for an unstarted Planned Workout occurrence. The source must be SCHEDULED,
+        have no execution seal or linked Actual Workout log, and either start in the future or have
+        a known valid planned end that has passed. Eligibility and source version are checked at
+        generation and rechecked by the Workout domain during atomic apply.
         Preserves recovery intervals, supervision requirement, and timezone constraints.
       security:
         - bearerAuth: []
@@ -6700,8 +6707,11 @@ components:
         WORKOUT_SCHEDULE_OVERLAP, WORKOUT_SCHEDULE_EXISTING_END_UNKNOWN, and
         WORKOUT_SCHEDULE_IDEMPOTENCY_CONFLICT. An unknown end on another SCHEDULED occurrence blocks
         replacement creation, without disclosing that row's ID or timing.
-        WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED compares the occurrence being changed's current
-        plannedStartAt with authoritative PostgreSQL time, not its chain-wide originalPlannedStartAt.
+        For RESCHEDULE, WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED means the source has started its planned
+        interval but its known valid end has not passed, or the end is unknown. The backend compares the
+        current planned interval with authoritative PostgreSQL time. A past interval with no execution
+        or linked Actual Workout log is eligible for rescheduling. Trainer CANCEL proposal creation still
+        requires a future source start. The chain-wide originalPlannedStartAt remains historical evidence.
         Same actor, command type,
         commandKey, and logical payload replay one committed effect after current visibility/authority
         checks; a different payload conflicts. A committed authorized replay does not reapply mutation

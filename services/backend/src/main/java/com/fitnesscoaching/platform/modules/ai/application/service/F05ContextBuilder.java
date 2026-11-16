@@ -13,6 +13,7 @@ import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery.Occurrence;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutScheduleFailure;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,18 +31,21 @@ public class F05ContextBuilder {
     private final UserAccountStatusQuery accountStatusQuery;
     private final ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider;
     private final Clock clock;
+    private final WorkoutMissedEvidenceQuery missedEvidence;
 
     @Autowired
     public F05ContextBuilder(
             CurrentCoachingContextQuery coachingContextQuery,
             UserAccountStatusQuery accountStatusQuery,
             ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
-            Clock clock
+            Clock clock,
+            WorkoutMissedEvidenceQuery missedEvidence
     ) {
         this.coachingContextQuery = coachingContextQuery;
         this.accountStatusQuery = accountStatusQuery;
         this.scheduleCalendarProvider = scheduleCalendarProvider;
         this.clock = clock != null ? clock : Clock.systemUTC();
+        this.missedEvidence = missedEvidence;
     }
 
     public record CoachingContextDetails(
@@ -139,6 +143,11 @@ public class F05ContextBuilder {
         }
 
         Instant asOf = Instant.now(clock);
+        var evidence = missedEvidence.find(occurrence.occurrenceId());
+        if (evidence.isEmpty() || evidence.get().occurrenceVersion() != occurrence.occurrenceVersion()
+                || !evidence.get().canRescheduleAt(asOf)) {
+            throw new AiRunLifecycleConflictException("Workout must be unstarted and either upcoming or past its known end time.");
+        }
 
         String rawSupervision = (occurrence.sessionSummary() != null && occurrence.sessionSummary().supervisionRequirement() != null)
                 ? occurrence.sessionSummary().supervisionRequirement()

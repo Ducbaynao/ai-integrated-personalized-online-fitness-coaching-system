@@ -252,7 +252,7 @@ The `B06-PLAN-SESSION-SUPERVISION-READ` checkpoint adds the stored, version-scop
 
 1. The Student may directly reschedule or cancel **one** Planned Workout occurrence. A Trainer may only propose a change to one occurrence while a current effective Coaching Period and current `WORKOUT_PLAN` authority of at least `CONTRIBUTE` exist. The Student alone ACCEPTs or REJECTs that proposal. The first change flow does not move or cancel a whole batch or series.
 2. Only a `SCHEDULED` occurrence without an execution seal is eligible. Terminal occurrences and any occurrence whose execution has STARTed cannot be rescheduled or cancelled. The backend rechecks occurrence state and optimistic version within the mutation transaction.
-3. Reschedule requires the **old** planned start still to be in the future. The Student may cancel an overdue `SCHEDULED`, unsealed occurrence only with a reason. A Trainer may propose a change only before the occurrence's planned start.
+3. The original 2026-10-12 decision required the **old** planned start to be in the future. The 2026-11-16 missed-workout extension below supersedes that source-time requirement for RESCHEDULE. The Student may cancel an overdue `SCHEDULED`, unsealed occurrence only with a reason. Trainer CANCEL proposal creation requires a future source start.
 4. A source plan becoming `PAUSED`, `COMPLETED`, or `ARCHIVED` does not by itself revoke reschedule/cancel eligibility for an already confirmed occurrence. The original source plan version, session, and prescription remain authoritative; no remapping to a later version occurs.
 5. Reschedule creates a **new occurrence ID** and transitions the old row to `RESCHEDULED`. The replacement's `rescheduled_from_id` points to its immediate predecessor; the original planned-time anchor is preserved across the whole chain. Cancel transitions the current row to `CANCELLED` and creates no replacement. Both retain append-only audit/history.
 6. The replacement may move to another date or week within the approved time limit. A changed execution date does not change the source version's plan-week/session identity or prescription. Audit/history retains the old and new scheduled times.
@@ -266,3 +266,27 @@ The `B06-PLAN-SESSION-SUPERVISION-READ` checkpoint adds the stored, version-scop
 These decisions **do not change** the existing B05 START/SKIP policy, execution seal, optimistic occurrence-version checks, or the current Student/Trainer calendar authority boundary. The existing Appointment reschedule-request table is Appointment-owned; it is not, by itself, a Planned Workout change workflow.
 
 The subsequent `B06-RESCHEDULE-CANCEL-CONTRACT` checkpoint declares Student occurrence detail/direct reschedule/direct cancel, Trainer one-occurrence change-proposal create/list/detail/withdraw, Student proposal list/detail/ACCEPT/REJECT, lineage in calendar/detail, and stable error semantics in OpenAPI. This is a **contract declaration only**: no reschedule/cancel migration, backend command/read implementation, or Mobile flow is delivered by this checkpoint. A separate change-proposal aggregate and a detail read spanning calendar windows are contract design choices, not additional product policy. Existing confirmed batch/proposal records stay unchanged. The contract's Student late-cancel reason is supplied with direct cancel or with a Student ACCEPT decision; it is never inferred from the Trainer's proposal note. `WORKOUT_SCHEDULE_OCCURRENCE_START_PASSED` compares the occurrence being changed's current `plannedStartAt`, not the chain-wide `originalPlannedStartAt`. The read contract exposes one nullable `replacementOccurrenceId` for the approved one-to-one chain. V5 does not enforce unique `rescheduled_from_id` for legacy rows, so implementation must audit ambiguous legacy lineage rather than silently choose one successor. V31 duplicate/overlap constraints cover only batch-linked rows; transaction guards must also cover legacy conflicts. Receipt storage, exact lock order, one-new-successor enforcement, audit persistence, legacy lineage projection, Appointment-link query, and action/command parity must be established in later implementation checkpoints.
+
+
+## 19. Missed-workout rescheduling extension approved 2026-11-16
+
+The project owner approved the proposed missed-workout change in the working
+session on 2026-11-16. Workout evidence determines source eligibility. A source
+must be SCHEDULED, unsealed and free of linked Actual Workout logs, including
+legacy, aborted and partially completed executions. It may start in the future,
+or its known valid planned interval may already have ended. Sources still within
+their original interval and past-start sources with unknown end are blocked.
+
+The known planned end is the cutoff for voluntary rescheduling. Progress reporting
+and automatic attention rules use their respective existing reporting windows.
+F05 context selection, calendar RESCHEDULE actions, direct reschedule and
+RESCHEDULE proposal inspection reuse the same Workout evidence predicate. Apply
+checks again under Student/occurrence locks using PostgreSQL time. The existing
+authority rules determine the actor who decides in each workflow.
+
+The old interval and original anchor remain in history. The old occurrence becomes
+RESCHEDULED and one SCHEDULED successor links to it. Append-only change history
+records the move time, and Actual Workout history retains its execution dates.
+The destination must be in the future within the existing 90-day horizon and pass
+source-version, overlap, supervision and Appointment guards. Occurrence changes,
+receipt and mandatory audit commit atomically.

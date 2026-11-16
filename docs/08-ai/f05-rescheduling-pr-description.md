@@ -28,10 +28,10 @@ Scenario 9 GUI evidence.
 
 ## Verification
 
-- F05 Backend: 39 tests (23 unit + 11 database + 5 FastAPI integration).
+- F05 Backend includes 45 tests (23 unit + 16 database + 6 FastAPI integration).
   Final-review rerun results and report hashes are in the verification record.
-- Saved prior regression reports: F02 25, F03 30, Workout scheduling 15 and
-  module boundary 4 pass. These were inspected, not rerun in final review.
+- Prior F02/F03 reports contain 25/30 passing tests. The missed-source update
+  additionally ran 21 Workout change tests and the 111-test regression listed below.
 - Final-review AI service Ruff passes; pytest 85/85; OpenAPI valid;
   10 AI schemas / 46 fixtures; contract scenarios 21/21.
 - Runtime: in-process MockMvc -> Spring -> HTTP Uvicorn/FastAPI with simulated
@@ -42,10 +42,15 @@ Scenario 9 GUI evidence.
 
 ## Reviewer decisions and limits
 
-Open as **draft technical review**, not merge/release acceptance:
+Review includes the implemented Backend scope and these remaining feature items.
 
-- Approved F05 includes a missed workout; domain currently rejects a source after
-  its planned start, while runtime fixtures use future occurrences.
+- Missed-source rescheduling was approved on 2026-11-16 and implemented through
+  shared Workout evidence. A known ended interval, SCHEDULED state and absence of
+  execution/log permit rescheduling. FastAPI integration covers this flow.
+- Workout change tests cover 21 cases, including missed-source history, START
+  races, legacy execution evidence and atomic audit-failure rollback.
+- Follow-up regression passes 111 tests across Schedule changes/proposals,
+  Workout batch materialization, Progress, attention rules and module boundary.
 - Deterministic slot generation does not prove recovery/availability suitability.
   Review specialist rules and Appointment/COACH_REQUIRED cases.
 - TTL 30 minutes is the approved experimental default; +90 days is the domain

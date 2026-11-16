@@ -109,13 +109,12 @@ Checks executed in this review:
 | One occurrence | Approved release decision D02 |
 | Slot horizon | Existing Workout command and OpenAPI require future start through +90 days; not proof of recovery suitability |
 | Generation clock skew | F05 validator permits 120 seconds of past-clock skew; domain apply requires a future destination using database time |
-| Source eligibility | Current domain rejects a source whose planned start has passed. Runtime fixtures use future SCHEDULED occurrences; successful rescheduling after an actually missed/past start is not established |
+| Source eligibility | Extended with project-owner approval on 2026-11-16. Future unstarted sources and ended known intervals with no execution/log are eligible. Both source kinds are covered by the FastAPI integration flow |
 | Supervision / Appointment | Mapping/domain guards exist; the five runtime cases do not exercise approved appointment changes or COACH_REQUIRED application |
 | Recovery / availability | Provider chooses a deterministic morning slot. Its recovery sentence does not establish specialist-approved recovery checks or availability search |
 | Mobile ownership | No F05 Mobile UI in this branch. Named assignee/reviewer must come from task/issue, not inference from product roles |
 
-Open before acceptance: resolve post-missed-start/domain eligibility mismatch;
-verify availability/recovery and Appointment/supervision against matrix section 6;
+Open before acceptance: verify availability/recovery and Appointment/supervision against matrix section 6;
 applicable D06/OD-3 review; real provider quality/latency/usage/cost; F05 Mobile;
 required F05 failure/recovery verification. GET/decision concurrency remains a
 review item, not a proven guarantee. None of these gates is closed by test counts.
@@ -136,3 +135,33 @@ and P2-M4 acceptance remain open.
 [PR description](../../f05-rescheduling-pr-description.md) covers the complete branch.
 Final-review edits remain in the working tree; no staging, commit, fetch, push,
 PR creation or deployment was performed.
+
+
+## Missed-workout extension verified 2026-11-16
+
+The project owner approved the proposed source eligibility extension in the working
+session. The shared Workout evidence predicate now allows an unstarted SCHEDULED
+source with no linked Actual Workout log when its start is future or its known
+valid planned interval has ended. Apply uses database time under the existing
+Student/occurrence locks. Generation and calendar actions use the same predicate.
+The voluntary reschedule cutoff is the known planned end. Progress aggregation
+and automatic attention reporting keep their existing windows.
+
+The extension preserves source time and original anchor, creates one linked
+successor, and retains append-only change/audit history. The existing tests now
+exercise START/reschedule races for both future and missed sources, historical
+execution logs without a seal, late START after AI generation, idempotent replay,
+concurrent decisions, unknown end, unfinished interval and audit rollback.
+
+The main Backend run passed 66 tests, comprising 45 F05 tests and 21 Workout
+schedule-change tests. Follow-up regression passed 111 tests across Schedule
+change proposals (11), scheduling proposals (33), batches (24), Progress (28),
+attention rules (11) and module boundary (4). The total is 177 passing Backend tests. Exact current suite results and follow-up regression
+results are recorded in the missedReschedulingUpdate section of
+[review_verification.json](review_verification.json).
+
+The generated missed-source runtime payload is retained separately at
+[runtime_verification_evidence_missed.json](runtime_verification_evidence_missed.json).
+It was produced by MockMvc -> Spring -> HTTP Uvicorn with simulated provider ->
+Workout domain -> PostgreSQL. Test evidence now writes to target/f05-runtime-evidence
+so reruns preserve the retained repository artifacts.
