@@ -138,10 +138,18 @@ public class F05RuntimeOutputValidator {
         try {
             ZoneOffset startOffset = ZoneOffset.of(startOffsetStr);
             ZoneOffset endOffset = ZoneOffset.of(endOffsetStr);
-            if (!zone.getRules().getValidOffsets(localStart).contains(startOffset)) {
+            var startValid = zone.getRules().getValidOffsets(localStart);
+            if (startValid.isEmpty()) {
+                return ValidationResult.invalid("destination localStart falls in a DST transition gap (nonexistent local time).");
+            }
+            if (!startValid.contains(startOffset)) {
                 return ValidationResult.invalid("startUtcOffset is not valid for timezone at localStart.");
             }
-            if (!zone.getRules().getValidOffsets(localEnd).contains(endOffset)) {
+            var endValid = zone.getRules().getValidOffsets(localEnd);
+            if (endValid.isEmpty()) {
+                return ValidationResult.invalid("destination localEnd falls in a DST transition gap (nonexistent local time).");
+            }
+            if (!endValid.contains(endOffset)) {
                 return ValidationResult.invalid("endUtcOffset is not valid for timezone at localEnd.");
             }
         } catch (DateTimeException e) {

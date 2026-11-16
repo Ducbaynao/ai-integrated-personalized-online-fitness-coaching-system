@@ -39,7 +39,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.CurrentCoachingContext;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -69,9 +79,11 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     private final CurrentCoachingContextQuery coachingContextQuery;
     private final WorkoutScheduleChangeUseCase workoutScheduleChangeUseCase;
     private final ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider;
+    private final PlatformTransactionManager transactionManager;
+    private final UserAccountStatusQuery accountStatusQuery;
+    private final CoachingAuthorityQuery coachingAuthorityQuery;
     private final Clock clock;
 
-    @Autowired
     public AiWorkoutRescheduleService(
             AiRunRepository aiRunRepository,
             AiRecommendationRepository recommendationRepository,
@@ -85,6 +97,28 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
             Clock clock
     ) {
+        this(aiRunRepository, recommendationRepository, aiServiceClient, contextBuilder, outputValidator,
+                auditService, objectMapper, coachingContextQuery, workoutScheduleChangeUseCase,
+                scheduleCalendarProvider, clock, null, null, null);
+    }
+
+    @Autowired
+    public AiWorkoutRescheduleService(
+            AiRunRepository aiRunRepository,
+            AiRecommendationRepository recommendationRepository,
+            F05AiServiceClient aiServiceClient,
+            F05ContextBuilder contextBuilder,
+            F05RuntimeOutputValidator outputValidator,
+            AuditService auditService,
+            ObjectMapper objectMapper,
+            CurrentCoachingContextQuery coachingContextQuery,
+            WorkoutScheduleChangeUseCase workoutScheduleChangeUseCase,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            Clock clock,
+            @Autowired(required = false) PlatformTransactionManager transactionManager,
+            @Autowired(required = false) UserAccountStatusQuery accountStatusQuery,
+            @Autowired(required = false) CoachingAuthorityQuery coachingAuthorityQuery
+    ) {
         this.aiRunRepository = aiRunRepository;
         this.recommendationRepository = recommendationRepository;
         this.aiServiceClient = aiServiceClient;
@@ -96,6 +130,27 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
         this.workoutScheduleChangeUseCase = workoutScheduleChangeUseCase;
         this.scheduleCalendarProvider = scheduleCalendarProvider;
         this.clock = clock != null ? clock : Clock.systemUTC();
+        this.transactionManager = transactionManager;
+        this.accountStatusQuery = accountStatusQuery;
+        this.coachingAuthorityQuery = coachingAuthorityQuery;
+    }
+
+    private record AcceptExecutionResult(AcceptRescheduleApiResponse response, boolean expired, String expiredMessage) {
+        static AcceptExecutionResult success(AcceptRescheduleApiResponse res) {
+            return new AcceptExecutionResult(res, false, null);
+        }
+        static AcceptExecutionResult expired(String msg) {
+            return new AcceptExecutionResult(null, true, msg);
+        }
+    }
+
+    private record RejectExecutionResult(RejectRescheduleApiResponse response, boolean expired, String expiredMessage) {
+        static RejectExecutionResult success(RejectRescheduleApiResponse res) {
+            return new RejectExecutionResult(res, false, null);
+        }
+        static RejectExecutionResult expired(String msg) {
+            return new RejectExecutionResult(null, true, msg);
+        }
     }
 
     @Override
@@ -217,8 +272,24 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public AiRecommendation getReschedule(UUID actorId, UUID recommendationId) {
+        AiRecommendation rec = getValidRecommendation(actorId, recommendationId);
+        if (rec.status() == AiRecommendationStatus.PENDING && rec.isExpired(Instant.now(clock))) {
+            recommendationRepository.updateDecision(
+                    rec.id(),
+                    AiRecommendationStatus.EXPIRED,
+                    null,
+                    Instant.now(clock),
+                    "Recommendation expired",
+                    rec.targetEntityType(),
+                    rec.targetEntityId()
+            );
+            return recommendationRepository.findById(recommendationId).orElse(rec);
+        }
+        return rec;
+    }
+
+    private AiRecommendation getValidRecommendation(UUID actorId, UUID recommendationId) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authentication required.");
         }
@@ -245,7 +316,6 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     }
 
     @Override
-    @Transactional
     public AcceptRescheduleApiResponse acceptReschedule(UUID actorId, UUID recommendationId, AcceptRescheduleApiRequest req) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authentication required.");
@@ -254,6 +324,30 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             throw new AiRunValidationException("commandKey is required to accept recommendation.");
         }
 
+        // 1.5 Verify Actor Account is Active
+        if (accountStatusQuery != null) {
+            AccountStatus actorStatus = accountStatusQuery.getAccountStatus(actorId).orElse(null);
+            if (actorStatus != AccountStatus.ACTIVE) {
+                throw new AiRunAccessDeniedException("Actor account is not active.");
+            }
+        }
+
+        AcceptExecutionResult result;
+        if (transactionManager != null) {
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
+            result = tx.execute(status -> doAcceptReschedule(actorId, recommendationId, req));
+        } else {
+            result = doAcceptReschedule(actorId, recommendationId, req);
+        }
+
+        if (result != null && result.expired()) {
+            throw new AiRunLifecycleConflictException(result.expiredMessage());
+        }
+
+        return result != null ? result.response() : null;
+    }
+
+    private AcceptExecutionResult doAcceptReschedule(UUID actorId, UUID recommendationId, AcceptRescheduleApiRequest req) {
         // 1. Lock Recommendation
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(recommendationId)
                 .orElseThrow(() -> new AiRunNotFoundException("AI recommendation not found: " + recommendationId));
@@ -264,6 +358,11 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
 
         // 2. Check Decision Authority based on Current Coaching Mode (T02, T03)
         var contextOpt = coachingContextQuery.findEffectiveContext(rec.studentId(), false);
+        UUID currentPeriodId = contextOpt.map(CurrentCoachingContext::periodId).orElse(null);
+        if (rec.coachingPeriodId() != null && !Objects.equals(rec.coachingPeriodId(), currentPeriodId)) {
+            throw new AiRunLifecycleConflictException("Coaching period has changed since proposal was generated.");
+        }
+
         String currentMode = contextOpt.isPresent() && contextOpt.get().mode() != null
                 ? contextOpt.get().mode().name()
                 : "SELF_DIRECTED";
@@ -276,6 +375,14 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             // T03: Unrelated trainer cannot accept
             if (contextOpt.isEmpty() || contextOpt.get().trainerId() == null || !actorId.equals(contextOpt.get().trainerId())) {
                 throw new AiRunAccessDeniedException("Only the currently assigned coach has decision authority to accept this recommendation.");
+            }
+            if (coachingAuthorityQuery != null) {
+                var decision = coachingAuthorityQuery.evaluateCurrent(new AuthorityRequest(
+                        actorId, rec.studentId(), DataScope.WORKOUT_PLAN, DataAccessLevel.MANAGE
+                ));
+                if (!decision.allowed()) {
+                    throw new AiRunAccessDeniedException("Trainer coaching or data sharing authority is no longer valid: " + decision.reason());
+                }
             }
         } else {
             // SELF_DIRECTED: Student must be the actor
@@ -323,7 +430,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                         ChangeResult changeResult = appPayloadNode.has("changeResult")
                                 ? objectMapper.treeToValue(appPayloadNode.path("changeResult"), ChangeResult.class)
                                 : null;
-                        return new AcceptRescheduleApiResponse(
+                        return AcceptExecutionResult.success(new AcceptRescheduleApiResponse(
                                 rec.id(),
                                 rec.status(),
                                 app.appliedBy(),
@@ -332,7 +439,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                                 app.appliedAt(),
                                 true,
                                 changeResult
-                        );
+                        ));
                     } else {
                         throw new AiRunLifecycleConflictException("Idempotency conflict: commandKey matches a previous command with differing parameters.");
                     }
@@ -350,8 +457,16 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
 
         Instant now = Instant.now(clock);
         if (rec.isExpired(now)) {
-            recommendationRepository.updateDecision(rec.id(), AiRecommendationStatus.EXPIRED, null, now, "Recommendation expired", rec.targetEntityType(), rec.targetEntityId());
-            throw new AiRunLifecycleConflictException("Recommendation has expired and cannot be accepted.");
+            recommendationRepository.updateDecision(
+                    rec.id(),
+                    AiRecommendationStatus.EXPIRED,
+                    null,
+                    now,
+                    "Recommendation expired",
+                    rec.targetEntityType(),
+                    rec.targetEntityId()
+            );
+            return AcceptExecutionResult.expired("Recommendation has expired and cannot be accepted.");
         }
 
         if (req.expectedRevision() != null && rec.revision() != req.expectedRevision()) {
@@ -365,6 +480,11 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             sourceSnapshot = objectMapper.readValue(rec.sourceSnapshot(), F05SourceSnapshot.class);
         } catch (Exception e) {
             throw new AiRunLifecycleConflictException("Source snapshot is malformed and cannot be verified: " + e.getMessage());
+        }
+
+        // Coaching Period Guard: hard conflict if period changed or ended since proposal generation
+        if (sourceSnapshot.coachingPeriodId() != null && !Objects.equals(currentPeriodId, sourceSnapshot.coachingPeriodId())) {
+            throw new AiRunLifecycleConflictException("Coaching period has changed since proposal was generated.");
         }
 
         F05RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(rec.structuredPayload(), sourceSnapshot);
@@ -414,6 +534,13 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
         // Internal command key namespaced to ensure uniqueness
         String internalWorkoutKey = "ai-reschedule-" + rec.id() + "-" + req.commandKey();
 
+        UUID expectedAppId = req.expectedAppointmentId() != null
+                ? req.expectedAppointmentId()
+                : sourceSnapshot.linkedAppointmentId();
+        Long expectedAppVersion = req.expectedAppointmentVersion() != null
+                ? req.expectedAppointmentVersion()
+                : sourceSnapshot.linkedAppointmentVersion();
+
         ChangeResult changeResult = workoutScheduleChangeUseCase.reschedule(new Reschedule(
                 sourceSnapshot.occurrenceId(),
                 rec.studentId(),
@@ -421,8 +548,8 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                 destination,
                 req.decisionNote() != null ? req.decisionNote() : rec.title(),
                 internalWorkoutKey,
-                req.expectedAppointmentVersion(),
-                req.expectedAppointmentId()
+                expectedAppVersion,
+                expectedAppId
         ));
 
         // 8. Update Recommendation Status to APPLIED
@@ -485,7 +612,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                 .occurredAt(now)
                 .build());
 
-        return new AcceptRescheduleApiResponse(
+        return AcceptExecutionResult.success(new AcceptRescheduleApiResponse(
                 rec.id(),
                 AiRecommendationStatus.APPLIED,
                 actorId,
@@ -494,15 +621,37 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                 now,
                 false,
                 changeResult
-        );
+        ));
     }
 
     @Override
-    @Transactional
     public RejectRescheduleApiResponse rejectReschedule(UUID actorId, UUID recommendationId, RejectRescheduleApiRequest req) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authentication required.");
         }
+        if (accountStatusQuery != null) {
+            AccountStatus actorStatus = accountStatusQuery.getAccountStatus(actorId).orElse(null);
+            if (actorStatus != AccountStatus.ACTIVE) {
+                throw new AiRunAccessDeniedException("Actor account is not active.");
+            }
+        }
+
+        RejectExecutionResult result;
+        if (transactionManager != null) {
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
+            result = tx.execute(status -> doRejectReschedule(actorId, recommendationId, req));
+        } else {
+            result = doRejectReschedule(actorId, recommendationId, req);
+        }
+
+        if (result != null && result.expired()) {
+            throw new AiRunLifecycleConflictException(result.expiredMessage());
+        }
+
+        return result != null ? result.response() : null;
+    }
+
+    private RejectExecutionResult doRejectReschedule(UUID actorId, UUID recommendationId, RejectRescheduleApiRequest req) {
         AiRecommendation rec = recommendationRepository.findByIdForUpdate(recommendationId)
                 .orElseThrow(() -> new AiRunNotFoundException("AI recommendation not found: " + recommendationId));
 
@@ -517,8 +666,18 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                 : "SELF_DIRECTED";
 
         if ("HUMAN_COACH".equals(currentMode)) {
-            if (!actorId.equals(rec.studentId()) && (contextOpt.get().trainerId() == null || !actorId.equals(contextOpt.get().trainerId()))) {
-                throw new AiRunAccessDeniedException("Only the student or their coach may reject this recommendation.");
+            if (!actorId.equals(rec.studentId())) {
+                if (contextOpt.isEmpty() || contextOpt.get().trainerId() == null || !actorId.equals(contextOpt.get().trainerId())) {
+                    throw new AiRunAccessDeniedException("Only the student or their coach may reject this recommendation.");
+                }
+                if (coachingAuthorityQuery != null) {
+                    var decision = coachingAuthorityQuery.evaluateCurrent(new AuthorityRequest(
+                            actorId, rec.studentId(), DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW
+                    ));
+                    if (!decision.allowed()) {
+                        throw new AiRunAccessDeniedException("Trainer coaching authority is no longer valid: " + decision.reason());
+                    }
+                }
             }
         } else {
             if (!actorId.equals(rec.studentId())) {
@@ -526,11 +685,24 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             }
         }
 
+        Instant now = Instant.now(clock);
+        if (rec.isExpired(now)) {
+            recommendationRepository.updateDecision(
+                    rec.id(),
+                    AiRecommendationStatus.EXPIRED,
+                    null,
+                    now,
+                    "Recommendation expired",
+                    rec.targetEntityType(),
+                    rec.targetEntityId()
+            );
+            return RejectExecutionResult.expired("Recommendation has expired and cannot be rejected.");
+        }
+
         if (rec.status() != AiRecommendationStatus.PENDING) {
             throw new AiRunLifecycleConflictException("Recommendation is in status " + rec.status() + " and cannot be rejected.");
         }
 
-        Instant now = Instant.now(clock);
         String note = req != null ? req.decisionNote() : null;
         recommendationRepository.updateDecision(rec.id(), AiRecommendationStatus.REJECTED, actorId, now, note, rec.targetEntityType(), rec.targetEntityId());
 
@@ -545,7 +717,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                 .occurredAt(now)
                 .build());
 
-        return new RejectRescheduleApiResponse(rec.id(), AiRecommendationStatus.REJECTED, now);
+        return RejectExecutionResult.success(new RejectRescheduleApiResponse(rec.id(), AiRecommendationStatus.REJECTED, now));
     }
 
     private String computePayloadFingerprint(

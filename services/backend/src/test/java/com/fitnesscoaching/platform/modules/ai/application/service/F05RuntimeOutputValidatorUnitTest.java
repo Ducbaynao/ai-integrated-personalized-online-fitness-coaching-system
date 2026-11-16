@@ -315,4 +315,35 @@ class F05RuntimeOutputValidatorUnitTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.failureReason()).contains("Proposed reschedule slot cannot exceed 90 days");
     }
+
+    @Test
+    @DisplayName("Destination with DST transition gap (nonexistent local time) fails validation")
+    void dstGapNonexistentLocalTime_fails() {
+        // In America/New_York, 2026-03-08 02:30:00 does not exist due to spring-forward
+        String payload = """
+                {
+                  "recommendationType": "WORKOUT_RESCHEDULE_PROPOSAL",
+                  "summary": "Reschedule slot in DST gap",
+                  "confidence": 0.85,
+                  "reschedule": {
+                    "occurrenceId": "%s",
+                    "supervisionRequirement": "SELF_PERFORMABLE",
+                    "reasoning": "Test",
+                    "destination": {
+                      "timezone": "America/New_York",
+                      "localStart": "2026-03-08T02:30:00",
+                      "localEnd": "2026-03-08T03:30:00",
+                      "startUtcOffset": "-05:00",
+                      "endUtcOffset": "-04:00",
+                      "proposedStartAt": "2026-03-08T07:30:00Z",
+                      "proposedEndAt": "2026-03-08T08:30:00Z"
+                    }
+                  }
+                }
+                """.formatted(occurrenceId);
+
+        var result = validator.validate(payload, defaultSnapshot);
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.failureReason()).contains("DST transition gap (nonexistent local time)");
+    }
 }

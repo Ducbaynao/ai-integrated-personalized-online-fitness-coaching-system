@@ -4,6 +4,8 @@ import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.AiRunNotFoundException;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectRescheduleApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectRescheduleApiResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AcceptRescheduleApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AcceptRescheduleApiResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.WorkoutRescheduleApiRequest;
@@ -35,8 +37,15 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -382,6 +391,199 @@ class AiWorkoutRescheduleIntegrationTest {
                 .hasMessageContaining("Recommendation has expired");
 
         AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
-        assertThat(rec.isExpired(Instant.now())).isTrue();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("Concurrent double accept with different keys: exactly one succeeds, other gets conflict")
+    void concurrentDoubleAccept_differentKeys_onlyOneSucceeds() throws Exception {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-key-conc", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        int threads = 2;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threads);
+        List<Throwable> errors = Collections.synchronizedList(new ArrayList<>());
+        List<AcceptRescheduleApiResponse> successes = Collections.synchronizedList(new ArrayList<>());
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                final int index = i;
+                pool.submit(() -> {
+                    try {
+                        startLatch.await();
+                        var acceptReq = new AcceptRescheduleApiRequest("accept-key-conc-" + index, "Note " + index, 1, 0L, null, null);
+                        AcceptRescheduleApiResponse res = rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(), acceptReq);
+                        successes.add(res);
+                    } catch (Throwable t) {
+                        errors.add(t);
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            startLatch.countDown();
+            boolean done = doneLatch.await(5, TimeUnit.SECONDS);
+            assertThat(done).isTrue();
+        } finally {
+            pool.shutdownNow();
+            pool.awaitTermination(3, TimeUnit.SECONDS);
+        }
+
+        assertThat(successes).hasSize(1);
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).isInstanceOf(AiRunLifecycleConflictException.class);
+
+        // Exactly one rescheduled occurrence exists
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?", Integer.class, occurrenceId
+        );
+        assertThat(count).isOne();
+    }
+
+    @Test
+    @DisplayName("Concurrent accept and reject: serialized consistently, exactly one transition wins")
+    void concurrentAcceptAndReject_serializedConsistently() throws Exception {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-key-ar", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(2);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger conflictCount = new AtomicInteger();
+
+        try {
+            pool.submit(() -> {
+                try {
+                    startLatch.await();
+                    var acceptReq = new AcceptRescheduleApiRequest("accept-key-ar", "Accept note", 1, 0L, null, null);
+                    rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(), acceptReq);
+                    successCount.incrementAndGet();
+                } catch (AiRunLifecycleConflictException e) {
+                    conflictCount.incrementAndGet();
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+
+            pool.submit(() -> {
+                try {
+                    startLatch.await();
+                    var rejectReq = new RejectRescheduleApiRequest("Reject note");
+                    rescheduleService.rejectReschedule(f.studentId(), proposal.recommendationId(), rejectReq);
+                    successCount.incrementAndGet();
+                } catch (AiRunLifecycleConflictException e) {
+                    conflictCount.incrementAndGet();
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+
+            startLatch.countDown();
+            boolean done = doneLatch.await(5, TimeUnit.SECONDS);
+            assertThat(done).isTrue();
+        } finally {
+            pool.shutdownNow();
+            pool.awaitTermination(3, TimeUnit.SECONDS);
+        }
+
+        assertThat(successCount.get()).isOne();
+        assertThat(conflictCount.get()).isOne();
+
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isIn(AiRecommendationStatus.APPLIED, AiRecommendationStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("Rejection marks recommendation REJECTED and leaves planned workout unchanged")
+    void rejectReschedule_leavesWorkoutUnchanged() {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-key-rej", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        var rejectReq = new RejectRescheduleApiRequest("Not a good day for workout");
+        RejectRescheduleApiResponse rejectRes = rescheduleService.rejectReschedule(f.studentId(), proposal.recommendationId(), rejectReq);
+
+        assertThat(rejectRes.status()).isEqualTo(AiRecommendationStatus.REJECTED);
+
+        AiRecommendation rec = recommendationRepository.findById(proposal.recommendationId()).orElseThrow();
+        assertThat(rec.status()).isEqualTo(AiRecommendationStatus.REJECTED);
+
+        // Occurrence still SCHEDULED and no replacement
+        String status = jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?", String.class, occurrenceId);
+        assertThat(status).isEqualTo("SCHEDULED");
+        Integer replacementCount = jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?", Integer.class, occurrenceId);
+        assertThat(replacementCount).isZero();
+    }
+
+    @Test
+    @DisplayName("Trainer data sharing permission revoked before accept blocks execution with 403")
+    void trainerPermissionRevoked_blocksAccept() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-key-perm", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        // Student revokes WORKOUT_PLAN permission
+        jdbc.update("UPDATE fitness.data_sharing_permissions SET revoked_at=clock_timestamp(), revoke_reason='STUDENT_REVOKED', version=version+1 WHERE student_id=? AND data_scope='WORKOUT_PLAN'::fitness.data_scope_code",
+                f.studentId());
+
+        var trainerAcceptReq = new AcceptRescheduleApiRequest("trainer-key-revoked", "Trying to apply", 1, 0L, null, null);
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("authority is no longer valid");
+    }
+
+    @Test
+    @DisplayName("Coaching period ended before accept aborts with lifecycle conflict (409)")
+    void coachingPeriodChanged_abortsAccept() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-key-period", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        // Coaching period is ended
+        jdbc.update("UPDATE fitness.coaching_periods SET ended_at = clock_timestamp() WHERE student_id=?", f.studentId());
+
+        var trainerAcceptReq = new AcceptRescheduleApiRequest("trainer-key-period", "Apply after period end", 1, 0L, null, null);
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Coaching period has changed");
     }
 }
