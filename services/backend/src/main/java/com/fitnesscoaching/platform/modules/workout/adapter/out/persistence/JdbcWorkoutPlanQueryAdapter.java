@@ -76,13 +76,14 @@ public class JdbcWorkoutPlanQueryAdapter implements WorkoutPlanQueryPort {
     private List<PrescriptionView> prescriptions(UUID sessionId) {
         return jdbc.query("""
                 SELECT id,exercise_variation_id,sequence_number,target_sets,target_reps_min,target_reps_max,
-                       target_load,rest_seconds,duration_seconds,instructions
+                       target_load,load_unit_id,rest_seconds,duration_seconds,instructions
                 FROM fitness.workout_plan_session_exercises WHERE workout_plan_session_id=?
                 ORDER BY sequence_number,id
                 """, (rs, row) -> new PrescriptionView(rs.getObject("id", UUID.class),
                 rs.getObject("exercise_variation_id", UUID.class), rs.getInt("sequence_number"),
                 (Integer) rs.getObject("target_sets"), (Integer) rs.getObject("target_reps_min"),
                 (Integer) rs.getObject("target_reps_max"), rs.getBigDecimal("target_load"),
+                (Short) rs.getObject("load_unit_id", Short.class),
                 (Integer) rs.getObject("rest_seconds"), (Integer) rs.getObject("duration_seconds"),
                 rs.getString("instructions"), null), sessionId);
     }

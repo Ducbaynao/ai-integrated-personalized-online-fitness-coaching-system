@@ -7,6 +7,14 @@ import com.fitnesscoaching.platform.common.exception.AiProviderException;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException;
 import com.fitnesscoaching.platform.common.exception.AiRunNotFoundException;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F03DraftDiff;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiResponse;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Objects;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AcceptAdjustmentApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.AcceptAdjustmentApiResponse;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F03WorkoutAdjustmentPayload;
@@ -32,6 +40,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditRecord;
 import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
+import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PrescriptionView;
@@ -46,6 +55,7 @@ import com.fitnesscoaching.platform.modules.workout.domain.WorkoutSessionTemplat
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +63,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +87,38 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
     private final WorkoutPlanCommandUseCase workoutPlanCommandUseCase;
     private final WorkoutPlanQueryUseCase workoutPlanQueryUseCase;
     private final ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider;
+    private final ObjectProvider<MeasurementUnitReferenceQuery> unitReferenceQueryProvider;
+
+    @Autowired
+    public AiWorkoutAdjustmentService(
+            AiRunRepository aiRunRepository,
+            AiRecommendationRepository recommendationRepository,
+            F03AiServiceClient aiServiceClient,
+            F03ContextBuilder contextBuilder,
+            F03RuntimeOutputValidator outputValidator,
+            AuditService auditService,
+            ObjectMapper objectMapper,
+            CurrentCoachingContextQuery coachingContextQuery,
+            UserAccountStatusQuery accountStatusQuery,
+            WorkoutPlanCommandUseCase workoutPlanCommandUseCase,
+            WorkoutPlanQueryUseCase workoutPlanQueryUseCase,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            ObjectProvider<MeasurementUnitReferenceQuery> unitReferenceQueryProvider
+    ) {
+        this.aiRunRepository = aiRunRepository;
+        this.recommendationRepository = recommendationRepository;
+        this.aiServiceClient = aiServiceClient;
+        this.contextBuilder = contextBuilder;
+        this.outputValidator = outputValidator;
+        this.auditService = auditService;
+        this.objectMapper = objectMapper;
+        this.coachingContextQuery = coachingContextQuery;
+        this.accountStatusQuery = accountStatusQuery;
+        this.workoutPlanCommandUseCase = workoutPlanCommandUseCase;
+        this.workoutPlanQueryUseCase = workoutPlanQueryUseCase;
+        this.scheduleCalendarProvider = scheduleCalendarProvider;
+        this.unitReferenceQueryProvider = unitReferenceQueryProvider;
+    }
 
     public AiWorkoutAdjustmentService(
             AiRunRepository aiRunRepository,
@@ -91,18 +134,9 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
             WorkoutPlanQueryUseCase workoutPlanQueryUseCase,
             ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider
     ) {
-        this.aiRunRepository = aiRunRepository;
-        this.recommendationRepository = recommendationRepository;
-        this.aiServiceClient = aiServiceClient;
-        this.contextBuilder = contextBuilder;
-        this.outputValidator = outputValidator;
-        this.auditService = auditService;
-        this.objectMapper = objectMapper;
-        this.coachingContextQuery = coachingContextQuery;
-        this.accountStatusQuery = accountStatusQuery;
-        this.workoutPlanCommandUseCase = workoutPlanCommandUseCase;
-        this.workoutPlanQueryUseCase = workoutPlanQueryUseCase;
-        this.scheduleCalendarProvider = scheduleCalendarProvider;
+        this(aiRunRepository, recommendationRepository, aiServiceClient, contextBuilder,
+                outputValidator, auditService, objectMapper, coachingContextQuery, accountStatusQuery,
+                workoutPlanCommandUseCase, workoutPlanQueryUseCase, scheduleCalendarProvider, null);
     }
 
     @Override
@@ -273,6 +307,11 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                 .expiresAt(expiresAt)
                 .createdAt(completedAt)
                 .updatedAt(completedAt)
+                .sharedWithStudent(false)
+                .sharedRevision(null)
+                .sharedAt(null)
+                .sharedBy(null)
+                .sharedPayload(null)
                 .build();
 
         AiRecommendation saved = recommendationRepository.save(recommendation);
@@ -319,7 +358,39 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
             throw new AiRunNotFoundException("Recommendation is not a workout adjustment proposal: " + recommendationId);
         }
 
-        if (!actorId.equals(rec.studentId())) {
+        if (actorId.equals(rec.studentId())) {
+            if (rec.decisionAuthority() == AiDecisionAuthority.TRAINER) {
+                if (!rec.sharedWithStudent()) {
+                    throw new AiRunAccessDeniedException("Access denied: Private trainer draft has not been shared with the student.");
+                }
+                var ctx = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
+                if (ctx == null) {
+                    throw new AiRunAccessDeniedException("Access denied: No active coaching context.");
+                }
+                if (rec.sharedRevision() == null || rec.sharedRevision() < 1
+                        || rec.sharedPayload() == null || rec.sharedPayload().isBlank()
+                        || rec.sharedAt() == null || rec.sharedBy() == null) {
+                    log.error("Shared draft flag is active on recommendation {} but mandatory shared snapshot data is missing or corrupted.", rec.id());
+                    throw new AiRunLifecycleConflictException("Shared snapshot data is missing or corrupted.");
+                }
+                try {
+                    objectMapper.readTree(rec.sharedPayload());
+                } catch (Exception e) {
+                    log.error("Corrupted JSON in shared_payload for recommendation {}: {}", rec.id(), e.getMessage());
+                    throw new AiRunLifecycleConflictException("Shared snapshot payload is corrupted.");
+                }
+                boolean snapshotCustomized = rec.sharedRevision() > 1;
+                return rec.withSharedView(
+                        rec.sharedRevision(),
+                        rec.sharedTitle(),
+                        rec.sharedExplanation(),
+                        rec.sharedPayload(),
+                        rec.sharedAt(),
+                        rec.sharedBy(),
+                        snapshotCustomized
+                );
+            }
+        } else {
             var ctx = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
             if (ctx == null || !actorId.equals(ctx.trainerId())) {
                 throw new AiRunAccessDeniedException("Access denied to view this recommendation.");
@@ -403,7 +474,19 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                     String savedNote = appPayloadNode.path("decisionNote").asText("");
                     String reqNote = req.decisionNote() != null ? req.decisionNote() : "";
                     boolean noteMatches = reqNote.equals(savedNote);
-                    if (actorMatches && revMatches && targetVerMatches && noteMatches) {
+
+                    String currentFingerprint = computePayloadFingerprint(
+                            rec.id(),
+                            rec.revision(),
+                            actorId,
+                            rec.structuredPayload(),
+                            req.expectedTargetVersion(),
+                            req.decisionNote()
+                    );
+                    String savedFingerprint = appPayloadNode.path("payloadFingerprint").asText("");
+                    boolean fingerprintMatches = savedFingerprint.isEmpty() || savedFingerprint.equals(currentFingerprint);
+
+                    if (actorMatches && revMatches && targetVerMatches && noteMatches && fingerprintMatches) {
                         log.info("Replaying identical AcceptAdjustmentCommand for key: {}", req.commandKey());
                         return new AcceptAdjustmentApiResponse(
                                 rec.id(),
@@ -538,12 +621,34 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                         if (change.before() != null && change.before().hasNonNull("targetLoad")) {
                             beforeMap.put("targetLoad", new BigDecimal(change.before().path("targetLoad").asText()));
                         }
+                        if (change.before() != null && change.before().hasNonNull("loadUnitId")) {
+                            beforeMap.put("loadUnitId", change.before().path("loadUnitId").intValue());
+                        }
                         try {
                             String beforeJson = objectMapper.writeValueAsString(beforeMap);
                             Map<String, Object> afterMap = new HashMap<>();
                             afterMap.put("targetLoad", new BigDecimal(change.after().path("targetLoad").asText()));
+                            Integer resolvedAfterUnitId = null;
                             if (change.after().hasNonNull("loadUnitId")) {
-                                afterMap.put("loadUnitId", change.after().path("loadUnitId").intValue());
+                                resolvedAfterUnitId = change.after().path("loadUnitId").intValue();
+                            } else if (change.after().hasNonNull("loadUnit")) {
+                                String aUnit = F03RuntimeOutputValidator.canonicalUnitCode(change.after().path("loadUnit").asText());
+                                MeasurementUnitReferenceQuery unitQuery = unitReferenceQueryProvider != null ? unitReferenceQueryProvider.getIfAvailable() : null;
+                                if (unitQuery != null && aUnit != null) {
+                                    var details = unitQuery.resolveByCodes(List.of(aUnit)).get(aUnit);
+                                    if (details != null) {
+                                        resolvedAfterUnitId = (int) details.id();
+                                    }
+                                }
+                            } else if (change.before() != null && change.before().hasNonNull("loadUnitId")) {
+                                String bUnit = F03RuntimeOutputValidator.canonicalUnitCode(change.before().path("loadUnit").asText(null));
+                                String aUnit = F03RuntimeOutputValidator.canonicalUnitCode(change.after().path("loadUnit").asText(null));
+                                if (aUnit == null || aUnit.equals(bUnit)) {
+                                    resolvedAfterUnitId = change.before().path("loadUnitId").intValue();
+                                }
+                            }
+                            if (resolvedAfterUnitId != null) {
+                                afterMap.put("loadUnitId", resolvedAfterUnitId);
                             }
                             String afterJson = objectMapper.writeValueAsString(afterMap);
                             subActions.add(new OccurrenceSubAction(
@@ -810,6 +915,15 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
         );
 
         // 9. Persist Application Receipt
+        String currentFingerprint = computePayloadFingerprint(
+                rec.id(),
+                rec.revision(),
+                actorId,
+                rec.structuredPayload(),
+                req.expectedTargetVersion(),
+                req.decisionNote()
+        );
+
         String appPayload = "{}";
         try {
             Map<String, Object> pMap = new HashMap<>();
@@ -821,6 +935,7 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
             pMap.put("appliedRevision", rec.revision());
             pMap.put("action", action);
             pMap.put("scope", sourceSnapshot.scope().name());
+            pMap.put("payloadFingerprint", currentFingerprint);
             if (req.expectedTargetVersion() != null) {
                 pMap.put("expectedTargetVersion", req.expectedTargetVersion());
             }
@@ -956,5 +1071,455 @@ public class AiWorkoutAdjustmentService implements AiWorkoutAdjustmentUseCase {
                 req.reason(),
                 now
         );
+    }
+
+    @Override
+    @Transactional
+    public UpdateAdjustmentDraftApiResponse updateDraft(UUID actorId, UUID recommendationId, UpdateAdjustmentDraftApiRequest request) {
+        if (actorId == null) {
+            throw new AiRunAccessDeniedException("Authenticated actor ID is required.");
+        }
+        if (recommendationId == null) {
+            throw new IllegalArgumentException("recommendationId is required.");
+        }
+        if (request == null || request.structuredPayload() == null) {
+            throw new IllegalArgumentException("structuredPayload is required.");
+        }
+
+        // 1. Verify Actor Account Status
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(actorId).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
+        }
+
+        // 2. Lock Recommendation row
+        AiRecommendation rec = recommendationRepository.findByIdForUpdate(recommendationId)
+                .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + recommendationId));
+
+        if (!"WORKOUT_ADJUSTMENT_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunLifecycleConflictException("Recommendation is not a workout adjustment proposal: " + rec.recommendationType());
+        }
+
+        if (rec.status() != AiRecommendationStatus.PENDING) {
+            throw new AiRunLifecycleConflictException("Recommendation is in status " + rec.status() + " and cannot be edited.");
+        }
+
+        Instant now = Instant.now();
+        if (rec.isExpired(now)) {
+            throw new AiRunLifecycleConflictException("Recommendation has expired and cannot be edited.");
+        }
+
+        // 3. Verify Authority
+        var currentContext = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
+        if (currentContext == null) {
+            throw new AiRunAccessDeniedException("Active coaching context required to edit recommendation.");
+        }
+
+        if (currentContext.mode() == CurrentCoachingContextQuery.Mode.HUMAN_COACH) {
+            if (rec.decisionAuthority() != AiDecisionAuthority.TRAINER) {
+                throw new AiRunAccessDeniedException("Coaching mode has transitioned to HUMAN_COACH; student decision authority is invalid.");
+            }
+            if (currentContext.trainerId() == null || !actorId.equals(currentContext.trainerId())) {
+                throw new AiRunAccessDeniedException("Only the currently assigned coach has authority to edit this recommendation.");
+            }
+        } else {
+            // SELF_DIRECTED
+            if (rec.decisionAuthority() != AiDecisionAuthority.STUDENT) {
+                throw new AiRunAccessDeniedException("Coaching mode has transitioned to SELF_DIRECTED; trainer decision authority is invalid.");
+            }
+            if (!actorId.equals(rec.studentId())) {
+                throw new AiRunAccessDeniedException("Only the student has authority to edit this recommendation.");
+            }
+        }
+
+        // 4. Concurrency Guard: Revision Check
+        if (request.expectedRevision() == null) {
+            throw new AiRunLifecycleConflictException("expectedRevision is required when updating draft.");
+        }
+        if (rec.revision() != request.expectedRevision()) {
+            throw new AiRunLifecycleConflictException("Revision conflict: expected revision "
+                    + request.expectedRevision() + " but current is " + rec.revision());
+        }
+
+        String updatedPayloadString;
+        try {
+            updatedPayloadString = request.structuredPayload().isTextual()
+                    ? request.structuredPayload().asText()
+                    : objectMapper.writeValueAsString(request.structuredPayload());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize structuredPayload: " + e.getMessage(), e);
+        }
+
+        // 5. Revalidate Source Snapshot and Payload
+        F03SourceSnapshot sourceSnapshot;
+        try {
+            sourceSnapshot = objectMapper.readValue(rec.sourceSnapshot(), F03SourceSnapshot.class);
+        } catch (Exception e) {
+            throw new AiRunLifecycleConflictException("Source snapshot is malformed: " + e.getMessage());
+        }
+
+        F03RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(updatedPayloadString, sourceSnapshot);
+        if (!validation.isValid()) {
+            throw new AiOutputValidationException("Draft payload failed validation: " + validation.failureReason());
+        }
+
+        // 6. Update Draft with Incremented Revision
+        int newRevision = rec.revision() + 1;
+        String newTitle = request.title() != null && !request.title().isBlank() ? request.title() : rec.title();
+        String newExplanation = request.explanation() != null && !request.explanation().isBlank() ? request.explanation() : rec.explanation();
+        recommendationRepository.updateDraft(rec.id(), newRevision, newTitle, newExplanation, updatedPayloadString, actorId);
+
+        // 7. Compute Diff vs original proposal
+        String baselinePayload = rec.originalPayload() != null && !rec.originalPayload().isBlank()
+                ? rec.originalPayload()
+                : rec.structuredPayload();
+        F03DraftDiff diff = computeDiff(baselinePayload, updatedPayloadString);
+
+        // 8. Immutable Audit
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(actorId)
+                .actorRole(rec.decisionAuthority().name())
+                .action("AI_RECOMMENDATION_DRAFT_UPDATED")
+                .targetType("AI_RECOMMENDATION")
+                .targetId(rec.id())
+                .beforeDataJson(rec.structuredPayload())
+                .afterDataJson(updatedPayloadString)
+                .occurredAt(now)
+                .build());
+
+        JsonNode origPayloadNode = null;
+        try {
+            if (rec.originalPayload() != null) {
+                origPayloadNode = objectMapper.readTree(rec.originalPayload());
+            }
+        } catch (Exception ignored) {}
+
+        JsonNode updatedPayloadNode = request.structuredPayload();
+
+        return new UpdateAdjustmentDraftApiResponse(
+                rec.id(),
+                newRevision,
+                true,
+                rec.status(),
+                newTitle,
+                newExplanation,
+                now,
+                updatedPayloadNode,
+                origPayloadNode,
+                diff
+        );
+    }
+
+    @Override
+    @Transactional
+    public ShareAdjustmentDraftApiResponse shareDraft(UUID actorId, UUID recommendationId, ShareAdjustmentDraftApiRequest request) {
+        if (actorId == null) {
+            throw new AiRunAccessDeniedException("Authenticated actor ID is required.");
+        }
+        if (recommendationId == null) {
+            throw new IllegalArgumentException("recommendationId is required.");
+        }
+
+        // 1. Verify Actor Account Status
+        AccountStatus accountStatus = accountStatusQuery.getAccountStatus(actorId).orElse(null);
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new AiRunAccessDeniedException("Actor account is not active.");
+        }
+
+        // 2. Lock Recommendation row
+        AiRecommendation rec = recommendationRepository.findByIdForUpdate(recommendationId)
+                .orElseThrow(() -> new AiRunNotFoundException("Recommendation not found: " + recommendationId));
+
+        if (!"WORKOUT_ADJUSTMENT_PROPOSAL".equals(rec.recommendationType())) {
+            throw new AiRunLifecycleConflictException("Recommendation is not a workout adjustment proposal: " + rec.recommendationType());
+        }
+
+        if (rec.status() != AiRecommendationStatus.PENDING) {
+            throw new AiRunLifecycleConflictException("Recommendation is in status " + rec.status() + " and cannot be shared.");
+        }
+
+        Instant now = Instant.now();
+        if (rec.isExpired(now)) {
+            throw new AiRunLifecycleConflictException("Recommendation has expired and cannot be shared.");
+        }
+
+        // 3. Verify Authority: Only Trainer in HUMAN_COACH mode can share drafts
+        var currentContext = coachingContextQuery.findEffectiveContext(rec.studentId(), false).orElse(null);
+        if (currentContext == null) {
+            throw new AiRunAccessDeniedException("Active coaching context required to share recommendation.");
+        }
+
+        if (currentContext.mode() != CurrentCoachingContextQuery.Mode.HUMAN_COACH) {
+            throw new AiRunAccessDeniedException("Draft sharing is only supported in HUMAN_COACH mode.");
+        }
+
+        if (rec.decisionAuthority() != AiDecisionAuthority.TRAINER) {
+            throw new AiRunAccessDeniedException("Coaching mode has transitioned to HUMAN_COACH; student decision authority is invalid.");
+        }
+
+        if (rec.coachingPeriodId() != null && !rec.coachingPeriodId().equals(currentContext.periodId())) {
+            throw new AiRunAccessDeniedException("Recommendation belongs to a different coaching period.");
+        }
+
+        if (currentContext.trainerId() == null || !actorId.equals(currentContext.trainerId())) {
+            throw new AiRunAccessDeniedException("Only the currently assigned coach has authority to share drafts with the student.");
+        }
+
+        // 4. Expected Revision Guard (MANDATORY)
+        if (request == null || request.expectedRevision() == null) {
+            throw new AiRunLifecycleConflictException("expectedRevision is required when sharing draft.");
+        }
+        if (rec.revision() != request.expectedRevision()) {
+            throw new AiRunLifecycleConflictException("Revision conflict: expected revision "
+                    + request.expectedRevision() + " but current is " + rec.revision());
+        }
+
+        // 5. Source Dependencies & Payload Validation Guard
+        F03SourceSnapshot sourceSnapshot;
+        try {
+            sourceSnapshot = objectMapper.readValue(rec.sourceSnapshot(), F03SourceSnapshot.class);
+        } catch (Exception e) {
+            throw new AiRunLifecycleConflictException("Source snapshot is malformed and cannot be verified: " + e.getMessage());
+        }
+
+        if (sourceSnapshot.scope() == TargetScope.ONE_MATERIALIZED_OCCURRENCE) {
+            UUID plannedWorkoutId = sourceSnapshot.plannedWorkoutId();
+            if (plannedWorkoutId == null) {
+                throw new AiRunLifecycleConflictException("Missing plannedWorkoutId in source snapshot.");
+            }
+
+            WorkoutScheduleCalendarQuery calendarQuery = scheduleCalendarProvider.getIfAvailable();
+            if (calendarQuery == null) {
+                throw new AiProviderException("Workout schedule calendar query service is unavailable.");
+            }
+
+            WorkoutScheduleCalendarQuery.Occurrence occurrence;
+            try {
+                occurrence = calendarQuery.detail(actorId, plannedWorkoutId);
+            } catch (Exception e) {
+                throw new AiRunLifecycleConflictException("Failed to locate planned workout occurrence: " + plannedWorkoutId + " (" + e.getMessage() + ")");
+            }
+            if (occurrence == null) {
+                throw new AiRunLifecycleConflictException("Planned workout occurrence no longer exists: " + plannedWorkoutId);
+            }
+            if (!"SCHEDULED".equalsIgnoreCase(occurrence.status())) {
+                throw new AiRunLifecycleConflictException("Cannot share adjustment for occurrence with status " + occurrence.status() + " (only SCHEDULED occurrences can be shared).");
+            }
+
+            if (sourceSnapshot.occurrenceVersion() != null && occurrence.occurrenceVersion() != sourceSnapshot.occurrenceVersion()) {
+                throw new AiRunLifecycleConflictException("Planned workout occurrence version conflict: occurrence version changed from "
+                        + sourceSnapshot.occurrenceVersion() + " to " + occurrence.occurrenceVersion());
+            }
+        } else {
+            // TEMPLATE_OR_FUTURE_OCCURRENCES
+            UUID planId = sourceSnapshot.planId();
+            if (planId == null) {
+                throw new AiRunLifecycleConflictException("Missing planId in source snapshot.");
+            }
+
+            Optional<PlanDetail> activePlanOpt = workoutPlanQueryUseCase.findActive(actorId, rec.studentId());
+            if (activePlanOpt.isEmpty()) {
+                throw new AiRunLifecycleConflictException("Student has no active workout plan.");
+            }
+            PlanDetail activePlan = activePlanOpt.get();
+            if (!activePlan.plan().id().equals(planId)) {
+                throw new AiRunLifecycleConflictException("Active plan has changed since proposal was generated (was "
+                        + planId + ", now " + activePlan.plan().id() + ")");
+            }
+
+            if (sourceSnapshot.planAggregateVersion() != null
+                    && activePlan.plan().aggregateVersion() != sourceSnapshot.planAggregateVersion()) {
+                throw new AiRunLifecycleConflictException("Workout plan aggregate version conflict: aggregate version changed from "
+                        + sourceSnapshot.planAggregateVersion() + " to " + activePlan.plan().aggregateVersion());
+            }
+        }
+
+        F03RuntimeOutputValidator.ValidationResult validation = outputValidator.validate(rec.structuredPayload(), sourceSnapshot);
+        if (!validation.isValid()) {
+            throw new AiOutputValidationException("Recommendation cannot be shared because payload is no longer valid: " + validation.failureReason());
+        }
+
+        // 6. Update Sharing Columns (snapshot current revision, title, explanation, and payload for student view)
+        recommendationRepository.shareDraft(
+                rec.id(),
+                rec.revision(),
+                rec.title(),
+                rec.explanation(),
+                rec.structuredPayload(),
+                actorId,
+                now
+        );
+
+        // 7. Record Audit
+        auditService.recordAudit(AuditRecord.builder()
+                .actorUserId(actorId)
+                .actorRole("TRAINER")
+                .action("AI_RECOMMENDATION_SHARED")
+                .targetType("AI_RECOMMENDATION")
+                .targetId(rec.id())
+                .beforeDataJson(rec.structuredPayload())
+                .afterDataJson(rec.structuredPayload())
+                .occurredAt(now)
+                .build());
+
+        return new ShareAdjustmentDraftApiResponse(
+                rec.id(),
+                true,
+                rec.revision(),
+                now,
+                actorId
+        );
+    }
+
+    private JsonNode canonicalizeJsonNode(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return node;
+        }
+        if (node.isObject()) {
+            tools.jackson.databind.node.ObjectNode sortedNode = objectMapper.createObjectNode();
+            List<String> fieldNames = new ArrayList<>(node.propertyNames());
+            Collections.sort(fieldNames);
+            for (String fieldName : fieldNames) {
+                sortedNode.set(fieldName, canonicalizeJsonNode(node.get(fieldName)));
+            }
+            return sortedNode;
+        }
+        if (node.isArray()) {
+            tools.jackson.databind.node.ArrayNode arrayNode = objectMapper.createArrayNode();
+            for (JsonNode child : node) {
+                arrayNode.add(canonicalizeJsonNode(child));
+            }
+            return arrayNode;
+        }
+        return node;
+    }
+
+    private String computePayloadFingerprint(
+            UUID recommendationId,
+            int revision,
+            UUID actorId,
+            String structuredPayload,
+            Long expectedTargetVersion,
+            String decisionNote
+    ) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String canonicalPayload = "";
+            if (structuredPayload != null && !structuredPayload.isBlank()) {
+                JsonNode tree = objectMapper.readTree(structuredPayload);
+                JsonNode canonicalTree = canonicalizeJsonNode(tree);
+                canonicalPayload = objectMapper.writeValueAsString(canonicalTree);
+            }
+            String raw = String.join("|",
+                    recommendationId != null ? recommendationId.toString() : "",
+                    String.valueOf(revision),
+                    actorId != null ? actorId.toString() : "",
+                    canonicalPayload,
+                    expectedTargetVersion != null ? String.valueOf(expectedTargetVersion) : "",
+                    decisionNote != null ? decisionNote.trim() : ""
+            );
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to compute deterministic payload fingerprint: " + e.getMessage(), e);
+        }
+    }
+
+    private F03DraftDiff computeDiff(String originalPayloadJson, String updatedPayloadJson) {
+        if (originalPayloadJson == null || updatedPayloadJson == null || originalPayloadJson.isBlank() || updatedPayloadJson.isBlank()) {
+            return F03DraftDiff.noChanges("UNKNOWN");
+        }
+        try {
+            JsonNode origRoot = objectMapper.readTree(originalPayloadJson);
+            JsonNode updRoot = objectMapper.readTree(updatedPayloadJson);
+
+            JsonNode origChanges = origRoot.path("changes");
+            JsonNode updChanges = updRoot.path("changes");
+
+            if (!origChanges.isArray() || origChanges.isEmpty() || !updChanges.isArray() || updChanges.isEmpty()) {
+                return F03DraftDiff.noChanges("EMPTY");
+            }
+
+            JsonNode origChange = origChanges.get(0);
+            JsonNode updChange = updChanges.get(0);
+
+            String changeType = updChange.path("changeType").asText(origChange.path("changeType").asText("UNKNOWN"));
+            List<F03DraftDiff.FieldDiff> fieldDiffs = new ArrayList<>();
+
+            JsonNode origAfter = origChange.path("after");
+            JsonNode updAfter = updChange.path("after");
+
+            switch (changeType) {
+                case "EXERCISE_SUBSTITUTION" -> {
+                    String origVar = origAfter.path("replacementVariationId").asText("");
+                    String updVar = updAfter.path("replacementVariationId").asText("");
+                    if (!origVar.equals(updVar) && !updVar.isBlank()) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("replacementVariationId", changeType, origVar, updVar, "Replacement exercise variation modified"));
+                    }
+                    String origName = origAfter.path("replacementExerciseName").asText("");
+                    String updName = updAfter.path("replacementExerciseName").asText("");
+                    if (!origName.equals(updName) && !updName.isBlank()) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("replacementExerciseName", changeType, origName, updName, "Replacement exercise name updated"));
+                    }
+                }
+                case "LOAD_ADJUSTMENT" -> {
+                    String origLoad = origAfter.path("targetLoad").asText("");
+                    String updLoad = updAfter.path("targetLoad").asText("");
+                    if (!origLoad.equals(updLoad) && !updLoad.isBlank()) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("targetLoad", changeType, origLoad, updLoad, "Target load modified"));
+                    }
+                    String origDelta = origAfter.path("deltaLoad").asText("");
+                    String updDelta = updAfter.path("deltaLoad").asText("");
+                    if (!origDelta.equals(updDelta) && !updDelta.isBlank()) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("deltaLoad", changeType, origDelta, updDelta, "Delta load modified"));
+                    }
+                    String origDir = origAfter.path("direction").asText("");
+                    String updDir = updAfter.path("direction").asText("");
+                    if (!origDir.equals(updDir) && !updDir.isBlank()) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("direction", changeType, origDir, updDir, "Adjustment direction modified"));
+                    }
+                }
+                case "VOLUME_ADJUSTMENT" -> {
+                    int origSets = origAfter.path("targetSets").asInt(-1);
+                    int updSets = updAfter.path("targetSets").asInt(-1);
+                    if (origSets != updSets && updSets != -1) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("targetSets", changeType, String.valueOf(origSets), String.valueOf(updSets), "Target sets modified"));
+                    }
+                    int origDeltaSets = origAfter.path("deltaSets").asInt(-999);
+                    int updDeltaSets = updAfter.path("deltaSets").asInt(-999);
+                    if (origDeltaSets != updDeltaSets && updDeltaSets != -999) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("deltaSets", changeType, String.valueOf(origDeltaSets), String.valueOf(updDeltaSets), "Delta sets modified"));
+                    }
+                    int origRepsMin = origAfter.path("targetRepsMin").asInt(-1);
+                    int updRepsMin = updAfter.path("targetRepsMin").asInt(-1);
+                    if (origRepsMin != updRepsMin && updRepsMin != -1) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("targetRepsMin", changeType, String.valueOf(origRepsMin), String.valueOf(updRepsMin), "Min reps modified"));
+                    }
+                    int origRepsMax = origAfter.path("targetRepsMax").asInt(-1);
+                    int updRepsMax = updAfter.path("targetRepsMax").asInt(-1);
+                    if (origRepsMax != updRepsMax && updRepsMax != -1) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("targetRepsMax", changeType, String.valueOf(origRepsMax), String.valueOf(updRepsMax), "Max reps modified"));
+                    }
+                    int origDur = origAfter.path("durationSeconds").asInt(-1);
+                    int updDur = updAfter.path("durationSeconds").asInt(-1);
+                    if (origDur != updDur && updDur != -1) {
+                        fieldDiffs.add(new F03DraftDiff.FieldDiff("durationSeconds", changeType, String.valueOf(origDur), String.valueOf(updDur), "Duration seconds modified"));
+                    }
+                }
+            }
+
+            String summary = fieldDiffs.isEmpty()
+                    ? "No customization applied relative to original proposal"
+                    : "Customized " + fieldDiffs.size() + " field(s) in " + changeType;
+
+            return new F03DraftDiff(!fieldDiffs.isEmpty(), changeType, summary, fieldDiffs);
+        } catch (Exception e) {
+            log.warn("Failed to compute diff for F03 proposal: {}", e.getMessage());
+            return F03DraftDiff.noChanges("ERROR");
+        }
     }
 }

@@ -47,7 +47,14 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
             (UUID) rs.getObject("last_modified_by"),
             rs.getString("source_snapshot"),
             toInstant(rs.getTimestamp("created_at")),
-            toInstant(rs.getTimestamp("updated_at"))
+            toInstant(rs.getTimestamp("updated_at")),
+            rs.getBoolean("shared_with_student"),
+            (Integer) rs.getObject("shared_revision"),
+            toInstant(rs.getTimestamp("shared_at")),
+            (UUID) rs.getObject("shared_by"),
+            rs.getString("shared_title"),
+            rs.getString("shared_explanation"),
+            rs.getString("shared_payload")
     );
 
     private static final RowMapper<AiRecommendationApplication> APPLICATION_ROW_MAPPER = (rs, rowNum) -> new AiRecommendationApplication(
@@ -70,6 +77,7 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
         Timestamp now = Timestamp.from(recommendation.createdAt() != null ? recommendation.createdAt() : Instant.now());
         Timestamp expires = recommendation.expiresAt() != null ? Timestamp.from(recommendation.expiresAt()) : null;
         String origPayload = recommendation.originalPayload() != null ? recommendation.originalPayload() : recommendation.structuredPayload();
+        Timestamp sharedAtTs = recommendation.sharedAt() != null ? Timestamp.from(recommendation.sharedAt()) : null;
 
         String sql = """
             INSERT INTO fitness.ai_recommendations (
@@ -77,13 +85,15 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 title, explanation, structured_payload, status, decision_authority,
                 target_entity_type, target_entity_id, decided_by, decided_at, decision_note,
                 expires_at, revision, original_payload, is_customized, last_modified_by,
-                source_snapshot, created_at, updated_at
+                source_snapshot, created_at, updated_at,
+                shared_with_student, shared_revision, shared_at, shared_by, shared_title, shared_explanation, shared_payload
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?::jsonb, ?::fitness.recommendation_status, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?::jsonb, ?, ?,
-                ?::jsonb, ?, ?
+                ?::jsonb, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?::jsonb
             )
             """;
 
@@ -111,7 +121,14 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 recommendation.lastModifiedBy(),
                 recommendation.sourceSnapshot(),
                 now,
-                now
+                now,
+                recommendation.sharedWithStudent(),
+                recommendation.sharedRevision(),
+                sharedAtTs,
+                recommendation.sharedBy(),
+                recommendation.sharedTitle(),
+                recommendation.sharedExplanation(),
+                recommendation.sharedPayload()
         );
 
         return findById(id).orElseThrow();
@@ -200,6 +217,42 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
                 explanation,
                 structuredPayload,
                 lastModifiedBy,
+                Timestamp.from(Instant.now()),
+                id
+        );
+    }
+
+    @Override
+    public void shareDraft(
+            UUID id,
+            int sharedRevision,
+            String sharedTitle,
+            String sharedExplanation,
+            String sharedPayload,
+            UUID sharedBy,
+            Instant sharedAt
+    ) {
+        String sql = """
+            UPDATE fitness.ai_recommendations
+            SET shared_with_student = true,
+                shared_revision = ?,
+                shared_title = ?,
+                shared_explanation = ?,
+                shared_payload = ?::jsonb,
+                shared_by = ?,
+                shared_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """;
+
+        jdbcTemplate.update(
+                sql,
+                sharedRevision,
+                sharedTitle,
+                sharedExplanation,
+                sharedPayload,
+                sharedBy,
+                sharedAt != null ? Timestamp.from(sharedAt) : Timestamp.from(Instant.now()),
                 Timestamp.from(Instant.now()),
                 id
         );

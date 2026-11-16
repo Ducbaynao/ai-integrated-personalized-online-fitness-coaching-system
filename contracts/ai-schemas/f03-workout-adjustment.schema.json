@@ -136,7 +136,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "targetLoad": { "type": ["number", "null"], "minimum": 0 },
-                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LBS", null] },
+                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LB", "LBS", null] },
                   "loadUnitId": { "type": ["integer", "null"], "minimum": 1 }
                 }
               },
@@ -146,7 +146,7 @@
                 "required": ["direction"],
                 "properties": {
                   "targetLoad": { "type": ["number", "null"], "minimum": 0 },
-                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LBS", null] },
+                  "loadUnit": { "type": ["string", "null"], "enum": ["KG", "LB", "LBS", null] },
                   "loadUnitId": { "type": ["integer", "null"], "minimum": 1 },
                   "direction": {
                     "type": "string",

@@ -15,6 +15,7 @@ import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.exercise.application.port.in.ExerciseReferenceQuery;
+import com.fitnesscoaching.platform.modules.measurement.application.port.in.MeasurementUnitReferenceQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutExecutionViews;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews;
@@ -27,6 +28,7 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutE
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanQueryUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -51,7 +53,31 @@ public class F03ContextBuilder {
     private final ObjectProvider<ExerciseReferenceQuery> exerciseReferenceQueryProvider;
     private final ObjectProvider<WorkoutExecutionQueryUseCase> workoutExecutionQueryProvider;
     private final ObjectProvider<WorkoutCompletionEvidenceQuery> completionQueryProvider;
+    private final ObjectProvider<MeasurementUnitReferenceQuery> unitReferenceQueryProvider;
     private final Clock clock;
+
+    @Autowired
+    public F03ContextBuilder(
+            CurrentCoachingContextQuery coachingContextQuery,
+            UserAccountStatusQuery accountStatusQuery,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider,
+            ObjectProvider<ExerciseReferenceQuery> exerciseReferenceQueryProvider,
+            ObjectProvider<WorkoutExecutionQueryUseCase> workoutExecutionQueryProvider,
+            ObjectProvider<WorkoutCompletionEvidenceQuery> completionQueryProvider,
+            ObjectProvider<MeasurementUnitReferenceQuery> unitReferenceQueryProvider,
+            Clock clock
+    ) {
+        this.coachingContextQuery = coachingContextQuery;
+        this.accountStatusQuery = accountStatusQuery;
+        this.scheduleCalendarProvider = scheduleCalendarProvider;
+        this.workoutPlanQueryProvider = workoutPlanQueryProvider;
+        this.exerciseReferenceQueryProvider = exerciseReferenceQueryProvider;
+        this.workoutExecutionQueryProvider = workoutExecutionQueryProvider;
+        this.completionQueryProvider = completionQueryProvider;
+        this.unitReferenceQueryProvider = unitReferenceQueryProvider;
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
 
     public F03ContextBuilder(
             CurrentCoachingContextQuery coachingContextQuery,
@@ -63,14 +89,8 @@ public class F03ContextBuilder {
             ObjectProvider<WorkoutCompletionEvidenceQuery> completionQueryProvider,
             Clock clock
     ) {
-        this.coachingContextQuery = coachingContextQuery;
-        this.accountStatusQuery = accountStatusQuery;
-        this.scheduleCalendarProvider = scheduleCalendarProvider;
-        this.workoutPlanQueryProvider = workoutPlanQueryProvider;
-        this.exerciseReferenceQueryProvider = exerciseReferenceQueryProvider;
-        this.workoutExecutionQueryProvider = workoutExecutionQueryProvider;
-        this.completionQueryProvider = completionQueryProvider;
-        this.clock = clock != null ? clock : Clock.systemUTC();
+        this(coachingContextQuery, accountStatusQuery, scheduleCalendarProvider, workoutPlanQueryProvider,
+                exerciseReferenceQueryProvider, workoutExecutionQueryProvider, completionQueryProvider, null, clock);
     }
 
     public record CoachingContextDetails(
@@ -246,8 +266,24 @@ public class F03ContextBuilder {
         // 4. Extract Baseline Prescription Data
         UUID beforeVariationId = targetPrescription.exerciseVariationId();
         BigDecimal beforeTargetLoad = targetPrescription.targetLoad();
-        Integer beforeLoadUnitId = 1; // Standard Unit ID 1 is KG
-        String loadUnit = "KG";
+        Integer beforeLoadUnitId = targetPrescription.loadUnitId() != null ? (int) targetPrescription.loadUnitId() : null;
+        String loadUnit = null;
+        MeasurementUnitReferenceQuery unitQuery = unitReferenceQueryProvider != null ? unitReferenceQueryProvider.getIfAvailable() : null;
+        if (beforeLoadUnitId != null && unitQuery != null) {
+            var ref = unitQuery.resolveAll(List.of(targetPrescription.loadUnitId())).get(targetPrescription.loadUnitId());
+            if (ref != null) {
+                loadUnit = ref.code();
+            }
+        }
+        if (beforeTargetLoad != null && beforeLoadUnitId == null) {
+            loadUnit = "KG";
+            if (unitQuery != null) {
+                var kgDetails = unitQuery.resolveByCodes(List.of("KG")).get("KG");
+                if (kgDetails != null) {
+                    beforeLoadUnitId = (int) kgDetails.id();
+                }
+            }
+        }
         Integer beforeTargetSets = targetPrescription.targetSets();
         Integer beforeTargetRepsMin = targetPrescription.targetRepsMin();
         Integer beforeTargetRepsMax = targetPrescription.targetRepsMax();

@@ -1,0 +1,86 @@
+{
+  "checked_at_utc": "2026-11-15T14:00:32.749860+00:00",
+  "capture_method": "adb shell screencap -p /sdcard/<file>.png followed by adb pull",
+  "captures": [
+    {
+      "file": "gui_01_modal_initial.png",
+      "bytes": 268488,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "91ec025bd764e8722e6b33f19752820e096e9ff9da71bc38dc716e127c427209",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_02_proposal_v1.png",
+      "bytes": 294858,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "e022cc99cdb8f58b60a9cbbb70f32b9f0ee06053497ca9c440581f6eb5ecd266",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_03_edit_mode.png",
+      "bytes": 223891,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "5879e60efbcbf6e35396bc7e2bd29a6e6ae849fc7ec23092bdd178148b6fec49",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_04_student_form_edited.png",
+      "bytes": 221441,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "bad08507a022779d1824143e12ec073ba73bb93dd5f9b125bb03cae7c9f96844",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_05_student_diff_v2.png",
+      "bytes": 292400,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "cb0fb2143d2fc84d5db46aa9833e2bb5e4d3daaf2f17e582ca52a4cd67b6ff0f",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_06_student_hc_shared_v3.png",
+      "bytes": 324393,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "e5c3462d6bf43fbb40163cbf7ec6b81e7b1505e6a2040531ccd513f9d3a811b7",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_07_trainer_shared_v2.png",
+      "bytes": 283800,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "0f428c5ff3419ea08ef3668b522bd09c902b17771375a558bb04980f21cfe577",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_08_trainer_private_v3.png",
+      "bytes": 284168,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "78ce4c8007a125a1ca49197c6115ebdbf8820af2a97f48846d682ab8c0e7d39e",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_09_trainer_reshared_v3.png",
+      "bytes": 282991,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "c99ef7c0fc6980553ec6d22d0b5a34ab71baa7e1c4c2cc1a596aad653a1b05b2",
+      "signature_crc_and_zlib": "PASS"
+    },
+    {
+      "file": "gui_10_student_read_only_actions.png",
+      "bytes": 299210,
+      "width": 1080,
+      "height": 2400,
+      "sha256": "fe22b27bf1a25da62b2a9c007d1f620fd0260601e3821a70f794b49f0db25bb2",
+      "signature_crc_and_zlib": "PASS"
+    }
+  ]
+}

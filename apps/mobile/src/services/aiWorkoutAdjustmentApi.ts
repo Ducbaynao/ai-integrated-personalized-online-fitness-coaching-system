@@ -8,6 +8,10 @@ import {
   RejectAdjustmentApiRequest,
   RejectAdjustmentApiResponse,
   AiWorkoutAdjustmentDetail,
+  UpdateAdjustmentDraftApiRequest,
+  UpdateAdjustmentDraftApiResponse,
+  ShareAdjustmentDraftApiRequest,
+  ShareAdjustmentDraftApiResponse,
 } from '@/types/aiWorkoutAdjustment';
 import { ApiError } from '@/types/auth';
 
@@ -27,6 +31,7 @@ export function getWorkoutAdjustmentFieldErrors(error: unknown): Record<string, 
 export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const code = error.errorResponse?.errorCode;
+    const msg = error.message || '';
     if (code === 'PLANNED_WORKOUT_ADJUSTMENTS_SEALED') {
       return 'Buổi tập đã bắt đầu hoặc hoàn thành, không thể điều chỉnh.';
     }
@@ -40,7 +45,6 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       return 'Biến thể bài tập thay thế hiện không khả dụng trong danh mục bài tập.';
     }
     if (code === 'AI_RUN_LIFECYCLE_CONFLICT') {
-      const msg = error.message || '';
       if (msg.includes('expired')) {
         return 'Đề xuất điều chỉnh đã hết hạn. Vui lòng tạo đề xuất mới.';
       }
@@ -52,6 +56,9 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       }
       if (msg.includes('Revision conflict')) {
         return 'Bản thảo đã bị chỉnh sửa ở một phiên khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.';
+      }
+      if (msg.includes('snapshot') || msg.includes('missing or corrupted')) {
+        return 'Bản nháp chia sẻ bị thiếu hoặc hỏng dữ liệu snapshot. Vui lòng liên hệ Huấn luyện viên để chia sẻ lại.';
       }
       if (msg.includes('already been decided') || msg.includes('already been applied')) {
         return 'Đề xuất điều chỉnh này đã được quyết định trước đó.';
@@ -65,8 +72,23 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       if (error.errorResponse?.fieldErrors && error.errorResponse.fieldErrors.length > 0) {
         return 'Vui lòng kiểm tra và hoàn thiện các trường thông tin bắt buộc còn thiếu bên dưới.';
       }
+      if (msg.includes('invalid load') || msg.includes('load must be positive')) {
+        return 'Mức tạ điều chỉnh không hợp lệ. Vui lòng kiểm tra lại.';
+      }
+      if (msg.includes('Cannot share draft in SELF_DIRECTED')) {
+        return 'Không thể chia sẻ bản nháp trong chế độ tự tập luyện (SELF_DIRECTED).';
+      }
     }
-    if (error.status === 403 || code === 'AI_RUN_ACCESS_DENIED') {
+    if (error.status === 403 || code === 'AI_RUN_ACCESS_DENIED' || code === 'AI_FORBIDDEN') {
+      if (msg.includes('Private trainer draft has not been shared') || msg.includes('not been shared')) {
+        return 'Bản nháp của Huấn luyện viên chưa được chia sẻ cho học viên.';
+      }
+      if (msg.includes('Cannot share draft in SELF_DIRECTED')) {
+        return 'Không thể chia sẻ bản nháp trong chế độ tự tập luyện (SELF_DIRECTED).';
+      }
+      if (msg.includes('Only trainer may edit') || msg.includes('Only student may edit')) {
+        return 'Bạn không có thẩm quyền chỉnh sửa đề xuất điều chỉnh này trong chế độ hiện tại.';
+      }
       return 'Bạn không có thẩm quyền quyết định đối với đề xuất điều chỉnh này trong chế độ huấn luyện hiện tại.';
     }
     if (error.status === 404) {
@@ -104,6 +126,26 @@ export const aiWorkoutAdjustmentApi = {
     return request<AiWorkoutAdjustmentDetail>(`/ai/workout-adjustments/${encodeURIComponent(recommendationId)}`, {
       method: 'GET',
     });
+  },
+
+  updateDraft(recommendationId: string, body: UpdateAdjustmentDraftApiRequest) {
+    return request<UpdateAdjustmentDraftApiResponse>(
+      `/ai/workout-adjustments/${encodeURIComponent(recommendationId)}/draft`,
+      {
+        method: 'PUT',
+        body,
+      }
+    );
+  },
+
+  shareDraft(recommendationId: string, body: ShareAdjustmentDraftApiRequest) {
+    return request<ShareAdjustmentDraftApiResponse>(
+      `/ai/workout-adjustments/${encodeURIComponent(recommendationId)}/share`,
+      {
+        method: 'POST',
+        body,
+      }
+    );
   },
 
   accept(recommendationId: string, body?: AcceptAdjustmentApiRequest) {

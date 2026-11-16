@@ -158,6 +158,7 @@ public class WorkoutPlanQueryService implements WorkoutPlanQueryUseCase {
                             ExerciseReferenceQuery.PresentationState.UNAVAILABLE.name(), null, null));
             return new PrescriptionView(value.id(), value.exerciseVariationId(), value.sequenceNumber(),
                     value.targetSets(), value.targetRepsMin(), value.targetRepsMax(), value.targetLoad(),
+                    value.loadUnitId(),
                     value.restSeconds(), value.durationSeconds(), value.instructions(), presentation);
         }).toList();
         return new SessionView(session.id(), session.weekNumber(), session.dayNumber(), session.sequenceNumber(),

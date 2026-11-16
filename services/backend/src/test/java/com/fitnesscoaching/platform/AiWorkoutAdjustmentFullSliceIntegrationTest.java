@@ -17,6 +17,11 @@ import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F03WorkoutAdju
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.F03WorkoutAdjustmentPayload.TargetScope;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectAdjustmentApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.RejectAdjustmentApiResponse;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.ShareAdjustmentDraftApiResponse;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiRequest;
+import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.UpdateAdjustmentDraftApiResponse;
+import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.WorkoutAdjustmentApiRequest;
 import com.fitnesscoaching.platform.modules.ai.adapter.in.web.dto.WorkoutAdjustmentApiResponse;
 import com.fitnesscoaching.platform.modules.ai.application.port.in.AiWorkoutAdjustmentUseCase;
@@ -25,6 +30,7 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiRecommendation;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRecommendationStatus;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
+import com.fitnesscoaching.platform.modules.workout.application.port.out.WorkoutExecutionSnapshotPersistencePort;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.ActivateCommand;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanCommandUseCase.CreateDraftCommand;
@@ -95,6 +101,9 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private WorkoutExecutionSnapshotPersistencePort executionSnapshotPort;
 
     @MockitoSpyBean
     private AuditService auditService;
@@ -173,11 +182,29 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
         return new HumanCoachSetup(student, trainer, relationship, period);
     }
 
+    private int kgUnitId() {
+        return jdbc.queryForObject("SELECT id FROM fitness.measurement_units WHERE code = 'KG'", Integer.class);
+    }
+
     private PlanDetail activePlan(UUID student, UUID actor) {
+        return activePlanWithLoad(student, actor, kgUnitId(), BigDecimal.valueOf(80.0));
+    }
+
+    private PlanDetail activePlanWithLoad(UUID student, UUID actor, Integer loadUnitId, BigDecimal load) {
         UUID rxId = UUID.randomUUID();
-        var rx = new ExercisePrescription(rxId, exerciseVariation1, 1, 3, 8, 12, BigDecimal.valueOf(80.0), 90, null, "Standard");
+        var rx = new ExercisePrescription(rxId, exerciseVariation1, 1, 3, 8, 12, load, 90, null, "Standard");
         var session = new WorkoutSessionTemplate(UUID.randomUUID(), 1, 1, 1, "Day 1", "Legs", 60, null, List.of(rx));
         var draft = workoutPlanCommands.createDraft(new CreateDraftCommand(student, actor, "Test Plan", "Desc", List.of(session), "k-draft-" + UUID.randomUUID()));
+        if (loadUnitId != null) {
+            jdbc.update("""
+                    UPDATE fitness.workout_plan_session_exercises SET load_unit_id = ?
+                    WHERE workout_plan_session_id IN (
+                        SELECT s.id FROM fitness.workout_plan_sessions s
+                        JOIN fitness.workout_plan_versions v ON v.id = s.workout_plan_version_id
+                        WHERE v.workout_plan_id = ?
+                    )
+                    """, loadUnitId, draft.planId());
+        }
         workoutPlanCommands.activate(new ActivateCommand(draft.planId(), actor, 0L, "k-act-" + UUID.randomUUID()));
         return workoutPlanQuery.findActive(actor, student).orElseThrow();
     }
@@ -1260,5 +1287,1163 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
         // 7. No application receipt persisted
         Integer appCount = jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?", Integer.class, recId);
         assertThat(appCount).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("F03: Trainer edits draft, shares with student; student reads snapshot, cannot accept in HUMAN_COACH; subsequent trainer edits isolated")
+    void f03DraftLifecycle_trainerEdits_sharesWithStudent_studentReadsSharedSnapshot_concurrencyProtected() throws Exception {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var genReq = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-lifecycle-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Trainer requests load decrease proposal",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        // 1. Trainer generates adjustment proposal
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, genReq);
+        UUID recId = genRes.recommendationId();
+        assertThat(recId).isNotNull();
+
+        // 2. Student attempts to read unshared draft -> 403 Forbidden
+        assertThatThrownBy(() -> adjustmentService.getAdjustment(student, recId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Private trainer draft has not been shared with the student");
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 3. Trainer edits draft (V1 -> V2)
+        String v2Payload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Trainer customized load reduction to 70kg",
+          "reasoning": ["Customized load reduction"],
+          "usedData": ["fatigue"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnitId": %d },
+              "after": { "targetLoad": 70.0, "deltaLoad": -10.0, "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Trainer customized load adjustment",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+
+        UpdateAdjustmentDraftApiRequest editReqV2 = new UpdateAdjustmentDraftApiRequest(
+                1, // expected revision 1
+                "Customized Deload Proposal",
+                "Trainer customized load reduction to 70kg",
+                mapper.readTree(v2Payload)
+        );
+
+        UpdateAdjustmentDraftApiResponse editResV2 = adjustmentService.updateDraft(trainer, recId, editReqV2);
+        assertThat(editResV2.revision()).isEqualTo(2);
+        assertThat(editResV2.diff().hasChanges()).isTrue();
+
+        // Still unshared with student
+        assertThatThrownBy(() -> adjustmentService.getAdjustment(student, recId))
+                .isInstanceOf(AiRunAccessDeniedException.class);
+
+        // 4. Trainer shares draft with student
+        ShareAdjustmentDraftApiResponse shareRes = adjustmentService.shareDraft(trainer, recId, new ShareAdjustmentDraftApiRequest(2));
+        assertThat(shareRes.sharedWithStudent()).isTrue();
+        assertThat(shareRes.sharedRevision()).isEqualTo(2);
+
+        // 5. Student can now read the shared draft (gets revision 2 snapshot)
+        AiRecommendation studentViewV2 = adjustmentService.getAdjustment(student, recId);
+        assertThat(studentViewV2.revision()).isEqualTo(2);
+        assertThat(studentViewV2.title()).isEqualTo("Customized Deload Proposal");
+        assertThat(studentViewV2.explanation()).isEqualTo("Trainer customized load reduction to 70kg");
+        assertThat(studentViewV2.structuredPayload()).contains("70.0");
+
+        // 6. Trainer further edits draft (V2 -> V3) to 65kg
+        String v3Payload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Trainer further reduced load to 65kg",
+          "reasoning": ["Further load reduction"],
+          "usedData": ["fatigue"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnitId": %d },
+              "after": { "targetLoad": 65.0, "deltaLoad": -15.0, "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Trainer further reduced load",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+
+        UpdateAdjustmentDraftApiRequest editReqV3 = new UpdateAdjustmentDraftApiRequest(
+                2, // expected revision 2
+                "Further Load Reduction",
+                "Trainer further reduced load to 65kg",
+                mapper.readTree(v3Payload)
+        );
+        UpdateAdjustmentDraftApiResponse editResV3 = adjustmentService.updateDraft(trainer, recId, editReqV3);
+        assertThat(editResV3.revision()).isEqualTo(3);
+
+        // 7. Student reads again: student STILL gets revision 2 (isolation of unshared draft in progress!)
+        AiRecommendation studentViewStillV2 = adjustmentService.getAdjustment(student, recId);
+        assertThat(studentViewStillV2.revision()).isEqualTo(2);
+        assertThat(studentViewStillV2.title()).isEqualTo("Customized Deload Proposal");
+        assertThat(studentViewStillV2.explanation()).isEqualTo("Trainer customized load reduction to 70kg");
+        assertThat(studentViewStillV2.title()).doesNotContain("Further");
+        assertThat(studentViewStillV2.structuredPayload()).contains("70.0");
+
+        // Trainer reads: trainer gets active work-in-progress revision 3
+        AiRecommendation trainerViewV3 = adjustmentService.getAdjustment(trainer, recId);
+        assertThat(trainerViewV3.revision()).isEqualTo(3);
+        assertThat(trainerViewV3.title()).isEqualTo("Further Load Reduction");
+        assertThat(trainerViewV3.explanation()).isEqualTo("Trainer further reduced load to 65kg");
+        assertThat(trainerViewV3.structuredPayload()).contains("65.0");
+
+        // 8. Student attempts to accept: 403 Forbidden (student has no decision authority in HUMAN_COACH)
+        assertThatThrownBy(() -> adjustmentService.acceptAdjustment(student, recId, new AcceptAdjustmentApiRequest("key-stud-acc", null, 2, 1L)))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Only the currently assigned coach has decision authority");
+
+        // 9. Trainer accepts revision 3
+        String acceptCommandKey = "cmd-f03-trainer-acc-" + UUID.randomUUID();
+        AcceptAdjustmentApiResponse acceptRes = adjustmentService.acceptAdjustment(
+                trainer,
+                recId,
+                new AcceptAdjustmentApiRequest(acceptCommandKey, "Trainer approved 65kg load", 3, 1L)
+        );
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(acceptRes.resultingEntityType()).isEqualTo("WORKOUT_OCCURRENCE");
+
+        // 10. Verify DB applied state and occurrence mutation
+        AiRecommendation dbRec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(dbRec.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(dbRec.revision()).isEqualTo(3);
+
+        Integer occVersion = jdbc.queryForObject("SELECT version FROM fitness.planned_workouts WHERE id = ?", Integer.class, occurrenceId);
+        assertThat(occVersion).isEqualTo(2);
+
+        // 11. Idempotent replay by trainer returns replayed=true
+        AcceptAdjustmentApiResponse replayRes = adjustmentService.acceptAdjustment(
+                trainer,
+                recId,
+                new AcceptAdjustmentApiRequest(acceptCommandKey, "Trainer approved 65kg load", 3, 1L)
+        );
+        assertThat(replayRes.replayed()).isTrue();
+
+        // 12. Subsequent edits on APPLIED proposal throw 409 Conflict
+        assertThatThrownBy(() -> adjustmentService.updateDraft(trainer, recId, editReqV3))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Recommendation is in status APPLIED and cannot be edited");
+    }
+
+    @Test
+    @DisplayName("Concurrency: Two threads attempting to update draft from revision 1 simultaneously result in 1 success and 1 revision conflict")
+    void concurrentEditEditRace_onlyOneSucceeds_otherFailsWithConflict() throws Exception {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-ee-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<Future<Object>> futures = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            final int index = i;
+            futures.add(executor.submit(() -> {
+                readyLatch.countDown();
+                startLatch.await();
+                String payload = String.format(java.util.Locale.ROOT, """
+                {
+                  "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+                  "summary": "Thread %d edit",
+                  "reasoning": ["Thread edit"],
+                  "usedData": ["fatigue"],
+                  "missingData": [],
+                  "limitations": [],
+                  "confidence": 0.95,
+                  "changes": [
+                    {
+                      "changeId": "%s",
+                      "changeType": "LOAD_ADJUSTMENT",
+                      "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                      "targetRef": {
+                        "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                        "plannedWorkoutId": "%s",
+                        "plannedSessionExerciseId": "%s"
+                      },
+                      "before": { "targetLoad": 80.0, "loadUnitId": %d },
+                      "after": { "targetLoad": %f, "deltaLoad": %f, "loadUnitId": %d, "direction": "DECREASE" },
+                      "reason": "Thread load adjustment",
+                      "versionGuards": { "expectedOccurrenceVersion": 1 }
+                    }
+                  ]
+                }
+                """, index, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), 80.0 - (index + 1) * 5.0, -(index + 1) * 5.0, kgUnitId());
+
+                var editReq = new UpdateAdjustmentDraftApiRequest(1, "Title " + index, "Exp " + index, mapper.readTree(payload));
+                return adjustmentService.updateDraft(student, recId, editReq);
+            }));
+        }
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        int successes = 0;
+        int conflicts = 0;
+
+        for (Future<Object> f : futures) {
+            try {
+                Object res = f.get(10, TimeUnit.SECONDS);
+                if (res instanceof UpdateAdjustmentDraftApiResponse) {
+                    successes++;
+                }
+            } catch (Exception e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof AiRunLifecycleConflictException) {
+                    conflicts++;
+                } else {
+                    throw new AssertionError("Unexpected exception in concurrent edit", e);
+                }
+            }
+        }
+
+        executor.shutdown();
+        assertThat(successes).isEqualTo(1);
+        assertThat(conflicts).isEqualTo(1);
+
+        AiRecommendation finalRec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(finalRec.revision()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Concurrency: Simultaneous updateDraft and acceptAdjustment race resolves cleanly with 1 success and 1 conflict")
+    void concurrentEditAcceptRace_resolvesCleanlyWithoutCorruption() throws Exception {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-ea-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch readyLatch = new CountDownLatch(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        ObjectMapper mapper = new ObjectMapper();
+        Future<Object> editFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            String payload = String.format(java.util.Locale.ROOT, """
+            {
+              "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+              "summary": "Edit during accept race",
+              "reasoning": ["Fatigue"],
+              "usedData": ["fatigue"],
+              "missingData": [],
+              "limitations": [],
+              "confidence": 0.95,
+              "changes": [
+                {
+                  "changeId": "%s",
+                  "changeType": "LOAD_ADJUSTMENT",
+                  "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                  "targetRef": {
+                    "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                    "plannedWorkoutId": "%s",
+                    "plannedSessionExerciseId": "%s"
+                  },
+                  "before": { "targetLoad": 80.0, "loadUnitId": %d },
+                  "after": { "targetLoad": 75.0, "deltaLoad": -5.0, "loadUnitId": %d, "direction": "DECREASE" },
+                  "reason": "Fatigue edit",
+                  "versionGuards": { "expectedOccurrenceVersion": 1 }
+                }
+              ]
+            }
+            """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+            return adjustmentService.updateDraft(student, recId, new UpdateAdjustmentDraftApiRequest(1, "Edit Title", "Edit Exp", mapper.readTree(payload)));
+        });
+
+        Future<Object> acceptFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            return adjustmentService.acceptAdjustment(student, recId, new AcceptAdjustmentApiRequest("cmd-acc-race-" + UUID.randomUUID(), "Accept note", 1, 1L));
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        boolean editSucceeded = false;
+        boolean acceptSucceeded = false;
+        int conflicts = 0;
+
+        try {
+            editFuture.get(10, TimeUnit.SECONDS);
+            editSucceeded = true;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        try {
+            acceptFuture.get(10, TimeUnit.SECONDS);
+            acceptSucceeded = true;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        executor.shutdown();
+        assertThat(editSucceeded ^ acceptSucceeded).isTrue();
+        assertThat(conflicts).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Concurrency: Simultaneous updateDraft and shareDraft race resolves cleanly without data corruption")
+    void concurrentEditShareRace_resolvesCleanlyWithoutCorruption() throws Exception {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-es-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, req);
+        UUID recId = genRes.recommendationId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch readyLatch = new CountDownLatch(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        ObjectMapper mapper = new ObjectMapper();
+        Future<Object> editFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            String payload = String.format(java.util.Locale.ROOT, """
+            {
+              "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+              "summary": "Edit during share race",
+              "reasoning": ["Fatigue"],
+              "usedData": ["fatigue"],
+              "missingData": [],
+              "limitations": [],
+              "confidence": 0.95,
+              "changes": [
+                {
+                  "changeId": "%s",
+                  "changeType": "LOAD_ADJUSTMENT",
+                  "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                  "targetRef": {
+                    "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                    "plannedWorkoutId": "%s",
+                    "plannedSessionExerciseId": "%s"
+                  },
+                  "before": { "targetLoad": 80.0, "loadUnitId": %d },
+                  "after": { "targetLoad": 70.0, "deltaLoad": -10.0, "loadUnitId": %d, "direction": "DECREASE" },
+                  "reason": "Fatigue edit",
+                  "versionGuards": { "expectedOccurrenceVersion": 1 }
+                }
+              ]
+            }
+            """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+            return adjustmentService.updateDraft(trainer, recId, new UpdateAdjustmentDraftApiRequest(1, "Trainer Edit", "Exp", mapper.readTree(payload)));
+        });
+
+        Future<Object> shareFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            return adjustmentService.shareDraft(trainer, recId, new ShareAdjustmentDraftApiRequest(1));
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        int successes = 0;
+        int conflicts = 0;
+
+        try {
+            editFuture.get(10, TimeUnit.SECONDS);
+            successes++;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        try {
+            shareFuture.get(10, TimeUnit.SECONDS);
+            successes++;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        executor.shutdown();
+        assertThat(successes + conflicts).isEqualTo(2);
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.revision()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Rollback: updateDraft rolls back completely when audit fails")
+    void updateDraft_whenAuditFails_rollsBackEntireDraftUpdate() throws Exception {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-audit-edit-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, req);
+        UUID recId = genRes.recommendationId();
+
+        org.mockito.Mockito.doAnswer(invocation -> {
+            AuditRecord record = invocation.getArgument(0);
+            if ("AI_RECOMMENDATION_DRAFT_UPDATED".equals(record.action())) {
+                throw new RuntimeException("Simulated audit failure during draft update");
+            }
+            return invocation.callRealMethod();
+        }).when(auditService).recordAudit(any());
+
+        ObjectMapper mapper = new ObjectMapper();
+        String payload = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Custom load",
+          "reasoning": ["Fatigue"],
+          "usedData": ["fatigue"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnitId": %d },
+              "after": { "targetLoad": 70.0, "deltaLoad": -10.0, "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Fatigue edit",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+
+        var editReq = new UpdateAdjustmentDraftApiRequest(1, "Audit Fail Title", "Audit Fail Exp", mapper.readTree(payload));
+
+        assertThatThrownBy(() -> adjustmentService.updateDraft(student, recId, editReq))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Simulated audit failure during draft update");
+
+        // Verify PostgreSQL Database Rollback:
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.revision()).isEqualTo(1);
+        assertThat(rec.title()).doesNotContain("Audit Fail");
+        assertThat(rec.isCustomized()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Rollback: shareDraft rolls back completely when audit fails")
+    void shareDraft_whenAuditFails_rollsBackEntireSharingSnapshot() {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-audit-share-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, req);
+        UUID recId = genRes.recommendationId();
+
+        org.mockito.Mockito.doAnswer(invocation -> {
+            AuditRecord record = invocation.getArgument(0);
+            if ("AI_RECOMMENDATION_SHARED".equals(record.action())) {
+                throw new RuntimeException("Simulated audit failure during share draft");
+            }
+            return invocation.callRealMethod();
+        }).when(auditService).recordAudit(any());
+
+        assertThatThrownBy(() -> adjustmentService.shareDraft(trainer, recId, new ShareAdjustmentDraftApiRequest(1)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Simulated audit failure during share draft");
+
+        // Verify PostgreSQL Database Rollback:
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.sharedWithStudent()).isFalse();
+        assertThat(rec.sharedRevision()).isNull();
+        assertThat(rec.sharedTitle()).isNull();
+        assertThat(rec.sharedExplanation()).isNull();
+    }
+
+    @Test
+    @DisplayName("Concurrency: Simultaneous updateDraft and rejectAdjustment race resolves cleanly without data corruption")
+    void concurrentEditRejectRace_resolvesCleanlyWithoutCorruption() throws Exception {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-er-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, req);
+        UUID recId = genRes.recommendationId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch readyLatch = new CountDownLatch(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        ObjectMapper mapper = new ObjectMapper();
+        Future<Object> editFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            String payload = String.format(java.util.Locale.ROOT, """
+            {
+              "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+              "summary": "Edit during reject race",
+              "reasoning": ["Fatigue"],
+              "usedData": ["fatigue"],
+              "missingData": [],
+              "limitations": [],
+              "confidence": 0.95,
+              "changes": [
+                {
+                  "changeId": "%s",
+                  "changeType": "LOAD_ADJUSTMENT",
+                  "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                  "targetRef": {
+                    "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                    "plannedWorkoutId": "%s",
+                    "plannedSessionExerciseId": "%s"
+                  },
+                  "before": { "targetLoad": 80.0, "loadUnitId": %d },
+                  "after": { "targetLoad": 70.0, "deltaLoad": -10.0, "loadUnitId": %d, "direction": "DECREASE" },
+                  "reason": "Fatigue edit",
+                  "versionGuards": { "expectedOccurrenceVersion": 1 }
+                }
+              ]
+            }
+            """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+            return adjustmentService.updateDraft(trainer, recId, new UpdateAdjustmentDraftApiRequest(1, "Edit Race Title", "Exp", mapper.readTree(payload)));
+        });
+
+        Future<Object> rejectFuture = executor.submit(() -> {
+            readyLatch.countDown();
+            startLatch.await();
+            return adjustmentService.rejectAdjustment(trainer, recId, new RejectAdjustmentApiRequest("Trainer decided to reject"));
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        int successes = 0;
+        int conflicts = 0;
+
+        try {
+            editFuture.get(10, TimeUnit.SECONDS);
+            successes++;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        try {
+            rejectFuture.get(10, TimeUnit.SECONDS);
+            successes++;
+        } catch (Exception e) {
+            if (e.getCause() instanceof AiRunLifecycleConflictException) conflicts++;
+        }
+
+        executor.shutdown();
+        assertThat(successes + conflicts).isEqualTo(2);
+
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        if (rec.status() == AiRecommendationStatus.REJECTED) {
+            assertThat(rec.decidedBy()).isEqualTo(trainer);
+        } else {
+            assertThat(rec.status()).isEqualTo(AiRecommendationStatus.PENDING);
+            assertThat(rec.revision()).isGreaterThanOrEqualTo(1);
+        }
+    }
+
+    @Test
+    @DisplayName("Concurrency: Controlled order 1 (share wins first) -> Student keeps frozen shared snapshot while Trainer edits v2")
+    void concurrentEditShareRace_order1_shareWinsFirst_studentKeepsFrozenSnapshot() throws Exception {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-order1-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, req);
+        UUID recId = genRes.recommendationId();
+
+        // 1. Share draft at revision 1
+        ShareAdjustmentDraftApiResponse shareRes = adjustmentService.shareDraft(trainer, recId, new ShareAdjustmentDraftApiRequest(1));
+        assertThat(shareRes.sharedWithStudent()).isTrue();
+        assertThat(shareRes.sharedRevision()).isEqualTo(1);
+
+        // 2. Trainer subsequently modifies draft to revision 2 with distinct private content
+        ObjectMapper mapper = new ObjectMapper();
+        String payloadV2 = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Trainer Private Edit v2",
+          "reasoning": ["Secret adjustment"],
+          "usedData": ["fatigue"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnitId": %d },
+              "after": { "targetLoad": 65.0, "deltaLoad": -15.0, "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Secret load cut",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+
+        UpdateAdjustmentDraftApiResponse editRes = adjustmentService.updateDraft(
+                trainer, recId, new UpdateAdjustmentDraftApiRequest(1, "Private Trainer Title v2", "Private Explanation v2", mapper.readTree(payloadV2))
+        );
+        assertThat(editRes.revision()).isEqualTo(2);
+
+        // 3. Verify Database State
+        AiRecommendation liveRec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(liveRec.revision()).isEqualTo(2);
+        assertThat(liveRec.title()).isEqualTo("Private Trainer Title v2");
+        assertThat(liveRec.sharedRevision()).isEqualTo(1);
+
+        // 4. Verify Student View: completely isolated, sees frozen snapshot (revision 1, NOT 2)
+        AiRecommendation studentView = adjustmentService.getAdjustment(student, recId);
+        assertThat(studentView.revision()).isEqualTo(1);
+        assertThat(studentView.title()).doesNotContain("Private Trainer Title");
+        assertThat(studentView.explanation()).doesNotContain("Private Explanation");
+        assertThat(studentView.structuredPayload()).doesNotContain("Trainer Private Edit v2");
+        assertThat(studentView.sharedRevision()).isEqualTo(1);
+        assertThat(studentView.sharedWithStudent()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Concurrency: Controlled order 2 (edit wins first) -> share with old revision conflicts (409)")
+    void concurrentEditShareRace_order2_editWinsFirst_shareWithOldRevisionConflicts() throws Exception {
+        HumanCoachSetup setup = createHumanCoachSetup();
+        UUID student = setup.studentId();
+        UUID trainer = setup.trainerId();
+        PlanDetail plan = activePlan(student, trainer);
+        UUID occurrenceId = materializeOccurrence(student, setup.periodId(), plan);
+
+        UUID rxId = workoutPlanQuery.version(trainer, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var req = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-order2-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Deload",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(trainer, req);
+        UUID recId = genRes.recommendationId();
+
+        // 1. Edit wins first: increments revision to 2
+        ObjectMapper mapper = new ObjectMapper();
+        String payloadV2 = String.format(java.util.Locale.ROOT, """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Trainer Early Edit v2",
+          "reasoning": ["Early edit"],
+          "usedData": ["fatigue"],
+          "missingData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnitId": %d },
+              "after": { "targetLoad": 75.0, "deltaLoad": -5.0, "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Early adjust",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """, UUID.randomUUID(), occurrenceId, rxId, kgUnitId(), kgUnitId());
+
+        adjustmentService.updateDraft(trainer, recId, new UpdateAdjustmentDraftApiRequest(1, "Title v2", "Exp v2", mapper.readTree(payloadV2)));
+
+        // 2. Share request submitted with stale expectedRevision = 1 MUST conflict
+        assertThatThrownBy(() -> adjustmentService.shareDraft(trainer, recId, new ShareAdjustmentDraftApiRequest(1)))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Revision conflict: expected revision 1 but current is 2");
+
+        // 3. Verify Draft remains unshared in database and inaccessible to student
+        AiRecommendation rec = recommendationRepository.findById(recId).orElseThrow();
+        assertThat(rec.sharedWithStudent()).isFalse();
+        assertThat(rec.sharedRevision()).isNull();
+
+        assertThatThrownBy(() -> adjustmentService.getAdjustment(student, recId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Private trainer draft has not been shared with the student.");
+    }
+
+    @Test
+    @DisplayName("End-to-end Accept of Load Adjustment: enforces code-ID consistency, rejects mismatch, and persists valid matching LB unit with domain readback")
+    void acceptLoadAdjustment_withAuthoritativeLoadUnit_persistsCorrectly() throws Exception {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+
+        // Query authoritative LB and KG unit ids from DB
+        Integer lbUnitId = jdbc.queryForObject("SELECT id FROM fitness.measurement_units WHERE code = 'LB'", Integer.class);
+        Integer kgUnitId = jdbc.queryForObject("SELECT id FROM fitness.measurement_units WHERE code = 'KG'", Integer.class);
+        assertThat(lbUnitId).isNotNull();
+        assertThat(kgUnitId).isNotNull();
+        assertThat(lbUnitId).isNotEqualTo(kgUnitId);
+
+        PlanDetail plan = activePlanWithLoad(student, student, kgUnitId, BigDecimal.valueOf(80.0));
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var genReq = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-unit-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Testing unit fidelity",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, genReq);
+        UUID recId = genRes.recommendationId();
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 1. Case: Conflicting loadUnit 'KG' with loadUnitId of LB -> must be rejected
+        String payloadConflictKgWithLb = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Conflict KG code with LB ID",
+          "reasoning": ["Conflict test"],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnit": "KG", "loadUnitId": %d },
+              "after": { "targetLoad": 75.0, "deltaLoad": -5.0, "loadUnit": "KG", "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Mismatched unit id",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """.formatted(UUID.randomUUID(), occurrenceId, rxId, kgUnitId, lbUnitId);
+
+        assertThatThrownBy(() -> adjustmentService.updateDraft(student, recId,
+                new UpdateAdjustmentDraftApiRequest(1, "Conflict KG-LB Draft", "Exp", mapper.readTree(payloadConflictKgWithLb))))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Conflicting after loadUnit code and ID: code 'KG' does not match unit ID " + lbUnitId + " ('LB')");
+
+        // Verify no mutation written to DB and status remains PENDING
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId)).isZero();
+        assertThat(recommendationRepository.findById(recId).orElseThrow().status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // 2. Case: Conflicting loadUnit 'LB' with loadUnitId of KG -> must be rejected
+        String payloadConflictLbWithKg = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Conflict LB code with KG ID",
+          "reasoning": ["Conflict test 2"],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnit": "KG", "loadUnitId": %d },
+              "after": { "targetLoad": 180.0, "deltaLoad": 3.63, "loadUnit": "LB", "loadUnitId": %d, "direction": "INCREASE" },
+              "reason": "Mismatched unit id reverse",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """.formatted(UUID.randomUUID(), occurrenceId, rxId, kgUnitId, kgUnitId);
+
+        assertThatThrownBy(() -> adjustmentService.updateDraft(student, recId,
+                new UpdateAdjustmentDraftApiRequest(1, "Conflict LB-KG Draft", "Exp", mapper.readTree(payloadConflictLbWithKg))))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Conflicting after loadUnit code and ID: code 'LB' does not match unit ID " + kgUnitId + " ('KG')");
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Integer.class, occurrenceId)).isZero();
+        assertThat(recommendationRepository.findById(recId).orElseThrow().status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // 3. Case: Valid matching loadUnit 'LB' with loadUnitId of LB (80 KG = 176.37 LB, target = 170.0 LB, delta = -6.37, direction DECREASE)
+        String payloadValidLb = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Switch to LB and adjust",
+          "reasoning": ["Unit customization test"],
+          "usedData": [],
+          "limitations": [],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 80.0, "loadUnit": "KG", "loadUnitId": %d },
+              "after": { "targetLoad": 170.0, "deltaLoad": -6.37, "loadUnit": "LB", "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Test authoritative loadUnitId for LB",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """.formatted(UUID.randomUUID(), occurrenceId, rxId, kgUnitId, lbUnitId);
+
+        UpdateAdjustmentDraftApiResponse updateRes = adjustmentService.updateDraft(
+                student, recId, new UpdateAdjustmentDraftApiRequest(1, "Updated Draft Title", "Updated Exp", mapper.readTree(payloadValidLb))
+        );
+        assertThat(updateRes.revision()).isEqualTo(2);
+
+        // Accept revision 2
+        var acceptReq = new AcceptAdjustmentApiRequest("cmd-accept-unit-" + UUID.randomUUID(), "Accepted with custom unit", 2, 1L);
+        AcceptAdjustmentApiResponse acceptRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // Verify stored in fitness.workout_session_adjustments JSON and typed columns
+        String afterJson = jdbc.queryForObject("SELECT after_value::text FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", String.class, occurrenceId);
+        assertThat(afterJson).isNotNull();
+        tools.jackson.databind.JsonNode storedNode = mapper.readTree(afterJson);
+        assertThat(storedNode.path("loadUnitId").intValue()).isEqualTo(lbUnitId);
+        assertThat(storedNode.path("targetLoad").decimalValue()).isEqualByComparingTo(new BigDecimal("170.0"));
+
+        Short storedTypedUnitId = jdbc.queryForObject("SELECT typed_load_unit_id FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Short.class, occurrenceId);
+        assertThat(storedTypedUnitId).isNotNull();
+        assertThat(storedTypedUnitId.intValue()).isEqualTo(lbUnitId);
+
+        BigDecimal storedTypedLoad = jdbc.queryForObject("SELECT typed_target_load FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", BigDecimal.class, occurrenceId);
+        assertThat(storedTypedLoad).isNotNull();
+        assertThat(storedTypedLoad).isEqualByComparingTo(new BigDecimal("170.0"));
+
+        // Domain readback via execution snapshot port
+        var domainAdjustments = executionSnapshotPort.adjustments(occurrenceId);
+        assertThat(domainAdjustments).hasSize(1);
+        assertThat(domainAdjustments.get(0).loadUnitId()).isNotNull();
+        assertThat(domainAdjustments.get(0).loadUnitId().intValue()).isEqualTo(lbUnitId);
+        assertThat(domainAdjustments.get(0).targetLoad()).isEqualByComparingTo(new BigDecimal("170.0"));
+    }
+
+    @Test
+    @DisplayName("End-to-end Accept of Load Adjustment reverse: baseline in LB, updated to KG with authoritative kgUnitId, verified via DB and domain readback")
+    void acceptLoadAdjustment_reverseBaselineLbToKg_persistsCorrectly() throws Exception {
+        UUID student = person("STUDENT");
+        UUID periodId = createSelfDirectedPeriod(student);
+
+        Integer lbUnitId = jdbc.queryForObject("SELECT id FROM fitness.measurement_units WHERE code = 'LB'", Integer.class);
+        Integer kgUnitId = jdbc.queryForObject("SELECT id FROM fitness.measurement_units WHERE code = 'KG'", Integer.class);
+        assertThat(lbUnitId).isNotNull();
+        assertThat(kgUnitId).isNotNull();
+
+        PlanDetail plan = activePlanWithLoad(student, student, lbUnitId, BigDecimal.valueOf(100.0));
+        UUID occurrenceId = materializeOccurrence(student, periodId, plan);
+
+        UUID rxId = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().get(0).prescriptions().get(0).id();
+
+        var targetRef = new TargetRef(TargetScope.ONE_MATERIALIZED_OCCURRENCE, occurrenceId, rxId, null, null, null, null);
+        var genReq = new WorkoutAdjustmentApiRequest(
+                student,
+                "cmd-f03-rev-gen-" + UUID.randomUUID(),
+                TargetScope.ONE_MATERIALIZED_OCCURRENCE,
+                targetRef,
+                ChangeType.LOAD_ADJUSTMENT,
+                "Testing reverse unit fidelity",
+                List.of(),
+                List.of(),
+                true
+        );
+
+        WorkoutAdjustmentApiResponse genRes = adjustmentService.generateAdjustment(student, genReq);
+        UUID recId = genRes.recommendationId();
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 1. Conflict test: loadUnit 'KG' with loadUnitId of LB -> rejected
+        String payloadConflictKgWithLb = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Conflict KG with LB id in reverse test",
+          "reasoning": ["Conflict test"],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 100.0, "loadUnit": "LB", "loadUnitId": %d },
+              "after": { "targetLoad": 40.0, "deltaLoad": -5.36, "loadUnit": "KG", "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Mismatched unit id in reverse",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """.formatted(UUID.randomUUID(), occurrenceId, rxId, lbUnitId, lbUnitId);
+
+        assertThatThrownBy(() -> adjustmentService.updateDraft(student, recId,
+                new UpdateAdjustmentDraftApiRequest(1, "Conflict Reverse Draft", "Exp", mapper.readTree(payloadConflictKgWithLb))))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Conflicting after loadUnit code and ID: code 'KG' does not match unit ID " + lbUnitId + " ('LB')");
+
+        // 2. Valid update: baseline 100.0 LB (45.36 KG) -> target 40.0 KG, delta = -5.36 KG, direction: DECREASE, unitId: kgUnitId
+        String payloadValidKg = """
+        {
+          "recommendationType": "WORKOUT_ADJUSTMENT_PROPOSAL",
+          "summary": "Switch from LB to KG and adjust",
+          "reasoning": ["Valid reverse unit update"],
+          "confidence": 0.95,
+          "changes": [
+            {
+              "changeId": "%s",
+              "changeType": "LOAD_ADJUSTMENT",
+              "scope": "ONE_MATERIALIZED_OCCURRENCE",
+              "targetRef": {
+                "scope": "ONE_MATERIALIZED_OCCURRENCE",
+                "plannedWorkoutId": "%s",
+                "plannedSessionExerciseId": "%s"
+              },
+              "before": { "targetLoad": 100.0, "loadUnit": "LB", "loadUnitId": %d },
+              "after": { "targetLoad": 40.0, "deltaLoad": -5.36, "loadUnit": "KG", "loadUnitId": %d, "direction": "DECREASE" },
+              "reason": "Test authoritative loadUnitId for KG",
+              "versionGuards": { "expectedOccurrenceVersion": 1 }
+            }
+          ]
+        }
+        """.formatted(UUID.randomUUID(), occurrenceId, rxId, lbUnitId, kgUnitId);
+
+        UpdateAdjustmentDraftApiResponse updateRes = adjustmentService.updateDraft(
+                student, recId, new UpdateAdjustmentDraftApiRequest(1, "Draft in KG", "Exp", mapper.readTree(payloadValidKg))
+        );
+        assertThat(updateRes.revision()).isEqualTo(2);
+
+        // Accept revision 2
+        var acceptReq = new AcceptAdjustmentApiRequest("cmd-accept-rev-unit-" + UUID.randomUUID(), "Accepted with KG unit", 2, 1L);
+        AcceptAdjustmentApiResponse acceptRes = adjustmentService.acceptAdjustment(student, recId, acceptReq);
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // Verify stored in fitness.workout_session_adjustments JSON and typed columns
+        String afterJson = jdbc.queryForObject("SELECT after_value::text FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", String.class, occurrenceId);
+        assertThat(afterJson).isNotNull();
+        tools.jackson.databind.JsonNode storedNode = mapper.readTree(afterJson);
+        assertThat(storedNode.path("loadUnitId").intValue()).isEqualTo(kgUnitId);
+        assertThat(storedNode.path("targetLoad").decimalValue()).isEqualByComparingTo(new BigDecimal("40.0"));
+
+        Short storedTypedUnitId = jdbc.queryForObject("SELECT typed_load_unit_id FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", Short.class, occurrenceId);
+        assertThat(storedTypedUnitId).isNotNull();
+        assertThat(storedTypedUnitId.intValue()).isEqualTo(kgUnitId);
+
+        BigDecimal storedTypedLoad = jdbc.queryForObject("SELECT typed_target_load FROM fitness.workout_session_adjustments WHERE planned_workout_id = ?", BigDecimal.class, occurrenceId);
+        assertThat(storedTypedLoad).isNotNull();
+        assertThat(storedTypedLoad).isEqualByComparingTo(new BigDecimal("40.0"));
+
+        // Domain readback via execution snapshot port
+        var domainAdjustments = executionSnapshotPort.adjustments(occurrenceId);
+        assertThat(domainAdjustments).hasSize(1);
+        assertThat(domainAdjustments.get(0).loadUnitId()).isNotNull();
+        assertThat(domainAdjustments.get(0).loadUnitId().intValue()).isEqualTo(kgUnitId);
+        assertThat(domainAdjustments.get(0).targetLoad()).isEqualByComparingTo(new BigDecimal("40.0"));
     }
 }

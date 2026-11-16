@@ -5186,6 +5186,141 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+    patch:
+      tags: [AI Workout Adjustment (F03)]
+      operationId: patchWorkoutAdjustment
+      summary: Update draft workout adjustment proposal before approval
+      description: >-
+        Updates draft proposal content prior to approval, incrementing revision and preserving AI provenance.
+        Enforces optimistic locking via expectedRevision. Revalidates typed changes, exercise references, load/volume rules.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAdjustmentDraftRequest' }
+      responses:
+        '200':
+          description: Draft updated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateAdjustmentDraftResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Revision conflict, expired proposal, or invalid lifecycle state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: Domain or output validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-adjustments/{recommendationId}/draft:
+    put:
+      tags: [AI Workout Adjustment (F03)]
+      operationId: updateWorkoutAdjustmentDraft
+      summary: Update draft workout adjustment proposal before approval
+      description: >-
+        Updates draft proposal content prior to approval, incrementing revision and preserving AI provenance.
+        Enforces optimistic locking via expectedRevision. Revalidates typed changes, exercise references, load/volume rules.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAdjustmentDraftRequest' }
+      responses:
+        '200':
+          description: Draft updated successfully
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateAdjustmentDraftResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Revision conflict, expired proposal, or invalid lifecycle state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: Domain or output validation failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/workout-adjustments/{recommendationId}/share:
+    post:
+      tags: [AI Workout Adjustment (F03)]
+      operationId: shareWorkoutAdjustmentDraft
+      summary: Share private workout adjustment draft from Trainer to Student
+      description: >-
+        Shares a PENDING workout adjustment draft from assigned Trainer to Student in HUMAN_COACH mode.
+        Allows student to read the shared draft revision while preserving Trainer's exclusive decision authority.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recommendationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareAdjustmentDraftRequest' }
+      responses:
+        '200':
+          description: Draft shared successfully with student
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareAdjustmentDraftResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Revision conflict, expired proposal, or invalid lifecycle state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /ai/workout-adjustments/{recommendationId}/accept:
     post:
       tags: [AI Workout Adjustment (F03)]
@@ -11632,6 +11767,10 @@ components:
         expiresAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        sharedWithStudent: { type: boolean }
+        sharedRevision: { type: integer, nullable: true }
+        sharedAt: { type: string, format: date-time, nullable: true }
+        sharedBy: { type: string, format: uuid, nullable: true }
 
     AcceptRecommendationRequest:
       type: object
@@ -11850,6 +11989,105 @@ components:
         rejectedAt:
           type: string
           format: date-time
+
+    UpdateAdjustmentDraftRequest:
+      type: object
+      required: [expectedRevision, structuredPayload]
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 1
+          description: Expected revision number for optimistic locking.
+        title:
+          type: string
+        explanation:
+          type: string
+        structuredPayload:
+          type: object
+          description: Modified workout adjustment structured payload.
+
+    UpdateAdjustmentDraftResponse:
+      type: object
+      required: [recommendationId, revision, isCustomized, status, title, explanation, structuredPayload, originalPayload, updatedAt]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          minimum: 1
+        isCustomized:
+          type: boolean
+        status:
+          type: string
+          enum: [PENDING]
+        title:
+          type: string
+        explanation:
+          type: string
+        structuredPayload:
+          type: object
+        originalPayload:
+          type: object
+        updatedAt:
+          type: string
+          format: date-time
+        diff:
+          $ref: '#/components/schemas/F03DraftDiff'
+
+    F03DraftDiff:
+      type: object
+      required: [hasChanges, changeType, summary, fieldDiffs]
+      properties:
+        hasChanges:
+          type: boolean
+        changeType:
+          type: string
+        summary:
+          type: string
+        fieldDiffs:
+          type: array
+          items:
+            type: object
+            required: [field, changeType, description]
+            properties:
+              field:
+                type: string
+              changeType:
+                type: string
+              originalValue:
+                type: string
+              customizedValue:
+                type: string
+              description:
+                type: string
+
+    ShareAdjustmentDraftRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 1
+        shareNote:
+          type: string
+
+    ShareAdjustmentDraftResponse:
+      type: object
+      required: [recommendationId, sharedWithStudent, sharedRevision, sharedAt, sharedBy]
+      properties:
+        recommendationId:
+          type: string
+          format: uuid
+        sharedWithStudent:
+          type: boolean
+        sharedRevision:
+          type: integer
+        sharedAt:
+          type: string
+          format: date-time
+        sharedBy:
+          type: string
+          format: uuid
 
     F04ProgressSummaryRequest:
       type: object
