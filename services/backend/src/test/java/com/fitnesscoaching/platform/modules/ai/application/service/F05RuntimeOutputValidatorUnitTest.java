@@ -207,6 +207,55 @@ class F05RuntimeOutputValidatorUnitTest {
     }
 
     @Test
+    @DisplayName("T10: Degrading COACH_REQUIRED to COACH_OPTIONAL fails validation")
+    void t10_degradingCoachRequiredToOptional_fails() {
+        F05SourceSnapshot coachSnapshot = new F05SourceSnapshot(
+                defaultSnapshot.studentId(),
+                defaultSnapshot.coachingPeriodId(),
+                "HUMAN_COACH",
+                UUID.randomUUID(),
+                occurrenceId,
+                0L,
+                "SCHEDULED",
+                defaultSnapshot.planId(),
+                defaultSnapshot.planVersionId(),
+                defaultSnapshot.planSessionId(),
+                "Heavy Deadlift",
+                defaultSnapshot.plannedStartAt(),
+                defaultSnapshot.plannedEndAt(),
+                defaultSnapshot.originalPlannedStartAt(),
+                defaultSnapshot.timezone(),
+                defaultSnapshot.localStart(),
+                defaultSnapshot.localEnd(),
+                defaultSnapshot.startUtcOffset(),
+                defaultSnapshot.endUtcOffset(),
+                "COACH_REQUIRED",
+                null,
+                null,
+                TrainingContinuityState.RECENT_CONSISTENT,
+                now
+        );
+
+        Instant futureStart = now.plus(2, ChronoUnit.DAYS);
+        Instant futureEnd = futureStart.plus(1, ChronoUnit.HOURS);
+
+        String payload = createValidPayload(
+                occurrenceId,
+                "COACH_OPTIONAL",
+                "2026-11-18T09:00:00",
+                "2026-11-18T10:00:00",
+                "+07:00",
+                "+07:00",
+                futureStart.toString(),
+                futureEnd.toString()
+        );
+
+        var result = validator.validate(payload, coachSnapshot);
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.failureReason()).contains("COACH_REQUIRED supervision requirement cannot be degraded to COACH_OPTIONAL");
+    }
+
+    @Test
     @DisplayName("Preserving COACH_REQUIRED passes validation")
     void preservingCoachRequired_passes() {
         F05SourceSnapshot coachSnapshot = new F05SourceSnapshot(

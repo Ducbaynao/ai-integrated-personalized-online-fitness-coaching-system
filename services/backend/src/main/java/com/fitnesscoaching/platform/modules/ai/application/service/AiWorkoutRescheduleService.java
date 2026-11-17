@@ -275,8 +275,9 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     public AiRecommendation getReschedule(UUID actorId, UUID recommendationId) {
         AiRecommendation rec = getValidRecommendation(actorId, recommendationId);
         if (rec.status() == AiRecommendationStatus.PENDING && rec.isExpired(Instant.now(clock))) {
-            recommendationRepository.updateDecision(
+            recommendationRepository.updateDecisionIfStatus(
                     rec.id(),
+                    AiRecommendationStatus.PENDING,
                     AiRecommendationStatus.EXPIRED,
                     null,
                     Instant.now(clock),
@@ -515,6 +516,10 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             if (req.expectedOccurrenceVersion() != null && liveOccurrence.occurrenceVersion() != req.expectedOccurrenceVersion()) {
                 throw new AiRunLifecycleConflictException("Workout occurrence version conflict: expected version "
                         + req.expectedOccurrenceVersion() + " but current is " + liveOccurrence.occurrenceVersion());
+            }
+            if (!Objects.equals(liveOccurrence.linkedAppointmentId(), sourceSnapshot.linkedAppointmentId())
+                    || !Objects.equals(liveOccurrence.linkedAppointmentVersion(), sourceSnapshot.linkedAppointmentVersion())) {
+                throw new AiRunLifecycleConflictException("Linked appointment has changed since proposal was generated.");
             }
         }
 

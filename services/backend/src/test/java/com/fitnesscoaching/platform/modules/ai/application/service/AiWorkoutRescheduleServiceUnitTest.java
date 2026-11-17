@@ -38,6 +38,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.List;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -453,6 +455,91 @@ class AiWorkoutRescheduleServiceUnitTest {
         assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
                 .isInstanceOf(AiRunLifecycleConflictException.class)
                 .hasMessageContaining("Idempotency conflict");
+    }
+
+    @Test
+    @DisplayName("getReschedule: when expired, marks recommendation EXPIRED conditionally if PENDING")
+    void getReschedule_whenExpired_marksExpiredIfPending() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .targetEntityType("WORKOUT_OCCURRENCE")
+                .targetEntityId(occurrenceId)
+                .expiresAt(fixedNow.minus(1, ChronoUnit.MINUTES))
+                .revision(1)
+                .build();
+
+        AiRecommendation expiredRec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.EXPIRED)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .targetEntityType("WORKOUT_OCCURRENCE")
+                .targetEntityId(occurrenceId)
+                .expiresAt(fixedNow.minus(1, ChronoUnit.MINUTES))
+                .revision(1)
+                .build();
+
+        when(recommendationRepository.findById(recId)).thenReturn(Optional.of(rec), Optional.of(expiredRec));
+        when(recommendationRepository.updateDecisionIfStatus(
+                eq(recId), eq(AiRecommendationStatus.PENDING), eq(AiRecommendationStatus.EXPIRED),
+                isNull(), eq(fixedNow), any(), eq("WORKOUT_OCCURRENCE"), eq(occurrenceId)
+        )).thenReturn(true);
+
+        AiRecommendation result = service.getReschedule(studentId, recId);
+        assertThat(result.status()).isEqualTo(AiRecommendationStatus.EXPIRED);
+        verify(recommendationRepository).updateDecisionIfStatus(
+                eq(recId), eq(AiRecommendationStatus.PENDING), eq(AiRecommendationStatus.EXPIRED),
+                isNull(), eq(fixedNow), any(), eq("WORKOUT_OCCURRENCE"), eq(occurrenceId)
+        );
+    }
+
+    @Test
+    @DisplayName("acceptReschedule: when linked appointment changed after proposal generation, throws conflict (409)")
+    void acceptReschedule_whenLinkedAppointmentChanged_throwsConflict() throws Exception {
+        UUID recId = UUID.randomUUID();
+        String snapshotJson = objectMapper.writeValueAsString(defaultSnapshot);
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .targetEntityType("WORKOUT_OCCURRENCE")
+                .targetEntityId(occurrenceId)
+                .expiresAt(fixedNow.plus(30, ChronoUnit.MINUTES))
+                .revision(1)
+                .sourceSnapshot(snapshotJson)
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        // Live occurrence now has a linked appointment that wasn't in sourceSnapshot!
+        Occurrence liveOccurrence = new Occurrence(
+                occurrenceId, 0L, studentId, "SCHEDULED",
+                fixedNow, null, null, null, null,
+                "Asia/Ho_Chi_Minh", "2026-11-16T09:00:00", "2026-11-16T10:00:00", "+07:00", "+07:00",
+                null, null, List.of("RESCHEDULE"), UUID.randomUUID(), 1L
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(liveOccurrence);
+
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest("cmd-acc-app", "Accepting", 1, 0L, null, null);
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Linked appointment has changed");
     }
 
     @Test

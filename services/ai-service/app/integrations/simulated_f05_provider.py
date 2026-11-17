@@ -20,9 +20,9 @@ class SimulatedF05WorkoutProvider:
             planned_dt = datetime.now(UTC)
 
         now_utc = datetime.now(UTC)
-        # Advance by 1 day or enough to be in the future
+        # Advance by 1 day or enough to be in the future, respecting 90-day horizon
         candidate_dt = planned_dt + timedelta(days=1)
-        if candidate_dt <= now_utc:
+        if candidate_dt <= now_utc or candidate_dt > now_utc + timedelta(days=89):
             candidate_dt = now_utc + timedelta(days=1)
 
         # Handle timezone
@@ -37,8 +37,18 @@ class SimulatedF05WorkoutProvider:
             tz_name = "Asia/Ho_Chi_Minh"
 
         local_dt = candidate_dt.astimezone(tz)
-        # Set to standard morning slot 09:00:00 local time
-        local_start = local_dt.replace(hour=9, minute=0, second=0, microsecond=0)
+        hour = 9
+        pref = (request.preferredTimeOfDay or "").upper()
+        if pref == "AFTERNOON":
+            hour = 14
+        elif pref == "EVENING":
+            hour = 18
+
+        local_start = local_dt.replace(hour=hour, minute=0, second=0, microsecond=0)
+        for _ in range(90):
+            if local_start.astimezone(UTC) > now_utc:
+                break
+            local_start += timedelta(days=1)
         local_end = local_start + timedelta(hours=1)
 
         # Offset strings e.g. +07:00
@@ -79,7 +89,7 @@ class SimulatedF05WorkoutProvider:
 
         reasoning = [
             f"Session {request.sessionName or 'workout'} was missed or requested for reschedule.",
-            f"Next available slot on {local_start.strftime('%Y-%m-%d')} at 09:00 preserves recovery intervals.",
+            f"Next available slot on {local_start.strftime('%Y-%m-%d')} at {local_start.strftime('%H:%M')} preserves recovery intervals.",
             f"Supervision requirement {supervision} is preserved.",
         ]
 
@@ -95,7 +105,7 @@ class SimulatedF05WorkoutProvider:
 
         return F05WorkoutRescheduleResponse(
             recommendationType="WORKOUT_RESCHEDULE_PROPOSAL",
-            summary=f"Reschedule workout to {local_start.strftime('%Y-%m-%d 09:00')} ({tz_name})",
+            summary=f"Reschedule workout to {local_start.strftime('%Y-%m-%d %H:%M')} ({tz_name})",
             reasoning=reasoning,
             usedData=used_data,
             missingData=[],

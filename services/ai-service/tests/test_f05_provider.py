@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -64,6 +65,61 @@ def test_simulated_f05_provider_preserves_coach_required_invariant():
 
     assert response.recommendationType == "WORKOUT_RESCHEDULE_PROPOSAL"
     assert response.reschedule.supervisionRequirement == "COACH_REQUIRED"
+
+
+def test_simulated_f05_provider_preferred_time_of_day_and_future_slot():
+    provider = SimulatedF05WorkoutProvider()
+    request_afternoon = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Afternoon Conditioning",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        preferredTimeOfDay="AFTERNOON",
+    )
+    response_afternoon = asyncio.run(provider.generate_reschedule(request_afternoon))
+    assert response_afternoon.reschedule.destination.localStart.endswith("T14:00:00")
+    assert response_afternoon.reschedule.destination.localEnd.endswith("T15:00:00")
+
+    request_evening = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Evening Mobility",
+        supervisionRequirement="COACH_OPTIONAL",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        preferredTimeOfDay="evening",  # Test case-insensitivity
+    )
+    response_evening = asyncio.run(provider.generate_reschedule(request_evening))
+    assert response_evening.reschedule.destination.localStart.endswith("T18:00:00")
+    assert response_evening.reschedule.destination.localEnd.endswith("T19:00:00")
+    assert response_evening.reschedule.supervisionRequirement == "COACH_OPTIONAL"
+
+    # Test edge case: source far in future clamped to within 90-day horizon
+    request_far = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Far Future",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2027-11-16T02:00:00Z",
+        preferredTimeOfDay="morning",
+    )
+    response_far = asyncio.run(provider.generate_reschedule(request_far))
+    start_dt = datetime.fromisoformat(response_far.reschedule.destination.proposedStartAt)
+    now_dt = datetime.now(UTC)
+    assert start_dt > now_dt
+    assert start_dt < now_dt + timedelta(days=90)
 
 
 def test_internal_workout_reschedule_endpoint():

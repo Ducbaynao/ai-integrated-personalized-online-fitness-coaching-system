@@ -663,5 +663,108 @@
     },
     "migrationNeeded": false,
     "workingTreeChangesCommitted": false
+  },
+  "recoveryAvailabilityAppointmentUpdate": {
+    "reviewedAtUtc": "2026-11-17T00:35:00.000000+00:00",
+    "branch": "feat/f05-recovery-availability-appointment",
+    "baseCommit": "ff7cfc7c5076fe92bd8457d2a0c31709fb712652",
+    "suites": [
+      {
+        "name": "com.fitnesscoaching.platform.AiWorkoutRescheduleIntegrationTest",
+        "tests": 23,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "testMethods": [
+          "missedWorkoutStartedAfterGenerationCannotBeApplied",
+          "trainerPermissionRevoked_blocksAccept",
+          "concurrentAcceptAndReject_serializedConsistently(boolean)[1]",
+          "concurrentAcceptAndReject_serializedConsistently(boolean)[2]",
+          "idempotentAcceptRetry_replaysReceipt_T06_T25(boolean)[1]",
+          "idempotentAcceptRetry_replaysReceipt_T06_T25(boolean)[2]",
+          "expiredProposal_failsAndMarksExpired_T23",
+          "coachingPeriodChanged_abortsAccept",
+          "unrelatedTrainer_blocked_T03",
+          "concurrentDoubleAccept_differentKeys_onlyOneSucceeds(boolean)[1]",
+          "concurrentDoubleAccept_differentKeys_onlyOneSucceeds(boolean)[2]",
+          "studentInHumanCoachMode_acceptBlocked_T02",
+          "occurrenceVersionConflict_failsAndRollsBack_T05",
+          "rejectReschedule_leavesWorkoutUnchanged",
+          "generateAndAcceptReschedule_selfDirected_success",
+          "generationRejectsUnfinishedWindowUnknownEndAndStartedSources",
+          "coachRequiredSession_withConfirmedAppointment_acceptsAndTransfersLink",
+          "coachRequiredSession_withoutAppointment_abortsWithConflict",
+          "linkedAppointmentChangedAfterGeneration_abortsAccept",
+          "workoutScheduleConflictOnDestinationSlot_abortsAcceptWithOverlapConflict",
+          "acceptReschedule_whenAuditFails_rollsBackEntireTransaction",
+          "getReschedule_whenExpiringConcurrentlyWithAccept_doesNotOverwriteAppliedStatus",
+          "concurrentGetAndAcceptNearExpiry_resolvesToConsistentTerminalState"
+        ]
+      },
+      {
+        "name": "com.fitnesscoaching.platform.AiWorkoutRescheduleRealFastApiIntegrationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.fitnesscoaching.platform.modules.ai.application.service.AiWorkoutRescheduleServiceUnitTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "testMethods": [
+          "acceptReschedule_whenOccurrenceNotScheduled_throwsLifecycleConflict_T05",
+          "generateReschedule_success",
+          "acceptReschedule_differingParametersSameKey_throwsConflict_T25",
+          "getReschedule_studentView_success",
+          "getReschedule_unrelatedActor_denied",
+          "acceptReschedule_whenHumanCoachMode_studentAcceptBlocked_T02",
+          "acceptReschedule_whenOccurrenceVersionConflict_throwsLifecycleConflict_T05",
+          "acceptReschedule_idempotentReplay_T06",
+          "acceptReschedule_whenSelfDirected_studentAcceptSucceeds_T01_T27",
+          "rejectReschedule_success",
+          "acceptReschedule_whenExpired_marksExpiredAndThrows_T23",
+          "acceptReschedule_whenUnrelatedTrainer_blocked_T03",
+          "getReschedule_whenExpired_marksExpiredIfPending",
+          "acceptReschedule_whenLinkedAppointmentChanged_throwsConflict"
+        ]
+      },
+      {
+        "name": "com.fitnesscoaching.platform.modules.ai.application.service.F05RuntimeOutputValidatorUnitTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "testMethods": [
+          "preservingCoachRequired_passes",
+          "nullSnapshot_fails",
+          "slotExceeding90Days_fails",
+          "emptyPayload_fails",
+          "mismatchedOccurrenceId_fails",
+          "pastProposedStart_fails",
+          "destinationEndBeforeStart_fails",
+          "dstGapNonexistentLocalTime_fails",
+          "validPayload_passes",
+          "invalidRecommendationType_fails",
+          "t10_degradingCoachRequired_fails",
+          "t10_degradingCoachRequiredToOptional_fails"
+        ]
+      },
+      {
+        "name": "com.fitnesscoaching.platform.WorkoutScheduleChangeIntegrationTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "f05BackendSuiteTotal": 55,
+    "regressionSuiteTotal": 21,
+    "pythonPytestCount": 86,
+    "pythonRuff": "PASS",
+    "contractsValidation": "PASS",
+    "workingTreeChangesCommitted": false
   }
 }
