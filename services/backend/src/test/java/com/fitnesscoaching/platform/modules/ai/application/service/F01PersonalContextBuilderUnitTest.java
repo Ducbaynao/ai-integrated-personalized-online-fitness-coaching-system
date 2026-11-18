@@ -216,6 +216,24 @@ class F01PersonalContextBuilderUnitTest {
     }
 
     @Test
+    @DisplayName("Goal with null/unknown status is excluded from PersonalContext (invariant: missing data is unknown, never assumed active)")
+    void nullStatusGoal_excludedFromPersonalContext() {
+        UUID studentId = UUID.randomUUID();
+
+        FitnessGoal nullStatusGoal = new FitnessGoal(
+                UUID.randomUUID(), studentId, "Mục tiêu không rõ trạng thái", null,
+                studentId, Instant.now(), null, null, null, "Không xác định",
+                Instant.now(), Instant.now(), null
+        );
+        when(goalUseCase.getCurrentFitnessGoal(studentId)).thenReturn(Optional.of(nullStatusGoal));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(Optional.empty());
+
+        PersonalContext ctx = builder.buildPersonalContext(studentId, "STUDENT", null);
+
+        assertThat(ctx.activeGoal()).isNull();
+    }
+
+    @Test
     @DisplayName("Workout plan query exception does not fail personal context building, leaves plan name null")
     void workoutPlanQueryFailure_handledGracefully() {
         UUID studentId = UUID.randomUUID();

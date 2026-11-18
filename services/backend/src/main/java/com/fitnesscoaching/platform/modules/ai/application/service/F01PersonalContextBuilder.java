@@ -8,6 +8,7 @@ import com.fitnesscoaching.platform.modules.coaching.application.port.in.Current
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.CurrentCoachingContext;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
+import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.GetStudentProfileUseCase;
 import com.fitnesscoaching.platform.modules.student.domain.StudentProfile;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
@@ -100,7 +101,7 @@ public class F01PersonalContextBuilder {
                 Optional<FitnessGoal> goalOpt = goalProvider.getIfAvailable().getCurrentFitnessGoal(effectiveStudentId);
                 if (goalOpt.isPresent()) {
                     FitnessGoal goal = goalOpt.get();
-                    if (goal.status() == null || "ACTIVE".equalsIgnoreCase(goal.status().name())) {
+                    if (goal.status() == GoalStatus.ACTIVE) {
                         String goalType = goal.title() != null ? goal.title() : "GENERAL_FITNESS";
                         int version = goal.currentVersion() != null ? goal.currentVersion().versionNumber() : 1;
                         String targetSummary = goal.statusReason();

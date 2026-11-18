@@ -1153,4 +1153,45 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
     }
+
+    @Test
+    @DisplayName("21. Trainer query for general knowledge without studentId succeeds (200 OK)")
+    void trainerQuery_generalKnowledgeWithoutStudentId_succeeds() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Khuyến nghị thời gian nghỉ giữa các hiệp tập cho bài Squat là bao lâu?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                null,
+                false
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.resultType", is("INFORMATION")));
+    }
+
+    @Test
+    @DisplayName("22. Trainer requesting personalized context without studentId fails with 400 VALIDATION_FAILED")
+    void trainerQuery_personalizedWithoutStudentId_failsValidation() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Khuyến nghị thời gian nghỉ giữa các hiệp tập cho học viên?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                null,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
 }
