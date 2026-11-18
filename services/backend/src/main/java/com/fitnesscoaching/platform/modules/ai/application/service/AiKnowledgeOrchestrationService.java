@@ -381,9 +381,13 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                 // before releasing AI generated answer and citations to the caller.
                 aiRunUseCase.revalidateActorAuthorization(actorId);
 
-                // If personalized context was included for a student under human coaching, re-verify Trainer authority (T04)
+                // If personalized context was included for a student under human coaching, re-verify Trainer authority and granular permissions (T04)
                 if (envelope.personalContext() != null && "TRAINER".equals(envelope.actor().role()) && personalContextBuilder != null) {
-                    personalContextBuilder.validateTrainerAuthority(actorId, envelope.personalContext().studentId());
+                    UUID studentId = envelope.personalContext().studentId();
+                    personalContextBuilder.validateTrainerAuthority(actorId, studentId);
+                    boolean hadGoal = envelope.personalContext().activeGoal() != null;
+                    boolean hadPlan = envelope.personalContext().currentActivePlanName() != null;
+                    personalContextBuilder.validateGranularSharingAuthority(actorId, studentId, hadGoal, hadPlan);
                 }
 
                 return serviceResponse;

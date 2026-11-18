@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -150,15 +151,25 @@ public class AiRunF01Service implements AiRunF01UseCase {
         }
         String inputPayloadJson = toJson(inputMap);
 
+        // 6a. Resolve acting role for dual-role accounts (STUDENT + TRAINER)
+        String actingRole;
+        if (command.studentId() != null && !command.studentId().equals(actorId)) {
+            // Requesting for another student: must act as TRAINER if permitted
+            actingRole = isTrainer ? "TRAINER" : "STUDENT";
+        } else {
+            // Requesting for self or general query
+            actingRole = isStudent ? "STUDENT" : "TRAINER";
+        }
+
         // 6b. Build personal context only if explicitly requested
         F01InternalContextEnvelope.PersonalContext personalContext = null;
         if (Boolean.TRUE.equals(command.includePersonalContext()) && personalContextBuilder != null) {
             personalContext = personalContextBuilder.buildPersonalContext(
                     actorId,
-                    isStudent ? "STUDENT" : "TRAINER",
+                    actingRole,
                     command.studentId()
             );
-        } else if (isStudent && command.studentId() != null && !command.studentId().equals(actorId)) {
+        } else if ("STUDENT".equals(actingRole) && command.studentId() != null && !command.studentId().equals(actorId)) {
             // Even when includePersonalContext is false/omitted, a Student must not query with another Student's ID
             throw new AiRunAccessDeniedException("Student is not authorized to query another student's personal context");
         }
@@ -185,7 +196,7 @@ public class AiRunF01Service implements AiRunF01UseCase {
         F01InternalContextEnvelope envelope = envelopeBuilder.build(
                 runId,
                 actorId,
-                isStudent ? "STUDENT" : "TRAINER",
+                actingRole,
                 trimmedQuestion,
                 language,
                 command.correlationId(),
@@ -249,13 +260,35 @@ public class AiRunF01Service implements AiRunF01UseCase {
             throw new AiRunAccessDeniedException("Access denied: only the run owner can access this AI Run");
         }
 
-        // T04 Readback Guard: If the actor requested the run as TRAINER and the run contained personal context for a student,
-        // verify that the trainer STILL retains active authorized coaching authority over that student.
-        if (personalContextBuilder != null && userRoleQuery.hasActiveRole(actorId, "TRAINER")) {
+        // T04 Readback Guard: If the run contained personal context for a student other than the actor,
+        // verify that the actor STILL retains active TRAINER capability, active coaching authority over that student,
+        // and granular sharing permissions for any context data sources included in the run.
+        if (personalContextBuilder != null) {
             List<AiRunInputReference> inputRefs = provenanceRepository.findInputReferencesByRunId(runId);
             for (AiRunInputReference ref : inputRefs) {
                 if ("STUDENT".equals(ref.entityType()) && !actorId.equals(ref.entityId())) {
+                    if (!userRoleQuery.hasActiveRole(actorId, "TRAINER")) {
+                        throw new AiRunAccessDeniedException("Access denied: active trainer role required to access student context");
+                    }
                     personalContextBuilder.validateTrainerAuthority(actorId, ref.entityId());
+
+                    // Check snapshot to determine if goal or plan was included in this run's context
+                    boolean hadGoal = false;
+                    boolean hadPlan = false;
+                    Optional<AiContextSnapshot> snapshotOpt = provenanceRepository.findSnapshotByRunId(runId);
+                    if (snapshotOpt.isPresent() && snapshotOpt.get().contextPayload() != null) {
+                        try {
+                            JsonNode root = objectMapper.readTree(snapshotOpt.get().contextPayload());
+                            JsonNode personalCtxNode = root.get("personalContext");
+                            if (personalCtxNode != null && !personalCtxNode.isNull()) {
+                                hadGoal = personalCtxNode.hasNonNull("activeGoal");
+                                hadPlan = personalCtxNode.hasNonNull("currentActivePlanName");
+                            }
+                        } catch (Exception e) {
+                            log.debug("Failed to inspect context snapshot for run {}: {}", runId, e.getMessage());
+                        }
+                    }
+                    personalContextBuilder.validateGranularSharingAuthority(actorId, ref.entityId(), hadGoal, hadPlan);
                 }
             }
         }

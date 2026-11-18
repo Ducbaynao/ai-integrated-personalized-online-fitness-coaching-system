@@ -425,6 +425,94 @@ class AiP2M2ImportantFlowsUnitTest {
         }
 
         @Test
+        @DisplayName("Thu hồi quyền FITNESS_GOAL/VIEW khi provider đang chạy: chặn trả output (T04 pre-delivery)")
+        void inFlightGranularSharingRevocation_blocksDelivery() {
+            when(featureControlUseCase.isF01Enabled()).thenReturn(true);
+            UUID actorId = UUID.randomUUID();
+            UUID runId = UUID.randomUUID();
+
+            AiRun queuedRun = AiRun.builder()
+                    .id(runId)
+                    .requestedBy(actorId)
+                    .status(AiRunStatus.QUEUED)
+                    .requestType("F01_GENERAL_KNOWLEDGE")
+                    .purpose("BUSINESS_ASSISTANCE")
+                    .evaluationOnly(false)
+                    .queuedAt(Instant.now())
+                    .createdAt(Instant.now())
+                    .build();
+
+            UUID correlationId = UUID.randomUUID();
+            UUID studentId = UUID.randomUUID();
+            F01InternalContextEnvelope envelope = new F01InternalContextEnvelope(
+                    runId,
+                    "F01_GENERAL_KNOWLEDGE",
+                    "1.0.0",
+                    correlationId,
+                    new F01InternalContextEnvelope.ActorContext(actorId, "TRAINER"),
+                    "GENERAL_FITNESS_EXPLANATION",
+                    List.of("READ_INFORMATION"),
+                    Instant.now().toString(),
+                    "Tư vấn kỹ thuật bài tập cho học viên",
+                    "vi",
+                    null,
+                    new F01InternalContextEnvelope.KnowledgeScopeContext("ACTIVE", List.of("ISSN-PROTEIN-EXERCISE-2017")),
+                    new F01InternalContextEnvelope.PersonalContext(
+                            studentId, "HUMAN_COACH", "INTERMEDIATE",
+                            new F01InternalContextEnvelope.ActiveGoalContext("Giảm mỡ", null, 1),
+                            null, null, null
+                    )
+            );
+
+            when(aiRunUseCase.createF01RunContext(eq(actorId), any()))
+                    .thenReturn(new AiRunF01UseCase.CreatedF01RunContext(queuedRun, envelope));
+
+            F01KnowledgeQueryResponse fakeAiResponse = new F01KnowledgeQueryResponse(
+                    runId,
+                    correlationId,
+                    "SUCCEEDED",
+                    "INFORMATION",
+                    "NONE",
+                    "Kỹ thuật Bench Press chuẩn theo hướng dẫn.",
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Instant.now().toString(),
+                    new F01KnowledgeQueryResponse.UsageDto(250, 100, 350, 500),
+                    null,
+                    null
+            );
+
+            when(aiServiceClient.queryKnowledge(envelope)).thenReturn(fakeAiResponse);
+            when(runtimeValidator.validate(fakeAiResponse, envelope))
+                    .thenReturn(new F01RuntimeOutputValidator.ValidationResult(true, null));
+
+            // FITNESS_GOAL sharing revoked while provider was running
+            doThrow(new AiRunAccessDeniedException("Access denied: FITNESS_GOAL sharing permission has been revoked or is inactive"))
+                    .when(personalContextBuilder).validateGranularSharingAuthority(actorId, studentId, true, false);
+
+            F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                    "Tư vấn kỹ thuật bài tập cho học viên",
+                    "vi",
+                    null,
+                    correlationId,
+                    studentId,
+                    true
+            );
+
+            assertThatThrownBy(() -> orchestrationService.queryKnowledge(actorId, request))
+                    .isInstanceOf(AiRunAccessDeniedException.class)
+                    .hasMessageContaining("FITNESS_GOAL sharing permission has been revoked");
+
+            // Verify run was completed with usage tokens to prevent orphan run
+            verify(aiRunUseCase).completeF01Run(argThat(cmd ->
+                    cmd.runId().equals(runId)
+                            && cmd.terminalStatus() == AiRunStatus.SUCCEEDED
+                            && cmd.totalTokens() == 350
+            ));
+        }
+
+        @Test
         @DisplayName("Nếu recovery kết thúc run trước completion, giữ đúng cơ chế lifecycle conflict")
         void inFlightRecovery_conflictPreserved() {
             when(featureControlUseCase.isF01Enabled()).thenReturn(true);
