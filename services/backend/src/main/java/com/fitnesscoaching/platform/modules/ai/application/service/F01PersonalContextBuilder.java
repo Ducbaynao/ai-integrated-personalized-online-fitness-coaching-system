@@ -227,19 +227,27 @@ public class F01PersonalContextBuilder {
             throw new AiRunAccessDeniedException("Access denied: coaching authority evaluation unavailable");
         }
         CoachingAuthorityQuery authorityQuery = coachingAuthorityQueryProvider.getIfAvailable();
-        if (hadGoalInContext) {
-            var goalDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
-                    trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW));
-            if (goalDecision == null || !goalDecision.allowed()) {
-                throw new AiRunAccessDeniedException("Access denied: FITNESS_GOAL sharing permission has been revoked or is inactive");
+        try {
+            if (hadGoalInContext) {
+                var goalDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                        trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW));
+                if (goalDecision == null || !goalDecision.allowed()) {
+                    throw new AiRunAccessDeniedException("Access denied: FITNESS_GOAL sharing permission has been revoked or is inactive");
+                }
             }
-        }
-        if (hadPlanInContext) {
-            var planDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
-                    trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW));
-            if (planDecision == null || !planDecision.allowed()) {
-                throw new AiRunAccessDeniedException("Access denied: WORKOUT_PLAN sharing permission has been revoked or is inactive");
+            if (hadPlanInContext) {
+                var planDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                        trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW));
+                if (planDecision == null || !planDecision.allowed()) {
+                    throw new AiRunAccessDeniedException("Access denied: WORKOUT_PLAN sharing permission has been revoked or is inactive");
+                }
             }
+        } catch (AiRunAccessDeniedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Failed to evaluate granular sharing authority for trainer {} on student {}: {}",
+                    trainerId, studentId, e.getMessage());
+            throw new AiRunAccessDeniedException("Access denied: error occurred while evaluating sharing permissions");
         }
     }
 }

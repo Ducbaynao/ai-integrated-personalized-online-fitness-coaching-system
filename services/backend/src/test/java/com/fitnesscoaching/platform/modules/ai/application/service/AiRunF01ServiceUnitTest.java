@@ -418,4 +418,81 @@ class AiRunF01ServiceUnitTest {
                 .isInstanceOf(AiRunAccessDeniedException.class)
                 .hasMessageContaining("WORKOUT_PLAN sharing permission has been revoked");
     }
+
+    @Test
+    @DisplayName("getF01Run: Corrupted snapshot payload does not crash server and still enforces trainer authority")
+    void getF01Run_corruptedSnapshot_doesNotCrashAndEnforcesTrainerAuthority() {
+        when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(actorId, "STUDENT")).thenReturn(false);
+        when(userRoleQuery.hasActiveRole(actorId, "TRAINER")).thenReturn(true);
+
+        AiRun historicalRun = AiRun.builder()
+                .id(runId)
+                .requestedBy(actorId)
+                .status(AiRunStatus.SUCCEEDED)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .queuedAt(Instant.now())
+                .createdAt(Instant.now())
+                .build();
+
+        when(runRepository.findById(runId)).thenReturn(Optional.of(historicalRun));
+
+        UUID studentId = UUID.randomUUID();
+        when(provenanceRepository.findInputReferencesByRunId(runId)).thenReturn(List.of(
+                new AiRunInputReference(runId, "STUDENT", studentId, "PERSONAL_CONTEXT_SUBJECT")
+        ));
+
+        // Corrupted JSON payload
+        when(provenanceRepository.findSnapshotByRunId(runId)).thenReturn(Optional.of(
+                new AiContextSnapshot(UUID.randomUUID(), runId, "1.0.0", "{corrupted-json", "{}", "{}", "{}", "hash", Instant.now())
+        ));
+
+        AiRun result = service.getF01Run(actorId, runId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(runId);
+        verify(personalContextBuilder).validateTrainerAuthority(actorId, studentId);
+        verify(personalContextBuilder).validateGranularSharingAuthority(actorId, studentId, false, false);
+    }
+
+    @Test
+    @DisplayName("getF01Run: Run without Goal or Plan in context is not blocked by revoked Goal/Plan sharing")
+    void getF01Run_runWithoutGoalOrPlan_notBlockedByRevokedSharing() {
+        when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(actorId, "STUDENT")).thenReturn(false);
+        when(userRoleQuery.hasActiveRole(actorId, "TRAINER")).thenReturn(true);
+
+        AiRun historicalRun = AiRun.builder()
+                .id(runId)
+                .requestedBy(actorId)
+                .status(AiRunStatus.SUCCEEDED)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .queuedAt(Instant.now())
+                .createdAt(Instant.now())
+                .build();
+
+        when(runRepository.findById(runId)).thenReturn(Optional.of(historicalRun));
+
+        UUID studentId = UUID.randomUUID();
+        when(provenanceRepository.findInputReferencesByRunId(runId)).thenReturn(List.of(
+                new AiRunInputReference(runId, "STUDENT", studentId, "PERSONAL_CONTEXT_SUBJECT")
+        ));
+
+        // Context with only trainingExperience, no activeGoal, no currentActivePlanName
+        String snapshotPayload = "{\"personalContext\":{\"studentId\":\"" + studentId + "\",\"trainingExperience\":\"BEGINNER\"}}";
+        when(provenanceRepository.findSnapshotByRunId(runId)).thenReturn(Optional.of(
+                new AiContextSnapshot(UUID.randomUUID(), runId, "1.0.0", snapshotPayload, "{}", "{}", "{}", "hash", Instant.now())
+        ));
+
+        AiRun result = service.getF01Run(actorId, runId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(runId);
+        verify(personalContextBuilder).validateTrainerAuthority(actorId, studentId);
+        verify(personalContextBuilder).validateGranularSharingAuthority(actorId, studentId, false, false);
+    }
 }
