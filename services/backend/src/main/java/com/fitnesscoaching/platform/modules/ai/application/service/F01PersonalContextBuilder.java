@@ -4,8 +4,12 @@ import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunValidationException;
 import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope.ActiveGoalContext;
 import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope.PersonalContext;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.CurrentCoachingContext;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.GoalStatus;
@@ -13,6 +17,7 @@ import com.fitnesscoaching.platform.modules.student.application.port.in.GetStude
 import com.fitnesscoaching.platform.modules.student.domain.StudentProfile;
 import com.fitnesscoaching.platform.modules.workout.application.model.WorkoutPlanViews.PlanDetail;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutPlanQueryUseCase;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,18 +42,43 @@ public class F01PersonalContextBuilder {
     private final ObjectProvider<GetStudentProfileUseCase> studentProfileProvider;
     private final ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider;
     private final ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider;
+    private final ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider;
+    private final ObjectProvider<UserRoleQuery> userRoleQueryProvider;
+
+    public F01PersonalContextBuilder(
+            CurrentCoachingContextQuery coachingContextQuery,
+            ObjectProvider<GetStudentProfileUseCase> studentProfileProvider,
+            ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider,
+            ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider
+    ) {
+        this(coachingContextQuery, studentProfileProvider, goalProvider, workoutPlanQueryProvider, null, null);
+    }
+
+    public F01PersonalContextBuilder(
+            CurrentCoachingContextQuery coachingContextQuery,
+            ObjectProvider<GetStudentProfileUseCase> studentProfileProvider,
+            ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider,
+            ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider,
+            ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider
+    ) {
+        this(coachingContextQuery, studentProfileProvider, goalProvider, workoutPlanQueryProvider, coachingAuthorityQueryProvider, null);
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
     public F01PersonalContextBuilder(
             @org.springframework.beans.factory.annotation.Autowired(required = false) CurrentCoachingContextQuery coachingContextQuery,
             ObjectProvider<GetStudentProfileUseCase> studentProfileProvider,
             ObjectProvider<GetCurrentFitnessGoalUseCase> goalProvider,
-            ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider
+            ObjectProvider<WorkoutPlanQueryUseCase> workoutPlanQueryProvider,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectProvider<UserRoleQuery> userRoleQueryProvider
     ) {
         this.coachingContextQuery = coachingContextQuery;
         this.studentProfileProvider = studentProfileProvider;
         this.goalProvider = goalProvider;
         this.workoutPlanQueryProvider = workoutPlanQueryProvider;
+        this.coachingAuthorityQueryProvider = coachingAuthorityQueryProvider;
+        this.userRoleQueryProvider = userRoleQueryProvider;
     }
 
     public PersonalContext buildPersonalContext(UUID actorId, String actorRole, UUID requestedStudentId) {
@@ -94,9 +124,37 @@ public class F01PersonalContextBuilder {
             }
         }
 
-        // 3. Active Goal
+        // Check domain sharing permissions for Trainer accessing Student data (fail closed)
+        boolean hasGoalAccess = actorId.equals(effectiveStudentId);
+        boolean hasPlanAccess = actorId.equals(effectiveStudentId);
+        if (!actorId.equals(effectiveStudentId)) {
+            if (coachingAuthorityQueryProvider != null && coachingAuthorityQueryProvider.getIfAvailable() != null) {
+                try {
+                    CoachingAuthorityQuery authorityQuery = coachingAuthorityQueryProvider.getIfAvailable();
+                    var goalDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                            actorId, effectiveStudentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW));
+                    hasGoalAccess = goalDecision != null && goalDecision.allowed();
+
+                    var planDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                            actorId, effectiveStudentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW));
+                    hasPlanAccess = planDecision != null && planDecision.allowed();
+                } catch (Exception e) {
+                    log.warn("Failed to evaluate coaching sharing authority for trainer {} on student {}: {}",
+                            actorId, effectiveStudentId, e.getMessage());
+                    hasGoalAccess = false;
+                    hasPlanAccess = false;
+                }
+            } else {
+                log.warn("CoachingAuthorityQuery is unavailable; defaulting to fail-closed for trainer {} on student {}",
+                        actorId, effectiveStudentId);
+                hasGoalAccess = false;
+                hasPlanAccess = false;
+            }
+        }
+
+        // 3. Active Goal (requires FITNESS_GOAL sharing grant)
         ActiveGoalContext activeGoal = null;
-        if (goalProvider != null && goalProvider.getIfAvailable() != null) {
+        if (hasGoalAccess && goalProvider != null && goalProvider.getIfAvailable() != null) {
             try {
                 Optional<FitnessGoal> goalOpt = goalProvider.getIfAvailable().getCurrentFitnessGoal(effectiveStudentId);
                 if (goalOpt.isPresent()) {
@@ -113,9 +171,9 @@ public class F01PersonalContextBuilder {
             }
         }
 
-        // 4. Active Workout Plan name
+        // 4. Active Workout Plan name (requires WORKOUT_PLAN sharing grant)
         String activePlanName = null;
-        if (workoutPlanQueryProvider != null && workoutPlanQueryProvider.getIfAvailable() != null) {
+        if (hasPlanAccess && workoutPlanQueryProvider != null && workoutPlanQueryProvider.getIfAvailable() != null) {
             try {
                 Optional<PlanDetail> planOpt = workoutPlanQueryProvider.getIfAvailable().findActive(actorId, effectiveStudentId);
                 if (planOpt.isPresent() && planOpt.get().plan() != null) {
@@ -138,6 +196,12 @@ public class F01PersonalContextBuilder {
     }
 
     public void validateTrainerAuthority(UUID trainerId, UUID studentId) {
+        if (userRoleQueryProvider != null && userRoleQueryProvider.getIfAvailable() != null) {
+            UserRoleQuery userRoleQuery = userRoleQueryProvider.getIfAvailable();
+            if (!userRoleQuery.hasActiveRole(trainerId, "TRAINER")) {
+                throw new AiRunAccessDeniedException("Access denied: active trainer role required to access student context");
+            }
+        }
         if (coachingContextQuery == null) {
             throw new AiRunAccessDeniedException("Coaching context query unavailable");
         }
@@ -151,6 +215,39 @@ public class F01PersonalContextBuilder {
         }
         if (ctx.periodId() == null) {
             throw new AiRunAccessDeniedException("No active coaching period for student: " + studentId);
+        }
+    }
+
+    public void validateGranularSharingAuthority(UUID trainerId, UUID studentId, boolean hadGoalInContext, boolean hadPlanInContext) {
+        if (!hadGoalInContext && !hadPlanInContext) {
+            return;
+        }
+        if (coachingAuthorityQueryProvider == null || coachingAuthorityQueryProvider.getIfAvailable() == null) {
+            log.warn("CoachingAuthorityQuery unavailable when revalidating granular sharing for trainer {} on student {}", trainerId, studentId);
+            throw new AiRunAccessDeniedException("Access denied: coaching authority evaluation unavailable");
+        }
+        CoachingAuthorityQuery authorityQuery = coachingAuthorityQueryProvider.getIfAvailable();
+        try {
+            if (hadGoalInContext) {
+                var goalDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                        trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW));
+                if (goalDecision == null || !goalDecision.allowed()) {
+                    throw new AiRunAccessDeniedException("Access denied: FITNESS_GOAL sharing permission has been revoked or is inactive");
+                }
+            }
+            if (hadPlanInContext) {
+                var planDecision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                        trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW));
+                if (planDecision == null || !planDecision.allowed()) {
+                    throw new AiRunAccessDeniedException("Access denied: WORKOUT_PLAN sharing permission has been revoked or is inactive");
+                }
+            }
+        } catch (AiRunAccessDeniedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Failed to evaluate granular sharing authority for trainer {} on student {}: {}",
+                    trainerId, studentId, e.getMessage());
+            throw new AiRunAccessDeniedException("Access denied: error occurred while evaluating sharing permissions");
         }
     }
 }

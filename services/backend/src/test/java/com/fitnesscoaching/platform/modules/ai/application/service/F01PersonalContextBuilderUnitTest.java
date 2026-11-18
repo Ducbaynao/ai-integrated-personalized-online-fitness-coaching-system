@@ -3,9 +3,15 @@ package com.fitnesscoaching.platform.modules.ai.application.service;
 import com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException;
 import com.fitnesscoaching.platform.common.exception.AiRunValidationException;
 import com.fitnesscoaching.platform.modules.ai.domain.F01InternalContextEnvelope.PersonalContext;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.CurrentCoachingContext;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery.Mode;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityReason;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
 import com.fitnesscoaching.platform.modules.goal.application.port.in.GetCurrentFitnessGoalUseCase;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoal;
 import com.fitnesscoaching.platform.modules.goal.domain.FitnessGoalVersion;
@@ -244,6 +250,238 @@ class F01PersonalContextBuilderUnitTest {
 
         PersonalContext ctx = builder.buildPersonalContext(studentId, "STUDENT", null);
 
+        assertThat(ctx.currentActivePlanName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Trainer accessing Student personal context respects domain sharing permissions (revoked FITNESS_GOAL or WORKOUT_PLAN excluded)")
+    void trainer_sharingPermissionDenied_excludesGoalAndPlan() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        CurrentCoachingContext coachingCtx = new CurrentCoachingContext(
+                UUID.randomUUID(), Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, Instant.now(), null
+        );
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(Optional.of(coachingCtx));
+
+        // Mock CoachingAuthorityQuery denying FITNESS_GOAL and WORKOUT_PLAN
+        CoachingAuthorityQuery authorityQuery = mock(CoachingAuthorityQuery.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CoachingAuthorityQuery> authorityProvider = mock(ObjectProvider.class);
+        when(authorityProvider.getIfAvailable()).thenReturn(authorityQuery);
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW))))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW))))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                authorityProvider
+        );
+
+        PersonalContext ctx = guardedBuilder.buildPersonalContext(trainerId, "TRAINER", studentId);
+
+        assertThat(ctx.activeGoal()).isNull();
+        assertThat(ctx.currentActivePlanName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Trainer accessing Student personal context with allowed sharing permissions includes Goal and Plan")
+    void trainer_sharingPermissionAllowed_includesGoalAndPlan() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        CurrentCoachingContext coachingCtx = new CurrentCoachingContext(
+                UUID.randomUUID(), Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, Instant.now(), null
+        );
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(Optional.of(coachingCtx));
+
+        FitnessGoalVersion goalVersion = new FitnessGoalVersion(
+                UUID.randomUUID(), UUID.randomUUID(), 1, LocalDate.now(), LocalDate.now().plusMonths(3),
+                90, Instant.now(), null, null, null, null, studentId, null, Instant.now(), null,
+                null, null, null, null
+        );
+        FitnessGoal goal = new FitnessGoal(
+                UUID.randomUUID(), studentId, "Giảm mỡ", GoalStatus.ACTIVE,
+                studentId, Instant.now(), null, null, null, "Mục tiêu giảm 5kg",
+                Instant.now(), Instant.now(), goalVersion
+        );
+        when(goalUseCase.getCurrentFitnessGoal(studentId)).thenReturn(Optional.of(goal));
+
+        PlanDetail planDetail = mock(PlanDetail.class);
+        PlanSummary planSummary = mock(PlanSummary.class);
+        when(planSummary.name()).thenReturn("Giáo án tăng cơ");
+        when(planDetail.plan()).thenReturn(planSummary);
+        when(workoutPlanQueryUseCase.findActive(trainerId, studentId)).thenReturn(Optional.of(planDetail));
+
+        CoachingAuthorityQuery authorityQuery = mock(CoachingAuthorityQuery.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CoachingAuthorityQuery> authorityProvider = mock(ObjectProvider.class);
+        when(authorityProvider.getIfAvailable()).thenReturn(authorityQuery);
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW))))
+                .thenReturn(new AuthorityDecision(true, AuthorityReason.ALLOWED, null, 1, null, null, 1, DataAccessLevel.VIEW, null, null));
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW))))
+                .thenReturn(new AuthorityDecision(true, AuthorityReason.ALLOWED, null, 1, null, null, 1, DataAccessLevel.VIEW, null, null));
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                authorityProvider
+        );
+
+        PersonalContext ctx = guardedBuilder.buildPersonalContext(trainerId, "TRAINER", studentId);
+
+        assertThat(ctx.activeGoal()).isNotNull();
+        assertThat(ctx.activeGoal().goalType()).isEqualTo("Giảm mỡ");
+        assertThat(ctx.currentActivePlanName()).isEqualTo("Giáo án tăng cơ");
+    }
+
+    @Test
+    @DisplayName("validateTrainerAuthority with revoked TRAINER role throws 403 AiRunAccessDeniedException")
+    void validateTrainerAuthority_roleRevoked_throwsAccessDenied() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery userRoleQuery =
+                mock(com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery.class);
+        when(userRoleQuery.hasActiveRole(trainerId, "TRAINER")).thenReturn(false);
+
+        @SuppressWarnings("unchecked")
+        ObjectProvider<com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery> roleProvider = mock(ObjectProvider.class);
+        when(roleProvider.getIfAvailable()).thenReturn(userRoleQuery);
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                null,
+                roleProvider
+        );
+
+        assertThatThrownBy(() -> guardedBuilder.validateTrainerAuthority(trainerId, studentId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("active trainer role required to access student context");
+    }
+
+    @Test
+    @DisplayName("validateGranularSharingAuthority throws 403 when FITNESS_GOAL sharing is revoked")
+    void validateGranularSharingAuthority_goalRevoked_throwsAccessDenied() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        CoachingAuthorityQuery authorityQuery = mock(CoachingAuthorityQuery.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CoachingAuthorityQuery> authorityProvider = mock(ObjectProvider.class);
+        when(authorityProvider.getIfAvailable()).thenReturn(authorityQuery);
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.FITNESS_GOAL, DataAccessLevel.VIEW))))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                authorityProvider
+        );
+
+        assertThatThrownBy(() -> guardedBuilder.validateGranularSharingAuthority(trainerId, studentId, true, false))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("FITNESS_GOAL sharing permission has been revoked or is inactive");
+    }
+
+    @Test
+    @DisplayName("validateGranularSharingAuthority throws 403 when WORKOUT_PLAN sharing is revoked")
+    void validateGranularSharingAuthority_planRevoked_throwsAccessDenied() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        CoachingAuthorityQuery authorityQuery = mock(CoachingAuthorityQuery.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CoachingAuthorityQuery> authorityProvider = mock(ObjectProvider.class);
+        when(authorityProvider.getIfAvailable()).thenReturn(authorityQuery);
+
+        when(authorityQuery.evaluateCurrent(eq(new AuthorityRequest(
+                trainerId, studentId, DataScope.WORKOUT_PLAN, DataAccessLevel.VIEW))))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                authorityProvider
+        );
+
+        assertThatThrownBy(() -> guardedBuilder.validateGranularSharingAuthority(trainerId, studentId, false, true))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("WORKOUT_PLAN sharing permission has been revoked or is inactive");
+    }
+
+    @Test
+    @DisplayName("validateGranularSharingAuthority throws 403 when CoachingAuthorityQuery is unavailable")
+    void validateGranularSharingAuthority_queryUnavailable_throwsAccessDenied() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                null
+        );
+
+        assertThatThrownBy(() -> guardedBuilder.validateGranularSharingAuthority(trainerId, studentId, true, false))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("coaching authority evaluation unavailable");
+    }
+
+    @Test
+    @DisplayName("buildPersonalContext: When CoachingAuthorityQuery throws an unexpected exception, fail closed safe (Goal & Plan null)")
+    void buildPersonalContext_authorityQueryThrows_failsClosedSafe() {
+        UUID trainerId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+
+        CurrentCoachingContext coachingCtx = new CurrentCoachingContext(
+                UUID.randomUUID(), Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, Instant.now(), null
+        );
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(Optional.of(coachingCtx));
+
+        CoachingAuthorityQuery authorityQuery = mock(CoachingAuthorityQuery.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CoachingAuthorityQuery> authorityProvider = mock(ObjectProvider.class);
+        when(authorityProvider.getIfAvailable()).thenReturn(authorityQuery);
+
+        when(authorityQuery.evaluateCurrent(any()))
+                .thenThrow(new RuntimeException("Database connection timeout during authority query"));
+
+        F01PersonalContextBuilder guardedBuilder = new F01PersonalContextBuilder(
+                coachingContextQuery,
+                studentProfileProvider,
+                goalProvider,
+                workoutPlanQueryProvider,
+                authorityProvider
+        );
+
+        PersonalContext ctx = guardedBuilder.buildPersonalContext(trainerId, "TRAINER", studentId);
+
+        assertThat(ctx.activeGoal()).isNull();
         assertThat(ctx.currentActivePlanName()).isNull();
     }
 }
