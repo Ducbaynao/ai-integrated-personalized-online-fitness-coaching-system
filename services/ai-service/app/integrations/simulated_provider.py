@@ -182,10 +182,22 @@ class SimulatedF01KnowledgeProvider(F01KnowledgeProvider):
                 )
 
             top_chunk = retrieval_res.chunks[0]
+            personal_note = ""
+            missing_personal: list[str] = []
+            if envelope.personalContext:
+                ctx = envelope.personalContext
+                goal_info = f", mục tiêu: {ctx.activeGoal.goalType}" if ctx.activeGoal else ""
+                if not ctx.activeGoal:
+                    missing_personal.append("Học viên chưa thiết lập Fitness Goal đang hoạt động.")
+                exp_info = f", kinh nghiệm: {ctx.trainingExperience}"
+                limitations_info = f", lưu ý hạn chế: {', '.join(ctx.injuriesOrLimitations)}" if ctx.injuriesOrLimitations else ""
+                personal_note = f" [Áp dụng cho học viên (chế độ: {ctx.coachingMode}{exp_info}{goal_info}{limitations_info})]"
+
             answer = (
                 f"Thông tin giải thích dựa trên tài liệu {top_chunk.documentCode} (phiên bản {top_chunk.version}): "
                 f"{top_chunk.snippet} "
                 "Tập luyện thể chất đúng kỹ thuật và phân bổ dinh dưỡng hợp lý theo khuyến nghị giúp tối ưu hóa sức khỏe và hiệu suất."
+                f"{personal_note}"
             )
 
             return F01KnowledgeQueryResult(
@@ -200,7 +212,7 @@ class SimulatedF01KnowledgeProvider(F01KnowledgeProvider):
                     "Khuyến nghị áp dụng cho người trưởng thành khỏe mạnh tham gia tập luyện thể chất.",
                     "Không thay thế tư vấn y khoa hoặc điều trị bệnh lý chuyên sâu.",
                 ],
-                missingData=[],
+                missingData=missing_personal,
                 asOf=now_str,
                 usage=UsageDto(
                     promptTokens=450,
@@ -246,6 +258,17 @@ class SimulatedF01KnowledgeProvider(F01KnowledgeProvider):
             quoteOrExcerpt="Khuyến nghị leucine tối thiểu 2.0 - 3.0g mỗi bữa để tối đa hóa MPS.",
         )
 
+        fallback_personal_note = ""
+        fallback_missing_personal: list[str] = []
+        if envelope.personalContext:
+            ctx = envelope.personalContext
+            goal_info = f", mục tiêu: {ctx.activeGoal.goalType}" if ctx.activeGoal else ""
+            if not ctx.activeGoal:
+                fallback_missing_personal.append("Học viên chưa thiết lập Fitness Goal đang hoạt động.")
+            exp_info = f", kinh nghiệm: {ctx.trainingExperience}"
+            limitations_info = f", lưu ý hạn chế: {', '.join(ctx.injuriesOrLimitations)}" if ctx.injuriesOrLimitations else ""
+            fallback_personal_note = f" [Áp dụng cho học viên (chế độ: {ctx.coachingMode}{exp_info}{goal_info}{limitations_info})]"
+
         return F01KnowledgeQueryResult(
             runId=envelope.requestId,
             correlationId=envelope.correlationId,
@@ -256,13 +279,14 @@ class SimulatedF01KnowledgeProvider(F01KnowledgeProvider):
                 "Thông tin giải thích nguyên tắc vận động và bổ sung dinh dưỡng dựa trên tài liệu "
                 "ISSN 2017 và WHO 2020. Để tối ưu hóa tổng hợp protein cơ bắp (MPS), nên phân bổ lượng "
                 "protein đều qua các bữa ăn trong ngày kèm theo tập luyện kháng lực đều đặn."
+                f"{fallback_personal_note}"
             ),
             citations=[citation],
             limitations=[
                 "Khuyến nghị áp dụng cho người trưởng thành khỏe mạnh tham gia tập luyện kháng lực.",
                 "Không thay thế tư vấn y khoa hoặc dinh dưỡng lâm sàng cho người có bệnh lý thận.",
             ],
-            missingData=[],
+            missingData=fallback_missing_personal,
             asOf=now_str,
             usage=UsageDto(
                 promptTokens=520,

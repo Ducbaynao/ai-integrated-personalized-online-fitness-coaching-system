@@ -27,6 +27,26 @@ class KnowledgeScopeContext(BaseModel):
     allowedSourceIds: list[str] = Field(default_factory=list)
 
 
+class ActiveGoalContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    goalType: str
+    targetSummary: str | None = None
+    version: int | None = Field(default=None, ge=1)
+
+
+class PersonalContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    studentId: UUID
+    coachingMode: Literal["SELF_DIRECTED", "HUMAN_COACH"]
+    trainingExperience: Literal["BEGINNER", "INTERMEDIATE", "ADVANCED", "UNKNOWN"]
+    activeGoal: ActiveGoalContext | None = None
+    injuriesOrLimitations: list[str] | None = None
+    availableEquipment: list[str] | None = None
+    currentActivePlanName: str | None = None
+
+
 class F01InternalContextEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -42,6 +62,7 @@ class F01InternalContextEnvelope(BaseModel):
     language: Literal["vi", "en"]
     exerciseContext: ExerciseContext | None = None
     knowledgeScope: KnowledgeScopeContext
+    personalContext: PersonalContext | None = None
 
 
 class LocatorDto(BaseModel):

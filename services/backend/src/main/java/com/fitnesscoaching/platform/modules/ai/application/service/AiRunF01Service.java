@@ -49,7 +49,29 @@ public class AiRunF01Service implements AiRunF01UseCase {
     private final UserRoleQuery userRoleQuery;
     private final ExerciseCatalogRepository exerciseCatalogRepository;
     private final F01InternalEnvelopeBuilder envelopeBuilder;
+    private final F01PersonalContextBuilder personalContextBuilder;
     private final ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiRunF01Service(
+            AiRunRepository runRepository,
+            AiProvenanceRepository provenanceRepository,
+            UserAccountStatusQuery accountStatusQuery,
+            UserRoleQuery userRoleQuery,
+            ExerciseCatalogRepository exerciseCatalogRepository,
+            F01InternalEnvelopeBuilder envelopeBuilder,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) F01PersonalContextBuilder personalContextBuilder,
+            ObjectMapper objectMapper
+    ) {
+        this.runRepository = runRepository;
+        this.provenanceRepository = provenanceRepository;
+        this.accountStatusQuery = accountStatusQuery;
+        this.userRoleQuery = userRoleQuery;
+        this.exerciseCatalogRepository = exerciseCatalogRepository;
+        this.envelopeBuilder = envelopeBuilder;
+        this.personalContextBuilder = personalContextBuilder;
+        this.objectMapper = objectMapper;
+    }
 
     public AiRunF01Service(
             AiRunRepository runRepository,
@@ -60,13 +82,7 @@ public class AiRunF01Service implements AiRunF01UseCase {
             F01InternalEnvelopeBuilder envelopeBuilder,
             ObjectMapper objectMapper
     ) {
-        this.runRepository = runRepository;
-        this.provenanceRepository = provenanceRepository;
-        this.accountStatusQuery = accountStatusQuery;
-        this.userRoleQuery = userRoleQuery;
-        this.exerciseCatalogRepository = exerciseCatalogRepository;
-        this.envelopeBuilder = envelopeBuilder;
-        this.objectMapper = objectMapper;
+        this(runRepository, provenanceRepository, accountStatusQuery, userRoleQuery, exerciseCatalogRepository, envelopeBuilder, null, objectMapper);
     }
 
     @Override
@@ -126,7 +142,26 @@ public class AiRunF01Service implements AiRunF01UseCase {
         if (command.correlationId() != null) {
             inputMap.put("correlationId", command.correlationId().toString());
         }
+        if (command.studentId() != null) {
+            inputMap.put("studentId", command.studentId().toString());
+        }
+        if (command.includePersonalContext() != null) {
+            inputMap.put("includePersonalContext", command.includePersonalContext());
+        }
         String inputPayloadJson = toJson(inputMap);
+
+        // 6b. Build personal context only if explicitly requested
+        F01InternalContextEnvelope.PersonalContext personalContext = null;
+        if (Boolean.TRUE.equals(command.includePersonalContext()) && personalContextBuilder != null) {
+            personalContext = personalContextBuilder.buildPersonalContext(
+                    actorId,
+                    isStudent ? "STUDENT" : "TRAINER",
+                    command.studentId()
+            );
+        } else if (isStudent && command.studentId() != null && !command.studentId().equals(actorId)) {
+            // Even when includePersonalContext is false/omitted, a Student must not query with another Student's ID
+            throw new AiRunAccessDeniedException("Student is not authorized to query another student's personal context");
+        }
 
         UUID runId = UUID.randomUUID();
         Instant now = Instant.now();
@@ -154,7 +189,8 @@ public class AiRunF01Service implements AiRunF01UseCase {
                 trimmedQuestion,
                 language,
                 command.correlationId(),
-                exerciseDetail
+                exerciseDetail,
+                personalContext
         );
 
         String contextPayloadJson = toJson(envelope);
@@ -173,10 +209,15 @@ public class AiRunF01Service implements AiRunF01UseCase {
         );
         provenanceRepository.saveSnapshot(snapshot);
 
+        List<AiRunInputReference> inputReferences = new java.util.ArrayList<>();
         if (command.exerciseId() != null) {
-            provenanceRepository.saveInputReferences(runId, List.of(
-                    new AiRunInputReference(runId, "EXERCISE", command.exerciseId(), "CATALOG_SUBJECT")
-            ));
+            inputReferences.add(new AiRunInputReference(runId, "EXERCISE", command.exerciseId(), "CATALOG_SUBJECT"));
+        }
+        if (personalContext != null) {
+            inputReferences.add(new AiRunInputReference(runId, "STUDENT", personalContext.studentId(), "PERSONAL_CONTEXT_SUBJECT"));
+        }
+        if (!inputReferences.isEmpty()) {
+            provenanceRepository.saveInputReferences(runId, inputReferences);
         }
 
         return new CreatedF01RunContext(created, envelope);
@@ -206,6 +247,17 @@ public class AiRunF01Service implements AiRunF01UseCase {
         // Enforce ownership: only the user who requested the run can view it
         if (run.requestedBy() == null || !run.requestedBy().equals(actorId)) {
             throw new AiRunAccessDeniedException("Access denied: only the run owner can access this AI Run");
+        }
+
+        // T04 Readback Guard: If the actor requested the run as TRAINER and the run contained personal context for a student,
+        // verify that the trainer STILL retains active authorized coaching authority over that student.
+        if (personalContextBuilder != null && userRoleQuery.hasActiveRole(actorId, "TRAINER")) {
+            List<AiRunInputReference> inputRefs = provenanceRepository.findInputReferencesByRunId(runId);
+            for (AiRunInputReference ref : inputRefs) {
+                if ("STUDENT".equals(ref.entityType()) && !actorId.equals(ref.entityId())) {
+                    personalContextBuilder.validateTrainerAuthority(actorId, ref.entityId());
+                }
+            }
         }
 
         return run;

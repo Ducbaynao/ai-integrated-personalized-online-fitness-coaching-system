@@ -85,6 +85,7 @@ class AiP2M2ImportantFlowsUnitTest {
     @Mock private ContentLifecycleUseCase contentLifecycleUseCase;
     @Mock private ExerciseCatalogRepository exerciseCatalogRepository;
     @Mock private F01InternalEnvelopeBuilder envelopeBuilder;
+    @Mock private F01PersonalContextBuilder personalContextBuilder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID actorId = UUID.randomUUID();
@@ -109,7 +110,8 @@ class AiP2M2ImportantFlowsUnitTest {
                 objectMapper,
                 aiProps,
                 runtimeValidator,
-                featureControlUseCase
+                featureControlUseCase,
+                personalContextBuilder
         );
 
         featureControlService = new AiFeatureControlService(
@@ -337,6 +339,88 @@ class AiP2M2ImportantFlowsUnitTest {
                     cmd.runId().equals(runId)
                             && cmd.terminalStatus() == AiRunStatus.SUCCEEDED
                             && cmd.totalTokens() == 450
+            ));
+        }
+
+        @Test
+        @DisplayName("Trainer authority revoked while AI provider is executing: persists run audit for billing/tokens, but blocks delivery (T04)")
+        void trainerRevokedInFlight_persistsRunAudit_blocksDelivery_T04() {
+            when(featureControlUseCase.isF01Enabled()).thenReturn(true);
+
+            AiRun queuedRun = AiRun.builder()
+                    .id(runId)
+                    .requestedBy(actorId)
+                    .status(AiRunStatus.QUEUED)
+                    .requestType("F01_GENERAL_KNOWLEDGE")
+                    .purpose("BUSINESS_ASSISTANCE")
+                    .evaluationOnly(false)
+                    .queuedAt(Instant.now())
+                    .createdAt(Instant.now())
+                    .build();
+
+            UUID correlationId = UUID.randomUUID();
+            UUID studentId = UUID.randomUUID();
+            F01InternalContextEnvelope envelope = new F01InternalContextEnvelope(
+                    runId,
+                    "F01_GENERAL_KNOWLEDGE",
+                    "1.0.0",
+                    correlationId,
+                    new F01InternalContextEnvelope.ActorContext(actorId, "TRAINER"),
+                    "GENERAL_FITNESS_EXPLANATION",
+                    List.of("READ_INFORMATION"),
+                    Instant.now().toString(),
+                    "Tư vấn kỹ thuật Bench Press cho học viên",
+                    "vi",
+                    null,
+                    new F01InternalContextEnvelope.KnowledgeScopeContext("ACTIVE", List.of("ISSN-PROTEIN-EXERCISE-2017")),
+                    new F01InternalContextEnvelope.PersonalContext(studentId, "HUMAN_COACH", "INTERMEDIATE", null, null, null, null)
+            );
+
+            when(aiRunUseCase.createF01RunContext(eq(actorId), any()))
+                    .thenReturn(new AiRunF01UseCase.CreatedF01RunContext(queuedRun, envelope));
+
+            F01KnowledgeQueryResponse fakeAiResponse = new F01KnowledgeQueryResponse(
+                    runId,
+                    correlationId,
+                    "SUCCEEDED",
+                    "INFORMATION",
+                    "NONE",
+                    "Kỹ thuật Bench Press chuẩn theo hướng dẫn.",
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Instant.now().toString(),
+                    new F01KnowledgeQueryResponse.UsageDto(250, 100, 350, 500),
+                    null,
+                    null
+            );
+
+            when(aiServiceClient.queryKnowledge(envelope)).thenReturn(fakeAiResponse);
+            when(runtimeValidator.validate(fakeAiResponse, envelope))
+                    .thenReturn(new F01RuntimeOutputValidator.ValidationResult(true, null));
+
+            // Coaching relationship revoked while provider was running
+            doThrow(new AiRunAccessDeniedException("Trainer lacks active coaching relationship with student"))
+                    .when(personalContextBuilder).validateTrainerAuthority(actorId, studentId);
+
+            F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                    "Tư vấn kỹ thuật Bench Press cho học viên",
+                    "vi",
+                    null,
+                    correlationId,
+                    studentId,
+                    true
+            );
+
+            assertThatThrownBy(() -> orchestrationService.queryKnowledge(actorId, request))
+                    .isInstanceOf(AiRunAccessDeniedException.class)
+                    .hasMessageContaining("Trainer lacks active coaching relationship");
+
+            // CRITICAL INVARIANT: The run was STILL completed in the database with usage tokens to prevent orphan run
+            verify(aiRunUseCase).completeF01Run(argThat(cmd ->
+                    cmd.runId().equals(runId)
+                            && cmd.terminalStatus() == AiRunStatus.SUCCEEDED
+                            && cmd.totalTokens() == 350
             ));
         }
 
