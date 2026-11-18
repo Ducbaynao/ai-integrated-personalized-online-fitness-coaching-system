@@ -1021,4 +1021,177 @@ class AiKnowledgeQueryOrchestrationIntegrationTest {
         );
         assertThat(count).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("16. Personalized inquiry for Student: succeeds, persists PersonalContext in snapshot and input references")
+    void personalizedQuery_student_success() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Làm sao để tập Squat an toàn với mục tiêu tăng cơ?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                STUDENT_USER_ID,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.resultType", is("INFORMATION")))
+                .andExpect(jsonPath("$.answer", notNullValue()))
+                .andExpect(jsonPath("$.citations", notNullValue()));
+
+        // Check snapshot contains personalContext
+        String snapshotJson = jdbcTemplate.queryForObject(
+                "SELECT context_payload FROM fitness.ai_context_snapshots ORDER BY created_at DESC LIMIT 1",
+                String.class
+        );
+        assertThat(snapshotJson).contains("personalContext");
+        assertThat(snapshotJson).contains(STUDENT_USER_ID.toString());
+
+        // Check input references include STUDENT
+        Integer studentRef = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM fitness.ai_run_input_references WHERE entity_type = 'STUDENT' AND entity_id = ?",
+                Integer.class,
+                STUDENT_USER_ID
+        );
+        assertThat(studentRef).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("17. Student attempting to query another student's personalized context: 403 AI_FORBIDDEN (T03)")
+    void studentQueryingAnotherStudent_forbidden_T03() throws Exception {
+        UUID otherStudentId = UUID.randomUUID();
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Làm sao để tập Squat an toàn với mục tiêu tăng cơ?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                otherStudentId,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("18. Trainer querying unassigned student: 403 AI_FORBIDDEN (T03)")
+    void trainerQueryingUnassignedStudent_forbidden_T03() throws Exception {
+        UUID unassignedStudentId = UUID.randomUUID();
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Tư vấn kỹ thuật Bench Press cho học viên mới",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                unassignedStudentId,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("19. Request with includePersonalContext=false treats query as general knowledge (no personalContext in snapshot)")
+    void queryWithIncludePersonalContextFalse_actsAsGeneralKnowledge() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Làm sao để tập Squat an toàn theo nguyên tắc chung?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                STUDENT_USER_ID,
+                false
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.resultType", is("INFORMATION")));
+
+        String snapshotJson = jdbcTemplate.queryForObject(
+                "SELECT context_payload FROM fitness.ai_context_snapshots ORDER BY created_at DESC LIMIT 1",
+                String.class
+        );
+        assertThat(snapshotJson).doesNotContain("personalContext");
+    }
+
+    @Test
+    @DisplayName("20. Student querying with another student's ID even with includePersonalContext=false is forbidden (403 AI_FORBIDDEN)")
+    void studentWithAnotherStudentId_includePersonalFalse_forbidden() throws Exception {
+        UUID otherStudentId = UUID.randomUUID();
+
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Làm sao để tập Squat an toàn theo nguyên tắc chung?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                otherStudentId,
+                false
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("21. Trainer query for general knowledge without studentId succeeds (200 OK)")
+    void trainerQuery_generalKnowledgeWithoutStudentId_succeeds() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Khuyến nghị thời gian nghỉ giữa các hiệp tập cho bài Squat là bao lâu?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                null,
+                false
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.resultType", is("INFORMATION")));
+    }
+
+    @Test
+    @DisplayName("22. Trainer requesting personalized context without studentId fails with 400 VALIDATION_FAILED")
+    void trainerQuery_personalizedWithoutStudentId_failsValidation() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Khuyến nghị thời gian nghỉ giữa các hiệp tập cho học viên?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                null,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode", is("VALIDATION_FAILED")));
+    }
 }

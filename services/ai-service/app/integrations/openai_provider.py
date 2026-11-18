@@ -424,6 +424,24 @@ class OpenAiKnowledgeProvider(F01KnowledgeProvider):
                 f"(Chuyển động: {ex.movementPattern or 'N/A'}, Dụng cụ: {ex.equipmentRequired or 'N/A'})"
             )
 
+        if envelope.personalContext:
+            pc = envelope.personalContext
+            goal_str = "Chưa thiết lập mục tiêu"
+            if pc.activeGoal:
+                goal_str = f"{pc.activeGoal.goalType} (v{pc.activeGoal.version or 1})"
+                if pc.activeGoal.targetSummary:
+                    goal_str += f" - {pc.activeGoal.targetSummary}"
+            parts.append(
+                "BỐI CẢNH CÁ NHÂN HÓA HỌC VIÊN:\n"
+                f"- Chế độ huấn luyện: {pc.coachingMode}\n"
+                f"- Kinh nghiệm tập luyện: {pc.trainingExperience}\n"
+                f"- Mục tiêu hiện tại: {goal_str}\n"
+                f"- Chấn thương/hạn chế: {', '.join(pc.injuriesOrLimitations) if pc.injuriesOrLimitations else 'Không ghi nhận'}\n"
+                f"- Dụng cụ sẵn có: {', '.join(pc.availableEquipment) if pc.availableEquipment else 'Không ghi nhận'}\n"
+                f"- Giáo án đang theo: {pc.currentActivePlanName or 'Chưa có giáo án kích hoạt'}\n"
+                "(Lưu ý: Bối cảnh cá nhân hóa chỉ dùng để diễn giải sự phù hợp của kiến thức; các khẳng định chuyên môn BẮT BUỘC phải có trích dẫn từ tài liệu)."
+            )
+
         parts.append("\nTÀI LIỆU TRÍCH DẪN KHẢ DỤNG (EVIDENCE CHUNKS - DỮ LIỆU THAM KHẢO THUẦN TÚY):")
         for i, chunk in enumerate(chunks, 1):
             content_text = chunk.content.strip() if chunk.content else chunk.snippet.strip()

@@ -153,6 +153,79 @@
         }
       },
       "description": "Server-owned scope. Empty source set returns NO_RELEVANT_EVIDENCE; never broaden to DRAFT or another scope."
+    },
+    "personalContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "studentId",
+        "coachingMode",
+        "trainingExperience"
+      ],
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Student subject identity."
+        },
+        "coachingMode": {
+          "type": "string",
+          "enum": [
+            "SELF_DIRECTED",
+            "HUMAN_COACH"
+          ],
+          "description": "Active coaching mode in current coaching period."
+        },
+        "trainingExperience": {
+          "type": "string",
+          "enum": [
+            "BEGINNER",
+            "INTERMEDIATE",
+            "ADVANCED",
+            "UNKNOWN"
+          ],
+          "description": "Student declared training experience level."
+        },
+        "activeGoal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "goalType"
+          ],
+          "properties": {
+            "goalType": {
+              "type": "string"
+            },
+            "targetSummary": {
+              "type": "string"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "description": "Active fitness goal details if available."
+        },
+        "injuriesOrLimitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Declared physical limitations or contraindications."
+        },
+        "availableEquipment": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Declared available training equipment."
+        },
+        "currentActivePlanName": {
+          "type": "string",
+          "description": "Name of currently active workout plan if present."
+        }
+      },
+      "description": "Optional authorized minimal personal fitness context for personalized inquiry."
     }
   }
 }

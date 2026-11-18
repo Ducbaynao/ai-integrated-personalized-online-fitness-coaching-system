@@ -8,6 +8,7 @@ import com.fitnesscoaching.platform.common.exception.AiRunValidationException;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiProvenanceRepository;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.AiRunRepository;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRun;
+import com.fitnesscoaching.platform.modules.ai.domain.AiRunInputReference;
 import com.fitnesscoaching.platform.modules.ai.domain.AiRunStatus;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.exercise.application.port.out.ExerciseCatalogRepository;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,6 +53,9 @@ class AiRunF01ServiceUnitTest {
     @Mock
     private F01InternalEnvelopeBuilder envelopeBuilder;
 
+    @Mock
+    private F01PersonalContextBuilder personalContextBuilder;
+
     private ObjectMapper objectMapper;
     private AiRunF01Service service;
 
@@ -67,6 +72,7 @@ class AiRunF01ServiceUnitTest {
                 userRoleQuery,
                 exerciseCatalogRepository,
                 envelopeBuilder,
+                personalContextBuilder,
                 objectMapper
         );
     }
@@ -211,5 +217,38 @@ class AiRunF01ServiceUnitTest {
 
         AiRun result = service.getF01Run(actorId, runId);
         assertThat(result).isSameAs(myRun);
+    }
+
+    @Test
+    @DisplayName("getF01Run: Trainer reading back historical run after coaching authority revoked throws AiRunAccessDeniedException (T04 readback guard)")
+    void getF01Run_trainerRevoked_throwsAccessDenied_T04() {
+        when(accountStatusQuery.getAccountStatus(actorId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(actorId, "STUDENT")).thenReturn(false);
+        when(userRoleQuery.hasActiveRole(actorId, "TRAINER")).thenReturn(true);
+
+        AiRun trainerRun = AiRun.builder()
+                .id(runId)
+                .requestedBy(actorId)
+                .status(AiRunStatus.SUCCEEDED)
+                .requestType("F01_GENERAL_KNOWLEDGE")
+                .purpose("BUSINESS_ASSISTANCE")
+                .evaluationOnly(false)
+                .queuedAt(Instant.now())
+                .createdAt(Instant.now())
+                .build();
+
+        when(runRepository.findById(runId)).thenReturn(Optional.of(trainerRun));
+
+        UUID studentId = UUID.randomUUID();
+        when(provenanceRepository.findInputReferencesByRunId(runId)).thenReturn(List.of(
+                new AiRunInputReference(runId, "STUDENT", studentId, "PERSONAL_CONTEXT_SUBJECT")
+        ));
+
+        org.mockito.Mockito.doThrow(new AiRunAccessDeniedException("Trainer lacks active coaching relationship"))
+                .when(personalContextBuilder).validateTrainerAuthority(actorId, studentId);
+
+        assertThatThrownBy(() -> service.getF01Run(actorId, runId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer lacks active coaching relationship");
     }
 }

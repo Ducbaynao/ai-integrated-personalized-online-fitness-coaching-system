@@ -35,6 +35,9 @@ test('valid F01 request passes schema validation', () => {
 
   const validWithEx = requestSchema(loadFixture('valid-request-with-exercise.json'));
   assert.equal(validWithEx, true);
+
+  const validWithPersonal = requestSchema(loadFixture('valid-request-with-personal-context.json'));
+  assert.equal(validWithPersonal, true);
 });
 
 test('invalid request: input with too short question is rejected', () => {
@@ -55,6 +58,10 @@ test('valid internal context envelope passes validation with whitelist allowedAc
   const data = loadFixture('valid-internal-envelope.json');
   const valid = envelopeSchema(data);
   assert.equal(valid, true);
+
+  const dataPersonal = loadFixture('valid-internal-envelope-with-personal-context.json');
+  const validPersonal = envelopeSchema(dataPersonal);
+  assert.equal(validPersonal, true);
 });
 
 test('valid INFORMATION result with properly structured citations passes validation', () => {

@@ -113,6 +113,7 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
         pb.directory(aiServiceDir);
         pb.environment().put("INTERNAL_SERVICE_KEY", SERVICE_KEY);
         pb.environment().put("F01_MOCK_ENABLED", "true");
+        pb.environment().put("F01_PROVIDER", "simulated");
         pb.environment().put("BACKEND_INTERNAL_RETRIEVAL_ENABLED", "true");
         pb.environment().put("BACKEND_BASE_URL", "http://127.0.0.1:" + springPort);
         pb.redirectErrorStream(true);
@@ -433,5 +434,30 @@ class AiKnowledgeQueryRealFastApiIntegrationTest {
                 .andExpect(jsonPath("$.runStatus", is("FAILED")))
                 .andExpect(jsonPath("$.reasonCode", is("MODEL_ERROR")))
                 .andExpect(jsonPath("$.error.code", is("MODEL_ERROR")));
+    }
+
+    @Test
+    @DisplayName("5. Real FastAPI: Success PERSONALIZED inquiry through HTTP to Uvicorn process")
+    void testRealFastApiPersonalizedInquiry() throws Exception {
+        F01KnowledgeQueryApiRequest request = new F01KnowledgeQueryApiRequest(
+                "Phân bổ lượng protein và leucine trong từng bữa ăn như thế nào để tối đa hóa MPS?",
+                "vi",
+                null,
+                UUID.randomUUID(),
+                STUDENT_USER_ID,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/ai/knowledge/query")
+                        .header("Authorization", "Bearer " + validJwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId", notNullValue()))
+                .andExpect(jsonPath("$.runStatus", is("SUCCEEDED")))
+                .andExpect(jsonPath("$.resultType", is("INFORMATION")))
+                .andExpect(jsonPath("$.answer", notNullValue()))
+                .andExpect(jsonPath("$.answer", org.hamcrest.Matchers.containsString("Áp dụng cho học viên")))
+                .andExpect(jsonPath("$.citations", notNullValue()));
     }
 }

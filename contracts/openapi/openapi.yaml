@@ -11164,6 +11164,16 @@ components:
             "type": "string",
             "format": "uuid",
             "description": "Optional client tracing ID; never an idempotency key."
+          },
+          "studentId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional Student ID. When queried by a Trainer, specifies the managed student. When queried by a Student, must match their own identity."
+          },
+          "includePersonalContext": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to incorporate authorized personal fitness context (goal, experience, limitations) into the explanation."
           }
         }
       }

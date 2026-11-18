@@ -14,7 +14,6 @@ import java.util.UUID;
  * Server-owned builder for F01 Internal Context Envelope.
  * Guarantees that envelope identity, purpose, whitelist actions, and knowledge scope
  * are constructed strictly from authoritative server-side domain state, never client input.
- * Excludes personal coaching context and proposal mutations.
  */
 @Component
 public class F01InternalEnvelopeBuilder {
@@ -31,6 +30,19 @@ public class F01InternalEnvelopeBuilder {
             String language,
             UUID correlationId,
             ExerciseCatalogDetail exerciseDetail
+    ) {
+        return build(runId, actorId, actorRole, question, language, correlationId, exerciseDetail, null);
+    }
+
+    public F01InternalContextEnvelope build(
+            UUID runId,
+            UUID actorId,
+            String actorRole,
+            String question,
+            String language,
+            UUID correlationId,
+            ExerciseCatalogDetail exerciseDetail,
+            F01InternalContextEnvelope.PersonalContext personalContext
     ) {
         if (runId == null) {
             throw new AiRunValidationException("runId is required to construct envelope");
@@ -78,7 +90,8 @@ public class F01InternalEnvelopeBuilder {
                 trimmedQuestion,
                 selectedLanguage,
                 exerciseContext,
-                knowledgeScope
+                knowledgeScope,
+                personalContext
         );
     }
 }

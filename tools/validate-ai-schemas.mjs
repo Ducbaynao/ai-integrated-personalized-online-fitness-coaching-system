@@ -79,7 +79,9 @@ if (fs.existsSync(fixturesDir)) {
     // Valid fixtures
     { file: 'valid-request.json', validator: requestValidator, expectValid: true, desc: 'Valid F01 general knowledge request' },
     { file: 'valid-request-with-exercise.json', validator: requestValidator, expectValid: true, desc: 'Valid F01 request pinned to exercise' },
+    { file: 'valid-request-with-personal-context.json', validator: requestValidator, expectValid: true, desc: 'Valid F01 request with authorized personal context flags' },
     { file: 'valid-internal-envelope.json', validator: internalEnvelopeValidator, expectValid: true, desc: 'Valid internal context envelope' },
+    { file: 'valid-internal-envelope-with-personal-context.json', validator: internalEnvelopeValidator, expectValid: true, desc: 'Valid internal context envelope with personal context' },
     { file: 'valid-information-result.json', validator: resultValidator, expectValid: true, desc: 'Valid INFORMATION result with structured citations' },
     { file: 'valid-insufficient-data-result.json', validator: resultValidator, expectValid: true, desc: 'Valid INSUFFICIENT_DATA result' },
     { file: 'valid-blocked-result.json', validator: resultValidator, expectValid: true, desc: 'Valid BLOCKED result (safety guardrail)' },
