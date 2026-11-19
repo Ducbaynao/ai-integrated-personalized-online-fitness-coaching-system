@@ -7,6 +7,8 @@ import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/co
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { ApiError } from '@/types/auth';
+import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWorkoutRescheduleModal';
+import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import type { PlannedWorkoutOccurrence } from '@/types/workoutSchedule';
 import { calendarWindow, formatTrainerScheduleTime, plannedWorkoutStatusLabels } from './scheduleDisplay';
 import { useTrainerWorkoutSchedule, workoutScheduleQueryKeys } from './workoutScheduleQueries';
@@ -18,7 +20,7 @@ function localIntent(value: string | null, offset: string | null, timezone: stri
   return `${value.replace('T', ' ')} · ${offset ? `UTC${offset}` : 'chưa có UTC offset'} · ${timezone || 'chưa có múi giờ gốc'}`;
 }
 
-function TrainerOccurrenceCard({ item, relationshipId, canContribute }: { item: PlannedWorkoutOccurrence; relationshipId: string; canContribute: boolean }) {
+function TrainerOccurrenceCard({ item, relationshipId, canContribute, canManage, onAiReschedule }: { item: PlannedWorkoutOccurrence; relationshipId: string; canContribute: boolean; canManage: boolean; onAiReschedule: (item: PlannedWorkoutOccurrence) => void }) {
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const router = useRouter();
   return <WorkoutCard testID={`trainer-calendar-occurrence-${item.occurrenceId}`}>
@@ -33,6 +35,8 @@ function TrainerOccurrenceCard({ item, relationshipId, canContribute }: { item: 
     {item.sessionSummary?.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {item.sessionSummary.focus}</Text> : null}
     {canContribute && item.status === 'SCHEDULED' ? <WorkoutButton testID={`trainer-propose-change-${item.occurrenceId}`} label="Đề xuất đổi hoặc hủy buổi này" secondary
       onPress={() => router.push(`/coaching/${relationshipId}/change-proposals/new?occurrenceId=${encodeURIComponent(item.occurrenceId)}` as never)} /> : null}
+    {canManage && item.status === 'SCHEDULED' ? <WorkoutButton testID={`f05-trainer-open-${item.occurrenceId}`}
+      label="AI đề xuất xếp lại buổi tập" secondary onPress={() => onAiReschedule(item)} /> : null}
   </WorkoutCard>;
 }
 
@@ -53,6 +57,8 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
   const canView = activeCapability === 'TRAINER' && relationship?.trainerId === trainerId && relationship.status === 'ACTIVE'
     && grant?.state === 'ALLOWED' && ['VIEW', 'CONTRIBUTE', 'MANAGE'].includes(grant.accessLevel ?? '');
   const canContribute = canView && ['CONTRIBUTE', 'MANAGE'].includes(grant?.accessLevel ?? '');
+  const canManage = canView && grant?.accessLevel === 'MANAGE' && relationshipQuery.data?.currentPeriod?.mode === 'HUMAN_COACH';
+  const [aiOccurrence, setAiOccurrence] = useState<PlannedWorkoutOccurrence | null>(null);
   const [verifiedScope, setVerifiedScope] = useState('');
   const [deniedScope, setDeniedScope] = useState('');
   const [anchor] = useState(() => Date.now() - 7 * DAY);
@@ -65,7 +71,10 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
   const total = query.data?.pages[0]?.totalItems ?? 0;
 
   const clearCalendar = useCallback((subjectId: string) => {
-    if (trainerId && subjectId) client.removeQueries({ queryKey: workoutScheduleQueryKeys.trainer(trainerId, subjectId) });
+    if (trainerId && subjectId) {
+      client.removeQueries({ queryKey: workoutScheduleQueryKeys.trainer(trainerId, subjectId) });
+      client.removeQueries({ queryKey: rescheduleQueryKeys.scope(trainerId, 'TRAINER', subjectId) });
+    }
   }, [client, trainerId]);
 
   const verifyAuthority = useCallback(async (isActive: () => boolean) => {
@@ -132,8 +141,15 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
     {!query.isPending && !query.isError && !refreshing && items.length === 0 ? <WorkoutState testID="trainer-calendar-empty" title="Chưa có buổi tập trong khoảng này" message="Thử xem cửa sổ 30 ngày khác. Đề xuất đang chờ không phải lịch đã xác nhận." /> : null}
     {!query.isError && !refreshing && !query.isPending ? <>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Có {total} buổi trong cửa sổ này.</Text>
-      {items.map((item) => <TrainerOccurrenceCard key={item.occurrenceId} item={item} relationshipId={relationshipId} canContribute={canContribute} />)}
+      {items.map((item) => <TrainerOccurrenceCard key={item.occurrenceId} item={item} relationshipId={relationshipId}
+        canContribute={canContribute} canManage={canManage} onAiReschedule={setAiOccurrence} />)}
       {query.hasNextPage ? <WorkoutButton testID="trainer-calendar-load-more" label={query.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm buổi tập'} secondary busy={query.isFetchingNextPage} disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
     </> : null}
+    {aiOccurrence ? <AiWorkoutRescheduleModal visible={true} actorId={trainerId} capability="TRAINER"
+      studentId={studentId} occurrence={aiOccurrence} authorized={verified && canManage && !denied}
+      onClose={() => setAiOccurrence(null)} onApplied={async () => {
+        await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.trainer(trainerId, studentId) });
+        await query.refetch();
+      }} /> : null}
   </ScrollView>;
 }
