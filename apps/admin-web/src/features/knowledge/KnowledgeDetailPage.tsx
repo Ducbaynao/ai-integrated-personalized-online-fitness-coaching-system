@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { StatePanel } from '../../components/StatePanel.tsx'
 import { ConfirmationDialog } from '../../components/ConfirmationDialog.tsx'
@@ -13,6 +13,8 @@ type VersionAction =
 
 export function KnowledgeDetailPage() {
   const { documentId } = useParams<{ documentId: string }>()
+  const [searchParams] = useSearchParams()
+  const listUrl = `/knowledge${searchParams.has('page') ? `?page=${encodeURIComponent(searchParams.get('page') ?? '0')}` : ''}`
   const client = useQueryClient()
 
   const [activeAction, setActiveAction] = useState<VersionAction | null>(null)
@@ -44,7 +46,7 @@ export function KnowledgeDetailPage() {
         title="Không tìm thấy tài liệu tri thức"
         description="Tài liệu không tồn tại hoặc bạn không có quyền xem."
         action={
-          <Link to="/knowledge" className="button-secondary">
+          <Link to={listUrl} className="button-secondary">
             Quay lại danh sách
           </Link>
         }
@@ -112,7 +114,7 @@ export function KnowledgeDetailPage() {
   return (
     <section className="page-stack">
       <header className="page-header">
-        <Link to="/knowledge" className="back-link">
+        <Link to={listUrl} className="back-link">
           &larr; Danh sách tài liệu
         </Link>
         <h1>{doc.title}</h1>
