@@ -174,6 +174,40 @@ describe('F05 modal decision state', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('recovers the saved accept receipt after expiry when refreshed detail is APPLIED', async () => {
+    detailState.refetch.mockImplementation(async () => {
+      detailState.data = { ...detail, status: 'APPLIED' };
+      return { data: detailState.data };
+    });
+    (aiWorkoutRescheduleApi.accept as jest.Mock)
+      .mockRejectedValueOnce(new ApiError(504, 'timeout'))
+      .mockResolvedValueOnce({ recommendationId: 'rec-1', status: 'APPLIED', replayed: true,
+        resultingEntityId: 'new-occ', appliedBy: 'trainer-1', resultingEntityType: 'WORKOUT_OCCURRENCE',
+        appliedAt: '2026-11-19T00:01:00Z' });
+    const tree = await render('TRAINER', 'rec-1');
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'f05-accept' }).props.onPress(); });
+    expect(detailState.refetch).toHaveBeenCalledTimes(1);
+    expect(detailState.data.status).toBe('APPLIED');
+    (Date.now as jest.Mock).mockReturnValue(new Date('2026-11-21T00:00:00Z').getTime());
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'f05-retry-accept' }).props.onPress(); });
+    expect(aiWorkoutRescheduleApi.accept).toHaveBeenCalledTimes(2);
+    expect((aiWorkoutRescheduleApi.accept as jest.Mock).mock.calls[1]).toEqual((aiWorkoutRescheduleApi.accept as jest.Mock).mock.calls[0]);
+    expect((aiWorkoutRescheduleApi.accept as jest.Mock).mock.calls[1][1]).toMatchObject({
+      commandKey: 'key-1', expectedRevision: 3, expectedOccurrenceVersion: 4,
+      expectedAppointmentId: 'appointment-1', expectedAppointmentVersion: 2,
+    });
+    expect(tree.root.findAllByProps({ testID: 'f05-receipt' }).length).toBeGreaterThan(0);
+  });
+
+  it('blocks a new accept when expiry passes after the decision button renders', async () => {
+    const tree = await render('TRAINER', 'rec-1');
+    const acceptButton = tree.root.findByProps({ testID: 'f05-accept' });
+    (Date.now as jest.Mock).mockReturnValue(new Date('2026-11-21T00:00:00Z').getTime());
+    await renderer.act(async () => { acceptButton.props.onPress(); });
+    expect(aiWorkoutRescheduleApi.accept).not.toHaveBeenCalled();
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
+  });
+
   it.each([401, 403, 404])('conceals detail and removes scoped cache after HTTP %i', async (status) => {
     const tree = await render('TRAINER', 'rec-1');
     const remove = jest.spyOn(client, 'removeQueries');

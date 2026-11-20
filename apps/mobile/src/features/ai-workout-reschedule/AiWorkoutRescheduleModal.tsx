@@ -163,7 +163,8 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
 
   const runAccept = (body: AcceptRescheduleApiRequest) => {
     if (submitting.current || !canManage || !recommendationId) return;
-    if (!detail.data?.expiresAt || Date.parse(detail.data.expiresAt) <= Date.now()) {
+    const replayApplied = canRetryAccept && detail.data?.status === 'APPLIED' && body === acceptIntent;
+    if (!replayApplied && (!detail.data?.expiresAt || Date.parse(detail.data.expiresAt) <= Date.now())) {
       setNow(Date.now()); setError('Đề xuất đã hết hạn. Hãy tải lại lịch trước khi tạo đề xuất mới.');
       return;
     }
