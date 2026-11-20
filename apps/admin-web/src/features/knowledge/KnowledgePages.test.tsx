@@ -113,9 +113,9 @@ describe('KnowledgeListPage', () => {
 
   it('imports a JSON bundle and shows imported and skipped results without publishing', async () => {
     vi.mocked(knowledgeApi.listDocuments).mockResolvedValue([])
-    vi.mocked(knowledgeApi.importCorpus).mockResolvedValue({ totalItems: 2, importedCount: 1, skippedCount: 1,
+    vi.mocked(knowledgeApi.importCorpus).mockResolvedValue({ totalItems: 3, importedCount: 1, skippedCount: 2,
       importedItems: [{ documentId: 'doc-1', versionId: 'ver-1', documentCode: 'DOC-1', versionLabel: 'v1',
-        status: 'DRAFT', technicalReadiness: 'DRAFT_STAGED' }], skippedItems: ['DOC-2:v1'] })
+        status: 'DRAFT', technicalReadiness: 'DRAFT_STAGED' }], skippedItems: ['DOC-2:v1', 'DOC-2:v1'] })
     render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={['/knowledge']}>
       <KnowledgeListPage />
     </MemoryRouter></QueryClientProvider>)
@@ -126,10 +126,36 @@ describe('KnowledgeListPage', () => {
     fireEvent.change(screen.getByLabelText('Bundle JSON'), { target: { value: JSON.stringify(bundle) } })
     await userEvent.click(screen.getByRole('button', { name: 'Import bundle' }))
     await waitFor(() => expect(vi.mocked(knowledgeApi.importCorpus).mock.calls[0][0]).toEqual(bundle))
-    expect(await screen.findByText(/1 imported, 1 skipped \/ 2 mục/)).toBeInTheDocument()
+    expect(await screen.findByText(/1 imported, 2 skipped \/ 3 mục/)).toBeInTheDocument()
     expect(screen.getByText(/DOC-1 · v1 · DRAFT · DRAFT_STAGED/)).toBeInTheDocument()
-    expect(screen.getByText('DOC-2:v1')).toBeInTheDocument()
+    const skippedElements = screen.getAllByText('DOC-2:v1')
+    expect(skippedElements).toHaveLength(2)
     expect(knowledgeApi.publishVersion).not.toHaveBeenCalled()
+  })
+
+  it('preserves access denied banner after 403 even if auth state removes permission', async () => {
+    vi.mocked(knowledgeApi.listDocuments).mockResolvedValue([])
+    vi.mocked(knowledgeApi.importCorpus).mockRejectedValue(new ApiError(403, 'FORBIDDEN'))
+    const { rerender } = render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={['/knowledge']}>
+      <KnowledgeListPage />
+    </MemoryRouter></QueryClientProvider>)
+    const bundle = { items: [{ documentCode: 'DOC-1', sourceId: 'source-1', title: 'Strength',
+      versionLabel: 'v1', contentHash: 'abc', content: 'content' }] }
+    fireEvent.change(screen.getByLabelText('Bundle JSON'), { target: { value: JSON.stringify(bundle) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Import bundle' }))
+    expect(await screen.findByText(/Đã dừng thao tác import/)).toBeInTheDocument()
+
+    // simulate auth update losing KNOWLEDGE_IMPORT permission
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'authenticated',
+      user: createCurrentUser({ roles: ['ADMIN'], permissions: [] }),
+      signIn: vi.fn(), signOut: vi.fn(), retryBootstrap: vi.fn(),
+    })
+    rerender(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={['/knowledge']}>
+      <KnowledgeListPage />
+    </MemoryRouter></QueryClientProvider>)
+    expect(screen.getByText(/Đã dừng thao tác import/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import bundle' })).not.toBeInTheDocument()
   })
 
   it('does not resend an import after timeout and stops the action after 403', async () => {

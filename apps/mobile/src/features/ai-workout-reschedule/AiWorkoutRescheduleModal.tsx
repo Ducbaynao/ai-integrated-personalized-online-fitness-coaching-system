@@ -10,8 +10,8 @@ import { aiWorkoutRescheduleApi, getWorkoutRescheduleFailureKind } from '@/servi
 import { createCommandKey } from '@/services/coachingApi';
 import type { AcceptRescheduleApiRequest, AcceptRescheduleApiResponse } from '@/types/aiWorkoutReschedule';
 import type { PlannedWorkoutOccurrence } from '@/types/workoutSchedule';
-import { readReschedulePayload } from './payloadBoundary';
-import { rescheduleQueryKeys, useCurrentStudentPeriod, useRescheduleDetail, type RescheduleActorCapability } from './rescheduleQueries';
+import { areSameInstants, readReschedulePayload } from './payloadBoundary';
+import { isPeriodEffective, rescheduleQueryKeys, useCurrentStudentPeriod, useRescheduleDetail, type RescheduleActorCapability } from './rescheduleQueries';
 
 interface Props {
   visible: boolean;
@@ -64,8 +64,14 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
   const period = useCurrentStudentPeriod(actorId, visible && authorized && capability === 'STUDENT' && !concealed);
   const detail = useRescheduleDetail(actorId, capability, studentId, occurrenceId, recommendationId,
     visible && authorized && !concealed);
+  const isHumanCoach = capability === 'STUDENT' && Boolean(
+    period.data &&
+    period.data.mode === 'HUMAN_COACH' &&
+    (!period.data.startedAt || isPeriodEffective(period.data, now))
+  );
+  const isSelfDirected = capability === 'STUDENT' && !isHumanCoach;
   const canManage = authorized && !concealed && (capability === 'TRAINER' ||
-    (!period.isPending && !period.isError && period.data?.mode === 'SELF_DIRECTED'));
+    (!period.isPending && !period.isError && isSelfDirected));
 
   const clearSensitive = useCallback(() => {
     setConcealed(true);
@@ -173,7 +179,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
 
   const payload = readReschedulePayload(detail.data?.structuredPayload, occurrenceId,
     occurrence.sessionSummary?.supervisionRequirement ?? null);
-  const sameSourceStart = payload.supported && payload.previousPlannedStartAt === occurrence.plannedStartAt;
+  const sameSourceStart = payload.supported && areSameInstants(payload.previousPlannedStartAt, occurrence.plannedStartAt);
   const matchesDetail = detail.data?.studentId === studentId && detail.data.targetEntityId === occurrenceId &&
     detail.data.recommendationType === 'WORKOUT_RESCHEDULE_PROPOSAL';
   const expired = detail.data?.expiresAt ? Date.parse(detail.data.expiresAt) <= now : true;
@@ -199,7 +205,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
         </WorkoutCard>
         {capability === 'STUDENT' && period.isPending ? <WorkoutState busy title="Đang kiểm tra chế độ huấn luyện" message="Vui lòng chờ." /> : null}
         {capability === 'STUDENT' && period.isError ? <WorkoutState title="Chưa xác minh được quyền quyết định" message={failureMessage(period.error)} onRetry={() => void period.refetch()} /> : null}
-        {capability === 'STUDENT' && !period.isPending && !period.isError && period.data?.mode !== 'SELF_DIRECTED' ?
+        {capability === 'STUDENT' && !period.isPending && !period.isError && isHumanCoach ?
           <WorkoutState testID="f05-student-human-coach" title="Huấn luyện viên quyết định lịch tập"
             message="Học viên ở chế độ có Huấn luyện viên không thể tự áp dụng đề xuất đổi Planned Workout." /> : null}
         {!recommendationId && canManage && occurrence.status === 'SCHEDULED' ? <WorkoutCard>

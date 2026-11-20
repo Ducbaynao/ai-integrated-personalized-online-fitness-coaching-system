@@ -16,6 +16,15 @@ export interface SupportedReschedulePayload {
 
 export type ReschedulePayloadView = SupportedReschedulePayload | { supported: false; reason: string };
 
+/** Compares two instant strings by timestamp value. Returns false if either is null/empty or invalid. */
+export function areSameInstants(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const timeA = Date.parse(a);
+  const timeB = Date.parse(b);
+  if (Number.isNaN(timeA) || Number.isNaN(timeB)) return false;
+  return timeA === timeB;
+}
+
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const string = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;

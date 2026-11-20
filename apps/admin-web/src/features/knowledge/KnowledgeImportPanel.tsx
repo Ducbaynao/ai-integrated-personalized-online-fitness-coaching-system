@@ -45,8 +45,8 @@ export function KnowledgeImportPanel() {
     onError: (error) => { if (error instanceof ApiError && error.status === 403) setAccessDenied(true) },
   })
 
-  if (!canImport) return null
   if (accessDenied) return <div className="banner banner--danger" role="alert">Bạn không còn quyền KNOWLEDGE_IMPORT. Đã dừng thao tác import.</div>
+  if (!canImport) return null
 
   const submit = () => {
     if (mutation.isPending) return
@@ -83,7 +83,7 @@ export function KnowledgeImportPanel() {
       </div> : null}
       {mutation.data.skippedItems.length > 0 ? <div>
         <h3>Đã bỏ qua</h3>
-        <ul>{mutation.data.skippedItems.map((item) => <li key={item}>{item}</li>)}</ul>
+        <ul>{mutation.data.skippedItems.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
       </div> : null}
     </div> : null}
   </section>

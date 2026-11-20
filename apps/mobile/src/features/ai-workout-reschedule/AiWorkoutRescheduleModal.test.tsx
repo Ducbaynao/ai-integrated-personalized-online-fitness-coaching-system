@@ -2,8 +2,8 @@ import React from 'react';
 import renderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AiWorkoutRescheduleModal } from './AiWorkoutRescheduleModal';
-import { readReschedulePayload } from './payloadBoundary';
-import { rescheduleQueryKeys, useCurrentStudentPeriod, useRescheduleDetail } from './rescheduleQueries';
+import { areSameInstants, readReschedulePayload } from './payloadBoundary';
+import { findEffectivePeriod, isPeriodEffective, rescheduleQueryKeys, useCurrentStudentPeriod, useRescheduleDetail } from './rescheduleQueries';
 import { aiWorkoutRescheduleApi } from '@/services/aiWorkoutRescheduleApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
@@ -81,6 +81,53 @@ describe('F05 payload boundary', () => {
     expect(readReschedulePayload({ ...payload, unsupportedField: true }, 'occ-1', 'COACH_REQUIRED').supported).toBe(false);
     expect(readReschedulePayload({ ...payload, reschedule: { ...payload.reschedule, destination: { ...payload.reschedule.destination, timezone: 'Invalid/Zone' } } }, 'occ-1', 'COACH_REQUIRED').supported).toBe(false);
   });
+  it('compares instants by timestamp value and rejects invalid or different instants', () => {
+    // Two representations of the same instant
+    expect(areSameInstants('2026-11-18T08:00:00Z', '2026-11-18T08:00:00.000Z')).toBe(true);
+    expect(areSameInstants('2026-11-18T08:00:00Z', '2026-11-18T15:00:00+07:00')).toBe(true);
+    // Two different times
+    expect(areSameInstants('2026-11-18T08:00:00Z', '2026-11-18T09:00:00Z')).toBe(false);
+    // Invalid or missing timestamps
+    expect(areSameInstants('invalid-date', '2026-11-18T08:00:00Z')).toBe(false);
+    expect(areSameInstants('2026-11-18T08:00:00Z', '')).toBe(false);
+    expect(areSameInstants(null, '2026-11-18T08:00:00Z')).toBe(false);
+    expect(areSameInstants(undefined, undefined)).toBe(false);
+  });
+
+  it('determines effective coaching period matching backend effective rules', () => {
+    const fixedNow = new Date('2026-11-19T00:00:00Z').getTime();
+    // 1. Chưa có kỳ
+    expect(findEffectivePeriod([], fixedNow)).toBeNull();
+
+    // 2. Kỳ HUMAN_COACH đã hết
+    const expiredPeriod: any = {
+      id: 'p-1', mode: 'HUMAN_COACH', startedAt: '2026-10-01T00:00:00Z', endedAt: '2026-11-01T00:00:00Z',
+    };
+    expect(isPeriodEffective(expiredPeriod, fixedNow)).toBe(false);
+    expect(findEffectivePeriod([expiredPeriod], fixedNow)).toBeNull();
+
+    // 3. Kỳ HUMAN_COACH còn hiệu lực (endedAt null hoặc > now)
+    const activeOpenPeriod: any = {
+      id: 'p-2', mode: 'HUMAN_COACH', startedAt: '2026-11-01T00:00:00Z', endedAt: null,
+    };
+    expect(isPeriodEffective(activeOpenPeriod, fixedNow)).toBe(true);
+    expect(findEffectivePeriod([activeOpenPeriod], fixedNow)).toEqual(activeOpenPeriod);
+
+    const activeFutureEndPeriod: any = {
+      id: 'p-3', mode: 'HUMAN_COACH', startedAt: '2026-11-01T00:00:00Z', endedAt: '2026-11-30T00:00:00Z',
+    };
+    expect(findEffectivePeriod([activeFutureEndPeriod], fixedNow)).toEqual(activeFutureEndPeriod);
+
+    // 4. Kỳ bắt đầu trong tương lai (startedAt > now)
+    const futurePeriod: any = {
+      id: 'p-4', mode: 'HUMAN_COACH', startedAt: '2026-12-01T00:00:00Z', endedAt: null,
+    };
+    expect(findEffectivePeriod([futurePeriod], fixedNow)).toBeNull();
+
+    // 5. Cả kỳ tương lai và kỳ hiện tại: chọn đúng kỳ hiện tại chứ không lấy kỳ tương lai dù nó ở đầu danh sách (DESC)
+    expect(findEffectivePeriod([futurePeriod, activeOpenPeriod], fixedNow)).toEqual(activeOpenPeriod);
+  });
+
   it('separates actor capability, subject, occurrence and recommendation in keys', () => {
     expect(rescheduleQueryKeys.detail('actor-1', 'TRAINER', 'student-1', 'occ-1', 'rec-1'))
       .not.toEqual(rescheduleQueryKeys.detail('actor-1', 'STUDENT', 'student-1', 'occ-1', 'rec-1'));
@@ -114,6 +161,74 @@ describe('F05 modal decision state', () => {
     expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' }).length).toBeGreaterThan(0);
     expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ testID: 'f05-reject' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('allows Student decision when no coaching period exists (null) defaulting to SELF_DIRECTED', async () => {
+    periodState.data = null;
+    detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
+    const tree = await render('STUDENT', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' }).length).toBeGreaterThan(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('allows Student decision when past HUMAN_COACH period has ended', async () => {
+    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-10-01T00:00:00Z', endedAt: '2026-11-01T00:00:00Z' };
+    detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
+    const tree = await render('STUDENT', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' }).length).toBeGreaterThan(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('blocks Student decision when HUMAN_COACH period is currently active', async () => {
+    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-11-01T00:00:00Z', endedAt: null };
+    detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
+    const tree = await render('STUDENT', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('allows Student decision when HUMAN_COACH period starts in the future', async () => {
+    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-12-01T00:00:00Z', endedAt: null };
+    detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
+    const tree = await render('STUDENT', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' }).length).toBeGreaterThan(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('allows decision when previousPlannedStartAt matches occurrence.plannedStartAt by instant despite ISO formatting differences', async () => {
+    detailState.data = {
+      ...detail,
+      structuredPayload: {
+        ...payload,
+        reschedule: {
+          ...payload.reschedule,
+          previousPlannedStartAt: '2026-11-18T08:00:00.000Z',
+        },
+      },
+    };
+    const tree = await render('TRAINER', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' }).length).toBeGreaterThan(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('blocks decision when previousPlannedStartAt and occurrence.plannedStartAt represent different instants', async () => {
+    detailState.data = {
+      ...detail,
+      structuredPayload: {
+        ...payload,
+        reschedule: {
+          ...payload.reschedule,
+          previousPlannedStartAt: '2026-11-18T09:00:00Z',
+        },
+      },
+    };
+    const tree = await render('TRAINER', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
   });
 
