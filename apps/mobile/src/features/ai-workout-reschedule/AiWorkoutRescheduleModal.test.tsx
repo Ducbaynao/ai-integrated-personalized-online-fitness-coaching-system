@@ -156,7 +156,7 @@ describe('F05 modal decision state', () => {
   });
 
   it('never offers a plan decision to Student in HUMAN_COACH', async () => {
-    periodState.data = { mode: 'HUMAN_COACH' };
+    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-11-01T00:00:00Z', endedAt: null };
     const tree = await render('STUDENT', 'rec-1');
     expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' }).length).toBeGreaterThan(0);
     expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
@@ -174,7 +174,9 @@ describe('F05 modal decision state', () => {
   });
 
   it('allows Student decision when past HUMAN_COACH period has ended', async () => {
-    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-10-01T00:00:00Z', endedAt: '2026-11-01T00:00:00Z' };
+    periodState.data = findEffectivePeriod([
+      { mode: 'HUMAN_COACH', startedAt: '2026-10-01T00:00:00Z', endedAt: '2026-11-01T00:00:00Z' } as any,
+    ], Date.now());
     detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
     const tree = await render('STUDENT', 'rec-1');
     expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' })).toHaveLength(0);
@@ -192,11 +194,21 @@ describe('F05 modal decision state', () => {
   });
 
   it('allows Student decision when HUMAN_COACH period starts in the future', async () => {
-    periodState.data = { mode: 'HUMAN_COACH', startedAt: '2026-12-01T00:00:00Z', endedAt: null };
+    periodState.data = findEffectivePeriod([
+      { mode: 'HUMAN_COACH', startedAt: '2026-12-01T00:00:00Z', endedAt: null } as any,
+    ], Date.now());
     detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
     const tree = await render('STUDENT', 'rec-1');
     expect(tree.root.findAllByProps({ testID: 'f05-student-human-coach' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ testID: 'f05-accept' }).length).toBeGreaterThan(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('does not infer SELF_DIRECTED from a period with an unknown mode', async () => {
+    periodState.data = { mode: 'UNKNOWN', startedAt: '2026-11-01T00:00:00Z', endedAt: null };
+    detailState.data = { ...detail, decisionAuthority: 'STUDENT' };
+    const tree = await render('STUDENT', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
   });
 

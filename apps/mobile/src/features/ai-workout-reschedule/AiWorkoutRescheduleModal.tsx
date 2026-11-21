@@ -64,12 +64,10 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
   const period = useCurrentStudentPeriod(actorId, visible && authorized && capability === 'STUDENT' && !concealed);
   const detail = useRescheduleDetail(actorId, capability, studentId, occurrenceId, recommendationId,
     visible && authorized && !concealed);
-  const isHumanCoach = capability === 'STUDENT' && Boolean(
-    period.data &&
-    period.data.mode === 'HUMAN_COACH' &&
-    (!period.data.startedAt || isPeriodEffective(period.data, now))
-  );
-  const isSelfDirected = capability === 'STUDENT' && !isHumanCoach;
+  const isHumanCoach = capability === 'STUDENT' && period.data?.mode === 'HUMAN_COACH' &&
+    isPeriodEffective(period.data, now);
+  const isSelfDirected = capability === 'STUDENT' && (period.data === null ||
+    (period.data?.mode === 'SELF_DIRECTED' && isPeriodEffective(period.data, now)));
   const canManage = authorized && !concealed && (capability === 'TRAINER' ||
     (!period.isPending && !period.isError && isSelfDirected));
 
@@ -208,6 +206,9 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
         {capability === 'STUDENT' && !period.isPending && !period.isError && isHumanCoach ?
           <WorkoutState testID="f05-student-human-coach" title="Huấn luyện viên quyết định lịch tập"
             message="Học viên ở chế độ có Huấn luyện viên không thể tự áp dụng đề xuất đổi Planned Workout." /> : null}
+        {capability === 'STUDENT' && !period.isPending && !period.isError && !isHumanCoach && !isSelfDirected ?
+          <WorkoutState title="Chưa xác minh được chế độ huấn luyện" message="Tải lại để kiểm tra quyền quyết định hiện tại."
+            onRetry={() => void period.refetch()} /> : null}
         {!recommendationId && canManage && occurrence.status === 'SCHEDULED' ? <WorkoutCard>
           <Text style={[styles.label, { color: theme.textPrimary }]}>Lý do bỏ lỡ hoặc cần đổi lịch (tùy chọn)</Text>
           <TextInput accessibilityLabel="Lý do cần xếp lại buổi tập" value={reason} onChangeText={setReason}

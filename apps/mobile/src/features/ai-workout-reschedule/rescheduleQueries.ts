@@ -34,6 +34,16 @@ export function findEffectivePeriod(periods: readonly CoachingPeriod[], now = Da
   return null;
 }
 
+export async function loadEffectiveStudentPeriod(now = Date.now()): Promise<CoachingPeriod | null> {
+  const size = 100;
+  for (let pageNumber = 0; ; pageNumber += 1) {
+    const page = await request<Page<CoachingPeriod>>(`/coaching/periods/me?page=${pageNumber}&size=${size}`, { method: 'GET' });
+    const effective = findEffectivePeriod(page.items, now);
+    if (effective) return effective;
+    if (page.items.length < size) return null;
+  }
+}
+
 export function useRescheduleDetail(actorId: string, capability: RescheduleActorCapability, studentId: string,
   occurrenceId: string, recommendationId: string | null, enabled: boolean) {
   return useQuery(queryOptions({
@@ -49,12 +59,7 @@ export function useRescheduleDetail(actorId: string, capability: RescheduleActor
 export function useCurrentStudentPeriod(actorId: string, enabled: boolean) {
   return useQuery(queryOptions({
     queryKey: rescheduleQueryKeys.studentPeriod(actorId),
-    queryFn: async () => {
-      // Query recent periods (size=20) to find the current effective period (startedAt <= now and (endedAt is null or endedAt > now)).
-      // Limitation: if a student has more than 20 future periods scheduled, older effective period will not be on page 0. Backend enforces final authority.
-      const page = await request<Page<CoachingPeriod>>('/coaching/periods/me?page=0&size=20', { method: 'GET' });
-      return findEffectivePeriod(page.items);
-    },
+    queryFn: () => loadEffectiveStudentPeriod(),
     enabled: enabled && Boolean(actorId),
     staleTime: 0,
     retry: false,
