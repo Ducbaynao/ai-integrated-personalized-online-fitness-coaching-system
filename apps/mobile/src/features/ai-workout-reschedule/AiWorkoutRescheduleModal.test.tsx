@@ -44,7 +44,7 @@ const payload = {
 
 const detail = {
   id: 'rec-1', recommendationId: 'rec-1', runId: 'run-1', aiRunId: 'run-1',
-  studentId: 'student-1', targetEntityId: 'occ-1', recommendationType: 'WORKOUT_RESCHEDULE_PROPOSAL',
+  studentId: 'student-1', targetEntityType: 'WORKOUT_OCCURRENCE', targetEntityId: 'occ-1', recommendationType: 'WORKOUT_RESCHEDULE_PROPOSAL',
   title: 'Đổi buổi tập', status: 'PENDING', decisionAuthority: 'TRAINER',
   expiresAt: '2026-11-20T00:00:00Z', revision: 3, structuredPayload: payload,
 };
@@ -303,7 +303,7 @@ describe('F05 modal decision state', () => {
 
   it('recovers the saved accept receipt after expiry when refreshed detail is APPLIED', async () => {
     detailState.refetch.mockImplementation(async () => {
-      detailState.data = { ...detail, status: 'APPLIED' };
+      detailState.data = { ...detail, status: 'APPLIED', targetEntityId: 'replacement-occ' };
       return { data: detailState.data };
     });
     (aiWorkoutRescheduleApi.accept as jest.Mock)
@@ -333,6 +333,40 @@ describe('F05 modal decision state', () => {
     await renderer.act(async () => { acceptButton.props.onPress(); });
     expect(aiWorkoutRescheduleApi.accept).not.toHaveBeenCalled();
     expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
+  });
+
+  it.each([
+    ['recommendation id', { recommendationId: 'other-rec' }],
+    ['entity id alias', { id: 'other-rec' }],
+    ['student', { studentId: 'other-student' }],
+    ['recommendation type', { recommendationType: 'WORKOUT_ADJUSTMENT_PROPOSAL' }],
+    ['entity type', { targetEntityType: 'OTHER' }],
+    ['authority', { decisionAuthority: 'STUDENT' }],
+    ['payload occurrence', { structuredPayload: { ...payload, reschedule: { ...payload.reschedule, occurrenceId: 'other-occ' } } }],
+    ['source instant', { structuredPayload: { ...payload, reschedule: { ...payload.reschedule, previousPlannedStartAt: '2026-11-18T09:00:00Z' } } }],
+    ['supervision', { structuredPayload: { ...payload, reschedule: { ...payload.reschedule, supervisionRequirement: 'SELF_PERFORMABLE' } } }],
+    ['pending replacement target', { status: 'PENDING' }],
+  ])('blocks saved receipt replay when refreshed detail mismatches %s', async (_name, mismatch) => {
+    detailState.refetch.mockImplementation(async () => {
+      detailState.data = { ...detail, status: 'APPLIED', targetEntityId: 'replacement-occ', ...mismatch };
+      return { data: detailState.data };
+    });
+    (aiWorkoutRescheduleApi.accept as jest.Mock).mockRejectedValueOnce(new ApiError(504, 'timeout'));
+    const tree = await render('TRAINER', 'rec-1');
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'f05-accept' }).props.onPress(); });
+    expect(detailState.refetch).toHaveBeenCalledTimes(1);
+    expect(tree.root.findAllByProps({ testID: 'f05-retry-accept' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-reject' })).toHaveLength(0);
+    expect(aiWorkoutRescheduleApi.accept).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer APPLIED receipt replay without a saved accept intent', async () => {
+    detailState.data = { ...detail, status: 'APPLIED', targetEntityId: 'replacement-occ' };
+    const tree = await render('TRAINER', 'rec-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-retry-accept' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'f05-accept' })).toHaveLength(0);
+    expect(aiWorkoutRescheduleApi.accept).not.toHaveBeenCalled();
   });
 
   it.each([401, 403, 404])('conceals detail and removes scoped cache after HTTP %i', async (status) => {

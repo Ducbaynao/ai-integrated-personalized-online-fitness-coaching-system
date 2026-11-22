@@ -167,6 +167,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
 
   const runAccept = (body: AcceptRescheduleApiRequest) => {
     if (submitting.current || !canManage || !recommendationId) return;
+    if (!canDecide && !(canRetryAccept && body === acceptIntent)) return;
     const replayApplied = canRetryAccept && detail.data?.status === 'APPLIED' && body === acceptIntent;
     if (!replayApplied && (!detail.data?.expiresAt || Date.parse(detail.data.expiresAt) <= Date.now())) {
       setNow(Date.now()); setError('Đề xuất đã hết hạn. Hãy tải lại lịch trước khi tạo đề xuất mới.');
@@ -178,15 +179,22 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
   const payload = readReschedulePayload(detail.data?.structuredPayload, occurrenceId,
     occurrence.sessionSummary?.supervisionRequirement ?? null);
   const sameSourceStart = payload.supported && areSameInstants(payload.previousPlannedStartAt, occurrence.plannedStartAt);
-  const matchesDetail = detail.data?.studentId === studentId && detail.data.targetEntityId === occurrenceId &&
-    detail.data.recommendationType === 'WORKOUT_RESCHEDULE_PROPOSAL';
+  const matchesRecommendation = detail.data?.id === recommendationId && detail.data?.recommendationId === recommendationId &&
+    detail.data?.studentId === studentId && detail.data?.recommendationType === 'WORKOUT_RESCHEDULE_PROPOSAL' &&
+    detail.data?.targetEntityType === 'WORKOUT_OCCURRENCE';
+  const matchesSourceTarget = matchesRecommendation && detail.data?.targetEntityId === occurrenceId;
+  // APPLIED targets the replacement occurrence. Only a saved, uncertain accept may recover its receipt.
+  const matchesAppliedReplay = matchesRecommendation && detail.data?.status === 'APPLIED' && acceptUnknown &&
+    acceptIntent !== null && typeof detail.data?.targetEntityId === 'string' && detail.data.targetEntityId.length > 0 &&
+    detail.data.decisionAuthority === capability && payload.supported && sameSourceStart;
+  const matchesDetail = matchesSourceTarget || matchesAppliedReplay;
   const expired = detail.data?.expiresAt ? Date.parse(detail.data.expiresAt) <= now : true;
-  const canDecide = canManage && matchesDetail && detail.data?.decisionAuthority === capability &&
+  const canDecide = canManage && matchesSourceTarget && detail.data?.decisionAuthority === capability &&
     payload.supported && sameSourceStart && detail.data?.status === 'PENDING' && !expired && !conflictReview &&
     occurrence.status === 'SCHEDULED' && !detail.isFetching && !acceptUnknown;
   const canRetryAccept = acceptUnknown && canManage && matchesDetail && detail.data?.decisionAuthority === capability &&
     payload.supported && sameSourceStart && !conflictReview && !detail.isError && !detail.isFetching &&
-    acceptIntent && (detail.data?.status === 'PENDING' || detail.data?.status === 'APPLIED');
+    acceptIntent && ((detail.data?.status === 'PENDING' && matchesSourceTarget) || matchesAppliedReplay);
 
   return <Modal visible={visible} animationType="slide" onRequestClose={close}>
     <ScrollView testID="f05-modal" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
