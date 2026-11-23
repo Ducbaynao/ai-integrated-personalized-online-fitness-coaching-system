@@ -3,15 +3,16 @@ import renderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
-import { appointmentApi, AppointmentRequest } from '@/services/appointmentApi';
+import { appointmentApi, Appointment, AppointmentRequest } from '@/services/appointmentApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
-import { AppointmentRequestScreen } from '@/features/appointments/AppointmentScreens';
+import { AppointmentDetailScreen, AppointmentRequestScreen } from '@/features/appointments/AppointmentScreens';
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }) }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), push: mockPush, replace: jest.fn() }) }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('@/services/coachingApi', () => ({ createCommandKey: jest.fn() }));
-jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { requestDetail: jest.fn(), detail: jest.fn(), decide: jest.fn(), decideReschedule: jest.fn() } }));
+jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { requestDetail: jest.fn(), detail: jest.fn(), decide: jest.fn(), decideReschedule: jest.fn(), cancel: jest.fn() } }));
 
 const request: AppointmentRequest = {
   requestId: 'request-1', kind: 'CREATE', studentId: 'student-1', trainerId: 'trainer-1',
@@ -103,4 +104,69 @@ it('drops the old decision after 409 and refetches rather than automatically acc
     .some(node => React.Children.toArray(node.props.children).join('') === 'Phiên bản yêu cầu 5')).toBe(true));
   expect(tree.root.findAllByProps({ accessibilityLabel: 'Xác nhận quyết định' })).toHaveLength(0);
   expect(appointmentApi.decide).toHaveBeenCalledTimes(1);
+});
+
+describe('AppointmentDetailScreen linked workout navigation', () => {
+  const confirmedAppointment: Appointment = {
+    appointmentId: 'apt-1',
+    version: 3,
+    studentId: 'student-1',
+    trainerId: 'trainer-1',
+    coachingPeriodId: 'period-1',
+    plannedWorkoutId: 'workout-occ-99',
+    status: 'CONFIRMED',
+    startAt: '2026-11-25T09:00:00Z',
+    endAt: '2026-11-25T10:00:00Z',
+    timezone: 'Asia/Ho_Chi_Minh',
+    localStart: '2026-11-25T16:00',
+    localEnd: '2026-11-25T17:00',
+    startUtcOffset: '+07:00',
+    endUtcOffset: '+07:00',
+  };
+
+  it('navigates student to planned workout occurrence detail', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'student-1' }, activeCapability: 'STUDENT' });
+    (appointmentApi.detail as jest.Mock).mockResolvedValue(confirmedAppointment);
+
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    renderer.act(() => {
+      tree = renderer.create(
+        <QueryClientProvider client={client}>
+          <AppointmentDetailScreen appointmentId="apt-1" />
+        </QueryClientProvider>
+      );
+    });
+
+    await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Có liên kết buổi tập'));
+    const linkButton = tree.root.findByProps({ testID: 'open-linked-workout-button' });
+    expect(linkButton.props.label).toBe('Xem buổi tập liên kết');
+
+    renderer.act(() => {
+      linkButton.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/workouts/schedule/workout-occ-99');
+  });
+
+  it('navigates trainer to coaching area instead of student workout occurrence route', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (appointmentApi.detail as jest.Mock).mockResolvedValue(confirmedAppointment);
+
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    renderer.act(() => {
+      tree = renderer.create(
+        <QueryClientProvider client={client}>
+          <AppointmentDetailScreen appointmentId="apt-1" />
+        </QueryClientProvider>
+      );
+    });
+
+    await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Có liên kết buổi tập'));
+    const linkButton = tree.root.findByProps({ testID: 'open-linked-workout-button' });
+    expect(linkButton.props.label).toBe('Mở khu vực huấn luyện viên');
+
+    renderer.act(() => {
+      linkButton.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/coaching');
+  });
 });

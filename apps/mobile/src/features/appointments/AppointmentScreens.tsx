@@ -6,6 +6,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAuth } from '@/features/auth/AuthContext';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { spacing } from '@/design-system/tokens/spacing';
 import { createCommandKey } from '@/services/coachingApi';
 import { appointmentApi, AppointmentInterval } from '@/services/appointmentApi';
 import { validProposalOffsets, proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
@@ -249,6 +250,28 @@ export function AppointmentDetailScreen({ appointmentId }: { appointmentId: stri
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{label(item.status)}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{localText(item)}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {item.version}{item.plannedWorkoutId ? ' · Có liên kết buổi tập' : ''}</Text>
+      {item.plannedWorkoutId ? (
+        <View style={{ gap: spacing.xs, marginVertical: spacing.sm }}>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>
+            Lịch hẹn này có liên kết với một buổi tập theo lịch ({item.plannedWorkoutId}). Sau khi đổi lịch hẹn thành công, cần tạo và xem xét đề xuất dời lịch AI (F05) mới cho buổi tập.
+          </Text>
+          {role === 'TRAINER' ? (
+            <CoachingButton
+              testID="open-linked-workout-button"
+              label="Mở khu vực huấn luyện viên"
+              secondary
+              onPress={() => router.push('/coaching' as never)}
+            />
+          ) : (
+            <CoachingButton
+              testID="open-linked-workout-button"
+              label="Xem buổi tập liên kết"
+              secondary
+              onPress={() => router.push(`/workouts/schedule/${item.plannedWorkoutId}` as never)}
+            />
+          )}
+        </View>
+      ) : null}
       {item.status === 'CONFIRMED' && guidanceNow > 0 && Date.parse(item.startAt) > guidanceNow ? <>
         <CoachingButton label="Đề xuất đổi lịch hẹn" secondary onPress={() => router.push(`/appointments/${appointmentId}/reschedule` as never)} />
         {!confirmCancel ? <CoachingButton label="Hủy lịch hẹn" danger onPress={() => setConfirmCancel(true)} /> : <View>
