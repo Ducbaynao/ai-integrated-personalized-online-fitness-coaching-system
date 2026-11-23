@@ -3,6 +3,7 @@ import renderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useRelationships } from '@/features/coaching/coachingQueries';
 import { appointmentApi, Appointment, AppointmentRequest } from '@/services/appointmentApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
@@ -11,6 +12,7 @@ import { AppointmentDetailScreen, AppointmentRequestScreen } from '@/features/ap
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), push: mockPush, replace: jest.fn() }) }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('@/features/coaching/coachingQueries', () => ({ useRelationships: jest.fn() }));
 jest.mock('@/services/coachingApi', () => ({ createCommandKey: jest.fn() }));
 jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { requestDetail: jest.fn(), detail: jest.fn(), decide: jest.fn(), decideReschedule: jest.fn(), cancel: jest.fn() } }));
 
@@ -56,6 +58,7 @@ function press(label: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'student-1' }, activeCapability: 'STUDENT' });
+  (useRelationships as jest.Mock).mockReturnValue({ data: { pages: [{ items: [] }] } });
   (createCommandKey as jest.Mock).mockReturnValue('same-command-key');
   (appointmentApi.requestDetail as jest.Mock).mockResolvedValue(request);
   (appointmentApi.decide as jest.Mock).mockResolvedValue({ request: { ...request, status: 'ACCEPTED', version: 5 }, appointment: {}, replayed: false });
@@ -147,9 +150,46 @@ describe('AppointmentDetailScreen linked workout navigation', () => {
     expect(mockPush).toHaveBeenCalledWith('/workouts/schedule/workout-occ-99');
   });
 
-  it('navigates trainer to coaching area instead of student workout occurrence route', async () => {
+  it('navigates trainer directly to student workout schedule when active relationship exists', async () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
     (appointmentApi.detail as jest.Mock).mockResolvedValue(confirmedAppointment);
+    (useRelationships as jest.Mock).mockReturnValue({
+      data: {
+        pages: [
+          {
+            items: [
+              { id: 'rel-active-1', studentId: 'student-1', status: 'ACTIVE' },
+            ],
+          },
+        ],
+      },
+    });
+
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    renderer.act(() => {
+      tree = renderer.create(
+        <QueryClientProvider client={client}>
+          <AppointmentDetailScreen appointmentId="apt-1" />
+        </QueryClientProvider>
+      );
+    });
+
+    await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Có liên kết buổi tập'));
+    const linkButton = tree.root.findByProps({ testID: 'open-linked-workout-button' });
+    expect(linkButton.props.label).toBe('Mở lịch tập học viên liên kết');
+
+    renderer.act(() => {
+      linkButton.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/coaching/rel-active-1/workout-schedule');
+  });
+
+  it('navigates trainer to coaching hub when no active relationship is matched', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    (appointmentApi.detail as jest.Mock).mockResolvedValue(confirmedAppointment);
+    (useRelationships as jest.Mock).mockReturnValue({
+      data: { pages: [{ items: [] }] },
+    });
 
     client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     renderer.act(() => {

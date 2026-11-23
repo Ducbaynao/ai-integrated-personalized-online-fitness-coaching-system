@@ -1,10 +1,12 @@
 # F05 — Bàn giao triển khai Mobile Workout Rescheduling
 
-**Ngày cập nhật:** 23/11/2026, UTC+7.  
-**Vai trò thực hiện:** DEV-A (theo phân công chỉ đạo Phase 2).  
-**Branch:** `feat/mobile-f05-rescheduling`.  
-**Base commit:** `c289ff044c0ac7c5bd2f3036b013acac09f986f8` (Merge PR #167).  
-**Tình trạng CI base:** [Run 45168230342](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/45168230342) trên commit `c289ff044c0ac7c5bd2f3036b013acac09f986f8` đã hoàn thành thành công (**6/6 jobs success**, bao gồm Backend đã hoàn tất).  
+**Ngày cập nhật:** 23/11/2026, UTC+7.
+**Vai trò thực hiện:** DEV-A (theo phân công chỉ đạo Phase 2).
+**Branch:** `feat/mobile-f05-rescheduling`.
+**Base commit:** `c289ff044c0ac7c5bd2f3036b013acac09f986f8` (Merge PR #167).
+**Head commit ban đầu:** `62b61523d4ce0034eed7e5700d13782948c634ca` (PR #168).
+**Tình trạng CI base PR #167:** [Run 45168230342](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/45168230342) trên commit `c289ff044c0ac7c5bd2f3036b013acac09f986f8` (**6/6 jobs success**).
+**Tình trạng CI head PR #168:** [Run 45179594993](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/45179594993) trên commit `62b61523d4ce0034eed7e5700d13782948c634ca` (**6/6 jobs success**, bao gồm Backend 12m16s, Client Mobile, AI Service, Database Migrations, Client Admin Web, Contracts & Docs).
 **Trạng thái tính năng:** **ĐÃ TRIỂN KHAI VÀ KIỂM CHỨNG MOBILE F05** cho luồng hợp đồng tích hợp. Nghiệm thu toàn bộ tính năng và mốc phát hành (P2-M4/Release) vẫn **MỞ** theo quy định.
 
 ---
@@ -14,11 +16,13 @@
 Căn cứ theo tiến độ ngày 23/11/2026:
 - F05 Backend / AI Service và các bổ sung BL-01, BL-02, BL-03 đã merge vào `main` tại PR #167.
 - Xác nhận CI sau merge PR #167: toàn bộ 6/6 jobs hoàn tất thành công (`completed / success`).
-- Nhánh mới `feat/mobile-f05-rescheduling` được tạo trực tiếp từ `main` đã cập nhật fast-forward tại commit `c289ff044c0ac7c5bd2f3036b013acac09f986f8`. Working tree được bảo toàn sạch sẽ, không ghi đè bất kỳ thay đổi nào.
+- Nhánh `feat/mobile-f05-rescheduling` được tạo trực tiếp từ `main` đã cập nhật fast-forward tại commit `c289ff044c0ac7c5bd2f3036b013acac09f986f8`.
+- Draft PR #168 đã được tạo trên GitHub và CI run 45179594993 đã xác nhận thành công 6/6 jobs.
+- Hoàn thiện tinh chỉnh bổ sung: điều hướng HLV từ Lịch hẹn trực tiếp tới Lịch tập của Học viên liên kết và cơ chế phát lại lệnh Accept (idempotent replay) khi hết hạn.
 
 ---
 
-## 2. Các thành phần Mobile F05 đã triển khai
+## 2. Các thành phần Mobile F05 đã triển khai & tinh chỉnh
 
 Tận dụng cấu trúc hiện có, apiClient, Expo Router, React Native UI components, token semantic colors, không tạo thêm dependency thừa:
 
@@ -51,7 +55,9 @@ Tận dụng cấu trúc hiện có, apiClient, Expo Router, React Native UI com
      - Trong `SELF_DIRECTED`: Học viên có quyền phê duyệt áp dụng.
      - Huấn luyện viên trong `HUMAN_COACH`: có quyền phê duyệt áp dụng.
    - Xử lý hết hạn (TTL 30 phút, tính động số phút còn lại theo `proposal.expiresAt`) và xung đột (409): hiển thị cảnh báo và cung cấp nút "Tạo đề xuất mới".
-   - Bảo toàn danh tính lệnh (retry identity): Khi gặp timeout mạng (status 0), thao tác thử lại giữ nguyên `commandKey` để backend phát lại an toàn (`replayed: true`), tránh tạo lệnh trùng lặp.
+   - **Bảo toàn danh tính lệnh & Phát lại sau timeout (Idempotent Retry Replay)**:
+     - Khi gặp timeout mạng (status 0), thao tác thử lại giữ nguyên `pendingAcceptCommandKey`.
+     - Tinh chỉnh `canAccept`: Nếu đang giữ `pendingAcceptCommandKey` từ lần bấm trước bị lỗi, client vẫn cho phép bấm "Thử lại cùng lệnh (Xác nhận & Áp dụng)" kể cả khi đồng hồ client đã quá `expiresAt`. Điều này khớp tuyệt đối với kiến trúc backend `AiWorkoutRescheduleService.java`: Bước 3 (kiểm tra Idempotent Replay) được thực thi trước Bước 4 (kiểm tra Expiry), đảm bảo nếu server đã áp dụng thành công lệnh trước đó trước khi mất mạng, client vẫn đọc lại được kết quả mà không bị chặn oan.
    - Ngăn phản hồi đến muộn (stale response): sử dụng ref theo dõi `activeOccurrenceId`, `activeStudentId` và `targetRecommendationId`, hủy cập nhật state nếu màn hình unmount hoặc đối tượng đổi trước khi request hoàn tất.
    - Hiển thị biên nhận thành công (Applied Receipt) kèm `resultingEntityId` và cờ phát lại `replayed`.
 
@@ -68,23 +74,31 @@ Tận dụng cấu trúc hiện có, apiClient, Expo Router, React Native UI com
    - Trong chi tiết lịch hẹn (`AppointmentDetailScreen`), khi có `plannedWorkoutId`:
      Hiển thị hướng dẫn và nút điều hướng theo vai trò (`testID="open-linked-workout-button"`):
      - Học viên: Điều hướng tới chi tiết buổi tập (`/workouts/schedule/${item.plannedWorkoutId}`) để tạo đề xuất dời lịch AI (F05) mới.
-     - Huấn luyện viên: Điều hướng tới khu vực quản lý huấn luyện (`/coaching`), tránh lỗi truy cập màn hình chỉ dành riêng cho Học viên.
+     - Huấn luyện viên: Tinh chỉnh tra cứu quan hệ huấn luyện đang hoạt động (`useRelationships`) của `studentId`. Nếu tìm thấy quan hệ `ACTIVE`, hiển thị nút `"Mở lịch tập học viên liên kết"` và điều hướng trực tiếp tới `/coaching/${activeRelationship.id}/workout-schedule`, bảo toàn nguyên vẹn ngữ cảnh học viên và buổi tập liên kết. Nếu không tìm thấy, fallback an toàn về `/coaching`.
 
 ---
 
-## 3. Đối chiếu Acceptance / Test IDs
+## 3. Đối chiếu Acceptance / Test IDs và Phân định Mức độ Kiểm chứng
 
-| Test ID / Yêu cầu | Triển khai & Kiểm chứng trên Mobile | Trạng thái |
-|---|---|---|
-| **T01 / T27** — PROPOSAL lifecycle | Modal hỗ trợ đầy đủ luồng: Generate → Read payload/explanation → Accept/Apply hoặc Reject. Nhận biên nhận `resultingEntityId`, `replayed`. | **VERIFIED (Unit & Component Tests)** |
-| **T02** — Quyền theo mode | Trong `HUMAN_COACH`, Student bị chặn nút Accept và hiển thị hướng dẫn quyền HLV. Trainer có quyền `MANAGE` được phép Accept. Trong `SELF_DIRECTED`, Student được phép Accept. | **VERIFIED (Component Tests)** |
-| **T03 / T04** — Mất quyền / Scope | Khi mất quyền hoặc 403, modal hiển thị thông báo lỗi thẩm quyền và không cho phép thực hiện thao tác áp dụng. Nút HLV yêu cầu quyền `MANAGE`. | **VERIFIED (Component Tests)** |
-| **T05** — Trôi phiên bản / Stale | Khi gặp HTTP 409 (`PLANNED_WORKOUT_VERSION_CONFLICT`, `APPOINTMENT_VERSION_CONFLICT`), modal hiển thị giải thích xung đột và cung cấp nút "Tạo đề xuất mới". | **VERIFIED (Component Tests)** |
-| **T06 / T25** — Idempotent retry | Lưu giữ `pendingAcceptCommandKey`, truyền đầy đủ `expectedOccurrenceVersion`, `expectedAppointmentVersion`, `expectedAppointmentId` khi gọi Accept. Khi thử lại sau timeout, giữ nguyên `commandKey`. Phản ánh đúng cờ `replayed` trên biên nhận. | **VERIFIED (Unit & Component Tests)** |
-| **T09** — Bảo toàn lịch sử | Buổi cũ được giữ lại; biên nhận hiển thị ID buổi thay thế (`resultingEntityId`). Không can thiệp Actual Workout. | **VERIFIED (Component Tests)** |
-| **T10 / BL-03** — Phối hợp lịch hẹn | Kiểm tra containment lịch hẹn; hiển thị hướng dẫn đổi lịch hẹn hai bên trước nếu muốn đổi sang khoảng giờ khác; nút liên kết giữa Lịch hẹn và Buổi tập phân quyền theo vai trò. | **VERIFIED (Component Tests)** |
-| **T23** — Hết hạn đề xuất | Kiểm tra TTL 30 phút (`expiresAt`) hiển thị động số phút còn lại; chặn nút Accept khi đã hết hạn và yêu cầu tạo đề xuất mới. | **VERIFIED (Component Tests)** |
-| **Stale Async Guard** | Ngăn response đến muộn ghi đè dữ liệu khi đổi Student hoặc rời màn hình thông qua ref guards. | **VERIFIED (Component Tests)** |
+Bảng phân định minh bạch giữa các mức độ kiểm chứng:
+- **Unit/Component Test (Mock API)**: Kiểm chứng hành vi giao diện, tương tác, tính thẩm quyền, xử lý lỗi mạng/timeout và logic nội bộ Mobile với mock data.
+- **Backend Integration**: Kiểm chứng tích hợp Spring Boot MockMvc, HTTP FastAPI, PostgreSQL Testcontainers, và transactions nguyên tử (đã đạt 5/5 kịch bản tại PR #167).
+- **Mobile UI Live Integration**: Kiểm chứng ứng dụng React Native Expo chạy trực tiếp nối tới backend local/staging đang hoạt động trên cổng 8080.
+- **Real Model Evaluation**: Đánh giá latency, chi phí token, và chất lượng sinh đề xuất với nhà cung cấp LLM production (Non-goal của Phase 2 Mobile).
+
+| Acceptance / Test ID | Tiêu chí nghiệm thu | Bằng chứng hiện có | Phân định mức độ kiểm chứng | Phần còn thiếu / Trạng thái |
+|---|---|---|---|---|
+| **T01 / T27** | PROPOSAL lifecycle: Generate → Review (reasoning, missingData, usedData) → Accept/Reject → Receipt. | Component test `AiWorkoutRescheduleModal.test.tsx` (11 tests); Backend test `AiWorkoutRescheduleIntegrationTest.java` (5 tests). | Unit/Component Tests (Mock) + Backend Integration (Testcontainers) | **PASS (Mock & Backend Integration)**; Mobile UI Live Backend chưa chạy (cổng 8080 không có service chạy sẵn). |
+| **T02** | Phân định thẩm quyền theo mode: `HUMAN_COACH` chỉ HLV mới Accept; `SELF_DIRECTED` Học viên Accept; Học viên `HUMAN_COACH` bị khóa Accept và có cảnh báo. | Component test `AiWorkoutRescheduleModal.test.tsx`; Trainer schedule component test `trainerWorkoutScheduleScreen.test.tsx`. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **T03 / T04** | Quyền `MANAGE` vs `CONTRIBUTE` của Trainer; xử lý mất quyền / 403. | `trainerWorkoutScheduleScreen.test.tsx` kiểm tra ẩn nút khi thiếu MANAGE; `aiWorkoutRescheduleApi.test.ts` kiểm tra ánh xạ 403. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **T05** | Xử lý trôi phiên bản (HTTP 409): `PLANNED_WORKOUT_VERSION_CONFLICT`, `APPOINTMENT_VERSION_CONFLICT`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra hiển thị nút "Tạo đề xuất mới", không bị crash, dọn dẹp state cũ. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **T06 / T25** | Idempotent Retry sau Timeout: giữ nguyên `commandKey`, xử lý phát lại (`replayed: true`), cho phép replay kể cả khi quá `expiresAt`. | `AiWorkoutRescheduleModal.test.tsx` (test replay timeout & expiry); `aiWorkoutRescheduleApi.test.ts` kiểm tra payload commandKey. | Unit/Component Tests (Mock) + Backend Integration | **PASS (Mock & Backend Integration)**. |
+| **T09** | Bảo toàn lịch sử: buổi tập cũ giữ nguyên, tạo bản ghi kế thừa, biên nhận hiển thị `resultingEntityId`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra biên nhận thành công; Backend Flyway v45 bảo toàn DB audit. | Unit/Component Tests (Mock) + Backend Integration | **PASS (Mock & Backend Integration)**. |
+| **T10 / BL-03** | Phối hợp Lịch hẹn: điều hướng liên kết từ Lịch hẹn sang Buổi tập/Lịch tập theo vai trò; bảo toàn context `studentId`. | `appointmentScreens.test.tsx` (6 tests kiểm tra vai trò Student và Trainer với relationship active). | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **T23** | TTL Hết hạn (30 phút): hiển thị thời gian còn lại, khóa chấp nhận mới khi quá hạn, cho phép tạo đề xuất mới. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra nhãn hết hạn và vô hiệu hóa nút Chấp nhận mới. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **Stale Async Guard** | Ngăn response đến muộn ghi đè dữ liệu khi unmount, đổi Student hoặc đổi Buổi tập. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra mount/unmount hủy bỏ an toàn không leak state. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **Mobile Live Runtime E2E** | Chạy toàn bộ luồng trên thiết bị/emulator thật với backend Spring Boot & Postgres thật trên cổng 8080. | Chưa có môi trường backend local chạy nền (không có daemon process hoặc docker backend active). | Mobile UI Live Integration | **CHƯA THỰC HIỆN (Lacks live running backend in current workspace)**. Không ghi khống là PASS. |
+| **Real LLM Model Validation** | Đánh giá chất lượng đề xuất với model Gemini/OpenAI production thật. | Non-goal của Phase 2 Mobile; sử dụng simulated provider theo đúng quy định. | Real Model Evaluation | **MỞ (Non-goal Phase 2 Mobile)**. |
 
 ---
 
@@ -92,19 +106,19 @@ Tận dụng cấu trúc hiện có, apiClient, Expo Router, React Native UI com
 
 Các kiểm tra đã chạy thành công trong phiên làm việc:
 
-1. **Mobile Test Suites (46/46 PASS)**:
+1. **Mobile Test Suites (48/48 PASS)**:
    - `aiWorkoutRescheduleApi.test.ts`: **18/18 tests PASS** (tham số API, retry identity, error mapping tiếng Việt, field errors).
-   - `AiWorkoutRescheduleModal.test.tsx`: **10/10 tests PASS** (luồng Student SELF_DIRECTED, luồng Trainer HUMAN_COACH, chặn quyền Student HUMAN_COACH, từ chối đề xuất, xử lý xung đột 409, hướng dẫn lịch hẹn liên kết, ngăn phản hồi trễ, thử lại giữ nguyên commandKey sau lỗi mạng, kiểm tra copy disclaimer heuristic và đếm ngược hết hạn).
+   - `AiWorkoutRescheduleModal.test.tsx`: **11/11 tests PASS** (luồng Student SELF_DIRECTED, luồng Trainer HUMAN_COACH, chặn quyền Student HUMAN_COACH, từ chối đề xuất, xử lý xung đột 409, hướng dẫn lịch hẹn liên kết, ngăn phản hồi trễ, thử lại giữ nguyên commandKey sau lỗi mạng, phát lại lệnh sau timeout kể cả khi quá hạn, kiểm tra copy disclaimer heuristic và đếm ngược hết hạn).
    - `workoutScheduleChange.test.tsx`: **11/11 tests PASS** (hồi quy đổi lịch thủ công Học viên).
    - `trainerWorkoutScheduleScreen.test.tsx`: **2/2 tests PASS** (hồi quy màn hình lịch HLV và phân định thẩm quyền MANAGE vs CONTRIBUTE cho nút AI Reschedule).
-   - `appointmentScreens.test.tsx`: **5/5 tests PASS** (hồi quy màn hình lịch hẹn và điều hướng liên kết buổi tập theo vai trò Student vs Trainer).
+   - `appointmentScreens.test.tsx`: **6/6 tests PASS** (hồi quy màn hình lịch hẹn, điều hướng học viên tới buổi tập liên kết, điều hướng HLV tới lịch tập của học viên liên kết theo active relationship và fallback về coaching hub).
 
 2. **Kiểm tra cú pháp & Typecheck**:
    - `npm run typecheck:mobile` (`tsc --noEmit`): **PASS** (0 errors).
    - `npm run lint:mobile` (`expo lint`): **PASS** (0 errors, 0 warnings).
 
 3. **Kiểm tra Hợp đồng & UX docs**:
-   - `npm run validate:contracts`: **PASS** (10 schemas, 48 contract fixtures).
+   - `npm run validate:contracts`: **PASS** (10 schemas, 48 contract fixtures verified with Ajv 2020).
    - `npm run validate:ux-docs`: **PASS** (18 required files).
 
 4. **Kiểm tra Git diff**:
@@ -119,4 +133,5 @@ Các giới hạn được giữ nguyên đúng theo thỏa thuận kỹ thuật
 - **Request status EXPIRED/CANCELLED**: V45 database hiện chỉ hỗ trợ `PENDING/ACCEPTED/REJECTED`. Mobile không tự tạo thêm trạng thái không có trong hợp đồng.
 - **Availability đầy đủ & Recovery chuyên môn (D06/OD-3)**: Vẫn dùng slot gợi ý có khung giờ buổi sáng/chiều/tối; các quy tắc hồi phục sinh lý chuyên sâu vẫn tiếp tục **MỞ** chờ Hội đồng chuyên môn phê duyệt.
 - **Provider thật**: Kiểm thử sử dụng API contract và simulated provider; việc đánh giá latency/cost trên LLM production vẫn tiếp tục **MỞ**.
+- **Mobile Live Runtime E2E**: Yêu cầu môi trường staging/dev có Backend và DB hoạt động để kiểm chứng thiết bị cuối.
 - **Sign-off**: Quyết định nghiệm thu toàn bộ tính năng F05/P2-M4 thuộc về Project Owner / Reviewer chính thức.

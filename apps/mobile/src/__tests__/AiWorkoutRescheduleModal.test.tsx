@@ -591,4 +591,62 @@ describe('AiWorkoutRescheduleModal', () => {
     // Check destination box heuristic disclaimer
     expect(reviewOutput).toContain('chưa bao gồm xác nhận lịch rảnh thực tế');
   });
+
+  it('allows replaying accept command even when client clock passed expiresAt if previous command failed', async () => {
+    // Generate proposal with expiry in the past
+    (aiWorkoutRescheduleApi.generate as jest.Mock).mockResolvedValueOnce({
+      ...mockProposalResponse,
+      expiresAt: new Date(Date.now() + 1000).toISOString(),
+    });
+    // First accept attempt fails with network error
+    (aiWorkoutRescheduleApi.accept as jest.Mock).mockRejectedValueOnce(new ApiError(0, 'Network timeout'));
+    // Second accept attempt succeeds (server replayed existing receipt)
+    (aiWorkoutRescheduleApi.accept as jest.Mock).mockResolvedValueOnce({
+      ...mockAcceptResponse,
+      replayed: true,
+    });
+
+    let component: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      component = renderer.create(
+        <AiWorkoutRescheduleModal
+          visible={true}
+          studentId="student-1"
+          occurrenceId="occ-1"
+          coachingMode="SELF_DIRECTED"
+          isTrainer={false}
+          onClose={jest.fn()}
+        />
+      );
+    });
+
+    await flushPromises();
+
+    // Generate proposal
+    const generateBtn = component!.root.findByProps({ testID: 'generate-reschedule-button' });
+    await renderer.act(async () => {
+      generateBtn.props.onPress();
+    });
+    await flushPromises();
+
+    // First accept attempt fails
+    const acceptBtn = component!.root.findByProps({ testID: 'accept-reschedule-button' });
+    await renderer.act(async () => {
+      acceptBtn.props.onPress();
+    });
+    await flushPromises();
+
+    // Retry button is available
+    const retryBtn = component!.root.findByProps({ testID: 'accept-reschedule-button' });
+    expect(retryBtn.props.label).toContain('Thử lại cùng lệnh');
+
+    // Second accept attempt (replay)
+    await renderer.act(async () => {
+      retryBtn.props.onPress();
+    });
+    await flushPromises();
+
+    expect(aiWorkoutRescheduleApi.accept).toHaveBeenCalledTimes(2);
+    expect(component!.root.findByProps({ testID: 'reschedule-applied-receipt' })).toBeTruthy();
+  });
 });

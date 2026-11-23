@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useRelationships } from '@/features/coaching/coachingQueries';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -237,6 +238,13 @@ export function AppointmentDetailScreen({ appointmentId }: { appointmentId: stri
     },
   });
   const item = query.data;
+  const relationshipsQuery = useRelationships();
+  const activeRelationship = role === 'TRAINER' && item?.studentId
+    ? (relationshipsQuery.data?.pages.flatMap((page) => page.items) ?? []).find(
+        (rel) => rel.studentId === item.studentId && rel.status === 'ACTIVE'
+      )
+    : undefined;
+
   const submitCancel = () => { if (!item || !reason.trim() || cancel.isPending) return;
     const body = pending.current ?? { expectedAppointmentVersion: item.version, reason: reason.trim(), commandKey: createCommandKey() };
     pending.current = body; cancel.mutate(body);
@@ -258,9 +266,15 @@ export function AppointmentDetailScreen({ appointmentId }: { appointmentId: stri
           {role === 'TRAINER' ? (
             <CoachingButton
               testID="open-linked-workout-button"
-              label="Mở khu vực huấn luyện viên"
+              label={activeRelationship ? 'Mở lịch tập học viên liên kết' : 'Mở khu vực huấn luyện viên'}
               secondary
-              onPress={() => router.push('/coaching' as never)}
+              onPress={() => {
+                if (activeRelationship) {
+                  router.push(`/coaching/${activeRelationship.id}/workout-schedule` as never);
+                } else {
+                  router.push('/coaching' as never);
+                }
+              }}
             />
           ) : (
             <CoachingButton

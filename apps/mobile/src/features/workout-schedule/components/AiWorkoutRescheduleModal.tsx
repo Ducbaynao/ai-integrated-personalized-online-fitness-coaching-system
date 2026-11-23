@@ -220,7 +220,9 @@ function RescheduleModalContent({
   // Decision authority calculation
   const canAccept = useMemo(() => {
     if (!proposal) return false;
-    if (isExpired || proposal.status !== 'PENDING') return false;
+    // If a retry is pending with previous commandKey, allow replaying even if client-side clock passed expiresAt
+    if (isExpired && !pendingAcceptCommandKey) return false;
+    if (proposal.status !== 'PENDING') return false;
 
     // Decision authority from backend proposal
     if (proposal.decisionAuthority === 'TRAINER') {
@@ -230,7 +232,7 @@ function RescheduleModalContent({
       return !isTrainer && coachingMode !== 'HUMAN_COACH';
     }
     return false;
-  }, [proposal, isExpired, coachingMode, isTrainer]);
+  }, [proposal, isExpired, pendingAcceptCommandKey, coachingMode, isTrainer]);
 
   // Accept and apply
   const handleAccept = async () => {
@@ -582,7 +584,7 @@ function RescheduleModalContent({
           ) : null}
 
           {/* Action Buttons */}
-          {proposal.status === 'PENDING' && !isExpired ? (
+          {proposal.status === 'PENDING' && (!isExpired || Boolean(pendingAcceptCommandKey)) ? (
             <View style={styles.actionColumn}>
               {canAccept ? (
                 <WorkoutButton
@@ -594,7 +596,7 @@ function RescheduleModalContent({
                 />
               ) : null}
 
-              {!showRejectForm ? (
+              {!isExpired && !showRejectForm ? (
                 <WorkoutButton
                   testID="toggle-reject-form-button"
                   label="Từ chối đề xuất này"
@@ -603,7 +605,9 @@ function RescheduleModalContent({
                   disabled={isApplying || isRejecting}
                   onPress={() => setShowRejectForm(true)}
                 />
-              ) : (
+              ) : null}
+
+              {!isExpired && showRejectForm ? (
                 <WorkoutCard testID="reject-form-card">
                   <Text style={[styles.label, { color: theme.textPrimary }]}>Lý do từ chối (tùy chọn):</Text>
                   <TextInput
@@ -634,7 +638,7 @@ function RescheduleModalContent({
                     />
                   </View>
                 </WorkoutCard>
-              )}
+              ) : null}
             </View>
           ) : null}
 
