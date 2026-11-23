@@ -2,14 +2,16 @@
 
 **Status:** Draft implementation for issue #164. OpenAPI, the AI output schema,
 forward migration V61 and an internal simulated AI route exist on this branch.
-They do not establish Spring runtime, live nutrition calculations, model quality,
+Spring now has a first generation/readback slice backed by V61. This does not
+establish Correct, preview, Confirm, live nutrient calculation, model quality,
 Mobile behavior or release readiness.
 
 ## Existing source and gap
 
 - `V7__nutrition.sql` has `food_analysis_requests` and
   `food_analysis_candidates`, but candidates point at the legacy `foods` table.
-  No Spring analysis endpoint currently uses them.
+  The new Spring analysis endpoint uses the request row for command identity
+  and new V61 item rows; it does not use legacy candidate rows.
 - `V39__student_basic_nutrition_logging.sql` has actor-scoped command receipts;
   `NutritionBasicService` calculates catalog nutrients and writes one confirmed
   item per command. Repeating that public command cannot provide atomic
@@ -63,9 +65,13 @@ hard-coded contract value.
 2. V61 adds forward draft/item/preview storage and stable receipt identity.
    It passed a clean PostgreSQL 18/Flyway disposable migration run. V7, V39 and
    V41 were not edited; legacy rows remain nullable in the new columns.
-3. Implement Spring ownership, matching, preview/calculation, atomic Confirm,
-   receipt replay, erasure and audit handling. Add tests for T14/T15/T24/T26/T27
-   and competing catalog/draft writers.
+3. Spring currently implements Student-scoped text generation, same-key
+   replay, owner-scoped recovery/detail, durable failure status, and audit.
+   A focused PostgreSQL/Testcontainers HTTP test checks identity, isolation and
+   that no Food Log is written. Implement matching, Correct, preview/calculation,
+   atomic Confirm, receipt replay, erasure and audit for later commands. Add
+   tests for T14/T15/T24/T26/T27 and competing catalog/draft writers. A
+   PROCESSING row orphaned by a crash also needs bounded recovery handling.
 4. The internal FastAPI route currently uses a simulated provider that returns
    one unresolved item from the supplied text, with unknown identity and amount.
    It never supplies nutrient values. The route's three focused tests pass;

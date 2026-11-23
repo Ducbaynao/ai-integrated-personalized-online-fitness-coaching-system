@@ -17,7 +17,7 @@ import java.time.Instant;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {NutritionBasicController.class, NutritionStrategyController.class,
-        NutritionCatalogController.class})
+        NutritionCatalogController.class, FoodTextAnalysisController.class})
 public class NutritionBasicErrorAdvice {
     private final Clock clock;
     public NutritionBasicErrorAdvice(Clock clock) { this.clock = clock; }

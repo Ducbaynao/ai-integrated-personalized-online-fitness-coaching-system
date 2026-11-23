@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService.*;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionFailure;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionCatalogService;
+import com.jayway.jsonpath.JsonPath;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -62,6 +63,46 @@ class NutritionBasicIntegrationTest {
     @Autowired CoachingSharingUseCase sharing;
     private static final LocalDate DAY = LocalDate.of(2026, 10, 13);
     private static final Instant AT = Instant.parse("2026-10-13T12:00:00Z");
+
+    @Test void textEstimateIsRecoverableOwnerScopedAndDoesNotWriteFoodLog() throws Exception {
+        UUID owner = student();
+        UUID another = student();
+        String body = """
+                {"text":"oats with milk","day":"2026-10-13","timezone":"Etc/UTC",
+                 "consumedAt":"2026-10-13T12:00:00Z","mealType":"BREAKFAST",
+                 "commandKey":"f06-generate-1"}
+                """;
+        String created = mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultType").value("ESTIMATE"))
+                .andExpect(jsonPath("$.analysisStatus").value("READY"))
+                .andExpect(jsonPath("$.items[0].quantity").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.draftId");
+        mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftId").value(id));
+        mvc.perform(get("/api/v1/nutrition/food-analyses/by-command-key/f06-generate-1")
+                        .with(jwt().jwt(j -> j.subject(owner.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.draftId").value(id));
+        mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json")
+                        .content(body.replace("oats with milk", "different food")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("NUTRITION_IDEMPOTENCY_CONFLICT"));
+        mvc.perform(get("/api/v1/nutrition/food-analyses/" + id)
+                        .with(jwt().jwt(j -> j.subject(another.toString()))))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.food_log_items i
+                JOIN fitness.meals m ON m.id=i.meal_id WHERE m.student_id=?
+                """, Integer.class, owner)).isZero();
+    }
 
     @Test void privateFoodFactsAreFrozenAndCorrectionsRecalculate() {
         UUID student = student();
