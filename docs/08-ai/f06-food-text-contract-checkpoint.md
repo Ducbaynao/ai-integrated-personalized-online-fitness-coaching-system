@@ -1,8 +1,9 @@
 # F06 food text estimate contract checkpoint
 
-**Status:** Draft implementation contract for issue #164. OpenAPI and the AI output
-schema in this branch describe proposed interfaces; they do not establish runtime,
-database migration, live nutrition calculations, or release readiness.
+**Status:** Draft implementation for issue #164. OpenAPI, the AI output schema,
+forward migration V61 and an internal simulated AI route exist on this branch.
+They do not establish Spring runtime, live nutrition calculations, model quality,
+Mobile behavior or release readiness.
 
 ## Existing source and gap
 
@@ -59,14 +60,16 @@ hard-coded contract value.
 
 1. Review the OpenAPI and AI schema shape, including error codes and the
    generation recovery path, from the Mobile consumer perspective.
-2. Add a **new** forward Flyway migration for draft/item/preview identity,
-   revisions, catalog references, confirmation mapping and constraints. Do not
-   edit V7, V39 or V41.
+2. V61 adds forward draft/item/preview storage and stable receipt identity.
+   It passed a clean PostgreSQL 18/Flyway disposable migration run. V7, V39 and
+   V41 were not edited; legacy rows remain nullable in the new columns.
 3. Implement Spring ownership, matching, preview/calculation, atomic Confirm,
    receipt replay, erasure and audit handling. Add tests for T14/T15/T24/T26/T27
    and competing catalog/draft writers.
-4. Implement and validate the F06 FastAPI internal route/provider; validate
-   structured output before Spring accepts it. Run AI schema/fixture tests.
+4. The internal FastAPI route currently uses a simulated provider that returns
+   one unresolved item from the supplied text, with unknown identity and amount.
+   It never supplies nutrient values. The route's three focused tests pass;
+   real recognition and Spring output validation remain to be implemented.
 5. Implement the Mobile typed consumer and Correct/Confirm UI on its own branch
    after the executable DTO stabilizes. Client calls Spring only.
 
