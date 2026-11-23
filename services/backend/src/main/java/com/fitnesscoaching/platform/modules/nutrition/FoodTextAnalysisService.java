@@ -74,6 +74,13 @@ public class FoodTextAnalysisService {
                 request.consumedAt(), request.mealType())));
         Start start = transactions.execute(ignored -> {
             lockStudent(actor);
+            // Generate is durable before provider I/O; prevent collision with committed Nutrition actions.
+            jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 709))",
+                    rs -> { while (rs.next()) { /* receipt namespace */ } }, actor.toString());
+            if (Boolean.TRUE.equals(jdbc.queryForObject("""
+                    SELECT EXISTS(SELECT 1 FROM fitness.nutrition_command_receipts WHERE actor_id=? AND command_key=?)
+                    """, Boolean.class, actor, request.commandKey())))
+                throw new NutritionFailure("NUTRITION_IDEMPOTENCY_CONFLICT", 409);
             var prior = jdbc.query("""
                     SELECT id,request_fingerprint FROM fitness.food_analysis_requests
                     WHERE student_id=? AND command_key=? FOR UPDATE
@@ -169,6 +176,14 @@ public class FoodTextAnalysisService {
 
     public Draft detail(UUID actor, UUID id) {
         requireStudent(actor);
+        return transactions.execute(ignored -> {
+            lockStudent(actor);
+            requireStudent(actor);
+            return readDetail(actor, id);
+        });
+    }
+
+    private Draft readDetail(UUID actor, UUID id) {
         jdbc.update("""
                 UPDATE fitness.food_analysis_requests SET status='FAILED',
                   failure_reason='PROCESSING_TIMEOUT',updated_at=clock_timestamp()
@@ -201,7 +216,27 @@ public class FoodTextAnalysisService {
         };
         return new Draft(id, actor, row.commandKey(), "ESTIMATE", analysis, confirmation,
                 row.revision(), row.day(), row.timezone(), row.consumedAt(), row.mealType(),
-                row.runId(), row.expiresAt(), items, null, row.createdAt(), row.updatedAt());
+                row.runId(), row.expiresAt(), items, latestPreview(id, row.revision()), row.createdAt(), row.updatedAt());
+    }
+
+    private FoodAnalysisReviewService.Preview latestPreview(UUID id, long revision) {
+        var rows = jdbc.query("""
+                SELECT nutrients_json::text FROM fitness.food_analysis_previews
+                WHERE request_id=? AND draft_revision=? ORDER BY preview_revision DESC LIMIT 1
+                """, (rs, n) -> rs.getString(1), id, revision);
+        if (rows.isEmpty()) return null;
+        try {
+            var preview = mapper.readValue(rows.getFirst(), FoodAnalysisReviewService.Preview.class);
+            // Historical receipts remain available, but current detail must not advertise stale catalog selections.
+            for (var item : preview.items()) {
+                Boolean current = jdbc.queryForObject("""
+                        SELECT EXISTS (SELECT 1 FROM fitness.nutrition_catalog_foods
+                        WHERE id=? AND status='PUBLISHED' AND current_revision_id=?)
+                        """, Boolean.class, item.selection().foodId(), item.selection().catalogRevisionId());
+                if (!Boolean.TRUE.equals(current)) return null;
+            }
+            return preview;
+        } catch (Exception invalid) { throw new IllegalStateException("Invalid stored F06 preview", invalid); }
     }
 
     List<RecognizedItem> parseEstimate(String raw) {

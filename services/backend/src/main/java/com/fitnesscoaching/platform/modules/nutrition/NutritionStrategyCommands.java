@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 @Component
 final class NutritionStrategyCommands {
@@ -49,12 +50,21 @@ final class NutritionStrategyCommands {
 
     <T> T receipt(UUID actor, String key, String command, Object payload, Class<T> responseType,
                   Supplier<T> work) {
+        return receipt(actor, key, command, payload, responseType, id -> work.get());
+    }
+
+    <T> T receipt(UUID actor, String key, String command, Object payload, Class<T> responseType,
+                  Function<UUID, T> work) {
         if (key == null || key.isBlank() || key.length() > 120)
             throw new NutritionFailure("VALIDATION_FAILED", 400);
         // Student-scoped lock precedes this actor-scoped receipt lock for every mutation.
         // A Trainer can command two different Students with the same key concurrently.
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 709))",
                 rs -> { while (rs.next()) { /* held through transaction */ } }, actor.toString());
+        if (Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.food_analysis_requests WHERE student_id=? AND command_key=?)
+                """, Boolean.class, actor, key)))
+            throw new NutritionFailure("NUTRITION_IDEMPOTENCY_CONFLICT", 409);
         String hash = sha(json(payload));
         var rows = jdbc.query("""
                 SELECT command_name,payload_hash,response_json::text FROM fitness.nutrition_command_receipts
@@ -67,11 +77,12 @@ final class NutritionStrategyCommands {
             try { return mapper.readValue(prior.response(), responseType); }
             catch (Exception invalid) { throw new IllegalStateException("Invalid nutrition receipt", invalid); }
         }
-        T result = work.get();
+        UUID receiptId = UUID.randomUUID();
+        T result = work.apply(receiptId);
         jdbc.update("""
-                INSERT INTO fitness.nutrition_command_receipts(actor_id,command_key,command_name,payload_hash,response_json)
-                VALUES (?,?,?,?,?::jsonb)
-                """, actor, key, command, hash, json(result));
+                INSERT INTO fitness.nutrition_command_receipts(actor_id,command_key,command_name,payload_hash,response_json,receipt_id)
+                VALUES (?,?,?,?,?::jsonb,?)
+                """, actor, key, command, hash, json(result), receiptId);
         return result;
     }
 
