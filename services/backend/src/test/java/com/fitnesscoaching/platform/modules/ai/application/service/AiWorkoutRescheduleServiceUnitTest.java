@@ -30,6 +30,7 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutS
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery.Occurrence;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.ChangeResult;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
 import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
@@ -82,6 +83,8 @@ class AiWorkoutRescheduleServiceUnitTest {
     @Mock private WorkoutScheduleCalendarQuery calendarQuery;
     @Mock private UserAccountStatusQuery accountStatusQuery;
     @Mock private CoachingAuthorityQuery coachingAuthorityQuery;
+    @Mock private ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentQueryProvider;
+    @Mock private LinkedWorkoutAppointmentQuery linkedAppointmentQuery;
 
     private ObjectMapper objectMapper;
     private Clock clock;
@@ -109,6 +112,7 @@ class AiWorkoutRescheduleServiceUnitTest {
         lenient().when(accountStatusQuery.getAccountStatus(any())).thenReturn(Optional.of(AccountStatus.ACTIVE));
         AuthorityDecision defaultAllow = new AuthorityDecision(true, null, UUID.randomUUID(), 1L, UUID.randomUUID(), UUID.randomUUID(), 1L, DataAccessLevel.MANAGE, null, null);
         lenient().when(coachingAuthorityQuery.evaluateCurrent(any())).thenReturn(defaultAllow);
+        lenient().when(linkedAppointmentQueryProvider.getIfAvailable()).thenReturn(linkedAppointmentQuery);
 
         service = new AiWorkoutRescheduleService(
                 aiRunRepository,
@@ -124,7 +128,8 @@ class AiWorkoutRescheduleServiceUnitTest {
                 clock,
                 null,
                 accountStatusQuery,
-                coachingAuthorityQuery
+                coachingAuthorityQuery,
+                linkedAppointmentQueryProvider
         );
 
         defaultSnapshot = new F05SourceSnapshot(
@@ -931,5 +936,264 @@ class AiWorkoutRescheduleServiceUnitTest {
         assertThatThrownBy(() -> service.acceptReschedule(trainerId, recId, acceptReq))
                 .isInstanceOf(AiRunAccessDeniedException.class)
                 .hasMessageContaining("Trainer coaching or data sharing authority is no longer valid");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03 / T06: Differing expectedAppointmentVersion with same commandKey throws idempotency conflict (409)")
+    void acceptReschedule_idempotentReplayDifferentAppointmentVersion_throwsConflict_BL03() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.APPLIED)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+
+        String appPayload = """
+            {
+              "commandKey": "cmd-replay-app-ver",
+              "actorId": "%s",
+              "appliedRevision": 1,
+              "expectedOccurrenceVersion": 0,
+              "expectedAppointmentVersion": 1,
+              "expectedAppointmentId": null,
+              "decisionNote": ""
+            }
+            """.formatted(studentId);
+
+        AiRecommendationApplication app = new AiRecommendationApplication(
+                UUID.randomUUID(), recId, studentId, "WORKOUT_OCCURRENCE",
+                UUID.randomUUID(), appPayload, fixedNow
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(app));
+
+        // Replay with expectedAppointmentVersion = 2L instead of 1L
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest(
+                "cmd-replay-app-ver", "", 1, 0L, 2L, null
+        );
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Idempotency conflict: commandKey matches a previous command with differing parameters.");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03 / T06: Differing expectedAppointmentId with same commandKey throws idempotency conflict (409)")
+    void acceptReschedule_idempotentReplayDifferentAppointmentId_throwsConflict_BL03() {
+        UUID recId = UUID.randomUUID();
+        UUID oldAppId = UUID.randomUUID();
+        UUID newAppId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.APPLIED)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .revision(1)
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+
+        String appPayload = """
+            {
+              "commandKey": "cmd-replay-app-id",
+              "actorId": "%s",
+              "appliedRevision": 1,
+              "expectedOccurrenceVersion": 0,
+              "expectedAppointmentVersion": 1,
+              "expectedAppointmentId": "%s",
+              "decisionNote": ""
+            }
+            """.formatted(studentId, oldAppId);
+
+        AiRecommendationApplication app = new AiRecommendationApplication(
+                UUID.randomUUID(), recId, studentId, "WORKOUT_OCCURRENCE",
+                UUID.randomUUID(), appPayload, fixedNow
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.of(app));
+
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest(
+                "cmd-replay-app-id", "", 1, 0L, 1L, newAppId
+        );
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Idempotency conflict: commandKey matches a previous command with differing parameters.");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03 / T05: Linked appointment version drift between snapshot and live state blocks accept (409)")
+    void acceptReschedule_whenLinkedAppointmentVersionDrift_throwsLifecycleConflict_BL03() throws Exception {
+        UUID recId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        // Snapshot recorded appointment version 1
+        F05SourceSnapshot snapshot = new F05SourceSnapshot(
+                studentId, periodId, "SELF_DIRECTED", null,
+                occurrenceId, 0L, "SCHEDULED",
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Chest & Triceps",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(7200), null,
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", "COACH_REQUIRED",
+                appointmentId, 1L, TrainingContinuityState.CONFIRMED_NEW, 0, null, fixedNow
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .expiresAt(fixedNow.plus(30, ChronoUnit.MINUTES))
+                .revision(1)
+                .sourceSnapshot(objectMapper.writeValueAsString(snapshot))
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        // Live occurrence linked appointment has advanced to version 2 (e.g. bilateral reschedule completed)
+        Occurrence liveOccurrence = new Occurrence(
+                occurrenceId, 0L, studentId, "SCHEDULED",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(3600), null, null, fixedNow.plusSeconds(7200),
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", null, null, null,
+                appointmentId, 2L
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(liveOccurrence);
+
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest("cmd-acc", "Accepting", 1, 0L, 1L, appointmentId);
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Linked appointment has changed since proposal was generated.");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Expected appointment version mismatch with live state throws conflict (409)")
+    void acceptReschedule_whenExpectedAppointmentVersionMismatch_throwsLifecycleConflict_BL03() throws Exception {
+        UUID recId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        F05SourceSnapshot snapshot = new F05SourceSnapshot(
+                studentId, periodId, "SELF_DIRECTED", null,
+                occurrenceId, 0L, "SCHEDULED",
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Chest & Triceps",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(7200), null,
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", "COACH_REQUIRED",
+                appointmentId, 2L, TrainingContinuityState.CONFIRMED_NEW, 0, null, fixedNow
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .expiresAt(fixedNow.plus(30, ChronoUnit.MINUTES))
+                .revision(1)
+                .sourceSnapshot(objectMapper.writeValueAsString(snapshot))
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        Occurrence liveOccurrence = new Occurrence(
+                occurrenceId, 0L, studentId, "SCHEDULED",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(3600), null, null, fixedNow.plusSeconds(7200),
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", null, null, null,
+                appointmentId, 2L
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(liveOccurrence);
+
+        // Caller sends expectedAppointmentVersion = 1L (stale), while live is 2L
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest("cmd-acc", "Accepting", 1, 0L, 1L, appointmentId);
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Appointment version conflict: expected 1 but current is 2");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Linked appointment cancelled after generation blocks accept (409)")
+    void acceptReschedule_whenLinkedAppointmentNotConfirmed_throwsLifecycleConflict_BL03() throws Exception {
+        UUID recId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        F05SourceSnapshot snapshot = new F05SourceSnapshot(
+                studentId, periodId, "SELF_DIRECTED", null,
+                occurrenceId, 0L, "SCHEDULED",
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Chest & Triceps",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(7200), null,
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", "COACH_REQUIRED",
+                appointmentId, 1L, TrainingContinuityState.CONFIRMED_NEW, 0, null, fixedNow
+        );
+
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .decisionAuthority(AiDecisionAuthority.STUDENT)
+                .expiresAt(fixedNow.plus(30, ChronoUnit.MINUTES))
+                .revision(1)
+                .sourceSnapshot(objectMapper.writeValueAsString(snapshot))
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.SELF_DIRECTED, null, null, fixedNow, null))
+        );
+        when(recommendationRepository.findApplicationByRecommendationId(recId)).thenReturn(Optional.empty());
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        Occurrence liveOccurrence = new Occurrence(
+                occurrenceId, 0L, studentId, "SCHEDULED",
+                fixedNow.plusSeconds(3600), fixedNow.plusSeconds(3600), null, null, fixedNow.plusSeconds(7200),
+                "Asia/Ho_Chi_Minh", "2026-11-20T17:00:00", "2026-11-20T18:00:00",
+                "+07:00", "+07:00", null, null, null,
+                appointmentId, 1L
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(liveOccurrence);
+
+        // Appointment link is no longer CONFIRMED (cancelled or removed)
+        when(linkedAppointmentQuery.findActiveLinks(occurrenceId)).thenReturn(List.of(
+                new LinkedWorkoutAppointmentQuery.Linked(
+                        appointmentId, studentId, trainerId, periodId,
+                        1L, "CANCELLED", fixedNow.plusSeconds(3600), fixedNow.plusSeconds(7200)
+                )
+        ));
+
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest("cmd-acc", "Accepting", 1, 0L, 1L, appointmentId);
+
+        assertThatThrownBy(() -> service.acceptReschedule(studentId, recId, acceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Linked appointment is no longer in CONFIRMED status.");
     }
 }

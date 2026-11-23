@@ -1,5 +1,7 @@
 # F05 — Xác minh bàn giao và checklist nghiệm thu
 
+> **Bổ sung 23/11/2026 — BL-03:** Workflow đổi hẹn hai bên → sinh/review proposal F05 mới → Apply được triển khai cho phạm vi Schedule hiện hỗ trợ. Xem [báo cáo BL-03](f05-appointment-workflow-handover-20261123.md) và [evidence](artifacts/f05-runtime-evidence/bl03_verification_20261123.json). Giữ mở COACH_REQUIRED khi đổi sang khoảng rời buổi hiện tại, lifecycle request EXPIRED/CANCELLED chưa được Schedule hỗ trợ, availability/recovery D06/OD-3, Mobile, provider thật và operational drills. Các phần bên dưới giữ bằng chứng theo ngày/phạm vi lịch sử, không dùng số liệu CI cũ để chứng minh diff BL-03.
+
 **Ngày xác minh:** 20/11/2026, UTC+7.  
 **Phạm vi:** F05 / P2-M4; xác minh bàn giao Backend/AI Service.  
 **Commit bàn giao:** `be5925872bbf0d08d7188a611a0fad616a115a84`.  

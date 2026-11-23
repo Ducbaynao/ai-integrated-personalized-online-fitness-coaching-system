@@ -1,0 +1,451 @@
+{
+  "verifiedOn": "2026-11-23",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "branch": "feat/f05-appointment-workflow",
+  "baseCommit": "bee4c08605d0c087236c5a297edb75bb2149f1aa",
+  "baseline": {
+    "pr": 166,
+    "mergeCommit": "bee4c08605d0c087236c5a297edb75bb2149f1aa",
+    "postMergeCi": 45143204129,
+    "conclusion": "success",
+    "remoteMainMatched": true,
+    "baselineCiDoesNotVerifyWorkingTree": true
+  },
+  "initialState": {
+    "branchAlreadyExisted": true,
+    "preExistingModifiedFiles": 9,
+    "preservedInitialDiff": "D:\\Projects\\reports\\f05-bl03-20261123\\initial-working-tree.patch",
+    "initialDiffSha256": "e6ebdde523be1f6e10775078a33ddcf8cf1a9eb211316646dd60b4c38e4d95ce"
+  },
+  "implementationStatus": "IMPLEMENTED_AND_VERIFIED_FOR_SUPPORTED_SCHEDULE_FLOW",
+  "fullFeatureAcceptance": "OPEN",
+  "testedSourceDiffSha256": "ac3f4d5fc422f225c0d75031c919389870e30b3df7b8c1425acb35f5081a8649",
+  "testedSourcePatch": "D:\\Projects\\reports\\f05-bl03-20261123\\tested-source.patch",
+  "sourceFiles": [
+    {
+      "path": "contracts/openapi/openapi.yaml",
+      "sha256": "d2f6fc2b50dcac9a8b1b48c553ab4112bd56a54e820c8f71986d47141fabac1c"
+    },
+    {
+      "path": "services/ai-service/app/integrations/simulated_f05_provider.py",
+      "sha256": "75570b6f85ea81c194fb6020455520548183186161f2517841a9a9fa01a64e4c"
+    },
+    {
+      "path": "services/ai-service/app/schemas/f05_schemas.py",
+      "sha256": "2967a66985b7c0bde7f0f36ddb0c36773562cb1f42b4ad918df6eed46fab58f7"
+    },
+    {
+      "path": "services/ai-service/tests/test_f05_provider.py",
+      "sha256": "014aeaf5e34c2d56e1f62d70b23c13bc16f6a77d0583d2e9248eea46d07efc18"
+    },
+    {
+      "path": "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/adapter/out/client/SimulatedF05AiServiceClient.java",
+      "sha256": "396ee6d18161b66550be21f0ac0b9b141978040e95e333961731943ccbea053a"
+    },
+    {
+      "path": "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/port/out/F05AiServiceClient.java",
+      "sha256": "6690faea25db92d0fac89bead837b22b64bf765ca9c905480c008436a0acc421"
+    },
+    {
+      "path": "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/AiWorkoutRescheduleService.java",
+      "sha256": "9cb628e1de854cb49264513d0630a1c02112f7a1cb02ce039d1e41acbfe5291e"
+    },
+    {
+      "path": "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/F05ContextBuilder.java",
+      "sha256": "1405aacbfe25a236e11a6962600e4c70aff4897065b9b5594826ee3fd511635a"
+    },
+    {
+      "path": "services/backend/src/test/java/com/fitnesscoaching/platform/AiWorkoutRescheduleIntegrationTest.java",
+      "sha256": "e14e23d87f021293c293fc64c83daaf3d50bb36db7c3f4b03fab788222785d03"
+    },
+    {
+      "path": "services/backend/src/test/java/com/fitnesscoaching/platform/AiWorkoutRescheduleRealFastApiIntegrationTest.java",
+      "sha256": "a23e14a141bb685a49a62d1c0d650af9b420995677525350db25b9bde9b15222"
+    },
+    {
+      "path": "services/backend/src/test/java/com/fitnesscoaching/platform/modules/ai/application/service/AiWorkoutRescheduleServiceUnitTest.java",
+      "sha256": "fa2c09155d6aecd1fce6ecbb5df9a78d5db9877915faeebf86c4ca7a2f17f3e6"
+    },
+    {
+      "path": "services/backend/src/test/java/com/fitnesscoaching/platform/modules/ai/application/service/F05ContextBuilderUnitTest.java",
+      "sha256": "cdcbed568ab231a9c667cd8f01808289c4dd061480fcecf85f5427e03d6a8b7a"
+    }
+  ],
+  "backend": {
+    "tests": 139,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "class": "AiWorkoutRescheduleIntegrationTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.AiWorkoutRescheduleIntegrationTest.xml",
+        "reportSha256": "f5746d9b667e7c95193066b872e5c7b7b7a51648129c283badbba60c1d51265c",
+        "reportModifiedUtc": "2026-11-23T11:26:22.531516+00:00",
+        "tests": 46,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "missedWorkoutStartedAfterGenerationCannotBeApplied",
+          "f05Bl03_legacyExplicitAppointmentReceipt_replaysOnlyMatchingSource",
+          "trainerPermissionRevoked_blocksAccept",
+          "inFlightRevocation_accountDeactivated_failsDeliveryAndPersistsFailedRun_T04",
+          "workoutScheduleConflictOnDestinationSlot_abortsAcceptWithOverlapConflict",
+          "concurrentAcceptAndReject_serializedConsistently(boolean)[1]",
+          "concurrentAcceptAndReject_serializedConsistently(boolean)[2]",
+          "f05Bl03_trainerRequestsAppointmentReschedule_studentAccepts_proposalAccepted",
+          "f05Bl03_pendingOrRejectedChangeRequest_doesNotChangeAppointment",
+          "idempotentAcceptRetry_replaysReceipt_T06_T25(boolean)[1]",
+          "idempotentAcceptRetry_replaysReceipt_T06_T25(boolean)[2]",
+          "inFlightRevocation_viewPermissionRevoked_failsDeliveryAndPersistsFailedRun_T04",
+          "expiredProposal_failsAndMarksExpired_T23",
+          "coachingPeriodChanged_abortsAccept",
+          "unrelatedTrainer_blocked_T03",
+          "concurrentDoubleAccept_differentKeys_onlyOneSucceeds(boolean)[1]",
+          "concurrentDoubleAccept_differentKeys_onlyOneSucceeds(boolean)[2]",
+          "inFlightRevocation_managePermissionRevoked_failsDeliveryAndPersistsFailedRun_T04",
+          "f05Bl03_unacceptedRequests_doNotAuthorizeProposedSlot(String)[1]",
+          "f05Bl03_unacceptedRequests_doNotAuthorizeProposedSlot(String)[2]",
+          "f05Bl03_unacceptedRequests_doNotAuthorizeProposedSlot(String)[3]",
+          "f05Bl03_unacceptedRequests_doNotAuthorizeProposedSlot(String)[4]",
+          "f05Bl03_concurrentCompetingAccepts_onlyOneSucceeds",
+          "studentInHumanCoachMode_acceptBlocked_T02",
+          "inFlightRevocation_coachingPeriodEnded_failsDeliveryAndPersistsFailedRun_T04",
+          "acceptReschedule_whenAuditFails_rollsBackEntireTransaction",
+          "f05Bl03_appointmentDecisionAndF05ApplyRace_onlyOneCommits",
+          "generateReschedule_whenAuditFails_rollsBackProposalAndMarksRunFailed",
+          "occurrenceVersionConflict_failsAndRollsBack_T05",
+          "coachRequiredSession_withConfirmedAppointment_acceptsAndTransfersLink",
+          "rejectReschedule_leavesWorkoutUnchanged",
+          "f05Bl03_staleProposalBlockedWhenAppointmentVersionAdvances_freshProposalSucceeds",
+          "generateAndAcceptReschedule_selfDirected_success",
+          "continuityAndProvenance_persistedInSnapshotAndPayload_T01",
+          "f05Bl03_idempotentReplayPreservesFingerprintAndReceipt",
+          "readbackGuards_distinguishManageAndDismissView_T04",
+          "linkedAppointmentChangedAfterGeneration_abortsAccept",
+          "f05Bl03_cancelledAppointment_blocksApplyWithoutCancellingWorkout",
+          "getReschedule_whenExpiringConcurrentlyWithAccept_doesNotOverwriteAppliedStatus",
+          "f05Bl03_studentRequestsAppointmentReschedule_trainerAccepts_proposalAccepted",
+          "concurrentGetAndAcceptNearExpiry_resolvesToConsistentTerminalState",
+          "coachRequiredSession_withoutAppointment_abortsWithConflict",
+          "legacySnapshot_missingNewFields_handledGracefullyDuringAccept",
+          "f05Bl03_coachRequired_disjointMoveBlocked_butContainingChangeAndFreshProposalWork",
+          "generationRejectsUnfinishedWindowUnknownEndAndStartedSources",
+          "f05Bl03_legacyReceiptFingerprint_stillReplays"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.AiWorkoutRescheduleIntegrationTest.xml"
+      },
+      {
+        "class": "AiWorkoutRescheduleRealFastApiIntegrationTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.AiWorkoutRescheduleRealFastApiIntegrationTest.xml",
+        "reportSha256": "f1ab105d10da71a7b6caf1fe93a72ebe0bc338b45788e3a97fe80151c3e1a7af",
+        "reportModifiedUtc": "2026-11-23T11:22:50.700854+00:00",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "completeE2EFlow_generateReadAccept_domainReadback(boolean)[1]",
+          "completeE2EFlow_generateReadAccept_domainReadback(boolean)[2]",
+          "retrySameKey_idempotentReplay_noSecondMutation",
+          "bilateralAppointmentRefresh_throughRealFastApi_preservesSnapshotAndAppliesNewProposal",
+          "unauthorizedActor_deniedWith403",
+          "occurrenceVersionConflict_returnsConflict_noMutation",
+          "rejectProposal_leavesWorkoutUnchanged"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.AiWorkoutRescheduleRealFastApiIntegrationTest.xml"
+      },
+      {
+        "class": "AiWorkoutRescheduleServiceUnitTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.modules.ai.application.service.AiWorkoutRescheduleServiceUnitTest.xml",
+        "reportSha256": "0264d23701cd1228d726e8c451a8b7af9dcecb3c640c166527ab35b66d90d691",
+        "reportModifiedUtc": "2026-11-23T11:26:23.203956+00:00",
+        "tests": 24,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "acceptReschedule_whenOccurrenceNotScheduled_throwsLifecycleConflict_T05",
+          "getReschedule_whenExpired_marksExpiredIfPending",
+          "generateReschedule_success",
+          "acceptReschedule_differingParametersSameKey_throwsConflict_T25",
+          "acceptReschedule_idempotentReplayDifferentAppointmentId_throwsConflict_BL03",
+          "getReschedule_studentView_success",
+          "getReschedule_whenTrainerViewRevoked_blocksReadback_T04",
+          "getReschedule_unrelatedActor_denied",
+          "acceptReschedule_whenHumanCoachMode_studentAcceptBlocked_T02",
+          "acceptReschedule_whenOccurrenceVersionConflict_throwsLifecycleConflict_T05",
+          "acceptReschedule_idempotentReplayDifferentAppointmentVersion_throwsConflict_BL03",
+          "acceptReschedule_whenLinkedAppointmentChanged_throwsConflict",
+          "generateReschedule_whenTrainerManageRevokedInFlight_abortsDeliveryAndFailsRun_T04",
+          "acceptReschedule_idempotentReplay_T06",
+          "acceptReschedule_whenSelfDirected_studentAcceptSucceeds_T01_T27",
+          "acceptReschedule_whenLinkedAppointmentNotConfirmed_throwsLifecycleConflict_BL03",
+          "acceptReschedule_whenLinkedAppointmentVersionDrift_throwsLifecycleConflict_BL03",
+          "generateReschedule_whenCoachingPeriodChangedInFlight_abortsDelivery_T04",
+          "generateReschedule_whenTrainerViewRevokedInFlight_abortsDeliveryAndFailsRun_T04",
+          "getReschedule_whenTrainerManageRevoked_stillAllowsView_T04",
+          "acceptReschedule_whenExpectedAppointmentVersionMismatch_throwsLifecycleConflict_BL03",
+          "rejectReschedule_success",
+          "acceptReschedule_whenExpired_marksExpiredAndThrows_T23",
+          "acceptReschedule_whenUnrelatedTrainer_blocked_T03"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.modules.ai.application.service.AiWorkoutRescheduleServiceUnitTest.xml"
+      },
+      {
+        "class": "F05ContextBuilderUnitTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.modules.ai.application.service.F05ContextBuilderUnitTest.xml",
+        "reportSha256": "06f2ff2029e600924313bb0ee928b70bb561fde8795b9ccef651194336b59c34",
+        "reportModifiedUtc": "2026-11-23T11:21:00.759413+00:00",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "buildContext_fallbackCompletionEvidence_resolvesCorrectly",
+          "buildContext_confirmedBeginner_mapsToConfirmedNew",
+          "buildContext_coachRestricted_mapsToRestrictedHistory",
+          "buildContext_prolongedInactivity_mapsToProlongedInactivity",
+          "buildContext_withLinkedConfirmedAppointment_populatesAppointmentIntervalInRequest",
+          "buildContext_recentWorkout_mapsToRecentActivityObserved",
+          "buildContext_noProviders_defaultsToUnknownHistory",
+          "buildContext_fallbackProlongedInactivity_resolvesCorrectly",
+          "buildContext_missingHistory_mapsToUnknownHistory"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.modules.ai.application.service.F05ContextBuilderUnitTest.xml"
+      },
+      {
+        "class": "F05RuntimeOutputValidatorUnitTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.modules.ai.application.service.F05RuntimeOutputValidatorUnitTest.xml",
+        "reportSha256": "5c253cb53bc746d1727fa492e5a3a1dc281741eab6a300c1ce8e7b8a375e7e38",
+        "reportModifiedUtc": "2026-11-23T11:21:00.764441+00:00",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "preservingCoachRequired_passes",
+          "t10_degradingCoachRequiredToOptional_fails",
+          "nullSnapshot_fails",
+          "slotExceeding90Days_fails",
+          "emptyPayload_fails",
+          "mismatchedOccurrenceId_fails",
+          "pastProposedStart_fails",
+          "destinationEndBeforeStart_fails",
+          "dstGapNonexistentLocalTime_fails",
+          "validPayload_passes",
+          "invalidRecommendationType_fails",
+          "t10_degradingCoachRequired_fails"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.modules.ai.application.service.F05RuntimeOutputValidatorUnitTest.xml"
+      },
+      {
+        "class": "WorkoutScheduleChangeIntegrationTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.WorkoutScheduleChangeIntegrationTest.xml",
+        "reportSha256": "acc3bd1e6e06d12ea94ab9b6d9752b9f25dee85727b3966df61e6eda52d8c879",
+        "reportModifiedUtc": "2026-11-23T11:21:17.740144+00:00",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "ambiguousDstOffsetsRescheduleToDistinctInstantsWithinFrozenWindow",
+          "missedSourceReschedulesWithHistoryAndReplay",
+          "rescheduleWinningRejectsStartWithoutExecution(boolean)[1]",
+          "rescheduleWinningRejectsStartWithoutExecution(boolean)[2]",
+          "sourceStillWithinSlotOrWithoutKnownEndCannotReschedule",
+          "appointmentLinkAndRescheduleRaceHasOnlyOneWinner",
+          "historicalExecutionWithoutSealBlocksMissedReschedule",
+          "startWinningSealsOccurrenceAndRejectsRescheduleWithoutEffects(boolean)[1]",
+          "startWinningSealsOccurrenceAndRejectsRescheduleWithoutEffects(boolean)[2]",
+          "studentHttpRescheduleAndDetailExposeRealLineage",
+          "validatesDstAndWindowAndLegacySource",
+          "lateCancelRequiresReasonAndSealedOccurrenceCannotChange",
+          "competingCommandsCreateOnlyOneReplacement",
+          "historicalAmbiguousDstOffsetsCannotBypassRescheduleWindow",
+          "unknownEndOverlapDuplicateAndAppointmentRejectWithoutPartialHistory",
+          "sourcePlanTerminalTransitionsDoNotRevokeConfirmedOccurrenceChanges",
+          "missedRescheduleAuditFailureRollsBackHistoryAndReplacement",
+          "appointmentCannotAttachAfterChange",
+          "rescheduleRetainsSourceCreatesOneSuccessorAndReplays",
+          "cancelLegacyNullEndAndConcealOtherStudent",
+          "skipAndRescheduleRaceLeavesExactlyOneTerminalOutcome"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.WorkoutScheduleChangeIntegrationTest.xml"
+      },
+      {
+        "class": "AppointmentHttpIntegrationTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.AppointmentHttpIntegrationTest.xml",
+        "reportSha256": "6f34b6c0f7ac6f5f06a4af350f64fd1ef352628ab4757070f537e37c5ac60e0b",
+        "reportModifiedUtc": "2026-11-23T11:20:59.528725+00:00",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "httpCreateAndRejectReturnContractShapeWithoutAppointment",
+          "cancellingIndependentAppointmentDoesNotCancelOverlappingPlannedWorkout",
+          "twoAcceptsOfOverlappingRequestsNeverBothCommit",
+          "studentCancelIsVersionedAuditedAndReplayStable",
+          "confirmedCoachRequiredAppointmentLinksOnlyContainedUnsealedOccurrence",
+          "trainerRescheduleRequestNeedsStudentDecisionAndPreservesHistory",
+          "legacyAppointmentRetainsNullableIntentAndCannotBeSilentlyDecided",
+          "foreignActorCannotReadOrDecideAndStaleDecisionDoesNotCreateAppointment",
+          "studentRequestAndTrainerAcceptCommitOneAppointmentAndReplay"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.AppointmentHttpIntegrationTest.xml"
+      },
+      {
+        "class": "ScheduleChangeProposalIntegrationTest",
+        "report": "services/backend/target/surefire-reports/TEST-com.fitnesscoaching.platform.ScheduleChangeProposalIntegrationTest.xml",
+        "reportSha256": "f7e811e3848e6327b10ff754ca7a977c238b10f6f28d1b7d6b7424c5f6c0c5d9",
+        "reportModifiedUtc": "2026-11-23T11:21:09.736799+00:00",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "methods": [
+          "staleVersionAndPayloadConflictDoNotCommitSecondEffect",
+          "studentAcceptRescheduleIsAtomicAndStaleProposalRemainsPending",
+          "acceptWinningPreventsAppointmentLinkWithoutPartialWriterCommit",
+          "appointmentUnknownEndAndOverlapRollbackAcceptButRejectRemainsAvailable",
+          "appointmentWinningReturnsHttp409AndKeepsProposalPendingForRejection",
+          "viewCanReadButCannotCreateOrWithdrawAndForeignStudentIsConcealed",
+          "createListDetailWithdrawAndReplayThroughHttp",
+          "competingAcceptAndStartCannotBothSucceed",
+          "competingAcceptAndDirectChangeHaveOnlyOneOccurrenceEffect",
+          "competingAcceptCommandsApplyOneChangeAndOneReceipt",
+          "trainerLossConcealsReadAndAcceptButStudentCanReject"
+        ],
+        "retainedReport": "D:\\Projects\\reports\\f05-bl03-20261123\\TEST-com.fitnesscoaching.platform.ScheduleChangeProposalIntegrationTest.xml"
+      }
+    ],
+    "executionNote": "Latest successful report per suite: six unaffected suites passed during the eight-suite run; two integration suites reran after fixture corrections (52/52). An extra legacy explicit-Appointment receipt regression then failed as expected; after the fix service/integration suites reran (70/70). Final aggregate is 139 distinct tests across eight suites, not a single final 139-test command."
+  },
+  "commands": [
+    {
+      "cwd": "services/backend",
+      "command": ".\\mvnw.cmd -B test \"-Dtest=AiWorkoutRescheduleIntegrationTest,AiWorkoutRescheduleRealFastApiIntegrationTest,AiWorkoutRescheduleServiceUnitTest,F05ContextBuilderUnitTest,F05RuntimeOutputValidatorUnitTest,WorkoutScheduleChangeIntegrationTest,AppointmentHttpIntegrationTest,ScheduleChangeProposalIntegrationTest\"",
+      "log": "final-backend-tests.log",
+      "outcome": "Six suites passed; two integration suites required fixture corrections"
+    },
+    {
+      "cwd": "services/backend",
+      "command": ".\\mvnw.cmd -B test \"-Dtest=AiWorkoutRescheduleIntegrationTest,AiWorkoutRescheduleRealFastApiIntegrationTest\"",
+      "log": "final-integration-tests.log",
+      "outcome": "52/52 PASS"
+    },
+    {
+      "cwd": "services/backend",
+      "command": ".\\mvnw.cmd -B test \"-Dtest=AiWorkoutRescheduleIntegrationTest,AiWorkoutRescheduleServiceUnitTest\"",
+      "log": "final-replay-tests.log",
+      "outcome": "70/70 PASS after legacy explicit-Appointment receipt compatibility fix"
+    },
+    {
+      "cwd": "services/ai-service",
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider",
+      "log": "python-tests.log",
+      "outcome": "90 passed; 2 existing deprecation warnings"
+    },
+    {
+      "cwd": "services/ai-service",
+      "command": ".\\.venv\\Scripts\\python.exe -m ruff check .",
+      "outcome": "PASS"
+    },
+    {
+      "cwd": ".",
+      "command": "npm run validate:contracts",
+      "log": "contracts.log",
+      "outcome": "PASS; OpenAPI valid; 10 schemas / 48 fixtures"
+    },
+    {
+      "cwd": ".",
+      "command": "npm run test:contracts",
+      "log": "contract-tests.log",
+      "outcome": "21/21 PASS"
+    },
+    {
+      "cwd": ".",
+      "command": "npm run validate:ux-docs",
+      "outcome": "PASS; 18 required files"
+    },
+    {
+      "cwd": ".",
+      "command": "git diff --check",
+      "outcome": "PASS"
+    }
+  ],
+  "python": {
+    "passed": 90,
+    "f05ProviderTests": 7,
+    "warnings": 2,
+    "ruff": "PASS"
+  },
+  "environment": {
+    "dockerEngine": "29.2.1",
+    "databaseImage": "pgvector/pgvector:pg18",
+    "databasePurpose": "Disposable Testcontainers only",
+    "boundary": "MockMvc -> Spring -> real HTTP Uvicorn/FastAPI -> simulated provider -> Workout domain -> PostgreSQL"
+  },
+  "logRecords": [
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\baseline-tests.log",
+      "sha256": "403bbad5be25ca212de720e5a840f42be8443c56d6716625f170b77c6dcaa9af",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\legacy-red.log",
+      "sha256": "140c6eb4dc77454a74e12cad164714d13a673ea1f003c42a7fcc33a5103c9b06",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\verification-tests.log",
+      "sha256": "12945d25dfbdca963836525ab920c00cd2bd04c04e14ef98a259cceae1a01525",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\final-backend-tests.log",
+      "sha256": "e2d4388620806d4f8a0746b61e58cb0fe8ab9f3d2db6c12a7f555aba5d63b29c",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\final-integration-tests.log",
+      "sha256": "d95923b4566d5896b20fa9abfc96629b036bcb5c5177f7f413bff3ef5d1e0a1b",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\python-tests.log",
+      "sha256": "edf484da607de21670265d0317421595857b2fb78aebd92a27393367b88242db",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\contracts.log",
+      "sha256": "1a352c730fc8cc9d409fdf63c1a213bc98d454e8ce4bc218f05e65f1005f733d",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\contract-tests.log",
+      "sha256": "2de18db5a857964aa89fc43408f11440bcf0c3c16891385955db6c62d4e34e3c",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\legacy-explicit-red.log",
+      "sha256": "f0cb869020a153cc9ff03b8d9ef3bba63ef9882545d96ea2c51d6ea5968b3554",
+      "summary": []
+    },
+    {
+      "path": "D:\\Projects\\reports\\f05-bl03-20261123\\final-replay-tests.log",
+      "sha256": "57b02cde8c9c888daf8e73f2a7899f89ff5bb43709123601f21946aa232edb6c",
+      "summary": []
+    }
+  ],
+  "limits": [
+    "COACH_REQUIRED moves leaving the current occurrence outside the confirmed Appointment remain blocked by existing approved Schedule dependency guards. Only containing interval changes are demonstrated.",
+    "V45 permits only PENDING/ACCEPTED/REJECTED change requests. EXPIRED/CANCELLED request values are rejected by DB; no expiry/withdraw command is delivered. Appointment cancellation itself is separately tested.",
+    "Full availability, D06/OD-3 recovery rules, Mobile, live provider evaluation, remaining operational drills and feature/milestone sign-off remain OPEN.",
+    "No new migration, recurring-series mutation or Actual Workout mutation.",
+    "No Git mutation, commit, push, PR/issue, messaging or deployment."
+  ],
+  "completedAtLocal": "2026-11-23T18:27:10.047681+07:00"
+}

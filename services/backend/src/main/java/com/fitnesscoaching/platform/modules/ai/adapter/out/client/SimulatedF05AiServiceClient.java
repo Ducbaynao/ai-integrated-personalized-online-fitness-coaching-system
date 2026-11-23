@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.fitnesscoaching.platform.modules.ai.application.port.out.F05AiServiceClient;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -71,6 +72,24 @@ public class SimulatedF05AiServiceClient implements F05AiServiceClient {
             Instant proposedEnd = localEndDt.toInstant(offset);
             String offsetFormatted = offset.getId().equals("Z") ? "+00:00" : offset.getId();
 
+            if (request.hasLinkedAppointment() && request.appointmentStartAt() != null && request.appointmentEndAt() != null) {
+                    Instant appStart = Instant.parse(request.appointmentStartAt());
+                    Instant appEnd = Instant.parse(request.appointmentEndAt());
+                    if (!appEnd.isAfter(appStart)) throw new IllegalArgumentException("Invalid Appointment interval");
+                    Duration duration = request.plannedEndAt() == null ? Duration.ofHours(1)
+                            : Duration.between(plannedStart, Instant.parse(request.plannedEndAt()));
+                    Instant alignedEnd = appStart.plus(duration);
+                    if (duration.isPositive() && appStart.isAfter(now) && !appStart.isAfter(now.plus(90, ChronoUnit.DAYS))
+                            && !appStart.equals(plannedStart) && !alignedEnd.isAfter(appEnd)) {
+                        proposedStart = appStart;
+                        proposedEnd = alignedEnd;
+                        localStartDt = LocalDateTime.ofInstant(proposedStart, zone);
+                        localEndDt = LocalDateTime.ofInstant(proposedEnd, zone);
+                        offset = zone.getRules().getOffset(proposedStart);
+                        offsetFormatted = offset.getId().equals("Z") ? "+00:00" : offset.getId();
+                    }
+            }
+
             String supervision = request.supervisionRequirement() != null
                     ? request.supervisionRequirement()
                     : "SELF_PERFORMABLE";
@@ -80,7 +99,8 @@ public class SimulatedF05AiServiceClient implements F05AiServiceClient {
             destination.put("localEnd", localEndDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             destination.put("timezone", tzName);
             destination.put("startUtcOffset", offsetFormatted);
-            destination.put("endUtcOffset", offsetFormatted);
+            ZoneOffset endOffset = zone.getRules().getOffset(proposedEnd);
+            destination.put("endUtcOffset", endOffset.getId().equals("Z") ? "+00:00" : endOffset.getId());
             destination.put("proposedStartAt", proposedStart.toString());
             destination.put("proposedEndAt", proposedEnd.toString());
 

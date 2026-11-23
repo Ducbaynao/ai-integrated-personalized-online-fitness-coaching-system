@@ -24,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutExecutionCommandUseCase;
 import com.fitnesscoaching.platform.modules.workout.domain.WorkoutScheduleFailure;
+import com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -94,6 +95,7 @@ class AiWorkoutRescheduleIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private WorkoutExecutionCommandUseCase execution;
+    @Autowired private AppointmentService appointmentService;
     @MockitoSpyBean private F05AiServiceClient aiServiceClient;
 
     @BeforeEach
@@ -113,6 +115,7 @@ class AiWorkoutRescheduleIntegrationTest {
 
         jdbc.update("INSERT INTO fitness.users(id, email, password_hash, display_name, status, preferred_locale, timezone) VALUES (?, ?, 'hash', 'Student', 'ACTIVE', 'vi-VN', 'Asia/Ho_Chi_Minh')",
                 student, student + "@example.com");
+        jdbc.update("INSERT INTO fitness.user_roles(user_id, role_id, assigned_by, assigned_at) SELECT ?, id, ?, clock_timestamp() FROM fitness.roles WHERE code = 'STUDENT' ON CONFLICT DO NOTHING", student, student);
         jdbc.update("INSERT INTO fitness.student_profiles(user_id) VALUES (?)", student);
         jdbc.update("""
                 INSERT INTO fitness.workout_plans(id, student_id, name, source, status, created_by, decision_owner_type, decision_owner_id)
@@ -1439,5 +1442,538 @@ class AiWorkoutRescheduleIntegrationTest {
             jdbc.execute("DROP TRIGGER IF EXISTS trg_test_fail_reschedule_proposed_audit ON fitness.audit_logs");
             jdbc.execute("DROP FUNCTION IF EXISTS fitness.test_fail_reschedule_proposed_audit_trigger()");
         }
+    }
+
+    private record Bl03Fixture(UUID student, UUID trainer, UUID period, UUID occurrence, UUID appointment, Instant start) {}
+
+    private Bl03Fixture linkedBl03Fixture(boolean coachRequired) {
+        var f = createFixture(coachRequired);
+        UUID trainer = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainer, "HUMAN_COACH");
+        UUID period = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+        Instant start = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3).atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        UUID occurrence = timedOccurrence(f, start, start.plus(1, ChronoUnit.HOURS));
+        UUID appointment = insertConfirmedAppointment(f.studentId(), trainer, period, occurrence, start, start.plus(1, ChronoUnit.HOURS));
+        return new Bl03Fixture(f.studentId(), trainer, period, occurrence, appointment, start);
+    }
+
+    private AppointmentService.CommandResult requestBl03(Bl03Fixture f, Instant start, Instant end, long version) {
+        return appointmentService.requestReschedule(new AppointmentService.RescheduleCommand(f.student(), f.appointment(), version,
+                new AppointmentService.LocalInterval(LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)),
+                        LocalDateTime.ofInstant(end, ZoneOffset.ofHours(7)), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"),
+                "Coordinate Appointment separately", UUID.randomUUID()));
+    }
+
+    private void decideBl03(Bl03Fixture f, UUID request, long version) {
+        appointmentService.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                f.trainer(), request, "ACCEPT", 0L, version, UUID.randomUUID()));
+    }
+
+    private WorkoutRescheduleApiResponse generateBl03(Bl03Fixture f) {
+        return rescheduleService.generateReschedule(f.student(), new WorkoutRescheduleApiRequest(
+                f.student(), f.occurrence(), 0L, UUID.randomUUID().toString(), "Review current confirmed Appointment", null));
+    }
+
+    private AcceptRescheduleApiRequest acceptBl03(Bl03Fixture f, long version) {
+        return new AcceptRescheduleApiRequest(UUID.randomUUID().toString(), "Reviewed", 1, 0L, version, f.appointment());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PENDING", "REJECTED", "EXPIRED", "CANCELLED"})
+    void f05Bl03_unacceptedRequests_doNotAuthorizeProposedSlot(String status) {
+        var f = linkedBl03Fixture(false);
+        var change = requestBl03(f, f.start().plus(2, ChronoUnit.DAYS), f.start().plus(2, ChronoUnit.DAYS).plusSeconds(3600), 0L);
+        if ("REJECTED".equals(status)) {
+            appointmentService.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                    f.trainer(), change.request().requestId(), "REJECT", 0L, 0L, UUID.randomUUID()));
+        } else if (!"PENDING".equals(status)) {
+            // V45 supports only PENDING/ACCEPTED/REJECTED: unsupported states cannot grant consent.
+            assertThatThrownBy(() -> jdbc.update(
+                    "UPDATE fitness.appointment_requests_v2 SET status=?,decided_at=clock_timestamp(),decided_by=?,version=version+1 WHERE id=?",
+                    status, f.student(), change.request().requestId()))
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        }
+        var proposal = generateBl03(f);
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), acceptBl03(f, 0L)))
+                .isInstanceOf(WorkoutScheduleFailure.class);
+        assertThat(jdbc.queryForObject("SELECT start_at FROM fitness.appointments WHERE id=?", Timestamp.class, f.appointment()).toInstant())
+                .isEqualTo(f.start());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts WHERE rescheduled_from_id=?", Integer.class, f.occurrence()))
+                .isZero();
+    }
+
+    @Test
+    void f05Bl03_coachRequired_disjointMoveBlocked_butContainingChangeAndFreshProposalWork() {
+        var f = linkedBl03Fixture(true);
+        var disjoint = requestBl03(f, f.start().plus(2, ChronoUnit.DAYS), f.start().plus(2, ChronoUnit.DAYS).plusSeconds(3600), 0L);
+        assertThatThrownBy(() -> decideBl03(f, disjoint.request().requestId(), 0L))
+                .isInstanceOf(com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentFailure.class)
+                .hasMessageContaining("APPOINTMENT_COACH_REQUIRED_DEPENDENCY");
+        appointmentService.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                f.trainer(), disjoint.request().requestId(), "REJECT", 0L, 0L, UUID.randomUUID()));
+        var containing = requestBl03(f, f.start().minusSeconds(3600), f.start().plusSeconds(3600), 0L);
+        decideBl03(f, containing.request().requestId(), 0L);
+        var proposal = generateBl03(f);
+        assertThat(proposal.structuredPayload().path("reschedule").path("supervisionRequirement").asText()).isEqualTo("COACH_REQUIRED");
+        var applied = rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), acceptBl03(f, 1L));
+        assertThat(applied.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?", UUID.class, f.appointment()))
+                .isEqualTo(applied.resultingEntityId());
+        assertThat(jdbc.queryForObject("SELECT planned_end_at-planned_start_at=interval '1 hour' FROM fitness.planned_workouts WHERE id=?",
+                Boolean.class, applied.resultingEntityId())).isTrue();
+    }
+
+    @Test
+    void f05Bl03_cancelledAppointment_blocksApplyWithoutCancellingWorkout() {
+        var f = linkedBl03Fixture(false);
+        var proposal = generateBl03(f);
+        appointmentService.cancel(new AppointmentService.CancelCommand(f.student(), f.appointment(), 0L, "Cancelled meeting", UUID.randomUUID()));
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), acceptBl03(f, 0L)))
+                .isInstanceOf(AiRunLifecycleConflictException.class);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?", String.class, f.occurrence())).isEqualTo("SCHEDULED");
+        assertThat(recommendationRepository.findById(proposal.recommendationId()).orElseThrow().status()).isEqualTo(AiRecommendationStatus.PENDING);
+    }
+
+    @Test
+    void f05Bl03_appointmentDecisionAndF05ApplyRace_onlyOneCommits() throws Exception {
+        var f = linkedBl03Fixture(false);
+        Instant firstStart = f.start().plus(2, ChronoUnit.DAYS);
+        var first = requestBl03(f, firstStart, firstStart.plusSeconds(3600), 0L);
+        decideBl03(f, first.request().requestId(), 0L);
+        var proposal = generateBl03(f);
+        var second = requestBl03(f, firstStart.plus(1, ChronoUnit.DAYS), firstStart.plus(1, ChronoUnit.DAYS).plusSeconds(3600), 1L);
+        var gate = new CountDownLatch(1);
+        var ready = new CountDownLatch(2);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var apply = executor.submit(() -> {
+                ready.countDown(); gate.await();
+                try { rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), acceptBl03(f, 1L)); return true; }
+                catch (AiRunLifecycleConflictException | WorkoutScheduleFailure expected) { return false; }
+            });
+            var change = executor.submit(() -> {
+                ready.countDown(); gate.await();
+                try { decideBl03(f, second.request().requestId(), 1L); return true; }
+                catch (com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentFailure expected) { return false; }
+            });
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            gate.countDown();
+            boolean applied = apply.get(15, TimeUnit.SECONDS);
+            boolean changed = change.get(15, TimeUnit.SECONDS);
+            assertThat(applied ^ changed).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id=?",
+                    Integer.class, proposal.recommendationId())).isEqualTo(applied ? 1 : 0);
+        } finally { gate.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test
+    void f05Bl03_legacyReceiptFingerprint_stillReplays() throws Exception {
+        TestFixture f = createFixture(false);
+        UUID occurrence = createOccurrence(f, LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0));
+        var proposal = rescheduleService.generateReschedule(f.studentId(),
+                new WorkoutRescheduleApiRequest(f.studentId(), occurrence, 0L, "legacy-generate", "Legacy", null));
+        var request = new AcceptRescheduleApiRequest("legacy-accept", "Legacy", 1, 0L, null, null);
+        var applied = rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(), request);
+        String oldIdentity = proposal.recommendationId() + ":1:" + f.studentId() + ":0:Legacy:"
+                + recommendationRepository.findById(proposal.recommendationId()).orElseThrow().structuredPayload();
+        String fingerprint = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(oldIdentity.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        jdbc.update("""
+                UPDATE fitness.ai_recommendation_applications
+                SET application_payload=jsonb_set(application_payload-'expectedAppointmentVersion'-'expectedAppointmentId',
+                    '{payloadFingerprint}',to_jsonb(?::text)) WHERE ai_recommendation_id=?
+                """, fingerprint, proposal.recommendationId());
+        var replay = rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(), request);
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.resultingEntityId()).isEqualTo(applied.resultingEntityId());
+    }
+
+    @Test
+    void f05Bl03_legacyExplicitAppointmentReceipt_replaysOnlyMatchingSource() {
+        var f = linkedBl03Fixture(false);
+        Instant moved = f.start().plus(2, ChronoUnit.DAYS);
+        var change = requestBl03(f, moved, moved.plusSeconds(3600), 0L);
+        decideBl03(f, change.request().requestId(), 0L);
+        var proposal = generateBl03(f);
+        var request = acceptBl03(f, 1L);
+        var applied = rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), request);
+        // Legacy encoding uses the original fingerprint, but predates saving Appointment expectation fields.
+        jdbc.update("UPDATE fitness.ai_recommendation_applications SET application_payload=application_payload-'expectedAppointmentVersion'-'expectedAppointmentId' WHERE ai_recommendation_id=?",
+                proposal.recommendationId());
+        var replay = rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(), request);
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.resultingEntityId()).isEqualTo(applied.resultingEntityId());
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(f.trainer(), proposal.recommendationId(),
+                new AcceptRescheduleApiRequest(request.commandKey(), request.decisionNote(), 1, 0L, 99L, f.appointment())))
+                .isInstanceOf(AiRunLifecycleConflictException.class);
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Student requests appointment reschedule -> Trainer accepts -> F05 refreshed -> Proposal accepted successfully")
+    void f05Bl03_studentRequestsAppointmentReschedule_trainerAccepts_proposalAccepted() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+        UUID periodId = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+
+        LocalDate date1 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3);
+        LocalDate date2 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(5);
+
+        Instant start1 = date1.atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end1 = start1.plus(1, ChronoUnit.HOURS);
+
+        Instant start2 = date2.atTime(14, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end2 = start2.plus(1, ChronoUnit.HOURS);
+
+        UUID occurrenceId = timedOccurrence(f, start1, end1);
+        UUID appointmentId = insertConfirmedAppointment(f.studentId(), trainerId, periodId, null, start1, end1);
+
+        // Link occurrence with appointment
+        jdbc.update("UPDATE fitness.appointments SET planned_workout_id=? WHERE id=?", occurrenceId, appointmentId);
+
+        // 1. Student requests Appointment reschedule to slot 2 via Schedule bilateral workflow
+        var interval2 = new AppointmentService.LocalInterval(
+                date2.atTime(14, 0), date2.atTime(15, 0), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"
+        );
+        var reqCmd = new AppointmentService.RescheduleCommand(
+                f.studentId(), appointmentId, 0L, interval2, "Student requested afternoon slot", UUID.randomUUID()
+        );
+        var reqResult = appointmentService.requestReschedule(reqCmd);
+        assertThat(reqResult.request().status()).isEqualTo("PENDING");
+
+        // While pending, appointment remains in original slot
+        Instant liveStartPending = jdbc.queryForObject("SELECT start_at FROM fitness.appointments WHERE id=?", Timestamp.class, appointmentId).toInstant();
+        assertThat(liveStartPending).isEqualTo(start1);
+
+        // 2. Trainer accepts Appointment reschedule
+        var decideCmd = new AppointmentService.RescheduleDecisionCommand(
+                trainerId, reqResult.request().requestId(), "ACCEPT", 0L, 0L, UUID.randomUUID()
+        );
+        var decideResult = appointmentService.decideReschedule(decideCmd);
+        assertThat(decideResult.appointment().version()).isEqualTo(1L);
+        assertThat(decideResult.appointment().startAt()).isEqualTo(start2);
+
+        // 3. Generate fresh F05 Reschedule Proposal
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-student-req", "Align with updated coach appointment", "AFTERNOON"
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+        assertThat(proposal.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(proposal.structuredPayload().path("reschedule").path("destination").path("proposedStartAt").asText())
+                .isEqualTo(start2.toString());
+
+        // 4. Trainer accepts F05 proposal with expected appointment version 1
+        var trainerAcceptReq = new AcceptRescheduleApiRequest(
+                "trainer-acc-bl03-1", "Coach approved aligned workout", 1, 0L, 1L, appointmentId
+        );
+        AcceptRescheduleApiResponse acceptResp = rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq);
+
+        assertThat(acceptResp.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        UUID replacementId = acceptResp.resultingEntityId();
+        assertThat(replacementId).isNotNull();
+
+        // 5. Verify database invariants
+        String oldStatus = jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?", String.class, occurrenceId);
+        assertThat(oldStatus).isEqualTo("RESCHEDULED");
+
+        String newStatus = jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?", String.class, replacementId);
+        assertThat(newStatus).isEqualTo("SCHEDULED");
+
+        UUID activeLinkedWorkout = jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?", UUID.class, appointmentId);
+        assertThat(activeLinkedWorkout).isEqualTo(replacementId);
+
+        Integer auditCount = jdbc.queryForObject(
+                "SELECT count(*) FROM fitness.audit_logs WHERE action='AI_WORKOUT_RESCHEDULE_APPLIED' AND target_id=?",
+                Integer.class, replacementId);
+        assertThat(auditCount).isOne();
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Trainer requests appointment reschedule -> Student accepts -> Proposal accepted successfully")
+    void f05Bl03_trainerRequestsAppointmentReschedule_studentAccepts_proposalAccepted() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+        UUID periodId = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+
+        LocalDate date1 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(4);
+        LocalDate date2 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(6);
+
+        Instant start1 = date1.atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end1 = start1.plus(1, ChronoUnit.HOURS);
+        Instant start2 = date2.atTime(18, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end2 = start2.plus(1, ChronoUnit.HOURS);
+
+        UUID occurrenceId = timedOccurrence(f, start1, end1);
+        UUID appointmentId = insertConfirmedAppointment(f.studentId(), trainerId, periodId, null, start1, end1);
+        jdbc.update("UPDATE fitness.appointments SET planned_workout_id=? WHERE id=?", occurrenceId, appointmentId);
+
+        // 1. Trainer requests Appointment reschedule to evening slot
+        var interval2 = new AppointmentService.LocalInterval(
+                date2.atTime(18, 0), date2.atTime(19, 0), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"
+        );
+        var reqCmd = new AppointmentService.RescheduleCommand(
+                trainerId, appointmentId, 0L, interval2, "Trainer proposed evening slot", UUID.randomUUID()
+        );
+        var reqResult = appointmentService.requestReschedule(reqCmd);
+        assertThat(reqResult.request().status()).isEqualTo("PENDING");
+
+        // 2. Student accepts Appointment reschedule
+        var decideCmd = new AppointmentService.RescheduleDecisionCommand(
+                f.studentId(), reqResult.request().requestId(), "ACCEPT", 0L, 0L, UUID.randomUUID()
+        );
+        var decideResult = appointmentService.decideReschedule(decideCmd);
+        assertThat(decideResult.appointment().version()).isEqualTo(1L);
+
+        // 3. Fresh F05 proposal generated
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-trainer-req", "Evening slot aligned", "EVENING"
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+        assertThat(proposal.status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // 4. Trainer accepts F05 proposal
+        var trainerAcceptReq = new AcceptRescheduleApiRequest(
+                "trainer-acc-bl03-2", "Coach approved", 1, 0L, 1L, appointmentId
+        );
+        AcceptRescheduleApiResponse acceptResp = rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq);
+        assertThat(acceptResp.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Pending or Rejected change request does not take effect; old appointment remains intact")
+    void f05Bl03_pendingOrRejectedChangeRequest_doesNotChangeAppointment() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+        UUID periodId = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+
+        LocalDate date1 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3);
+        LocalDate date2 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(5);
+
+        Instant start1 = date1.atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end1 = start1.plus(1, ChronoUnit.HOURS);
+        Instant start2 = date2.atTime(14, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end2 = start2.plus(1, ChronoUnit.HOURS);
+
+        UUID occurrenceId = timedOccurrence(f, start1, end1);
+        UUID appointmentId = insertConfirmedAppointment(f.studentId(), trainerId, periodId, null, start1, end1);
+        jdbc.update("UPDATE fitness.appointments SET planned_workout_id=? WHERE id=?", occurrenceId, appointmentId);
+
+        // 1. Student requests reschedule
+        var interval2 = new AppointmentService.LocalInterval(
+                date2.atTime(14, 0), date2.atTime(15, 0), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"
+        );
+        var reqCmd = new AppointmentService.RescheduleCommand(
+                f.studentId(), appointmentId, 0L, interval2, "Pending request test", UUID.randomUUID()
+        );
+        var reqResult = appointmentService.requestReschedule(reqCmd);
+        assertThat(reqResult.request().status()).isEqualTo("PENDING");
+
+        // 2. Trainer REJECTS the reschedule request
+        var decideCmd = new AppointmentService.RescheduleDecisionCommand(
+                trainerId, reqResult.request().requestId(), "REJECT", 0L, 0L, UUID.randomUUID()
+        );
+        appointmentService.decideReschedule(decideCmd);
+
+        // Verify Appointment start time and version remain unchanged
+        Map<String, Object> appRow = jdbc.queryForMap(
+                "SELECT start_at, version, status FROM fitness.appointments WHERE id=?", appointmentId
+        );
+        assertThat(((Timestamp) appRow.get("start_at")).toInstant()).isEqualTo(start1);
+        assertThat(((Number) appRow.get("version")).longValue()).isEqualTo(0L);
+        assertThat(appRow.get("status")).isEqualTo("CONFIRMED");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Stale proposal blocked when appointment version advances; fresh proposal succeeds")
+    void f05Bl03_staleProposalBlockedWhenAppointmentVersionAdvances_freshProposalSucceeds() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+        UUID periodId = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+
+        LocalDate date1 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3);
+        LocalDate date2 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(5);
+
+        Instant start1 = date1.atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end1 = start1.plus(1, ChronoUnit.HOURS);
+        Instant start2 = date2.atTime(14, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end2 = start2.plus(1, ChronoUnit.HOURS);
+
+        UUID occurrenceId = timedOccurrence(f, start1, end1);
+        UUID appointmentId = insertConfirmedAppointment(f.studentId(), trainerId, periodId, null, start1, end1);
+        jdbc.update("UPDATE fitness.appointments SET planned_workout_id=? WHERE id=?", occurrenceId, appointmentId);
+
+        // 1. Generate Proposal while appointment is at version 0
+        var generateReq1 = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-stale", "Before bilateral change", null
+        );
+        WorkoutRescheduleApiResponse staleProposal = rescheduleService.generateReschedule(f.studentId(), generateReq1);
+
+        // 2. Both parties complete appointment reschedule -> appointment version advances to 1
+        var interval2 = new AppointmentService.LocalInterval(
+                date2.atTime(14, 0), date2.atTime(15, 0), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"
+        );
+        var reqCmd = new AppointmentService.RescheduleCommand(
+                f.studentId(), appointmentId, 0L, interval2, "Moving to slot 2", UUID.randomUUID()
+        );
+        var reqResult = appointmentService.requestReschedule(reqCmd);
+        appointmentService.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                trainerId, reqResult.request().requestId(), "ACCEPT", 0L, 0L, UUID.randomUUID()
+        ));
+
+        // 3. Attempt to accept STALE proposal -> MUST FAIL with 409
+        var staleAcceptReq = new AcceptRescheduleApiRequest(
+                "trainer-acc-stale", "Attempting stale accept", 1, 0L, 0L, appointmentId
+        );
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, staleProposal.recommendationId(), staleAcceptReq))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Linked appointment has changed since proposal was generated.");
+
+        // Stale recommendation remains PENDING and occurrence remains SCHEDULED
+        assertThat(recommendationRepository.findById(staleProposal.recommendationId()).orElseThrow().status())
+                .isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(jdbc.queryForObject("SELECT status FROM fitness.planned_workouts WHERE id=?", String.class, occurrenceId))
+                .isEqualTo("SCHEDULED");
+
+        // 4. Generate FRESH proposal capturing updated appointment version 1
+        var generateReq2 = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-fresh", "Fresh proposal after bilateral change", "AFTERNOON"
+        );
+        WorkoutRescheduleApiResponse freshProposal = rescheduleService.generateReschedule(f.studentId(), generateReq2);
+
+        // 5. Accept fresh proposal -> SUCCEEDS
+        var freshAcceptReq = new AcceptRescheduleApiRequest(
+                "trainer-acc-fresh", "Approved fresh proposal", 1, 0L, 1L, appointmentId
+        );
+        AcceptRescheduleApiResponse freshResp = rescheduleService.acceptReschedule(trainerId, freshProposal.recommendationId(), freshAcceptReq);
+        assertThat(freshResp.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Concurrency with CountDownLatch — competing accepts for same recommendation")
+    void f05Bl03_concurrentCompetingAccepts_onlyOneSucceeds() throws Exception {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-concurrent", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(2);
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger conflictCount = new AtomicInteger(0);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < 2; i++) {
+                final int idx = i;
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        rescheduleService.acceptReschedule(
+                                f.studentId(),
+                                proposal.recommendationId(),
+                                new AcceptRescheduleApiRequest("competing-cmd-" + idx, "Concurrency test", 1, 0L, null, null)
+                        );
+                        successCount.incrementAndGet();
+                    } catch (AiRunLifecycleConflictException e) {
+                        conflictCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            startLatch.countDown();
+            boolean completed = doneLatch.await(10, TimeUnit.SECONDS);
+            assertThat(completed).isTrue();
+
+            assertThat(successCount.get()).isEqualTo(1);
+            assertThat(conflictCount.get()).isEqualTo(1);
+
+            // Exactly 1 application persisted
+            Integer appCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id=?",
+                    Integer.class, proposal.recommendationId()
+            );
+            assertThat(appCount).isEqualTo(1);
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: Idempotent replay preserves fingerprint and receipt; differing params trigger conflict")
+    void f05Bl03_idempotentReplayPreservesFingerprintAndReceipt() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+        UUID periodId = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+
+        LocalDate date1 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3);
+        LocalDate date2 = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(5);
+        Instant start1 = date1.atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end1 = start1.plus(1, ChronoUnit.HOURS);
+        Instant start2 = date2.atTime(14, 0).toInstant(ZoneOffset.ofHours(7));
+        Instant end2 = start2.plus(1, ChronoUnit.HOURS);
+
+        UUID occurrenceId = timedOccurrence(f, start1, end1);
+        UUID appointmentId = insertConfirmedAppointment(f.studentId(), trainerId, periodId, null, start1, end1);
+        jdbc.update("UPDATE fitness.appointments SET planned_workout_id=? WHERE id=?", occurrenceId, appointmentId);
+
+        // Bilateral reschedule appointment to slot 2
+        var interval2 = new AppointmentService.LocalInterval(
+                date2.atTime(14, 0), date2.atTime(15, 0), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"
+        );
+        var reqResult = appointmentService.requestReschedule(new AppointmentService.RescheduleCommand(
+                f.studentId(), appointmentId, 0L, interval2, "Reschedule for idemp test", UUID.randomUUID()
+        ));
+        appointmentService.decideReschedule(new AppointmentService.RescheduleDecisionCommand(
+                trainerId, reqResult.request().requestId(), "ACCEPT", 0L, 0L, UUID.randomUUID()
+        ));
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-f05-bl03-idemp", "Idempotency test", "AFTERNOON"
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        // First apply
+        var acceptReq1 = new AcceptRescheduleApiRequest(
+                "cmd-idemp-bl03", "Initial decision note", 1, 0L, 1L, appointmentId
+        );
+        AcceptRescheduleApiResponse resp1 = rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), acceptReq1);
+        assertThat(resp1.replayed()).isFalse();
+        assertThat(resp1.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+
+        // Replay with identical parameters
+        var acceptReq2 = new AcceptRescheduleApiRequest(
+                "cmd-idemp-bl03", "Initial decision note", 1, 0L, 1L, appointmentId
+        );
+        AcceptRescheduleApiResponse resp2 = rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), acceptReq2);
+        assertThat(resp2.replayed()).isTrue();
+        assertThat(resp2.resultingEntityId()).isEqualTo(resp1.resultingEntityId());
+
+        // Replay with differing expectedAppointmentVersion -> throws conflict
+        var acceptReqDifferingVer = new AcceptRescheduleApiRequest(
+                "cmd-idemp-bl03", "Initial decision note", 1, 0L, 99L, appointmentId
+        );
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), acceptReqDifferingVer))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Idempotency conflict");
+
+        // Replay with differing expectedAppointmentId -> throws conflict
+        var acceptReqDifferingId = new AcceptRescheduleApiRequest(
+                "cmd-idemp-bl03", "Initial decision note", 1, 0L, 1L, UUID.randomUUID()
+        );
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), acceptReqDifferingId))
+                .isInstanceOf(AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Idempotency conflict");
     }
 }

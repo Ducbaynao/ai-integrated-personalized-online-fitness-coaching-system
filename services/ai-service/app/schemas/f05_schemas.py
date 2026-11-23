@@ -51,6 +51,8 @@ class F05WorkoutRescheduleRequest(BaseModel):
     continuityState: str | None = None
     hasLinkedAppointment: bool = False
     appointmentId: UUID | None = None
+    appointmentStartAt: str | None = None
+    appointmentEndAt: str | None = None
 
 
 class F05WorkoutRescheduleResponse(BaseModel):
