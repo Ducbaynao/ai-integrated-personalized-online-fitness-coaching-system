@@ -10,8 +10,21 @@ import com.fitnesscoaching.platform.modules.ai.domain.AiDecisionAuthority;
 import com.fitnesscoaching.platform.modules.ai.domain.F05SourceSnapshot;
 import com.fitnesscoaching.platform.modules.ai.domain.TrainingContinuityState;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CurrentCoachingContextQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
+import com.fitnesscoaching.platform.modules.progress.application.port.in.ProgressEngineQuery;
+import com.fitnesscoaching.platform.modules.progress.application.port.in.ProgressEngineQuery.ProgressSnapshot;
+import com.fitnesscoaching.platform.modules.progress.domain.ProgressError;
+import com.fitnesscoaching.platform.modules.progress.domain.ProgressFailure;
+import com.fitnesscoaching.platform.modules.student.application.port.in.GetStudentProfileUseCase;
+import com.fitnesscoaching.platform.modules.student.domain.StudentProfile;
+import com.fitnesscoaching.platform.modules.student.domain.TrainingExperienceLevel;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutCompletionEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery.Occurrence;
@@ -20,8 +33,14 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Component
@@ -32,6 +51,10 @@ public class F05ContextBuilder {
     private final ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider;
     private final Clock clock;
     private final WorkoutMissedEvidenceQuery missedEvidence;
+    private final ObjectProvider<ProgressEngineQuery> progressEngineQueryProvider;
+    private final ObjectProvider<WorkoutCompletionEvidenceQuery> workoutCompletionQueryProvider;
+    private final ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider;
+    private final ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider;
 
     @Autowired
     public F05ContextBuilder(
@@ -39,13 +62,32 @@ public class F05ContextBuilder {
             UserAccountStatusQuery accountStatusQuery,
             ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
             Clock clock,
-            WorkoutMissedEvidenceQuery missedEvidence
+            WorkoutMissedEvidenceQuery missedEvidence,
+            ObjectProvider<ProgressEngineQuery> progressEngineQueryProvider,
+            ObjectProvider<WorkoutCompletionEvidenceQuery> workoutCompletionQueryProvider,
+            ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider,
+            ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider
     ) {
         this.coachingContextQuery = coachingContextQuery;
         this.accountStatusQuery = accountStatusQuery;
         this.scheduleCalendarProvider = scheduleCalendarProvider;
         this.clock = clock != null ? clock : Clock.systemUTC();
         this.missedEvidence = missedEvidence;
+        this.progressEngineQueryProvider = progressEngineQueryProvider;
+        this.workoutCompletionQueryProvider = workoutCompletionQueryProvider;
+        this.coachingAuthorityQueryProvider = coachingAuthorityQueryProvider;
+        this.studentProfileUseCaseProvider = studentProfileUseCaseProvider;
+    }
+
+    public F05ContextBuilder(
+            CurrentCoachingContextQuery coachingContextQuery,
+            UserAccountStatusQuery accountStatusQuery,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            Clock clock,
+            WorkoutMissedEvidenceQuery missedEvidence
+    ) {
+        this(coachingContextQuery, accountStatusQuery, scheduleCalendarProvider, clock, missedEvidence,
+                null, null, null, null);
     }
 
     public record CoachingContextDetails(
@@ -159,6 +201,9 @@ public class F05ContextBuilder {
         UUID planSessionId = occurrence.sessionSummary() != null ? occurrence.sessionSummary().planSessionId() : null;
         String sessionName = occurrence.sessionSummary() != null ? occurrence.sessionSummary().name() : null;
 
+        ContinuityResolution continuityResolution = resolveTrainingContinuity(actorId, studentId, occurrence.timezone(), asOf);
+        TrainingContinuityState continuityState = continuityResolution.state();
+
         F05SourceSnapshot sourceSnapshot = new F05SourceSnapshot(
                 studentId,
                 coaching.periodId(),
@@ -182,7 +227,9 @@ public class F05ContextBuilder {
                 supervision,
                 occurrence.linkedAppointmentId(),
                 occurrence.linkedAppointmentVersion(),
-                TrainingContinuityState.RECENT_CONSISTENT,
+                continuityState,
+                continuityResolution.daysSinceLastWorkout(),
+                continuityResolution.watermark(),
                 asOf
         );
 
@@ -202,13 +249,163 @@ public class F05ContextBuilder {
                 occurrence.plannedEndAt() != null ? occurrence.plannedEndAt().toString() : null,
                 requestDto.reason(),
                 requestDto.preferredTimeOfDay(),
-                TrainingContinuityState.RECENT_CONSISTENT.name(),
+                continuityState != null ? continuityState.name() : "UNKNOWN_HISTORY",
                 occurrence.linkedAppointmentId() != null,
                 occurrence.linkedAppointmentId(),
                 sourceSnapshot
         );
 
         return new ContextEnvelopeResult(serviceRequest, sourceSnapshot, decisionAuthority, studentId, coaching.periodId());
+    }
+
+    public record ContinuityResolution(
+            TrainingContinuityState state,
+            Integer daysSinceLastWorkout,
+            String watermark
+    ) {}
+
+    public ContinuityResolution resolveTrainingContinuity(
+            UUID actorId,
+            UUID studentId,
+            String timezoneStr,
+            Instant asOf
+    ) {
+        ZoneId zoneId;
+        try {
+            zoneId = ZoneId.of(timezoneStr != null ? timezoneStr : "Asia/Ho_Chi_Minh");
+        } catch (Exception ex) {
+            zoneId = ZoneId.of("Asia/Ho_Chi_Minh");
+        }
+
+        // 1. Primary source: ProgressEngineQuery (authoritative, verified signals with composite watermark)
+        ProgressEngineQuery progressEngineQuery = progressEngineQueryProvider != null
+                ? progressEngineQueryProvider.getIfAvailable() : null;
+        if (progressEngineQuery != null) {
+            try {
+                LocalDate today = asOf.atZone(zoneId).toLocalDate();
+                LocalDate fromDate = today.minusDays(28);
+                LocalDate toDate = today;
+                ProgressSnapshot snapshot = progressEngineQuery.query(
+                        actorId,
+                        studentId,
+                        (java.util.Set<String>) null,
+                        fromDate,
+                        toDate,
+                        zoneId,
+                        asOf
+                );
+                if (snapshot != null && snapshot.continuity() != null && snapshot.continuity().state() != null) {
+                    TrainingContinuityState mappedState = switch (snapshot.continuity().state()) {
+                        case CONFIRMED_NEW -> TrainingContinuityState.CONFIRMED_NEW;
+                        case PROLONGED_INACTIVITY -> TrainingContinuityState.PROLONGED_INACTIVITY;
+                        case RECENT_ACTIVITY_OBSERVED -> TrainingContinuityState.RECENT_ACTIVITY_OBSERVED;
+                        case RESTRICTED_HISTORY -> TrainingContinuityState.RESTRICTED_HISTORY;
+                        case UNKNOWN_HISTORY -> TrainingContinuityState.UNKNOWN_HISTORY;
+                    };
+                    return new ContinuityResolution(
+                            mappedState,
+                            snapshot.continuity().daysSinceLastWorkout(),
+                            snapshot.compositeWatermark()
+                    );
+                }
+            } catch (ProgressFailure pf) {
+                if (pf.error() == ProgressError.PROGRESS_ACCESS_DENIED) {
+                    return new ContinuityResolution(TrainingContinuityState.RESTRICTED_HISTORY, null, null);
+                }
+                return new ContinuityResolution(TrainingContinuityState.UNKNOWN_HISTORY, null, null);
+            } catch (Exception ignored) {
+                // Fail-safe to fallback resolution below
+            }
+        }
+
+        // 2. Secondary fallback: WorkoutCompletionEvidenceQuery + CoachingAuthorityQuery + GetStudentProfileUseCase
+        WorkoutCompletionEvidenceQuery completionQuery = workoutCompletionQueryProvider != null
+                ? workoutCompletionQueryProvider.getIfAvailable() : null;
+        if (completionQuery != null) {
+            Instant historyFrom = null;
+            Instant historyUntil = null;
+            if (!actorId.equals(studentId)) {
+                CoachingAuthorityQuery authorityQuery = coachingAuthorityQueryProvider != null
+                        ? coachingAuthorityQueryProvider.getIfAvailable() : null;
+                if (authorityQuery != null) {
+                    var decision = authorityQuery.evaluateCurrent(new AuthorityRequest(
+                            actorId, studentId, DataScope.WORKOUT_HISTORY, DataAccessLevel.VIEW));
+                    if (decision != null) {
+                        if (!decision.allowed()) {
+                            return new ContinuityResolution(TrainingContinuityState.RESTRICTED_HISTORY, null, null);
+                        }
+                        historyFrom = decision.historyFrom();
+                        historyUntil = decision.historyUntil();
+                        if (historyUntil != null && historyUntil.isBefore(asOf)) {
+                            return new ContinuityResolution(TrainingContinuityState.RESTRICTED_HISTORY, null, null);
+                        }
+                    }
+                }
+            }
+
+            try {
+                final Instant hFrom = historyFrom;
+                final Instant effectiveUntil = (historyUntil != null && historyUntil.isBefore(asOf)) ? historyUntil : asOf;
+                List<WorkoutCompletionEvidenceQuery.Completion> rawCompletions = completionQuery.completedForStudent(studentId);
+                List<WorkoutCompletionEvidenceQuery.Completion> validCompletions = (rawCompletions != null ? rawCompletions : List.<WorkoutCompletionEvidenceQuery.Completion>of())
+                        .stream()
+                        .filter(c -> {
+                            Instant performed = c.performedEndAt() != null ? c.performedEndAt() : c.performedStartAt();
+                            if (performed == null || performed.isAfter(effectiveUntil)) {
+                                return false;
+                            }
+                            return hFrom == null || !performed.isBefore(hFrom);
+                        })
+                        .toList();
+
+                if (!validCompletions.isEmpty()) {
+                    Instant latestEnd = validCompletions.stream()
+                            .map(c -> c.performedEndAt() != null ? c.performedEndAt() : c.performedStartAt())
+                            .filter(Objects::nonNull)
+                            .max(Instant::compareTo)
+                            .orElse(null);
+
+                    if (latestEnd != null) {
+                        LocalDate lastDate = latestEnd.atZone(zoneId).toLocalDate();
+                        LocalDate today = asOf.atZone(zoneId).toLocalDate();
+                        long days = ChronoUnit.DAYS.between(lastDate, today);
+                        int daysSince = (int) Math.max(0, days);
+
+                        if (daysSince >= 100) {
+                            return new ContinuityResolution(TrainingContinuityState.PROLONGED_INACTIVITY, daysSince, null);
+                        } else {
+                            // Invariant D06: Do not infer RECENT_CONSISTENT without approved specialist threshold
+                            return new ContinuityResolution(TrainingContinuityState.RECENT_ACTIVITY_OBSERVED, daysSince, null);
+                        }
+                    }
+                } else {
+                    if (historyFrom != null && historyFrom.isAfter(asOf.minus(100, ChronoUnit.DAYS))) {
+                        return new ContinuityResolution(TrainingContinuityState.RESTRICTED_HISTORY, null, null);
+                    }
+                    GetStudentProfileUseCase profileUseCase = studentProfileUseCaseProvider != null
+                            ? studentProfileUseCaseProvider.getIfAvailable() : null;
+                    if (profileUseCase != null) {
+                        try {
+                            StudentProfile profile = profileUseCase.getStudentProfile(studentId);
+                            if (profile != null) {
+                                boolean isZeroMonths = profile.trainingExperienceMonths() != null
+                                        && profile.trainingExperienceMonths().compareTo(BigDecimal.ZERO) == 0;
+                                boolean isBeginner = profile.trainingExperienceLevel() == TrainingExperienceLevel.BEGINNER;
+                                boolean onboardingDoneBeforeAsOf = profile.onboardingCompletedAt() != null
+                                        && !profile.onboardingCompletedAt().isAfter(asOf);
+
+                                if (isBeginner && isZeroMonths && onboardingDoneBeforeAsOf) {
+                                    return new ContinuityResolution(TrainingContinuityState.CONFIRMED_NEW, null, null);
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 3. Fail-closed: missing or unverified history is UNKNOWN_HISTORY, never assumed consistent
+        return new ContinuityResolution(TrainingContinuityState.UNKNOWN_HISTORY, null, null);
     }
 
     private String mapSupervisionToAiContract(String dbSupervision) {

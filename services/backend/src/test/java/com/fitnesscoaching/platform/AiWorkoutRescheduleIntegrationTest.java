@@ -44,12 +44,21 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.fitnesscoaching.platform.modules.ai.application.port.out.F05AiServiceClient;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.reset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,6 +94,14 @@ class AiWorkoutRescheduleIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private WorkoutExecutionCommandUseCase execution;
+    @MockitoSpyBean private F05AiServiceClient aiServiceClient;
+
+    @BeforeEach
+    void resetMocks() {
+        if (aiServiceClient != null) {
+            reset(aiServiceClient);
+        }
+    }
 
     private record TestFixture(UUID studentId, UUID planId, UUID versionId, UUID sessionId) {}
 
@@ -157,9 +174,9 @@ class AiWorkoutRescheduleIntegrationTest {
         String supervision = jdbc.queryForObject(
                 "SELECT supervision_requirement::text FROM fitness.workout_plan_sessions WHERE id=?",
                 String.class, f.sessionId());
-        UUID periodId = jdbc.query(
+        UUID periodId = jdbc.queryForList(
                 "SELECT id FROM fitness.coaching_periods WHERE student_id=? AND started_at <= clock_timestamp() AND (ended_at IS NULL OR ended_at > clock_timestamp()) LIMIT 1",
-                (rs, rowNum) -> rs.getObject(1, UUID.class), f.studentId())
+                UUID.class, f.studentId())
                 .stream().findFirst().orElse(null);
         jdbc.update("""
                 INSERT INTO fitness.planned_workouts
@@ -966,6 +983,461 @@ class AiWorkoutRescheduleIntegrationTest {
             // Accept failed because it expired first
             assertThat(acceptError.get()).isInstanceOf(AiRunLifecycleConflictException.class);
             assertThat(finalRec.status()).isEqualTo(AiRecommendationStatus.EXPIRED);
+        }
+    }
+
+    @Test
+    @DisplayName("T04: In-flight revocation of MANAGE permission fails delivery, commits FAILED run with null output, and prevents recommendation/audit")
+    void inFlightRevocation_managePermissionRevoked_failsDeliveryAndPersistsFailedRun_T04() throws Exception {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        CountDownLatch providerStartedLatch = new CountDownLatch(1);
+        CountDownLatch resumeProviderLatch = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            providerStartedLatch.countDown();
+            resumeProviderLatch.await(5, TimeUnit.SECONDS);
+            return invocation.callRealMethod();
+        }).when(aiServiceClient).generateRescheduleJson(any());
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var generateReq = new WorkoutRescheduleApiRequest(
+                    f.studentId(), occurrenceId, 0L, "in-flight-manage-revoked", "Conflict", null
+            );
+
+            Future<WorkoutRescheduleApiResponse> future = executor.submit(() ->
+                    rescheduleService.generateReschedule(trainerId, generateReq)
+            );
+
+            boolean reached = providerStartedLatch.await(5, TimeUnit.SECONDS);
+            assertThat(reached).isTrue();
+
+            // While provider is computing, student revokes MANAGE permission and grants VIEW only
+            jdbc.update("""
+                    UPDATE fitness.data_sharing_permissions
+                    SET revoked_at = clock_timestamp(), revoke_reason = 'STUDENT_REVOKED', version = version + 1
+                    WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code AND revoked_at IS NULL
+                    """, f.studentId());
+            jdbc.update("""
+                    INSERT INTO fitness.data_sharing_permissions
+                    (id, relationship_id, student_id, trainer_id, data_scope, decision, access_level, valid_from, granted_by)
+                    SELECT gen_random_uuid(), relationship_id, student_id, trainer_id, 'WORKOUT_PLAN'::fitness.data_scope_code,
+                           'ALLOW'::fitness.permission_decision, 'VIEW'::fitness.data_access_level, revoked_at, granted_by
+                    FROM fitness.data_sharing_permissions
+                    WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code AND revoked_at IS NOT NULL
+                    ORDER BY version DESC LIMIT 1
+                    """, f.studentId());
+
+            resumeProviderLatch.countDown();
+
+            ExecutionException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS)
+            );
+            assertThat(ex.getCause())
+                    .isInstanceOf(AiRunAccessDeniedException.class)
+                    .hasMessageContaining("MANAGE permission for WORKOUT_PLAN was revoked during generation");
+
+            // Verify in PostgreSQL that AI Run status is FAILED, error_code is AUTHORITY_REVOKED, and output_payload is NULL
+            Map<String, Object> runRow = jdbc.queryForMap(
+                    "SELECT status::text as status, error_code, error_message, output_payload FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC LIMIT 1",
+                    trainerId
+            );
+            assertThat(runRow.get("status")).isEqualTo("FAILED");
+            assertThat(runRow.get("error_code")).isEqualTo("AUTHORITY_REVOKED");
+            assertThat(runRow.get("output_payload")).isNull();
+
+            // Verify NO recommendation was created and NO proposed audit was logged
+            Integer recCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.ai_recommendations WHERE last_modified_by = ?",
+                    Integer.class, trainerId
+            );
+            assertThat(recCount).isZero();
+
+            Integer auditCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.audit_logs WHERE action = 'AI_WORKOUT_RESCHEDULE_PROPOSED' AND actor_user_id = ?",
+                    Integer.class, trainerId
+            );
+            assertThat(auditCount).isZero();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("T04: In-flight revocation of VIEW permission fails delivery, commits FAILED run with null output, and prevents recommendation/audit")
+    void inFlightRevocation_viewPermissionRevoked_failsDeliveryAndPersistsFailedRun_T04() throws Exception {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        CountDownLatch providerStartedLatch = new CountDownLatch(1);
+        CountDownLatch resumeProviderLatch = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            providerStartedLatch.countDown();
+            resumeProviderLatch.await(5, TimeUnit.SECONDS);
+            return invocation.callRealMethod();
+        }).when(aiServiceClient).generateRescheduleJson(any());
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var generateReq = new WorkoutRescheduleApiRequest(
+                    f.studentId(), occurrenceId, 0L, "in-flight-view-revoked", "Conflict", null
+            );
+
+            Future<WorkoutRescheduleApiResponse> future = executor.submit(() ->
+                    rescheduleService.generateReschedule(trainerId, generateReq)
+            );
+
+            boolean reached = providerStartedLatch.await(5, TimeUnit.SECONDS);
+            assertThat(reached).isTrue();
+
+            // While provider is computing, student revokes permission completely
+            jdbc.update("""
+                    UPDATE fitness.data_sharing_permissions
+                    SET revoked_at = clock_timestamp(), revoke_reason = 'STUDENT_REVOKED', version = version + 1
+                    WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code
+                    """, f.studentId());
+
+            resumeProviderLatch.countDown();
+
+            ExecutionException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS)
+            );
+            assertThat(ex.getCause())
+                    .isInstanceOf(AiRunAccessDeniedException.class);
+
+            // Verify in PostgreSQL that AI Run status is FAILED, error_code is AUTHORITY_REVOKED, and output_payload is NULL
+            Map<String, Object> runRow = jdbc.queryForMap(
+                    "SELECT status::text as status, error_code, error_message, output_payload FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC LIMIT 1",
+                    trainerId
+            );
+            assertThat(runRow.get("status")).isEqualTo("FAILED");
+            assertThat(runRow.get("error_code")).isEqualTo("AUTHORITY_REVOKED");
+            assertThat(runRow.get("output_payload")).isNull();
+
+            Integer recCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.ai_recommendations WHERE last_modified_by = ?",
+                    Integer.class, trainerId
+            );
+            assertThat(recCount).isZero();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("T04: In-flight account deactivation fails delivery and commits FAILED run with null output")
+    void inFlightRevocation_accountDeactivated_failsDeliveryAndPersistsFailedRun_T04() throws Exception {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        CountDownLatch providerStartedLatch = new CountDownLatch(1);
+        CountDownLatch resumeProviderLatch = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            providerStartedLatch.countDown();
+            resumeProviderLatch.await(5, TimeUnit.SECONDS);
+            return invocation.callRealMethod();
+        }).when(aiServiceClient).generateRescheduleJson(any());
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var generateReq = new WorkoutRescheduleApiRequest(
+                    f.studentId(), occurrenceId, 0L, "in-flight-deactivated", "Conflict", null
+            );
+
+            Future<WorkoutRescheduleApiResponse> future = executor.submit(() ->
+                    rescheduleService.generateReschedule(trainerId, generateReq)
+            );
+
+            boolean reached = providerStartedLatch.await(5, TimeUnit.SECONDS);
+            assertThat(reached).isTrue();
+
+            // Admin deactivates trainer account (suspends user account)
+            jdbc.update("UPDATE fitness.users SET status = 'SUSPENDED' WHERE id = ?", trainerId);
+
+            resumeProviderLatch.countDown();
+
+            ExecutionException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS)
+            );
+            assertThat(ex.getCause())
+                    .isInstanceOf(AiRunAccessDeniedException.class)
+                    .hasMessageContaining("Actor account is no longer active");
+
+            Map<String, Object> runRow = jdbc.queryForMap(
+                    "SELECT status::text as status, error_code, error_message, output_payload FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC LIMIT 1",
+                    trainerId
+            );
+            assertThat(runRow.get("status")).isEqualTo("FAILED");
+            assertThat(runRow.get("error_code")).isEqualTo("AUTHORITY_REVOKED");
+            assertThat(runRow.get("output_payload")).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("T04: In-flight coaching period termination fails delivery and commits FAILED run with null output")
+    void inFlightRevocation_coachingPeriodEnded_failsDeliveryAndPersistsFailedRun_T04() throws Exception {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        CountDownLatch providerStartedLatch = new CountDownLatch(1);
+        CountDownLatch resumeProviderLatch = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            providerStartedLatch.countDown();
+            resumeProviderLatch.await(5, TimeUnit.SECONDS);
+            return invocation.callRealMethod();
+        }).when(aiServiceClient).generateRescheduleJson(any());
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var generateReq = new WorkoutRescheduleApiRequest(
+                    f.studentId(), occurrenceId, 0L, "in-flight-period-ended", "Conflict", null
+            );
+
+            Future<WorkoutRescheduleApiResponse> future = executor.submit(() ->
+                    rescheduleService.generateReschedule(trainerId, generateReq)
+            );
+
+            boolean reached = providerStartedLatch.await(5, TimeUnit.SECONDS);
+            assertThat(reached).isTrue();
+
+            // Coaching period is terminated
+            jdbc.update("UPDATE fitness.coaching_periods SET ended_at = clock_timestamp() WHERE student_id = ?", f.studentId());
+
+            resumeProviderLatch.countDown();
+
+            ExecutionException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                    ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS)
+            );
+            assertThat(ex.getCause())
+                    .isInstanceOf(AiRunAccessDeniedException.class)
+                    .hasMessageContaining("relationship or period was revoked or changed");
+
+            Map<String, Object> runRow = jdbc.queryForMap(
+                    "SELECT status::text as status, error_code, error_message, output_payload FROM fitness.ai_runs WHERE requested_by = ? ORDER BY created_at DESC LIMIT 1",
+                    trainerId
+            );
+            assertThat(runRow.get("status")).isEqualTo("FAILED");
+            assertThat(runRow.get("error_code")).isEqualTo("AUTHORITY_REVOKED");
+            assertThat(runRow.get("output_payload")).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("T04: Readback proposal guard - losing MANAGE retains VIEW readback; losing VIEW blocks readback")
+    void readbackGuards_distinguishManageAndDismissView_T04() {
+        TestFixture f = createFixture(false);
+        UUID trainerId = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainerId, "HUMAN_COACH");
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(3).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "readback-guard-key", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+        assertThat(proposal.status()).isEqualTo(AiRecommendationStatus.PENDING);
+
+        // Scenario 1: Student downgrades trainer from MANAGE to VIEW
+        jdbc.update("""
+                UPDATE fitness.data_sharing_permissions
+                SET revoked_at = clock_timestamp(), revoke_reason = 'STUDENT_REVOKED', version = version + 1
+                WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code AND revoked_at IS NULL
+                """, f.studentId());
+        jdbc.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id, relationship_id, student_id, trainer_id, data_scope, decision, access_level, valid_from, granted_by)
+                SELECT gen_random_uuid(), relationship_id, student_id, trainer_id, 'WORKOUT_PLAN'::fitness.data_scope_code,
+                       'ALLOW'::fitness.permission_decision, 'VIEW'::fitness.data_access_level, revoked_at, granted_by
+                FROM fitness.data_sharing_permissions
+                WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code AND revoked_at IS NOT NULL
+                ORDER BY version DESC LIMIT 1
+                """, f.studentId());
+
+        // Trainer STILL can read back proposal via getReschedule
+        AiRecommendation readback = rescheduleService.getReschedule(trainerId, proposal.recommendationId());
+        assertThat(readback).isNotNull();
+        assertThat(readback.id()).isEqualTo(proposal.recommendationId());
+
+        // But Trainer CANNOT accept because MANAGE is missing
+        var trainerAcceptReq = new AcceptRescheduleApiRequest(
+                "trainer-accept-no-manage", "Trying to apply with VIEW only", 1, 0L, null, null
+        );
+        assertThatThrownBy(() -> rescheduleService.acceptReschedule(trainerId, proposal.recommendationId(), trainerAcceptReq))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("authority is no longer valid");
+
+        // Scenario 2: Student revokes VIEW completely
+        jdbc.update("""
+                UPDATE fitness.data_sharing_permissions
+                SET revoked_at = clock_timestamp(), revoke_reason = 'STUDENT_REVOKED', version = version + 1
+                WHERE student_id = ? AND data_scope = 'WORKOUT_PLAN'::fitness.data_scope_code AND revoked_at IS NULL
+                """, f.studentId());
+
+        // Trainer CANNOT even read back proposal (403 Access Denied)
+        assertThatThrownBy(() -> rescheduleService.getReschedule(trainerId, proposal.recommendationId()))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer VIEW permission for WORKOUT_PLAN is revoked");
+    }
+
+    @Test
+    @DisplayName("F05-BL-01: Legacy snapshot missing daysSinceLastWorkout and continuityWatermark is handled gracefully during accept")
+    void legacySnapshot_missingNewFields_handledGracefullyDuringAccept() throws Exception {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-legacy-snapshot", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        // Fetch original snapshot and remove daysSinceLastWorkout and continuityWatermark fields to simulate legacy DB record
+        String originalSnapshotJson = jdbc.queryForObject(
+                "SELECT source_snapshot FROM fitness.ai_recommendations WHERE id = ?",
+                String.class, proposal.recommendationId()
+        );
+        tools.jackson.databind.node.ObjectNode snapshotNode = (tools.jackson.databind.node.ObjectNode) objectMapper.readTree(originalSnapshotJson);
+        snapshotNode.remove("daysSinceLastWorkout");
+        snapshotNode.remove("continuityWatermark");
+        String legacySnapshotJson = objectMapper.writeValueAsString(snapshotNode);
+
+        // Update database with legacy snapshot JSON
+        jdbc.update("UPDATE fitness.ai_recommendations SET source_snapshot = ?::jsonb WHERE id = ?",
+                legacySnapshotJson, proposal.recommendationId());
+
+        // Verify acceptReschedule succeeds without error
+        var acceptReq = new AcceptRescheduleApiRequest("accept-legacy-snap", "Accepting legacy snapshot", 1, 0L, null, null);
+        AcceptRescheduleApiResponse acceptRes = rescheduleService.acceptReschedule(f.studentId(), proposal.recommendationId(), acceptReq);
+        assertThat(acceptRes.status()).isEqualTo(AiRecommendationStatus.APPLIED);
+        assertThat(acceptRes.resultingEntityId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("F05-BL-01: Continuity and provenance (including daysSinceLastWorkout and continuityWatermark) are persisted in source snapshot and conveyed in usedData")
+    void continuityAndProvenance_persistedInSnapshotAndPayload_T01() throws Exception {
+        TestFixture f = createFixture(false);
+
+        // Seed a completed workout session log 3 days ago to establish actual continuity
+        Instant pastStart = Instant.now().minus(3, ChronoUnit.DAYS);
+        Instant pastEnd = pastStart.plus(1, ChronoUnit.HOURS);
+        UUID loggedOccurrence = timedOccurrence(f, pastStart, pastEnd);
+        jdbc.update("""
+                INSERT INTO fitness.workout_session_logs
+                (id, student_id, planned_workout_id, workout_plan_version_id, performed_start_at, performed_end_at, status, logged_by)
+                VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, 'COMPLETED'::fitness.actual_workout_status, ?)
+                """, f.studentId(), loggedOccurrence, f.versionId(), Timestamp.from(pastStart), Timestamp.from(pastEnd), f.studentId());
+
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        var generateReq = new WorkoutRescheduleApiRequest(
+                f.studentId(), occurrenceId, 0L, "gen-provenance-test", "Conflict", null
+        );
+        WorkoutRescheduleApiResponse proposal = rescheduleService.generateReschedule(f.studentId(), generateReq);
+
+        // Check source_snapshot in database
+        String snapshotJson = jdbc.queryForObject(
+                "SELECT source_snapshot FROM fitness.ai_recommendations WHERE id = ?",
+                String.class, proposal.recommendationId()
+        );
+        tools.jackson.databind.JsonNode snap = objectMapper.readTree(snapshotJson);
+        assertThat(snap.has("continuityState")).isTrue();
+        assertThat(snap.get("continuityState").asText()).isEqualTo("RECENT_ACTIVITY_OBSERVED");
+        assertThat(snap.has("daysSinceLastWorkout")).isTrue();
+        assertThat(snap.get("daysSinceLastWorkout").asInt()).isGreaterThanOrEqualTo(0);
+        assertThat(snap.has("continuityWatermark")).isTrue();
+        assertThat(snap.has("asOf")).isTrue();
+        assertThat(snap.has("timezone")).isTrue();
+
+        // Check structuredPayload in database
+        tools.jackson.databind.JsonNode payload = proposal.structuredPayload();
+        tools.jackson.databind.JsonNode usedData = payload.path("usedData");
+        assertThat(usedData.isArray()).isTrue();
+        boolean hasContinuity = false;
+        for (tools.jackson.databind.JsonNode item : usedData) {
+            if (item.asText().startsWith("continuityState:")) {
+                hasContinuity = true;
+                break;
+            }
+        }
+        assertThat(hasContinuity).isTrue();
+    }
+
+    @Test
+    @DisplayName("Transaction Refactor: Mandatory audit failure during generation atomically rolls back proposal and commits FAILED run")
+    void generateReschedule_whenAuditFails_rollsBackProposalAndMarksRunFailed() {
+        TestFixture f = createFixture(false);
+        LocalDateTime baseStart = LocalDate.now(ZoneOffset.UTC).plusDays(2).atTime(9, 0);
+        UUID occurrenceId = createOccurrence(f, baseStart);
+
+        // Install temporary trigger on fitness.audit_logs to simulate failure during proposal audit recording
+        jdbc.execute("""
+            CREATE OR REPLACE FUNCTION fitness.test_fail_reschedule_proposed_audit_trigger() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.action = 'AI_WORKOUT_RESCHEDULE_PROPOSED' THEN
+                    RAISE EXCEPTION 'Simulated proposal audit failure';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """);
+        jdbc.execute("""
+            CREATE TRIGGER trg_test_fail_reschedule_proposed_audit
+            BEFORE INSERT ON fitness.audit_logs
+            FOR EACH ROW EXECUTE FUNCTION fitness.test_fail_reschedule_proposed_audit_trigger();
+        """);
+
+        try {
+            var generateReq = new WorkoutRescheduleApiRequest(
+                    f.studentId(), occurrenceId, 0L, "gen-audit-fail-key", "Audit fail proposal test", null
+            );
+            assertThatThrownBy(() -> rescheduleService.generateReschedule(f.studentId(), generateReq))
+                    .hasMessageContaining("Simulated proposal audit failure");
+
+            // Verify in PostgreSQL that NO recommendation was persisted
+            Integer recCount = jdbc.queryForObject(
+                    "SELECT count(*) FROM fitness.ai_recommendations WHERE target_entity_id = ?",
+                    Integer.class, occurrenceId
+            );
+            assertThat(recCount).isZero();
+
+            // Verify that the AI Run was recorded as FAILED with error_code PERSISTENCE_FAILED, never left in RUNNING or SUCCEEDED
+            Map<String, Object> runRow = jdbc.queryForMap(
+                    "SELECT status::text as status, error_code, error_message, output_payload FROM fitness.ai_runs WHERE student_id = ? ORDER BY created_at DESC LIMIT 1",
+                    f.studentId()
+            );
+            assertThat(runRow.get("status")).isEqualTo("FAILED");
+            assertThat(runRow.get("error_code")).isEqualTo("PERSISTENCE_FAILED");
+            assertThat(runRow.get("output_payload")).isNull();
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS trg_test_fail_reschedule_proposed_audit ON fitness.audit_logs");
+            jdbc.execute("DROP FUNCTION IF EXISTS fitness.test_fail_reschedule_proposed_audit_trigger()");
         }
     }
 }

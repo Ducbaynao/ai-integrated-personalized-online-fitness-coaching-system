@@ -103,16 +103,30 @@ class SimulatedF05WorkoutProvider:
             destination=destination,
         )
 
+        missing_data: list[str] = []
+        limitations: list[str] = [
+            "Reschedules one occurrence at a time (Phase 2 release scope baseline).",
+            "Proposal expires in 30 minutes.",
+        ]
+
+        if request.continuityState == "PROLONGED_INACTIVITY":
+            limitations.append("Prolonged inactivity detected (>= 100 days); return-to-training adaptation protocol applies.")
+            reasoning.append("Prolonged inactivity observed; scheduling preserves gradual return spacing.")
+        elif request.continuityState in ("UNKNOWN_HISTORY", "RESTRICTED_HISTORY"):
+            missing_data.append("trainingContinuity")
+            limitations.append(f"Training continuity status is {request.continuityState}; unrecorded training history cannot be verified.")
+        elif request.continuityState == "CONFIRMED_NEW":
+            reasoning.append("Confirmed beginner trainee with no prior workout history.")
+        elif request.continuityState in ("RECENT_ACTIVITY_OBSERVED", "RECENT_CONSISTENT"):
+            reasoning.append("Recent workout activity observed within normal training cadence.")
+
         return F05WorkoutRescheduleResponse(
             recommendationType="WORKOUT_RESCHEDULE_PROPOSAL",
             summary=f"Reschedule workout to {local_start.strftime('%Y-%m-%d %H:%M')} ({tz_name})",
             reasoning=reasoning,
             usedData=used_data,
-            missingData=[],
-            limitations=[
-                "Reschedules one occurrence at a time (Phase 2 release scope baseline).",
-                "Proposal expires in 30 minutes.",
-            ],
+            missingData=missing_data,
+            limitations=limitations,
             confidence=0.95,
             reschedule=payload,
         )
