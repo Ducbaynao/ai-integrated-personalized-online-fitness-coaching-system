@@ -71,13 +71,50 @@ hard-coded contract value.
    that no Food Log is written. Implement matching, Correct, preview/calculation,
    atomic Confirm, receipt replay, erasure and audit for later commands. Add
    tests for T14/T15/T24/T26/T27 and competing catalog/draft writers. A
-   PROCESSING row orphaned by a crash also needs bounded recovery handling.
+   Reading an owner-scoped PROCESSING draft now marks it FAILED after the
+   configured `ai.f06.processing-timeout-seconds` (default 300 seconds).
+   Recovery never automatically regenerates with the same key. A provider
+   response arriving after this terminal transition cannot persist items.
+   This is lazy recovery on read, not a scheduled sweep; the default is a
+   development setting and deployment must align it with provider deadlines.
 4. The internal FastAPI route currently uses a simulated provider that returns
    one unresolved item from the supplied text, with unknown identity and amount.
    It never supplies nutrient values. The route's three focused tests pass;
-   real recognition and Spring output validation remain to be implemented.
+   real recognition remains unimplemented. Spring validates the output shape;
+   JSON Schema, Pydantic and Spring enforce at most 20 detected items, candidate
+   names of 1–200 characters and unique candidate/missing-data arrays.
 5. Implement the Mobile typed consumer and Correct/Confirm UI on its own branch
    after the executable DTO stabilizes. Client calls Spring only.
 
 Passing contract lint or fixture validation proves neither backend behavior
 nor catalog quality, HTTP/DB live operation, device QA or Phase 2 release gates.
+
+## Independent review follow-up
+
+Antigravity reviewed `95c9c6c`. Its validator discrepancy and orphaned
+PROCESSING findings are addressed by the changes above. The review report
+contains several statements that should not be used as implementation evidence:
+
+- `receipt_id` is on `nutrition_command_receipts`, not an analysis draft table.
+- The original focused Spring test asserts no Food Log items for the owner; it
+  does not separately assert an empty meal table or prove all concurrency cases.
+- Current Correct DTO permits selection/quantity correction on an existing item;
+  it does not define adding/deleting items or editing the detected name.
+- Internal service key configuration is `ai.service.internal-service-key`, from
+  `AI_INTERNAL_SERVICE_KEY`; the review's alternative property name is incorrect.
+
+Contract structure remains draft until Correct/Preview/Confirm are executable
+and their authority, atomicity and retry behavior has integration evidence.
+
+Follow-up verification on 2026-11-23:
+
+- `npm run validate:contracts`: OpenAPI valid; 11 AI schemas / 52 fixtures.
+- `npm run test:contracts`: 22/22, including F06 boundary validation.
+- `python -m pytest -q tests/test_f06_food_text.py`: 5/5.
+- Backend clean build with
+  `./mvnw.cmd -q clean "-Dtest=FoodTextEstimateValidationTest,NutritionBasicIntegrationTest#textEstimate*+lateText*" test`:
+  2 validator tests and 3 PostgreSQL/Testcontainers integration tests passed.
+  An earlier incremental run executed stale main bytecode and failed the two
+  recovery cases; the clean build compiled the changed source and passed them.
+- These checks do not establish live Spring-to-FastAPI networking, device QA,
+  catalog/model quality or full-repository test results.

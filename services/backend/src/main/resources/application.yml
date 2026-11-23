@@ -61,6 +61,8 @@ auth:
     refresh-token-ttl: ${REFRESH_TOKEN_TTL:P30D}
 
 ai:
+  f06:
+    processing-timeout-seconds: ${AI_F06_PROCESSING_TIMEOUT_SECONDS:300}
   service:
     enabled: ${AI_SERVICE_ENABLED:true}
     mode: ${AI_SERVICE_MODE:simulated} # 'simulated' or 'http'

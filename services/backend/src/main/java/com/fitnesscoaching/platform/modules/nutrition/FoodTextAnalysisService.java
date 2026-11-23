@@ -7,6 +7,7 @@ import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -38,6 +39,8 @@ public class FoodTextAnalysisService {
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
+    @Value("${ai.f06.processing-timeout-seconds:300}")
+    private long processingTimeoutSeconds = 300;
 
     public FoodTextAnalysisService(JdbcTemplate jdbc, UserAccountStatusQuery accounts,
             StudentCapabilityQuery students, F06AiServiceClient ai, AuditService audit,
@@ -118,8 +121,12 @@ public class FoodTextAnalysisService {
         transactions.executeWithoutResult(ignored -> {
             requireStudent(actor);
             lockStudent(actor);
-            jdbc.query("SELECT id FROM fitness.food_analysis_requests WHERE id=? AND student_id=? FOR UPDATE",
-                    rs -> { while (rs.next()) { /* lock held through persistence */ } }, start.id(), actor);
+            var states = jdbc.query("""
+                    SELECT status FROM fitness.food_analysis_requests
+                    WHERE id=? AND student_id=? FOR UPDATE
+                    """, (rs, n) -> rs.getString(1), start.id(), actor);
+            // A recovered timeout is terminal: a late provider must not publish items.
+            if (states.isEmpty() || !"PROCESSING".equals(states.getFirst())) return;
             int order = 0;
             for (RecognizedItem item : parsed) {
                 jdbc.update("""
@@ -162,6 +169,12 @@ public class FoodTextAnalysisService {
 
     public Draft detail(UUID actor, UUID id) {
         requireStudent(actor);
+        jdbc.update("""
+                UPDATE fitness.food_analysis_requests SET status='FAILED',
+                  failure_reason='PROCESSING_TIMEOUT',updated_at=clock_timestamp()
+                WHERE id=? AND student_id=? AND command_key IS NOT NULL AND status='PROCESSING'
+                  AND updated_at < clock_timestamp() - (? * INTERVAL '1 second')
+                """, id, actor, Math.max(1, processingTimeoutSeconds));
         var rows = jdbc.query("""
                 SELECT * FROM fitness.food_analysis_requests WHERE id=? AND student_id=? AND command_key IS NOT NULL
                 """, (rs, n) -> draftRow(rs), id, actor);
@@ -191,14 +204,14 @@ public class FoodTextAnalysisService {
                 row.runId(), row.expiresAt(), items, null, row.createdAt(), row.updatedAt());
     }
 
-    private List<RecognizedItem> parseEstimate(String raw) {
+    List<RecognizedItem> parseEstimate(String raw) {
         try {
             JsonNode root = mapper.readTree(raw);
             if (root == null || !root.isObject() || root.size() != 4
                     || !"ESTIMATE".equals(root.path("resultType").asText())
                     || !root.path("items").isArray()
                     || root.path("items").size() > 20
-                    || !stringsNode(root.path("missingData"))
+                    || !uniqueStringsNode(root.path("missingData"), false)
                     || !stringsNode(root.path("limitations"))) throw new IllegalArgumentException();
             var result = new java.util.ArrayList<RecognizedItem>();
             for (JsonNode node : root.path("items")) {
@@ -206,8 +219,8 @@ public class FoodTextAnalysisService {
                         || !node.path("detectedName").isTextual()
                         || node.path("detectedName").asText().isBlank()
                         || node.path("detectedName").asText().length() > 200
-                        || !stringsNode(node.path("candidateNames"))
-                        || !stringsNode(node.path("missingData"))
+                        || !uniqueStringsNode(node.path("candidateNames"), true)
+                        || !uniqueStringsNode(node.path("missingData"), false)
                         || !stringsNode(node.path("limitations"))) throw new IllegalArgumentException();
                 JsonNode quantityNode = node.path("quantity");
                 JsonNode confidenceNode = node.path("confidence");
@@ -234,6 +247,17 @@ public class FoodTextAnalysisService {
     private static boolean stringsNode(JsonNode node) {
         if (!node.isArray()) return false;
         for (JsonNode value : node) if (!value.isTextual()) return false;
+        return true;
+    }
+
+    private static boolean uniqueStringsNode(JsonNode node, boolean candidate) {
+        if (!stringsNode(node)) return false;
+        var seen = new java.util.HashSet<String>();
+        for (JsonNode value : node) {
+            String text = value.asText();
+            int length = text.codePointCount(0, text.length());
+            if (!seen.add(text) || (candidate && (length < 1 || length > 200))) return false;
+        }
         return true;
     }
 

@@ -10,6 +10,7 @@
     "resultType": { "const": "ESTIMATE" },
     "items": {
       "type": "array",
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
