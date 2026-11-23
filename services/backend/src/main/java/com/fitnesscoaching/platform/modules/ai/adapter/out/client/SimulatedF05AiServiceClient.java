@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,25 +99,48 @@ public class SimulatedF05AiServiceClient implements F05AiServiceClient {
             reschedule.put("supervisionRequirement", supervision);
             reschedule.put("destination", destination);
 
-            Map<String, Object> root = new LinkedHashMap<>();
-            root.put("recommendationType", "WORKOUT_RESCHEDULE_PROPOSAL");
-            root.put("summary", "Reschedule workout to " + localStartDt.toLocalDate() + " at " + localStartDt.format(DateTimeFormatter.ofPattern("HH:mm")) + " (" + tzName + ")");
-            root.put("reasoning", List.of(
+            List<String> reasoning = new ArrayList<>(List.of(
                     "Session " + (request.sessionName() != null ? request.sessionName() : "workout") + " was requested for rescheduling.",
                     "Proposed slot preserves recovery and avoids conflict with subsequent workouts.",
                     "Supervision requirement " + supervision + " is preserved."
             ));
-            root.put("usedData", List.of(
+            List<String> usedData = new ArrayList<>(List.of(
                     "occurrenceId: " + request.occurrenceId(),
                     "previousPlannedStartAt: " + request.plannedStartAt(),
                     "supervisionRequirement: " + supervision,
                     "coachingMode: " + request.mode()
             ));
-            root.put("missingData", List.of());
-            root.put("limitations", List.of(
+            if (request.continuityState() != null) {
+                usedData.add("continuityState: " + request.continuityState());
+            }
+
+            List<String> missingData = new ArrayList<>();
+            List<String> limitations = new ArrayList<>(List.of(
                     "Single occurrence reschedule per proposal (Phase 2 release scope baseline).",
                     "Proposal expires in 30 minutes."
             ));
+
+            String continuity = request.continuityState();
+            if ("UNKNOWN_HISTORY".equals(continuity) || "RESTRICTED_HISTORY".equals(continuity)) {
+                missingData.add("trainingContinuity");
+                limitations.add("Training continuity is " + continuity + "; past workout adherence cannot be verified.");
+                reasoning.add("Proposed reschedule accounts for unverified continuity (" + continuity + ").");
+            } else if ("PROLONGED_INACTIVITY".equals(continuity)) {
+                limitations.add("Prolonged inactivity detected; conservative recovery interval applied.");
+                reasoning.add("Training continuity reflects prolonged inactivity; ensuring adequate rest window.");
+            } else if ("CONFIRMED_NEW".equals(continuity)) {
+                reasoning.add("Training continuity confirms new trainee; standard recovery spacing applied.");
+            } else if ("RECENT_ACTIVITY_OBSERVED".equals(continuity)) {
+                reasoning.add("Training continuity indicates recent activity; standard recovery spacing applied.");
+            }
+
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("recommendationType", "WORKOUT_RESCHEDULE_PROPOSAL");
+            root.put("summary", "Reschedule workout to " + localStartDt.toLocalDate() + " at " + localStartDt.format(DateTimeFormatter.ofPattern("HH:mm")) + " (" + tzName + ")");
+            root.put("reasoning", reasoning);
+            root.put("usedData", usedData);
+            root.put("missingData", missingData);
+            root.put("limitations", limitations);
             root.put("confidence", 0.95);
             root.put("reschedule", reschedule);
 

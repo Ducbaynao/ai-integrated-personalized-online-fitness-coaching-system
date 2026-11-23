@@ -30,6 +30,14 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutS
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery.Occurrence;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.ChangeResult;
+import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
+import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingAuthorityQuery;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityDecision;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityReason;
+import com.fitnesscoaching.platform.modules.coaching.domain.CoachingSharing.AuthorityRequest;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
+import com.fitnesscoaching.platform.modules.coaching.domain.DataScope;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +47,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -66,6 +80,8 @@ class AiWorkoutRescheduleServiceUnitTest {
     @Mock private WorkoutScheduleChangeUseCase workoutScheduleChangeUseCase;
     @Mock private ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider;
     @Mock private WorkoutScheduleCalendarQuery calendarQuery;
+    @Mock private UserAccountStatusQuery accountStatusQuery;
+    @Mock private CoachingAuthorityQuery coachingAuthorityQuery;
 
     private ObjectMapper objectMapper;
     private Clock clock;
@@ -90,6 +106,9 @@ class AiWorkoutRescheduleServiceUnitTest {
         periodId = UUID.randomUUID();
 
         lenient().when(scheduleCalendarProvider.getIfAvailable()).thenReturn(calendarQuery);
+        lenient().when(accountStatusQuery.getAccountStatus(any())).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        AuthorityDecision defaultAllow = new AuthorityDecision(true, null, UUID.randomUUID(), 1L, UUID.randomUUID(), UUID.randomUUID(), 1L, DataAccessLevel.MANAGE, null, null);
+        lenient().when(coachingAuthorityQuery.evaluateCurrent(any())).thenReturn(defaultAllow);
 
         service = new AiWorkoutRescheduleService(
                 aiRunRepository,
@@ -102,7 +121,10 @@ class AiWorkoutRescheduleServiceUnitTest {
                 coachingContextQuery,
                 workoutScheduleChangeUseCase,
                 scheduleCalendarProvider,
-                clock
+                clock,
+                null,
+                accountStatusQuery,
+                coachingAuthorityQuery
         );
 
         defaultSnapshot = new F05SourceSnapshot(
@@ -657,5 +679,257 @@ class AiWorkoutRescheduleServiceUnitTest {
         assertThat(response.status()).isEqualTo(AiRecommendationStatus.REJECTED);
         verify(recommendationRepository).updateDecision(eq(recId), eq(AiRecommendationStatus.REJECTED), eq(studentId), eq(fixedNow), eq("Not convenient"), eq("WORKOUT_OCCURRENCE"), eq(occurrenceId));
         verify(auditService).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("T04: In-flight revocation of Trainer MANAGE permission aborts delivery, fails AI run without storing payload")
+    void generateReschedule_whenTrainerManageRevokedInFlight_abortsDeliveryAndFailsRun_T04() throws Exception {
+        var req = new WorkoutRescheduleApiRequest(studentId, occurrenceId, 0L, "cmd-t04-manage", "Conflict", "MORNING");
+        var serviceReq = new F05ServiceRequest(
+                studentId, periodId, "HUMAN_COACH", occurrenceId, 0L,
+                UUID.randomUUID(), UUID.randomUUID(), "Push", "COACH_OPTIONAL",
+                "Asia/Ho_Chi_Minh", null, fixedNow.toString(), null, "Conflict", "MORNING",
+                "RECENT_ACTIVITY_OBSERVED", false, null, defaultSnapshot
+        );
+        var envelope = new F05ContextBuilder.ContextEnvelopeResult(
+                serviceReq, defaultSnapshot, AiDecisionAuthority.TRAINER, studentId, periodId
+        );
+
+        when(contextBuilder.buildContextEnvelope(trainerId, req)).thenReturn(envelope);
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        // Initial state before provider call: active coach in HUMAN_COACH mode with MANAGE & VIEW permissions
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        CountDownLatch providerStarted = new CountDownLatch(1);
+        CountDownLatch revocationApplied = new CountDownLatch(1);
+
+        when(aiServiceClient.generateRescheduleJson(serviceReq)).thenAnswer(inv -> {
+            providerStarted.countDown();
+            boolean waited = revocationApplied.await(5, TimeUnit.SECONDS);
+            assertThat(waited).isTrue();
+            return validPayloadJson();
+        });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+
+        Future<?> future = executor.submit(() -> {
+            try {
+                service.generateReschedule(trainerId, req);
+            } catch (Throwable t) {
+                thrown.set(t);
+            }
+        });
+
+        // Wait until provider starts executing
+        assertThat(providerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Simulate concurrent revocation of MANAGE authority during provider execution
+        when(coachingAuthorityQuery.evaluateCurrent(argThat(r -> r != null && r.dataScope() == DataScope.WORKOUT_PLAN && r.requiredLevel() == DataAccessLevel.MANAGE)))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.ACCESS_LEVEL_INSUFFICIENT));
+
+        revocationApplied.countDown();
+        future.get(5, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(thrown.get())
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer MANAGE permission for WORKOUT_PLAN was revoked during generation");
+
+        // Verify AI Run was marked FAILED with AUTHORITY_REVOKED and outputPayload was NOT persisted (null)
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.FAILED), isNull(), eq("AUTHORITY_REVOKED"), any(), isNull(), isNull(), isNull(), eq(fixedNow));
+        // Verify no recommendation was persisted
+        verify(recommendationRepository, never()).save(any());
+        // Verify audit proposed was not recorded
+        verify(auditService, never()).recordAudit(any());
+    }
+
+    @Test
+    @DisplayName("T04: In-flight revocation of Trainer VIEW permission aborts delivery without leaking sensitive payload")
+    void generateReschedule_whenTrainerViewRevokedInFlight_abortsDeliveryAndFailsRun_T04() throws Exception {
+        var req = new WorkoutRescheduleApiRequest(studentId, occurrenceId, 0L, "cmd-t04-view", "Conflict", "MORNING");
+        var serviceReq = new F05ServiceRequest(
+                studentId, periodId, "HUMAN_COACH", occurrenceId, 0L,
+                UUID.randomUUID(), UUID.randomUUID(), "Push", "COACH_OPTIONAL",
+                "Asia/Ho_Chi_Minh", null, fixedNow.toString(), null, "Conflict", "MORNING",
+                "RECENT_ACTIVITY_OBSERVED", false, null, defaultSnapshot
+        );
+        var envelope = new F05ContextBuilder.ContextEnvelopeResult(
+                serviceReq, defaultSnapshot, AiDecisionAuthority.TRAINER, studentId, periodId
+        );
+
+        when(contextBuilder.buildContextEnvelope(trainerId, req)).thenReturn(envelope);
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        CountDownLatch providerStarted = new CountDownLatch(1);
+        CountDownLatch revocationApplied = new CountDownLatch(1);
+
+        when(aiServiceClient.generateRescheduleJson(serviceReq)).thenAnswer(inv -> {
+            providerStarted.countDown();
+            boolean waited = revocationApplied.await(5, TimeUnit.SECONDS);
+            assertThat(waited).isTrue();
+            return validPayloadJson();
+        });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+
+        Future<?> future = executor.submit(() -> {
+            try {
+                service.generateReschedule(trainerId, req);
+            } catch (Throwable t) {
+                thrown.set(t);
+            }
+        });
+
+        assertThat(providerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Revoke VIEW permission while MANAGE remains allowed
+        when(coachingAuthorityQuery.evaluateCurrent(argThat(r -> r != null && r.dataScope() == DataScope.WORKOUT_PLAN && r.requiredLevel() == DataAccessLevel.VIEW)))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        revocationApplied.countDown();
+        future.get(5, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(thrown.get())
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer VIEW permission for WORKOUT_PLAN was revoked during generation");
+
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.FAILED), isNull(), eq("AUTHORITY_REVOKED"), any(), isNull(), isNull(), isNull(), eq(fixedNow));
+        verify(recommendationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T04: Coaching period changed during provider execution aborts proposal delivery")
+    void generateReschedule_whenCoachingPeriodChangedInFlight_abortsDelivery_T04() throws Exception {
+        var req = new WorkoutRescheduleApiRequest(studentId, occurrenceId, 0L, "cmd-t04-period", "Conflict", "MORNING");
+        var serviceReq = new F05ServiceRequest(
+                studentId, periodId, "HUMAN_COACH", occurrenceId, 0L,
+                UUID.randomUUID(), UUID.randomUUID(), "Push", "COACH_OPTIONAL",
+                "Asia/Ho_Chi_Minh", null, fixedNow.toString(), null, "Conflict", "MORNING",
+                "RECENT_ACTIVITY_OBSERVED", false, null, defaultSnapshot
+        );
+        var envelope = new F05ContextBuilder.ContextEnvelopeResult(
+                serviceReq, defaultSnapshot, AiDecisionAuthority.TRAINER, studentId, periodId
+        );
+
+        when(contextBuilder.buildContextEnvelope(trainerId, req)).thenReturn(envelope);
+        when(outputValidator.validate(any(), any())).thenReturn(F05RuntimeOutputValidator.ValidationResult.valid());
+
+        // Context at start: periodId
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        CountDownLatch providerStarted = new CountDownLatch(1);
+        CountDownLatch changeApplied = new CountDownLatch(1);
+
+        when(aiServiceClient.generateRescheduleJson(serviceReq)).thenAnswer(inv -> {
+            providerStarted.countDown();
+            changeApplied.await(5, TimeUnit.SECONDS);
+            return validPayloadJson();
+        });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+
+        Future<?> future = executor.submit(() -> {
+            try {
+                service.generateReschedule(trainerId, req);
+            } catch (Throwable t) {
+                thrown.set(t);
+            }
+        });
+
+        assertThat(providerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Period changes to new period
+        UUID newPeriodId = UUID.randomUUID();
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(newPeriodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        changeApplied.countDown();
+        future.get(5, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(thrown.get())
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer coaching relationship or period was revoked or changed during generation");
+
+        verify(aiRunRepository).completeRun(any(), eq(AiRunStatus.FAILED), isNull(), eq("AUTHORITY_REVOKED"), any(), isNull(), isNull(), isNull(), eq(fixedNow));
+        verify(recommendationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T04 Readback: When Trainer VIEW permission is revoked, getReschedule denies access without leaking payload")
+    void getReschedule_whenTrainerViewRevoked_blocksReadback_T04() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findById(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        // VIEW permission is denied
+        when(coachingAuthorityQuery.evaluateCurrent(argThat(r -> r != null && r.dataScope() == DataScope.WORKOUT_PLAN && r.requiredLevel() == DataAccessLevel.VIEW)))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.PERMISSION_NOT_GRANTED));
+
+        assertThatThrownBy(() -> service.getReschedule(trainerId, recId))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer VIEW permission for WORKOUT_PLAN is revoked");
+    }
+
+    @Test
+    @DisplayName("T04 Authority Matrix: Revoking MANAGE preserves VIEW for readback, but blocks acceptReschedule")
+    void getReschedule_whenTrainerManageRevoked_stillAllowsView_T04() {
+        UUID recId = UUID.randomUUID();
+        AiRecommendation rec = AiRecommendation.builder()
+                .id(recId)
+                .studentId(studentId)
+                .coachingPeriodId(periodId)
+                .recommendationType("WORKOUT_RESCHEDULE_PROPOSAL")
+                .status(AiRecommendationStatus.PENDING)
+                .structuredPayload(validPayloadJson())
+                .build();
+
+        when(recommendationRepository.findById(recId)).thenReturn(Optional.of(rec));
+        when(recommendationRepository.findByIdForUpdate(recId)).thenReturn(Optional.of(rec));
+        when(coachingContextQuery.findEffectiveContext(studentId, false)).thenReturn(
+                Optional.of(new CurrentCoachingContext(periodId, Mode.HUMAN_COACH, UUID.randomUUID(), trainerId, fixedNow, null))
+        );
+
+        // VIEW is allowed, but MANAGE is revoked
+        AuthorityDecision allowView = new AuthorityDecision(true, null, UUID.randomUUID(), 1L, UUID.randomUUID(), UUID.randomUUID(), 1L, DataAccessLevel.VIEW, null, null);
+        when(coachingAuthorityQuery.evaluateCurrent(argThat(r -> r != null && r.dataScope() == DataScope.WORKOUT_PLAN && r.requiredLevel() == DataAccessLevel.VIEW)))
+                .thenReturn(allowView);
+        when(coachingAuthorityQuery.evaluateCurrent(argThat(r -> r != null && r.dataScope() == DataScope.WORKOUT_PLAN && r.requiredLevel() == DataAccessLevel.MANAGE)))
+                .thenReturn(AuthorityDecision.denied(AuthorityReason.ACCESS_LEVEL_INSUFFICIENT));
+
+        // Readback succeeds because actor still retains VIEW authority
+        AiRecommendation found = service.getReschedule(trainerId, recId);
+        assertThat(found.id()).isEqualTo(recId);
+
+        // But Accept is strictly blocked because actor lacks MANAGE authority
+        AcceptRescheduleApiRequest acceptReq = new AcceptRescheduleApiRequest("cmd-acc-1", "Apply reschedule", 1, 0L, null, null);
+        assertThatThrownBy(() -> service.acceptReschedule(trainerId, recId, acceptReq))
+                .isInstanceOf(AiRunAccessDeniedException.class)
+                .hasMessageContaining("Trainer coaching or data sharing authority is no longer valid");
     }
 }
