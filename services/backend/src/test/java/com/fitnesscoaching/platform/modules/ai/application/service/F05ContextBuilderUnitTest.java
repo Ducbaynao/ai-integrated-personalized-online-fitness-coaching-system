@@ -16,6 +16,7 @@ import com.fitnesscoaching.platform.modules.progress.application.port.in.Progres
 import com.fitnesscoaching.platform.modules.progress.application.port.in.ProgressEngineQuery.ProgressSnapshot;
 import com.fitnesscoaching.platform.modules.progress.domain.ProgressError;
 import com.fitnesscoaching.platform.modules.progress.domain.ProgressFailure;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery;
 import com.fitnesscoaching.platform.modules.student.application.port.in.GetStudentProfileUseCase;
 import com.fitnesscoaching.platform.modules.student.domain.StudentProfile;
 import com.fitnesscoaching.platform.modules.student.domain.TrainingExperienceLevel;
@@ -56,6 +57,7 @@ class F05ContextBuilderUnitTest {
     private WorkoutCompletionEvidenceQuery completionEvidenceQuery;
     private CoachingAuthorityQuery coachingAuthorityQuery;
     private GetStudentProfileUseCase studentProfileUseCase;
+    private LinkedWorkoutAppointmentQuery linkedAppointmentQuery;
     private Clock clock;
 
     private ObjectProvider<WorkoutScheduleCalendarQuery> calendarProvider;
@@ -63,6 +65,7 @@ class F05ContextBuilderUnitTest {
     private ObjectProvider<WorkoutCompletionEvidenceQuery> completionProvider;
     private ObjectProvider<CoachingAuthorityQuery> authorityProvider;
     private ObjectProvider<GetStudentProfileUseCase> studentProfileProvider;
+    private ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentProvider;
 
     private F05ContextBuilder contextBuilder;
 
@@ -82,6 +85,7 @@ class F05ContextBuilderUnitTest {
         completionEvidenceQuery = mock(WorkoutCompletionEvidenceQuery.class);
         coachingAuthorityQuery = mock(CoachingAuthorityQuery.class);
         studentProfileUseCase = mock(GetStudentProfileUseCase.class);
+        linkedAppointmentQuery = mock(LinkedWorkoutAppointmentQuery.class);
 
         calendarProvider = mock(ObjectProvider.class);
         when(calendarProvider.getIfAvailable()).thenReturn(calendarQuery);
@@ -98,6 +102,9 @@ class F05ContextBuilderUnitTest {
         studentProfileProvider = mock(ObjectProvider.class);
         when(studentProfileProvider.getIfAvailable()).thenReturn(studentProfileUseCase);
 
+        linkedAppointmentProvider = mock(ObjectProvider.class);
+        when(linkedAppointmentProvider.getIfAvailable()).thenReturn(linkedAppointmentQuery);
+
         clock = Clock.fixed(fixedNow, ZoneId.of("UTC"));
 
         contextBuilder = new F05ContextBuilder(
@@ -109,7 +116,8 @@ class F05ContextBuilderUnitTest {
                 progressEngineProvider,
                 completionProvider,
                 authorityProvider,
-                studentProfileProvider
+                studentProfileProvider,
+                linkedAppointmentProvider
         );
 
         when(accountStatusQuery.getAccountStatus(studentId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
@@ -372,5 +380,61 @@ class F05ContextBuilderUnitTest {
                 .isEqualTo(TrainingContinuityState.UNKNOWN_HISTORY);
         assertThat(result.serviceRequest().continuityState())
                 .isEqualTo("UNKNOWN_HISTORY");
+    }
+
+    @Test
+    @DisplayName("F05-BL-03: When occurrence has linked confirmed appointment, context envelope captures appointment interval")
+    void buildContext_withLinkedConfirmedAppointment_populatesAppointmentIntervalInRequest() {
+        UUID appointmentId = UUID.randomUUID();
+        Instant appStart = fixedNow.plusSeconds(86400); // tomorrow 10:00
+        Instant appEnd = fixedNow.plusSeconds(86400 + 3600); // tomorrow 11:00
+
+        Occurrence occ = new Occurrence(
+                occurrenceId,
+                0L,
+                studentId,
+                "SCHEDULED",
+                fixedNow.plusSeconds(3600),
+                fixedNow.plusSeconds(3600),
+                null,
+                null,
+                fixedNow.plusSeconds(7200),
+                "Asia/Ho_Chi_Minh",
+                "2026-11-20T17:00:00",
+                "2026-11-20T18:00:00",
+                "+07:00",
+                "+07:00",
+                new PlanSummary(UUID.randomUUID(), UUID.randomUUID(), 1, "Hypertrophy"),
+                new SessionSummary(UUID.randomUUID(), 1, 1, 1, "Full Body Strength", "HYPERTROPHY", 60, "COACH_REQUIRED"),
+                List.of(),
+                appointmentId,
+                2L
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(occ);
+        when(missedEvidence.find(occurrenceId)).thenReturn(Optional.of(createMissedEvidence()));
+
+        when(linkedAppointmentQuery.findActiveLinks(occurrenceId)).thenReturn(List.of(
+                new LinkedWorkoutAppointmentQuery.Linked(
+                        appointmentId, studentId, trainerId, UUID.randomUUID(),
+                        2L, "CONFIRMED", appStart, appEnd
+                )
+        ));
+
+        WorkoutRescheduleApiRequest request = new WorkoutRescheduleApiRequest(studentId, occurrenceId, 0L, null, "Reschedule", null);
+        var result = contextBuilder.buildContextEnvelope(studentId, request);
+
+        assertThat(result.serviceRequest().hasLinkedAppointment()).isTrue();
+        assertThat(result.serviceRequest().appointmentId()).isEqualTo(appointmentId);
+        assertThat(result.serviceRequest().appointmentStartAt()).isEqualTo(appStart.toString());
+        assertThat(result.serviceRequest().appointmentEndAt()).isEqualTo(appEnd.toString());
+        assertThat(result.sourceSnapshot().linkedAppointmentId()).isEqualTo(appointmentId);
+        assertThat(result.sourceSnapshot().linkedAppointmentVersion()).isEqualTo(2L);
+
+        when(linkedAppointmentQuery.findActiveLinks(occurrenceId)).thenReturn(List.of(
+                new LinkedWorkoutAppointmentQuery.Linked(appointmentId, studentId, trainerId, UUID.randomUUID(),
+                        3L, "CONFIRMED", appStart, appEnd)));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> contextBuilder.buildContextEnvelope(studentId, request))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException.class)
+                .hasMessageContaining("Appointment changed while building context");
     }
 }

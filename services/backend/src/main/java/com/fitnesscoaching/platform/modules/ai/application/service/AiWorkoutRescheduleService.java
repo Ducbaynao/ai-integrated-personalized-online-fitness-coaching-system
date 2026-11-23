@@ -34,6 +34,7 @@ import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutS
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.ChangeResult;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.Destination;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleChangeUseCase.Reschedule;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -82,6 +83,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     private final PlatformTransactionManager transactionManager;
     private final UserAccountStatusQuery accountStatusQuery;
     private final CoachingAuthorityQuery coachingAuthorityQuery;
+    private final ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentQueryProvider;
     private final Clock clock;
 
     public AiWorkoutRescheduleService(
@@ -99,7 +101,28 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
     ) {
         this(aiRunRepository, recommendationRepository, aiServiceClient, contextBuilder, outputValidator,
                 auditService, objectMapper, coachingContextQuery, workoutScheduleChangeUseCase,
-                scheduleCalendarProvider, clock, null, null, null);
+                scheduleCalendarProvider, clock, null, null, null, null);
+    }
+
+    public AiWorkoutRescheduleService(
+            AiRunRepository aiRunRepository,
+            AiRecommendationRepository recommendationRepository,
+            F05AiServiceClient aiServiceClient,
+            F05ContextBuilder contextBuilder,
+            F05RuntimeOutputValidator outputValidator,
+            AuditService auditService,
+            ObjectMapper objectMapper,
+            CurrentCoachingContextQuery coachingContextQuery,
+            WorkoutScheduleChangeUseCase workoutScheduleChangeUseCase,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            Clock clock,
+            PlatformTransactionManager transactionManager,
+            UserAccountStatusQuery accountStatusQuery,
+            CoachingAuthorityQuery coachingAuthorityQuery
+    ) {
+        this(aiRunRepository, recommendationRepository, aiServiceClient, contextBuilder, outputValidator,
+                auditService, objectMapper, coachingContextQuery, workoutScheduleChangeUseCase,
+                scheduleCalendarProvider, clock, transactionManager, accountStatusQuery, coachingAuthorityQuery, null);
     }
 
     @Autowired
@@ -117,7 +140,8 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             Clock clock,
             @Autowired(required = false) PlatformTransactionManager transactionManager,
             @Autowired(required = false) UserAccountStatusQuery accountStatusQuery,
-            @Autowired(required = false) CoachingAuthorityQuery coachingAuthorityQuery
+            @Autowired(required = false) CoachingAuthorityQuery coachingAuthorityQuery,
+            @Autowired(required = false) ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentQueryProvider
     ) {
         this.aiRunRepository = aiRunRepository;
         this.recommendationRepository = recommendationRepository;
@@ -133,6 +157,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
         this.transactionManager = transactionManager;
         this.accountStatusQuery = accountStatusQuery;
         this.coachingAuthorityQuery = coachingAuthorityQuery;
+        this.linkedAppointmentQueryProvider = linkedAppointmentQueryProvider;
     }
 
     private record AcceptExecutionResult(AcceptRescheduleApiResponse response, boolean expired, String expiredMessage) {
@@ -547,6 +572,25 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                             ? appPayloadNode.path("expectedOccurrenceVersion").asLong()
                             : null;
                     boolean occurrenceVerMatches = Objects.equals(req.expectedOccurrenceVersion(), savedOccurrenceVer);
+                    Long savedAppVer = appPayloadNode.hasNonNull("expectedAppointmentVersion")
+                            ? appPayloadNode.path("expectedAppointmentVersion").asLong()
+                            : null;
+                    // Compare Appointment intent explicitly; keep the existing fingerprint format for old receipts.
+                    boolean appVerMatches = Objects.equals(req.expectedAppointmentVersion(), savedAppVer);
+                    String savedAppId = appPayloadNode.hasNonNull("expectedAppointmentId")
+                            ? appPayloadNode.path("expectedAppointmentId").asText()
+                            : null;
+                    String reqAppIdStr = req.expectedAppointmentId() != null ? req.expectedAppointmentId().toString() : null;
+                    boolean appIdMatches = Objects.equals(reqAppIdStr, savedAppId);
+                    if (!appPayloadNode.has("expectedAppointmentVersion") && !appPayloadNode.has("expectedAppointmentId")
+                            && (req.expectedAppointmentVersion() != null || req.expectedAppointmentId() != null)) {
+                        // Old receipts omitted these fields. Only the immutable source can establish their meaning.
+                        F05SourceSnapshot replaySource = objectMapper.readValue(rec.sourceSnapshot(), F05SourceSnapshot.class);
+                        appVerMatches = req.expectedAppointmentVersion() == null
+                                || Objects.equals(req.expectedAppointmentVersion(), replaySource.linkedAppointmentVersion());
+                        appIdMatches = req.expectedAppointmentId() == null
+                                || Objects.equals(req.expectedAppointmentId(), replaySource.linkedAppointmentId());
+                    }
                     String savedNote = appPayloadNode.path("decisionNote").asText("");
                     String reqNote = req.decisionNote() != null ? req.decisionNote() : "";
                     boolean noteMatches = reqNote.equals(savedNote);
@@ -562,7 +606,7 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
                     String savedFingerprint = appPayloadNode.path("payloadFingerprint").asText("");
                     boolean fingerprintMatches = savedFingerprint.isEmpty() || savedFingerprint.equals(currentFingerprint);
 
-                    if (actorMatches && revMatches && occurrenceVerMatches && noteMatches && fingerprintMatches) {
+                    if (actorMatches && revMatches && occurrenceVerMatches && appVerMatches && appIdMatches && noteMatches && fingerprintMatches) {
                         log.info("Replaying identical AcceptRescheduleCommand for key: {}", req.commandKey());
                         ChangeResult changeResult = appPayloadNode.has("changeResult")
                                 ? objectMapper.treeToValue(appPayloadNode.path("changeResult"), ChangeResult.class)
@@ -650,7 +694,24 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
             }
             if (!Objects.equals(liveOccurrence.linkedAppointmentId(), sourceSnapshot.linkedAppointmentId())
                     || !Objects.equals(liveOccurrence.linkedAppointmentVersion(), sourceSnapshot.linkedAppointmentVersion())) {
-                throw new AiRunLifecycleConflictException("Linked appointment has changed since proposal was generated.");
+                throw new AiRunLifecycleConflictException("Linked appointment has changed since proposal was generated. Complete the Schedule change request if needed, then generate and review a new F05 proposal; the original snapshot is retained.");
+            }
+            if (req.expectedAppointmentId() != null && !Objects.equals(req.expectedAppointmentId(), liveOccurrence.linkedAppointmentId())) {
+                throw new AiRunLifecycleConflictException("Appointment ID conflict: expected " + req.expectedAppointmentId() + " but current is " + liveOccurrence.linkedAppointmentId());
+            }
+            if (req.expectedAppointmentVersion() != null && !Objects.equals(req.expectedAppointmentVersion(), liveOccurrence.linkedAppointmentVersion())) {
+                throw new AiRunLifecycleConflictException("Appointment version conflict: expected " + req.expectedAppointmentVersion() + " but current is " + liveOccurrence.linkedAppointmentVersion());
+            }
+            if (liveOccurrence.linkedAppointmentId() != null && linkedAppointmentQueryProvider != null) {
+                LinkedWorkoutAppointmentQuery linkedQuery = linkedAppointmentQueryProvider.getIfAvailable();
+                if (linkedQuery != null) {
+                    var activeLinks = linkedQuery.findActiveLinks(liveOccurrence.occurrenceId());
+                    boolean hasConfirmedAppointment = activeLinks != null && activeLinks.stream()
+                            .anyMatch(l -> "CONFIRMED".equals(l.status()) && l.appointmentId().equals(liveOccurrence.linkedAppointmentId()));
+                    if (!hasConfirmedAppointment) {
+                        throw new AiRunLifecycleConflictException("Linked appointment is no longer in CONFIRMED status.");
+                    }
+                }
             }
         }
 
@@ -719,6 +780,8 @@ public class AiWorkoutRescheduleService implements AiWorkoutRescheduleUseCase {
         appPayload.put("actorId", actorId.toString());
         appPayload.put("appliedRevision", rec.revision());
         appPayload.put("expectedOccurrenceVersion", req.expectedOccurrenceVersion());
+        appPayload.put("expectedAppointmentVersion", req.expectedAppointmentVersion());
+        appPayload.put("expectedAppointmentId", req.expectedAppointmentId() != null ? req.expectedAppointmentId().toString() : null);
         appPayload.put("decisionNote", req.decisionNote() != null ? req.decisionNote() : "");
         appPayload.put("payloadFingerprint", payloadFingerprint);
         appPayload.put("changeResult", changeResult);

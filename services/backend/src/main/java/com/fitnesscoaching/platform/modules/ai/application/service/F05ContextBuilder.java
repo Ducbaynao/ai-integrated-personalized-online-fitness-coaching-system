@@ -24,6 +24,7 @@ import com.fitnesscoaching.platform.modules.student.application.port.in.GetStude
 import com.fitnesscoaching.platform.modules.student.domain.StudentProfile;
 import com.fitnesscoaching.platform.modules.student.domain.TrainingExperienceLevel;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.schedule.application.port.in.LinkedWorkoutAppointmentQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutCompletionEvidenceQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutScheduleCalendarQuery;
 import com.fitnesscoaching.platform.modules.workout.application.port.in.WorkoutMissedEvidenceQuery;
@@ -55,6 +56,7 @@ public class F05ContextBuilder {
     private final ObjectProvider<WorkoutCompletionEvidenceQuery> workoutCompletionQueryProvider;
     private final ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider;
     private final ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider;
+    private final ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentQueryProvider;
 
     @Autowired
     public F05ContextBuilder(
@@ -66,7 +68,8 @@ public class F05ContextBuilder {
             ObjectProvider<ProgressEngineQuery> progressEngineQueryProvider,
             ObjectProvider<WorkoutCompletionEvidenceQuery> workoutCompletionQueryProvider,
             ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider,
-            ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider
+            ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider,
+            @Autowired(required = false) ObjectProvider<LinkedWorkoutAppointmentQuery> linkedAppointmentQueryProvider
     ) {
         this.coachingContextQuery = coachingContextQuery;
         this.accountStatusQuery = accountStatusQuery;
@@ -77,6 +80,23 @@ public class F05ContextBuilder {
         this.workoutCompletionQueryProvider = workoutCompletionQueryProvider;
         this.coachingAuthorityQueryProvider = coachingAuthorityQueryProvider;
         this.studentProfileUseCaseProvider = studentProfileUseCaseProvider;
+        this.linkedAppointmentQueryProvider = linkedAppointmentQueryProvider;
+    }
+
+    public F05ContextBuilder(
+            CurrentCoachingContextQuery coachingContextQuery,
+            UserAccountStatusQuery accountStatusQuery,
+            ObjectProvider<WorkoutScheduleCalendarQuery> scheduleCalendarProvider,
+            Clock clock,
+            WorkoutMissedEvidenceQuery missedEvidence,
+            ObjectProvider<ProgressEngineQuery> progressEngineQueryProvider,
+            ObjectProvider<WorkoutCompletionEvidenceQuery> workoutCompletionQueryProvider,
+            ObjectProvider<CoachingAuthorityQuery> coachingAuthorityQueryProvider,
+            ObjectProvider<GetStudentProfileUseCase> studentProfileUseCaseProvider
+    ) {
+        this(coachingContextQuery, accountStatusQuery, scheduleCalendarProvider, clock, missedEvidence,
+                progressEngineQueryProvider, workoutCompletionQueryProvider, coachingAuthorityQueryProvider,
+                studentProfileUseCaseProvider, null);
     }
 
     public F05ContextBuilder(
@@ -87,7 +107,7 @@ public class F05ContextBuilder {
             WorkoutMissedEvidenceQuery missedEvidence
     ) {
         this(coachingContextQuery, accountStatusQuery, scheduleCalendarProvider, clock, missedEvidence,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public record CoachingContextDetails(
@@ -233,6 +253,27 @@ public class F05ContextBuilder {
                 asOf
         );
 
+        String appointmentStartAt = null;
+        String appointmentEndAt = null;
+        if (occurrence.linkedAppointmentId() != null && linkedAppointmentQueryProvider != null) {
+            LinkedWorkoutAppointmentQuery linkedQuery = linkedAppointmentQueryProvider.getIfAvailable();
+            if (linkedQuery != null) {
+                var links = linkedQuery.findActiveLinks(occurrence.occurrenceId());
+                if (links != null) {
+                    for (var link : links) {
+                        if (link.appointmentId().equals(occurrence.linkedAppointmentId()) && "CONFIRMED".equals(link.status())) {
+                            if (!Objects.equals(occurrence.linkedAppointmentVersion(), link.version())) {
+                                throw new AiRunLifecycleConflictException("Appointment changed while building context; generate a fresh proposal.");
+                            }
+                            appointmentStartAt = link.startAt() != null ? link.startAt().toString() : null;
+                            appointmentEndAt = link.endAt() != null ? link.endAt().toString() : null;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         F05ServiceRequest serviceRequest = new F05ServiceRequest(
                 studentId,
                 coaching.periodId(),
@@ -252,6 +293,8 @@ public class F05ContextBuilder {
                 continuityState != null ? continuityState.name() : "UNKNOWN_HISTORY",
                 occurrence.linkedAppointmentId() != null,
                 occurrence.linkedAppointmentId(),
+                appointmentStartAt,
+                appointmentEndAt,
                 sourceSnapshot
         );
 
