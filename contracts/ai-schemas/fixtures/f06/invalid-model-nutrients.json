@@ -1,0 +1,17 @@
+{
+  "resultType": "ESTIMATE",
+  "items": [
+    {
+      "detectedName": "cơm",
+      "candidateNames": [],
+      "quantity": 100,
+      "unitText": "g",
+      "confidence": 0.7,
+      "missingData": [],
+      "limitations": [],
+      "energyKcal": 130
+    }
+  ],
+  "missingData": [],
+  "limitations": []
+}

@@ -1,0 +1,16 @@
+{
+  "resultType": "ESTIMATE",
+  "items": [
+    {
+      "detectedName": "cơm",
+      "candidateNames": ["cơm trắng"],
+      "quantity": null,
+      "unitText": null,
+      "confidence": null,
+      "missingData": ["QUANTITY", "UNIT"],
+      "limitations": ["Mô tả không nêu lượng ăn; Student cần nhập trước khi xác nhận."]
+    }
+  ],
+  "missingData": ["QUANTITY", "UNIT"],
+  "limitations": []
+}
