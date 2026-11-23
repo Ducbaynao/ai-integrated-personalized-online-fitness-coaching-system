@@ -1,0 +1,71 @@
+{
+  "verificationTimestamp": "2026-11-23T14:34:47.802370+00:00",
+  "environment": "local-live",
+  "backendUrl": "http://localhost:8080/api/v1",
+  "aiServiceUrl": "http://localhost:8000",
+  "database": "digital_fitness (PostgreSQL 18.6 on port 5433)",
+  "provider": "simulated (SimulatedF05WorkoutProvider)",
+  "scenarios": {
+    "scenario_1_self_directed_flow": {
+      "status": "PASS",
+      "recommendationId": "0707b1b9-a71e-437c-9ae4-93eb291f254e",
+      "predecessorId": "22259324-2433-453a-8713-f5b3a9f156fd",
+      "successorId": "7104e580-ab67-4a07-9e70-8c26afc6b4fe",
+      "replayed": false,
+      "predecessorDbStatus": "RESCHEDULED",
+      "successorDbStatus": "SCHEDULED"
+    },
+    "scenario_2_student_human_coach_blocked": {
+      "status": "PASS",
+      "recommendationId": "eac3b4f3-f800-4055-9f8a-f16d0cd84f08",
+      "httpStatus": 403,
+      "errorCode": "AI_FORBIDDEN",
+      "message": "Student in HUMAN_COACH mode cannot unilaterally accept AI workout rescheduling. Trainer approval required."
+    },
+    "scenario_3_trainer_human_coach_apply": {
+      "status": "PASS",
+      "recommendationId": "eac3b4f3-f800-4055-9f8a-f16d0cd84f08",
+      "appliedBy": "1cb982ef-b7e6-493c-86f9-fe4994f8ad93",
+      "successorId": "e3ece020-a0ef-4ebc-b1b0-d0fd6d60e32d",
+      "predecessorDbStatus": "RESCHEDULED",
+      "successorDbStatus": "SCHEDULED"
+    },
+    "scenario_4_reject_preserves_workout": {
+      "status": "PASS",
+      "recommendationId": "d00b42e9-60b5-49c2-83e9-17b5d5e155a4",
+      "predecessorId": "9b89a425-c9d5-44c1-acf7-736abf17779a",
+      "predecessorDbStatus": "SCHEDULED",
+      "predecessorDbVersion": 1,
+      "recommendationDbStatus": "REJECTED"
+    },
+    "scenario_5_stale_source_version_conflict": {
+      "status": "PASS",
+      "recommendationId": "093c793d-c54c-4bd2-90d9-63177b9fa6ca",
+      "httpStatus": 409,
+      "errorCode": "AI_RUN_LIFECYCLE_CONFLICT",
+      "message": "Workout occurrence version conflict: expected version 1 but current is 2"
+    },
+    "scenario_6_appointment_version_drift": {
+      "status": "PASS",
+      "recommendationId": "c3ecb9fb-254b-475f-9ff9-53f00556f015",
+      "httpStatus": 409,
+      "errorCode": "AI_RUN_LIFECYCLE_CONFLICT",
+      "message": "Linked appointment has changed since proposal was generated. Complete the Schedule change request if needed, then generate and review a new F05 proposal; the original snapshot is retained."
+    },
+    "scenario_7_idempotent_replay": {
+      "status": "PASS",
+      "recommendationId": "0707b1b9-a71e-437c-9ae4-93eb291f254e",
+      "commandKey": "ce6798bc-4329-49ae-a0bc-67bdf1ed910a",
+      "replayed": true,
+      "resultingEntityId": "7104e580-ab67-4a07-9e70-8c26afc6b4fe",
+      "successorCount": 1
+    },
+    "scenario_8_expired_proposal_semantics": {
+      "status": "PASS",
+      "replayExpiredStatus": "SUCCESS_REPLAYED",
+      "newAcceptExpiredStatus": "BLOCKED_409",
+      "errorCode": "AI_RUN_LIFECYCLE_CONFLICT"
+    }
+  },
+  "overallResult": "PASS"
+}

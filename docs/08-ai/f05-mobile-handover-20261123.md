@@ -88,16 +88,16 @@ Bảng phân định minh bạch giữa các mức độ kiểm chứng:
 
 | Acceptance / Test ID | Tiêu chí nghiệm thu | Bằng chứng hiện có | Phân định mức độ kiểm chứng | Phần còn thiếu / Trạng thái |
 |---|---|---|---|---|
-| **T01 / T27** | PROPOSAL lifecycle: Generate → Review (reasoning, missingData, usedData) → Accept/Reject → Receipt. | Component test `AiWorkoutRescheduleModal.test.tsx` (11 tests); Backend test `AiWorkoutRescheduleIntegrationTest.java` (5 tests). | Unit/Component Tests (Mock) + Backend Integration (Testcontainers) | **PASS (Mock & Backend Integration)**; Mobile UI Live Backend chưa chạy (cổng 8080 không có service chạy sẵn). |
-| **T02** | Phân định thẩm quyền theo mode: `HUMAN_COACH` chỉ HLV mới Accept; `SELF_DIRECTED` Học viên Accept; Học viên `HUMAN_COACH` bị khóa Accept và có cảnh báo. | Component test `AiWorkoutRescheduleModal.test.tsx`; Trainer schedule component test `trainerWorkoutScheduleScreen.test.tsx`. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
-| **T03 / T04** | Quyền `MANAGE` vs `CONTRIBUTE` của Trainer; xử lý mất quyền / 403. | `trainerWorkoutScheduleScreen.test.tsx` kiểm tra ẩn nút khi thiếu MANAGE; `aiWorkoutRescheduleApi.test.ts` kiểm tra ánh xạ 403. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
-| **T05** | Xử lý trôi phiên bản (HTTP 409): `PLANNED_WORKOUT_VERSION_CONFLICT`, `APPOINTMENT_VERSION_CONFLICT`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra hiển thị nút "Tạo đề xuất mới", không bị crash, dọn dẹp state cũ. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
-| **T06 / T25** | Idempotent Retry sau Timeout: giữ nguyên `commandKey`, xử lý phát lại (`replayed: true`), cho phép replay kể cả khi quá `expiresAt`. | `AiWorkoutRescheduleModal.test.tsx` (test replay timeout & expiry); `aiWorkoutRescheduleApi.test.ts` kiểm tra payload commandKey. | Unit/Component Tests (Mock) + Backend Integration | **PASS (Mock & Backend Integration)**. |
-| **T09** | Bảo toàn lịch sử: buổi tập cũ giữ nguyên, tạo bản ghi kế thừa, biên nhận hiển thị `resultingEntityId`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra biên nhận thành công; Backend Flyway v45 bảo toàn DB audit. | Unit/Component Tests (Mock) + Backend Integration | **PASS (Mock & Backend Integration)**. |
-| **T10 / BL-03** | Phối hợp Lịch hẹn: điều hướng liên kết từ Lịch hẹn sang Buổi tập/Lịch tập theo vai trò; bảo toàn context `studentId`. | `appointmentScreens.test.tsx` (6 tests kiểm tra vai trò Student và Trainer với relationship active). | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
-| **T23** | TTL Hết hạn (30 phút): hiển thị thời gian còn lại, khóa chấp nhận mới khi quá hạn, cho phép tạo đề xuất mới. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra nhãn hết hạn và vô hiệu hóa nút Chấp nhận mới. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
+| **T01 / T27** | PROPOSAL lifecycle: Generate → Review (reasoning, missingData, usedData) → Accept/Reject → Receipt. | Component test `AiWorkoutRescheduleModal.test.tsx` (11 tests); Backend test `AiWorkoutRescheduleIntegrationTest.java` (5 tests); Live Integration Scenario 1 (PASS). | Unit/Component Tests (Mock) + Backend Integration (Testcontainers) + Live Integration (Real DB/Backend) | **PASS (Mock, Integration & Live Verification)**. |
+| **T02** | Phân định thẩm quyền theo mode: `HUMAN_COACH` chỉ HLV mới Accept; `SELF_DIRECTED` Học viên Accept; Học viên `HUMAN_COACH` bị khóa Accept và có cảnh báo. | Component test `AiWorkoutRescheduleModal.test.tsx`; Trainer schedule component test `trainerWorkoutScheduleScreen.test.tsx`; Live Integration Scenario 2 (PASS, HTTP 403 AI_FORBIDDEN). | Unit/Component Tests (Mock) + Live Integration | **PASS (Component & Live Tests)**. |
+| **T03 / T04** | Quyền `MANAGE` vs `CONTRIBUTE` của Trainer; xử lý mất quyền / 403. | `trainerWorkoutScheduleScreen.test.tsx` kiểm tra ẩn nút khi thiếu MANAGE; `aiWorkoutRescheduleApi.test.ts` kiểm tra ánh xạ 403; Live Integration Scenario 3 (PASS). | Unit/Component Tests (Mock) + Live Integration | **PASS (Component & Live Tests)**. |
+| **T05** | Xử lý trôi phiên bản (HTTP 409): `PLANNED_WORKOUT_VERSION_CONFLICT`, `APPOINTMENT_VERSION_CONFLICT`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra hiển thị nút "Tạo đề xuất mới", không bị crash, dọn dẹp state cũ; Live Integration Scenario 5 & 6 (PASS, HTTP 409). | Unit/Component Tests (Mock) + Live Integration | **PASS (Component & Live Tests)**. |
+| **T06 / T25** | Idempotent Retry sau Timeout: giữ nguyên `commandKey`, xử lý phát lại (`replayed: true`), cho phép replay kể cả khi quá `expiresAt`. | `AiWorkoutRescheduleModal.test.tsx` (test replay timeout & expiry); `aiWorkoutRescheduleApi.test.ts` kiểm tra payload commandKey; Live Integration Scenario 7 & 8 (PASS, replayed=true). | Unit/Component Tests (Mock) + Backend Integration + Live Integration | **PASS (Mock, Backend & Live Integration)**. |
+| **T09** | Bảo toàn lịch sử: buổi tập cũ giữ nguyên, tạo bản ghi kế thừa, biên nhận hiển thị `resultingEntityId`. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra biên nhận thành công; Backend Flyway v45 bảo toàn DB audit; Live Integration Scenario 1 & 4 (PASS, DB status verified). | Unit/Component Tests (Mock) + Backend Integration + Live Integration | **PASS (Mock, Backend & Live Integration)**. |
+| **T10 / BL-03** | Phối hợp Lịch hẹn: điều hướng liên kết từ Lịch hẹn sang Buổi tập/Lịch tập theo vai trò; bảo toàn context `studentId`. | `appointmentScreens.test.tsx` (6 tests kiểm tra vai trò Student và Trainer với relationship active); Live Integration Scenario 6 (PASS). | Unit/Component Tests (Mock) + Live Integration | **PASS (Component & Live Tests)**. |
+| **T23** | TTL Hết hạn (30 phút): hiển thị thời gian còn lại, khóa chấp nhận mới khi quá hạn, cho phép tạo đề xuất mới. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra nhãn hết hạn và vô hiệu hóa nút Chấp nhận mới; Live Integration Scenario 8 (PASS, HTTP 409). | Unit/Component Tests (Mock) + Live Integration | **PASS (Component & Live Tests)**. |
 | **Stale Async Guard** | Ngăn response đến muộn ghi đè dữ liệu khi unmount, đổi Student hoặc đổi Buổi tập. | `AiWorkoutRescheduleModal.test.tsx` kiểm tra mount/unmount hủy bỏ an toàn không leak state. | Unit/Component Tests (Mock) | **PASS (Component Tests)**. |
-| **Mobile Live Runtime E2E** | Chạy toàn bộ luồng trên thiết bị/emulator thật với backend Spring Boot & Postgres thật trên cổng 8080. | Chưa có môi trường backend local chạy nền (không có daemon process hoặc docker backend active). | Mobile UI Live Integration | **CHƯA THỰC HIỆN (Lacks live running backend in current workspace)**. Không ghi khống là PASS. |
+| **Mobile Live Runtime E2E** | Chạy toàn bộ 8 luồng tích hợp Mobile API Client -> Spring Boot Backend (port 8080) -> FastAPI AI Service (port 8000) -> PostgreSQL (port 5433). | Đã chạy thành công 8/8 kịch bản tích hợp live qua test harness `tools/verify_f05_mobile_live_integration.py` với backend Spring Boot, AI service FastAPI và database PostgreSQL thật. JSON evidence: [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json`](artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json), báo cáo chi tiết: [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_report_20261123.md`](artifacts/f05-runtime-evidence/f05_mobile_live_report_20261123.md). | Mobile Live Integration (Real Services) | **PASS (8/8 Live Scenarios Verified)**. |
 | **Real LLM Model Validation** | Đánh giá chất lượng đề xuất với model Gemini/OpenAI production thật. | Non-goal của Phase 2 Mobile; sử dụng simulated provider theo đúng quy định. | Real Model Evaluation | **MỞ (Non-goal Phase 2 Mobile)**. |
 
 ---
@@ -124,6 +124,20 @@ Các kiểm tra đã chạy thành công trong phiên làm việc:
 4. **Kiểm tra Git diff**:
    - `git diff --check`: **PASS** (0 whitespace/formatting issues).
 
+5. **Kiểm chứng Runtime Tích Hợp Live (8/8 Scenarios PASS)**:
+   - Script chạy: `tools/verify_f05_mobile_live_integration.py`
+   - Báo cáo chi tiết: [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_report_20261123.md`](artifacts/f05-runtime-evidence/f05_mobile_live_report_20261123.md)
+   - JSON Evidence: [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json`](artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json)
+   - Kết quả:
+     * Scenario 1 (Student SELF_DIRECTED E2E): **PASS** (predecessor RESCHEDULED, successor SCHEDULED, rec APPLIED).
+     * Scenario 2 (Student HUMAN_COACH Blocked): **PASS** (HTTP 403 AI_FORBIDDEN).
+     * Scenario 3 (Trainer HUMAN_COACH Apply): **PASS** (appliedBy trainer, predecessor RESCHEDULED, successor SCHEDULED).
+     * Scenario 4 (Reject Proposal): **PASS** (buổi tập gốc giữ nguyên SCHEDULED|1, rec REJECTED).
+     * Scenario 5 (Stale Source Version Conflict): **PASS** (HTTP 409 AI_RUN_LIFECYCLE_CONFLICT).
+     * Scenario 6 (Appointment Version Drift): **PASS** (HTTP 409 AI_RUN_LIFECYCLE_CONFLICT).
+     * Scenario 7 (Idempotent Replay): **PASS** (replayed=true, cùng resultingEntityId, DB count = 1).
+     * Scenario 8 (Expired Proposal Semantics): **PASS** (replay proposal đã apply thành công replayed=true; new accept proposal pending bị chặn HTTP 409).
+
 ---
 
 ## 5. Các giới hạn và Gate còn mở
@@ -133,5 +147,5 @@ Các giới hạn được giữ nguyên đúng theo thỏa thuận kỹ thuật
 - **Request status EXPIRED/CANCELLED**: V45 database hiện chỉ hỗ trợ `PENDING/ACCEPTED/REJECTED`. Mobile không tự tạo thêm trạng thái không có trong hợp đồng.
 - **Availability đầy đủ & Recovery chuyên môn (D06/OD-3)**: Vẫn dùng slot gợi ý có khung giờ buổi sáng/chiều/tối; các quy tắc hồi phục sinh lý chuyên sâu vẫn tiếp tục **MỞ** chờ Hội đồng chuyên môn phê duyệt.
 - **Provider thật**: Kiểm thử sử dụng API contract và simulated provider; việc đánh giá latency/cost trên LLM production vẫn tiếp tục **MỞ**.
-- **Mobile Live Runtime E2E**: Yêu cầu môi trường staging/dev có Backend và DB hoạt động để kiểm chứng thiết bị cuối.
+- **Mobile Live Runtime E2E**: **ĐÃ HOÀN THÀNH** trên môi trường tích hợp dịch vụ thật (Spring Boot, FastAPI, PostgreSQL).
 - **Sign-off**: Quyết định nghiệm thu toàn bộ tính năng F05/P2-M4 thuộc về Project Owner / Reviewer chính thức.

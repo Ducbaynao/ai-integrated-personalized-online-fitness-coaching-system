@@ -221,7 +221,11 @@ public class F05ContextBuilder {
         UUID planSessionId = occurrence.sessionSummary() != null ? occurrence.sessionSummary().planSessionId() : null;
         String sessionName = occurrence.sessionSummary() != null ? occurrence.sessionSummary().name() : null;
 
-        ContinuityResolution continuityResolution = resolveTrainingContinuity(actorId, studentId, occurrence.timezone(), asOf);
+        String effectiveTimezone = (occurrence.timezone() != null && !occurrence.timezone().isBlank())
+                ? occurrence.timezone()
+                : "Asia/Ho_Chi_Minh";
+
+        ContinuityResolution continuityResolution = resolveTrainingContinuity(actorId, studentId, effectiveTimezone, asOf);
         TrainingContinuityState continuityState = continuityResolution.state();
 
         F05SourceSnapshot sourceSnapshot = new F05SourceSnapshot(
@@ -284,7 +288,7 @@ public class F05ContextBuilder {
                 planSessionId,
                 sessionName,
                 supervision,
-                occurrence.timezone(),
+                effectiveTimezone,
                 occurrence.originalPlannedStartAt() != null ? occurrence.originalPlannedStartAt().toString() : null,
                 occurrence.plannedStartAt() != null ? occurrence.plannedStartAt().toString() : asOf.toString(),
                 occurrence.plannedEndAt() != null ? occurrence.plannedEndAt().toString() : null,
