@@ -138,4 +138,26 @@ describe('Trainer read-only Planned Workout calendar', () => {
     expect(view.tree.root.findAllByProps({ testID: 'trainer-propose-change-occurrence-new' })).toHaveLength(0);
     renderer.act(() => view.tree.unmount());
   });
+
+  it('shows AI Reschedule button only with MANAGE authority, not with CONTRIBUTE or VIEW', async () => {
+    // 1. MANAGE level: AI reschedule button should be present
+    setup('MANAGE');
+    const manageView = await render();
+    expect(manageView.tree.root.findByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toBeTruthy();
+    renderer.act(() => manageView.tree.unmount());
+
+    // 2. CONTRIBUTE level: Manual proposal button present, but AI reschedule button MUST NOT be present
+    setup('CONTRIBUTE');
+    const contributeView = await render();
+    expect(contributeView.tree.root.findByProps({ testID: 'trainer-propose-change-occurrence-new' })).toBeTruthy();
+    expect(contributeView.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toHaveLength(0);
+    renderer.act(() => contributeView.tree.unmount());
+
+    // 3. VIEW level: Neither button present
+    setup('VIEW');
+    const view = await render();
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-propose-change-occurrence-new' })).toHaveLength(0);
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toHaveLength(0);
+    renderer.act(() => view.tree.unmount());
+  });
 });

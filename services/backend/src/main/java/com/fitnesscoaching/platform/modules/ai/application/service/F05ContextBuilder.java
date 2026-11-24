@@ -221,7 +221,12 @@ public class F05ContextBuilder {
         UUID planSessionId = occurrence.sessionSummary() != null ? occurrence.sessionSummary().planSessionId() : null;
         String sessionName = occurrence.sessionSummary() != null ? occurrence.sessionSummary().name() : null;
 
-        ContinuityResolution continuityResolution = resolveTrainingContinuity(actorId, studentId, occurrence.timezone(), asOf);
+        if (occurrence.timezone() == null || occurrence.timezone().isBlank()) {
+            throw new AiRunLifecycleConflictException("Planned workout occurrence is missing required schedule timezone and cannot be rescheduled.");
+        }
+        String effectiveTimezone = occurrence.timezone();
+
+        ContinuityResolution continuityResolution = resolveTrainingContinuity(actorId, studentId, effectiveTimezone, asOf);
         TrainingContinuityState continuityState = continuityResolution.state();
 
         F05SourceSnapshot sourceSnapshot = new F05SourceSnapshot(
@@ -284,7 +289,7 @@ public class F05ContextBuilder {
                 planSessionId,
                 sessionName,
                 supervision,
-                occurrence.timezone(),
+                effectiveTimezone,
                 occurrence.originalPlannedStartAt() != null ? occurrence.originalPlannedStartAt().toString() : null,
                 occurrence.plannedStartAt() != null ? occurrence.plannedStartAt().toString() : asOf.toString(),
                 occurrence.plannedEndAt() != null ? occurrence.plannedEndAt().toString() : null,

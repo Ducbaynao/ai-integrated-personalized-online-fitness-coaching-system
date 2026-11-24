@@ -437,4 +437,38 @@ class F05ContextBuilderUnitTest {
                 .isInstanceOf(com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException.class)
                 .hasMessageContaining("Appointment changed while building context");
     }
+
+    @Test
+    @DisplayName("F05: Missing schedule timezone fails fast with lifecycle conflict rather than masking legacy data")
+    void buildContext_missingTimezone_throwsAiRunLifecycleConflictException() {
+        Occurrence occWithoutTz = new Occurrence(
+                occurrenceId,
+                0L,
+                studentId,
+                "SCHEDULED",
+                fixedNow.plusSeconds(3600),
+                fixedNow.plusSeconds(3600),
+                null,
+                null,
+                fixedNow.plusSeconds(7200),
+                null,
+                "2026-11-20T17:00:00",
+                "2026-11-20T18:00:00",
+                "+07:00",
+                "+07:00",
+                new PlanSummary(UUID.randomUUID(), UUID.randomUUID(), 1, "Hypertrophy"),
+                new SessionSummary(UUID.randomUUID(), 1, 1, 1, "Full Body Strength", "HYPERTROPHY", 60, "SELF_PERFORMABLE"),
+                List.of(),
+                null,
+                null
+        );
+        when(calendarQuery.detail(studentId, occurrenceId)).thenReturn(occWithoutTz);
+        when(missedEvidence.find(occurrenceId)).thenReturn(Optional.of(createMissedEvidence()));
+
+        WorkoutRescheduleApiRequest request = new WorkoutRescheduleApiRequest(studentId, occurrenceId, 0L, null, "Reschedule", null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> contextBuilder.buildContextEnvelope(studentId, request))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.AiRunLifecycleConflictException.class)
+                .hasMessageContaining("missing required schedule timezone");
+    }
 }
