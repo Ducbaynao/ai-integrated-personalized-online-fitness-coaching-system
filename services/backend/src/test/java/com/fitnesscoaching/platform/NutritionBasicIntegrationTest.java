@@ -87,7 +87,8 @@ class NutritionBasicIntegrationTest {
                 },
                 context.getBean(com.fitnesscoaching.platform.modules.audit.AuditService.class),
                 context.getBean(tools.jackson.databind.ObjectMapper.class),
-                context.getBean(org.springframework.transaction.support.TransactionTemplate.class));
+                context.getBean(org.springframework.transaction.support.TransactionTemplate.class),
+                context.getBean(com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence.class));
         try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
             var future = executor.submit(() -> service.create(owner,
                     new com.fitnesscoaching.platform.modules.nutrition.FoodTextAnalysisController.CreateRequest(

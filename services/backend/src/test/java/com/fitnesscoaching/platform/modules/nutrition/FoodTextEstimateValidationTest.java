@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FoodTextEstimateValidationTest {
     private final FoodTextAnalysisService service = new FoodTextAnalysisService(
-            null, null, null, null, null, new ObjectMapper(), null);
+            null, null, null, null, null, new ObjectMapper(), null, null);
 
     private String item(String candidates, String missing) {
         return """

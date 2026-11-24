@@ -3,6 +3,7 @@ package com.fitnesscoaching.platform.modules.user.application.service;
 import com.fitnesscoaching.platform.common.exception.SystemRoleNotFoundException;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleUseCase;
@@ -19,12 +20,40 @@ import java.util.UUID;
 
 @Service
 @Transactional
-public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAccountStatusQuery, UserPermissionQuery {
+public class UserRoleService implements UserRoleUseCase, UserRoleQuery, UserAccountStatusQuery, UserPermissionQuery, AccountErasureFence {
 
     private final JdbcTemplate jdbcTemplate;
 
     public UserRoleService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isActiveWithoutErasure(UUID userId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.users u WHERE u.id=? AND u.status='ACTIVE'
+                  AND NOT EXISTS(SELECT 1 FROM fitness.account_erasure_requests r WHERE r.user_id=u.id))
+                """, Boolean.class, userId));
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public boolean lockActiveWithoutErasure(UUID userId) {
+        jdbcTemplate.query("SELECT id FROM fitness.users WHERE id=? FOR SHARE",
+                rs -> { while (rs.next()) { /* conflicts with cutoff's FOR NO KEY UPDATE */ } }, userId);
+        return isActiveWithoutErasure(userId);
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public boolean lockCleanupAuthorized(UUID userId, UUID requestId) {
+        jdbcTemplate.query("SELECT id FROM fitness.users WHERE id=? FOR SHARE",
+                rs -> { while (rs.next()) { /* caller holds the erasure request lease/hold fence */ } }, userId);
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.users u JOIN fitness.account_erasure_requests r ON r.user_id=u.id
+                  WHERE u.id=? AND r.id=? AND u.status='DISABLED')
+                """, Boolean.class, userId, requestId));
     }
 
     @Override

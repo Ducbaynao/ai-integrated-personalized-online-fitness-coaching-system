@@ -379,3 +379,156 @@ Student/actor locks and competing writer paths also matter. Erasure, candidate
 matching, professional catalog/model review, Mobile and release gates remain
 open at this checkpoint. Erasure changes will be reviewed separately and are
 not part of this reviewed commit.
+
+## F06 Erasure / Data Minimization — reviewed checkpoint
+
+The reviewed checkpoint above was committed and pushed as
+`d153424b5ddcf8e827424a68aab37fb5e627369c`. PR #165's head was verified at that
+SHA and remains Draft. Its description now covers the implemented runtime and
+historical independent review. This section records the subsequent Erasure work, independently reviewed by Antigravity before the separate checkpoint below. The five pre-existing Mobile scripts are excluded.
+
+### Applied policy and source inventory
+
+Policy is the approved 2026-11-02 Nutrition decision in
+`docs/07-development/features/08-chat-notification.md`: remove requester food
+names, notes and analysis; personal nutrition facts require an explicitly
+approved retention purpose, otherwise remove/unlink them and retain only
+minimum processing evidence. The companion
+`b08-account-erasure-approved-domain-mapping.md` requires source classification,
+preservation of counterpart content and FK/processing evidence. V50's existing
+Account workflow supplies request identity, cutoff, lease, hold and retry;
+its evidenced audit-redaction mechanism remains the Audit owner's path.
+No GDPR assumption, new retention duration, public erase command, hold API,
+flag enablement or COMPLETE attestation is introduced.
+
+| F06 store / ownership evidence | Previous coverage and gap | Candidate action |
+|---|---|---|
+| V7/V61 `food_analysis_requests` Student-owned TEXT with command key | Original Nutrition port replaced `input_text` only; repeated context and arbitrary command key/fingerprint survived | Replace text with ERASED; remove clinical date/time/timezone/meal/expiry, replace key/hash with non-content tombstones; cancel nonterminal work, retain stable request/meal IDs, lifecycle/revisions and processing chronology with erasure-request evidence |
+| V61 draft items; recognized/candidate names, estimated/selected amount and basis, confidence, missingData/limitations | No cleanup; model text is still personal analysis even when not authored verbatim by the Student | Clear all analysis/selection fields and free-text arrays; keep item IDs/order/revision and confirmed Food Log mapping |
+| V7 legacy candidate rows attached to these F06 requests | New F06 does not write them, but legacy copies could exist | Redact names, bounds, quantity/unit, confidence and food match; retain processing identity/action/FK skeleton. Unrelated legacy/IMAGE requests remain outside this slice |
+| V61 Preview JSON, selection, key/hash | Immutable in ordinary runtime, no DB append-only trigger; contains exact selections, personal nutrient amounts and source links | Clear both JSON snapshots and sanitize key/hash in the fenced workflow; keep preview ID/revisions/createdAt for reconciliation |
+| V39/V61 Nutrition receipt bodies and keys | Correct returns Draft; Confirm returns intake; later Basic commands can copy F06 intake through `readMine` | Minimize F06 and known Student-owned Basic command response bodies, key/hash for this subject; keep receipt ID/action/createdAt. No normal replay may bypass current authority |
+| F06-mapped Food Log item, nutrient and provenance/notes rows | Old port only removed meal text; item snapshots/actual amounts remained | Delete nutrient rows; remove name, amount/unit/grams, confidence, private/catalog refs and notes; use valid DESCRIPTION_ONLY/ERASED processing skeleton, retaining item/meal IDs and confirmation processing evidence. Governed catalog rows are not deleted |
+| Draft-linked meal and affected actual summaries/day status | Non-null clinical meal context could not represent erasure; aggregates could retain copied actuals | Tombstone owned meals only when every item is mapped to this subject's F06 drafts. Drop affected derived nutrient summaries; drop day-status facts only when no unmapped item shares the day. Unattributed/shared meal/day context stays review-required, not falsely cleaned |
+| V39 append-only `nutrition_item_corrections` for F06-mapped Logs | JSON can retain original amount/name/provenance even after current Log cleanup | V62 records a prior-row hash, then a restricted trigger permits only before/after JSON redaction to empty objects for the disabled subject's real request and mapped F06 item. Versions/IDs/chronology remain; ordinary UPDATE/DELETE still fail |
+| Audit and AI/provider data | V50 Audit port already redacts actor/subject evidence using append-only redaction records. Current F06 adapter creates no persisted AI Run/context/vector copy; `runId` is null in this implementation | Reuse Audit port without bypassing its trigger. No speculative cross-module SQL against AI stores. Existing linked legacy AI/media, external provider copies, backup and non-F06 Nutrition target/history cleanup remain owner/operations gates |
+
+Retained UUIDs/FKs, event times and evidence hashes are re-linkable processing
+records, not anonymous data. Broader Nutrition target/frozen-target history,
+unattributed/manual/counterpart content, generic AI stores and objects are not
+attested by this F06 port. The existing minimum-receipt/audit retention policy
+does not authorize retaining the removed clinical payload; purge scheduling and
+backup/provider evidence remain separate, as before.
+
+### Schema need and runtime composition
+
+V61's command-keyed draft context CHECK and V7's non-null meal date/type could
+not represent unknown/erased context without either invented values or broken
+FK/mapping history. V39's correction trigger correctly rejected any ordinary
+JSON edit. Forward V62 therefore adds request-linked, one-way draft/meal
+tombstones, preserves context requirements for normal rows and adds the narrow
+evidenced correction-redaction path modelled on V50. V7/V39/V41/V61 are unchanged.
+This new shared migration and Account-owned port require owner/integration review
+before merge; they are not covered by the earlier independent code review.
+
+`AccountErasureService.minimizeCurrentScope` invokes the new Nutrition port in
+the existing lease/hold-fenced transaction. Cleanup failure rolls back all of
+that transaction and the existing worker reports RETRYABLE. Repeat/restart does
+not recreate payloads, change already-erased request identity or duplicate
+redaction evidence. Account flags stay default OFF; successful current-scope
+processing remains DOMAIN_REVIEW_PENDING, with backup/provider unverified.
+
+### Concurrency and read/replay fencing
+
+- `AccountErasureFence` is an Account-owned query port implemented by
+  `UserRoleService`; Nutrition does not inspect Account persistence directly.
+  It checks ACTIVE with no erasure request and offers a transaction-bound
+  `FOR SHARE` lock plus a disabled-subject/request cleanup guard.
+- F06 Generate identity/finalization/detail and Nutrition Student mutations
+  take 707 then Account `FOR SHARE`; receipt commands subsequently take 709.
+  This shared Account lock conflicts with cutoff's existing **exclusive**
+  `FOR NO KEY UPDATE`. A started domain transaction completes before cutoff;
+  a command waiting behind cutoff rechecks and denies before writing/replaying.
+- Account cutoff does not acquire Nutrition's 707/709. The inspected cutoff
+  Auth/Chat/Notification ports do not request them. The worker fences its request
+  lease/hold, invokes Audit, then Nutrition takes 707, the Account cleanup guard
+  and 709. Domain authority probes read erasure requests without a row lock,
+  so they do not wait for the worker's request row while holding Nutrition locks.
+  This order was inspected and specific interleavings tested; it is not a claim
+  that every possible interleaving is deadlock-free.
+- Provider I/O stays outside DB transactions. Generate checks authority again
+  before starting I/O and on finalization. A normal, invalid or failed provider
+  result arriving after cleanup cannot change the terminal request or publish
+  items. An already-dispatched provider call cannot be retracted; provider-copy
+  verification remains unverified. No network erasure guarantee is claimed.
+- Read, recovery, generation and receipt replay reject a subject with an erasure
+  request even if its account is accidentally set ACTIVE later. Minimized
+  snapshots are not deserialized or restored to rebuild a receipt.
+
+### Verification actually run for this Erasure candidate
+
+Environment: Microsoft OpenJDK 21.0.8, Spring Boot 4.1.1, Maven wrapper,
+PostgreSQL 18.6 Testcontainers (`pgvector/pgvector:pg18`) and Flyway. The initial
+`./mvnw.cmd -q -DskipTests compile` returned native exit 0. The first clean
+iteration ran 80 tests with zero failures/errors/skips. After adding the one-way
+tombstone guard, the F06-only day-status check and the two migration tests, the
+final command from `services/backend` was:
+
+```powershell
+& .\mvnw.cmd -q clean "-Dtest=FoodAnalysisErasureIntegrationTest,V62FoodErasureMigrationTest,AccountErasureHttpIntegrationTest,FoodAnalysisConfirmationIntegrationTest,FoodAnalysisReviewIntegrationTest,FoodTextEstimateValidationTest,NutritionBasicIntegrationTest,NutritionStrategyIntegrationTest" test *> target-f06-erasure-final.log
+$f06ErasureExit = $LASTEXITCODE
+Write-Output "MAVEN_EXIT_CODE=$f06ErasureExit"
+exit $f06ErasureExit
+```
+
+Native exit **0**, **82/82**, zero failures/errors/skips:
+
+| Suite | Tests |
+|---|---:|
+| FoodAnalysisErasureIntegrationTest | 10 |
+| V62FoodErasureMigrationTest | 2 |
+| AccountErasureHttpIntegrationTest | 14 |
+| FoodAnalysisConfirmationIntegrationTest | 19 |
+| FoodAnalysisReviewIntegrationTest | 14 |
+| FoodTextEstimateValidationTest | 2 |
+| NutritionBasicIntegrationTest | 11 |
+| NutritionStrategyIntegrationTest | 10 |
+
+The new tests exercise unconfirmed/partial/full drafts, JSON/receipt copies,
+mapped confirmed Logs and nullable amounts, minimum processing history,
+source-isolated counterpart data, audited correction redaction with trigger
+bypass denied, workflow restart/stale lease/hold/retry, post-erasure read/replay
+denial and accidental account reactivation. Controlled synchronization covers
+normal/invalid/failed late provider results, Correct/Preview/Confirm/replay holding
+their transactions while cutoff waits, and three mutations queued behind cutoff.
+An injected cleanup failure verifies transaction rollback and worker retry.
+Migration checks cover clean install, V61 upgrade preserving ordinary legacy
+context, normal context constraints, explicit tombstones, restoration rejection
+and Flyway validation. No failing test remained in either complete iteration;
+the cleanup failure and SQL rejections in those tests are intentional assertions.
+
+These are focused JUnit/Spring/MockMvc and real disposable-PostgreSQL checks,
+not full backend, live HTTP Spring-to-FastAPI, CI, provider-copy deletion or
+Pixel_7 evidence. No production migration was run. OpenAPI/AI schemas did not
+change, so contract and Python suites were not rerun here; their 22/22 and 5/5
+review results remain historical. Shared V62/Account port review, broader owner
+domains, catalog/model validation, Mobile, deployment/retention/backup/provider
+gates and release verification remain open. Account Erasure flags remain OFF
+by default, and this does not close backend F06 or a Phase 2/release milestone.
+
+### Independent review and checkpoint preparation — 2026-11-24
+
+Antigravity independently reran the focused clean backend suite with Docker
+active: **82/82**, zero failures, errors or skips, and reported no findings
+within the inspected scope. This is historical independent review evidence
+provided before checkpoint preparation, not a test run in this preparation
+turn. Contract **22/22** and Python **5/5** remain earlier historical evidence;
+neither was rerun here. The reviewed backend code is unchanged while preparing
+this checkpoint; only this review record was added. Exact paths and staged diff
+are checked before commit; no backend suite is repeated solely for Git handoff.
+
+The checkpoint includes the reviewed V62, Account fence and Nutrition cleanup,
+without claiming absolute safety or completion of broader erasure. Flags remain
+**OFF**, processing remains **DOMAIN_REVIEW_PENDING**, and owner/integration,
+retention, backup/provider and release gates remain open. No full backend,
+live Spring–FastAPI, CI, Pixel_7 or rollout authorization is attested.

@@ -526,14 +526,11 @@ public class NutritionBasicService {
     }
 
     private void requireStudent(UUID actor) {
-        if (actor == null || accounts.getAccountStatus(actor).orElse(null) != AccountStatus.ACTIVE
-                || !students.hasProfile(actor)) throw fail("NUTRITION_ACCESS_DENIED", 403);
+        commands.requireStudent(actor);
     }
 
     private void lockStudent(UUID student) {
-        // Nutrition-owned transaction advisory lock; no direct read of Student persistence.
-        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 707))",
-                rs -> { while (rs.next()) { /* hold until transaction end */ } }, student.toString());
+        commands.lockStudent(student);
     }
 
     private static void checkItemShape(UUID foodId, String description, BigDecimal servings) {

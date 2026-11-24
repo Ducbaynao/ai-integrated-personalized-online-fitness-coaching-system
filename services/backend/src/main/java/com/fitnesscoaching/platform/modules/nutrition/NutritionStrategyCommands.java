@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -25,21 +26,26 @@ final class NutritionStrategyCommands {
     private final AuditService audit;
     private final UserAccountStatusQuery accounts;
     private final StudentCapabilityQuery students;
+    private final AccountErasureFence erasureFence;
 
     NutritionStrategyCommands(JdbcTemplate jdbc, ObjectMapper mapper, AuditService audit,
-                              UserAccountStatusQuery accounts, StudentCapabilityQuery students) {
+                              UserAccountStatusQuery accounts, StudentCapabilityQuery students, AccountErasureFence erasureFence) {
         this.jdbc = jdbc; this.mapper = mapper; this.audit = audit;
         this.accounts = accounts; this.students = students;
+        this.erasureFence = erasureFence;
     }
 
     void requireStudent(UUID actor) {
         if (actor == null || accounts.getAccountStatus(actor).orElse(null) != AccountStatus.ACTIVE
-                || !students.hasProfile(actor)) throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
+                || !students.hasProfile(actor) || !erasureFence.isActiveWithoutErasure(actor))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     void lockStudent(UUID student) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 707))",
                 rs -> { while (rs.next()) { /* held through transaction */ } }, student.toString());
+        if (!erasureFence.lockActiveWithoutErasure(student))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     Instant databaseNow() {

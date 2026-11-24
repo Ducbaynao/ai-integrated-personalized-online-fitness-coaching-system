@@ -6,6 +6,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,12 +40,13 @@ public class FoodTextAnalysisService {
     private final AuditService audit;
     private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
+    private final AccountErasureFence erasureFence;
     @Value("${ai.f06.processing-timeout-seconds:300}")
     private long processingTimeoutSeconds = 300;
 
     public FoodTextAnalysisService(JdbcTemplate jdbc, UserAccountStatusQuery accounts,
             StudentCapabilityQuery students, F06AiServiceClient ai, AuditService audit,
-            ObjectMapper mapper, TransactionTemplate transactions) {
+            ObjectMapper mapper, TransactionTemplate transactions, AccountErasureFence erasureFence) {
         this.jdbc = jdbc;
         this.accounts = accounts;
         this.students = students;
@@ -52,6 +54,7 @@ public class FoodTextAnalysisService {
         this.audit = audit;
         this.mapper = mapper;
         this.transactions = transactions;
+        this.erasureFence = erasureFence;
     }
 
     public record Candidate(UUID foodId, UUID revisionId, String name) {}
@@ -106,6 +109,7 @@ public class FoodTextAnalysisService {
         if (!start.created()) return new Created(detail(actor, start.id()), false);
 
         // Never call the provider inside the request-identity transaction.
+        requireStudent(actor); // Do not start provider I/O after an already-observed Account cutoff.
         String estimate;
         try {
             estimate = ai.estimateTextJson(text);
@@ -322,7 +326,8 @@ public class FoodTextAnalysisService {
 
     private void requireStudent(UUID actor) {
         if (actor == null || accounts.getAccountStatus(actor).orElse(null) != AccountStatus.ACTIVE
-                || !students.hasProfile(actor)) throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
+                || !students.hasProfile(actor) || !erasureFence.isActiveWithoutErasure(actor))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     private static void validate(FoodTextAnalysisController.CreateRequest request) {
@@ -343,6 +348,8 @@ public class FoodTextAnalysisService {
     private void lockStudent(UUID actor) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 707))",
                 rs -> { while (rs.next()) { /* held through transaction */ } }, actor.toString());
+        if (!erasureFence.lockActiveWithoutErasure(actor))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     private void audit(UUID actor, String action, UUID id) {
