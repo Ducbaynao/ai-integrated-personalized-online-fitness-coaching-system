@@ -1,5 +1,129 @@
 # F06 food text estimate contract checkpoint
 
+## Reviewed P7-019/P7-021 checkpoint - 2026-11-25 ICT
+
+Antigravity independently reviewed both fixes and reported **FIXED**, with no new
+finding in that review scope. Its fresh run of the four focused Mobile suites
+passed **116/116**; typecheck, lint and diff check exit 0. This evidence is the
+independent report supplied by the project owner, not a test rerun in this
+checkpoint turn. Source/test hashes still match the previous p7021 verification
+manifest; no implementation/test edits followed that reviewed version.
+
+Pixel_7 UI/DB QA below was performed during implementation; Anti cross-checked
+that evidence, not a second independent device execution. Before-fix FAIL logs
+and original failure captures are preserved alongside after-fix evidence.
+P7-019/P7-021 are reviewed and device-retested for their stated scenarios.
+P7-020 remains deferred. Partial multi-item, controlled device timeout/replay,
+pending account switching, process death and screen reader were still NOT RUN
+at this checkpoint; a separate follow-up below must report any new results.
+
+Evidence publication is selective: see the artifact INDEX.md. Login capture and
+redundant intermediate/IME captures remain local, unmodified. Only synthetic
+fixture data and sanitized evidence are included; local ignored backlog and five
+untracked Mobile scripts are excluded. Precision/memory-only recovery, simulated
+provider/catalog review, live fault/session/lifecycle and dependency/integration
+limits remain open. Backend PR #165 is unchanged; Mobile #169 remains Draft on
+its existing backend-branch base. No F06/P2-M5/release completion claim.
+
+## P7-021 working-tree resolution - 2026-11-25 ICT
+
+Base remains `f299540`; P7-019 closure is preserved. P7-021 previously allowed
+old persisted preview selection to be confirmed while a newer unsaved form was
+visible; neither a dirty-device Confirm nor wrong intake was demonstrated.
+New editor comparison covers quantity, food/catalog revision, item revision,
+basis and portion. Edits invalidate preview/reviewVersion; new Preview/Confirm
+is blocked until Save/reconciliation and a matching fresh Preview. Cancel/revert
+never resurrects the old snapshot. Exact saved Confirm replay remains possible
+when dirty, with original key/body; other saved mutation intents are retained.
+
+Pre-fix P7-021 regression: 9 failed/3 passed/40 skipped (52 total), exit 1.
+Requested four Mobile suites after fix: **116/116**, exit 0; typecheck/lint exit 0.
+This is self-verification, not new Anti review (historical Anti 103/103 preserved).
+P7-019 + P7-021 should be reviewed together before a new checkpoint/PR change.
+
+Actual Pixel_7/API36/Expo Go57.0.9, synthetic B, working-tree Reload, backend
+17c485f with simulated source provider and disposable f06qa: separate draft for
+Nov24; Correct 1.25 -> Preview -> unsaved 2 removes Confirm/preview and blocks new
+Preview with guidance; Cancel needs fresh Preview; basis dirty/revert also tested.
+Save 2 -> Preview 320 kcal -> UI Confirm/receipt -> Nutrition retrieval succeeded.
+DB corroborates one new Log (2 portions/80g), one receipt; Nov24 count 0 -> 1,
+Nov25 count 1 unchanged. UI retains protein 0, unknown carb/fat, day PARTIAL.
+Return still required reselecting date (existing UX note, not auto-refetch-context
+PASS). Evidence `pixel7/118`-`136`, p7021 DB snapshots, logs and verification manifest.
+
+P7-021 is FIXED_IN_WORKING_TREE / REGRESSION_PASS / DEVICE_GUARD_RETEST_PASS;
+original FAIL evidence is preserved below/in local backlog. P7-020 stays deferred.
+Food/revision/portion variants, late responses/replay are mock-only this turn;
+partial multi-item, app fault timeout/account switch, process death, screen reader
+remain NOT RUN. No F06 completion, HTTP fault/device-wide/model/release PASS.
+Runtime retained; no commit/push/PR/backend/shared-contract/config changes.
+Full commands, scenarios and runtime identities are in the existing Mobile handoff.
+
+## P7-019 fix and device continuation — 2026-11-25 ICT
+
+Mobile base is still `f299540`, **working-tree fix not committed/reviewed**.
+Fresh Correct now wraps its action callback so native press event cannot become
+retry intent. Shared WorkoutUi/backend/contracts/Flyway/config unchanged.
+Native-shaped rendered-button regression failed before fix (undefined body,
+1 failed/39 skipped), then requested focused four suites passed **104/104**;
+Mobile typecheck/lint exit 0 and diff check passed. Saved Correct key/body replay
+after form edits remains asserted. Historical Anti 103/103 is not a review of
+this new fix; full backend/Mobile/HTTP harness were not repeated.
+
+After actual Expo Go Reload on Pixel_7/API36/Go57.0.9, same synthetic B session:
+comma quantity rejected without mutation; 1.25 SERVING Correct persisted revision
+1/2; Preview showed 200 kcal/protein 0/unknown carb-fat. Saved change to 1.5
+removed old preview; new Preview 240 kcal → actual UI Confirm → receipt →
+Nutrition read showed one item, 240/protein 0/unknown carb-fat, PARTIAL, not
+COMPLETE. DB corroborates one Food Log and one Confirm receipt. Return navigation
+required reselecting the date; do not claim automatic context preservation.
+
+P7-019 device retest passes in working tree. **New P7-021 remains open:** unsaved
+quantity edit leaves old Preview/Confirm enabled; saved correction invalidates
+it correctly. Dirty-editor Confirm was not executed, so wrong intake is not
+demonstrated. Different cause from callback/event; recorded for next code pass,
+not fixed here. P7-020 safe area remains deferred/untouched. Existing ignored
+local backlog holds full steps/evidence and all original failures.
+
+Partial multi-item selection, app fault-injected timeout/retry/session switch,
+process death and screen reader remain NOT RUN. Background resume retained state;
+am kill left same PID alive and does not count as process-death QA. No persistence
+added. Simulated provider/catalog are not recognition/professional evidence.
+See [Mobile handoff](../07-development/phase-2-dev-b-f06-mobile-handoff.md) and
+existing artifact `p7019-verification.json`/pixel7 captures. Runtime retained;
+no Git/PR/Erasure rollout or F06/whole-flow Pixel_7/release completion claim.
+
+## Initial device QA observation — 2026-11-24/25 ICT (before fix)
+
+Actual Pixel_7/Android 16 API 36/Expo Go 57.0.9 QA now reached the app using
+the user's existing synthetic Student B session on Mobile `f299540`. Spring
+18080 → source FastAPI simulated fallback → retained disposable `f06qa` was
+used. UI entry/context, Generate/rendered draft, missing-data selection guard,
+local catalog/basis/portion choices, DST offset/meal choice, Back and ordinary
+background retention were exercised. Nutrition showed no items and unknown
+nutrients pre-Confirm; read-only DB verified no confirmed intake/previews.
+
+**New device flow blocker P7-019:** native `Lưu chỉnh sửa` press event is treated
+as optional retry intent by `FoodAnalysisScreen.tsx:341/1082`, forwarded from
+`WorkoutUi.tsx:10`. Valid 1.25 SERVING cannot save. DB item stays uncorrected;
+no wrong intake observed. Preview/Confirm/receipt/selected partial group and
+post-Confirm refetch are therefore **NOT RUN from device**, regardless of
+historical HTTP 8/8 and mock 103/103. Fix and actual-event regression belong to
+a subsequent coding turn; this turn changes only documentation/evidence.
+
+P7-020 status-bar heading overlap is deferred UI, related to prior safe-area
+issue class; old date/timezone/font/copy notes remain in the existing ignored
+`PIXEL7_MANUAL_QA_ISSUES.local.md`, which was found/read with the Phase 1 local
+handoff. No literal old “end of Phase 2” schedule was found. Expo CLI warning
+recurs as environment limit. Back/unmount loses draft/intent as documented;
+process death, controlled timeout/retry and pending-request actor isolation
+remain NOT RUN. No new persistence or direct API writes bypassed the blocker.
+
+See [latest Mobile handoff](../07-development/phase-2-dev-b-f06-mobile-handoff.md)
+for scenario/evidence table, source references, runtime IDs and limits. Runtime
+is retained; no cleanup, Git/PR/source/config/dependency mutation, suite rerun,
+Erasure rollout, whole-flow Pixel_7 PASS or F06/release completion is claimed.
+
 **Status:** Draft implementation for issue #164. OpenAPI, the AI output schema,
 forward migration V61 and an internal simulated AI route exist on this branch.
 Spring has generation/recovery plus working-tree Correct, Preview and atomic
@@ -532,3 +656,106 @@ without claiming absolute safety or completion of broader erasure. Flags remain
 **OFF**, processing remains **DOMAIN_REVIEW_PENDING**, and owner/integration,
 retention, backup/provider and release gates remain open. No full backend,
 live Spring–FastAPI, CI, Pixel_7 or rollout authorization is attested.
+
+## Dependent Mobile Draft PR and limited live verification — 2026-11-24
+
+Dev-B Mobile checkpoint `f299540367b9b883414a4ac2bec06daee8e155c4` is now
+[Draft PR #169](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/pull/169),
+stacked on backend branch `feature/p2-m5-f06-full-slice-20261123` at
+`17c485fa6d248fff58c7dac00c931536ff6c7720` (PR #165 still OPEN/Draft).
+The verified delta contains only 11 Mobile/documentation files. Antigravity's
+independent 103/103/typecheck/lint review of f299540 is historical evidence
+provided by the user, not a rerun in this PR/runtime follow-up.
+
+New live HTTP harness evidence: eight scenarios passed against Spring and
+source FastAPI over real sockets plus a fresh task-owned PostgreSQL 18.6/V62 DB.
+FastAPI uses its simulated F06 fallback; catalog, 40g portion and accounts are
+synthetic fixtures. Confirm response loss was injected after observing upstream
+201 and a separately visible committed receipt. Replay kept the same receipt/
+Log IDs and one intake, including after expiry and catalog retirement. Other
+coverage: Generate/recovery/detail, Correct/Preview replay, unknown nutrients/
+partial selection, changed-payload 409, foreign-owner 404, and account disable
+while a request was held before forwarding (401). This does not attest
+mid-transaction revocation, a real nutrition model/catalog or Mobile app behavior.
+
+Pixel_7 AVD/Android 16 API 36 booted, but app scenarios are NOT RUN because
+Metro launch was rejected by automatic approval review (`blocked by policy`,
+no detailed reason supplied). No harness/Jest result is called PASS Pixel_7.
+See [the current Dev-B Mobile handoff](../07-development/phase-2-dev-b-f06-mobile-handoff.md)
+for evidence, fixture limits, base/main divergence and the smallest device task.
+This is personal/feature progress, not integration, F06/P2-M5 completion or
+release/Erasure rollout approval. Flags remain OFF, DOMAIN_REVIEW_PENDING, and
+provider/backup/catalog/model gates remain open.
+
+### Pixel_7 continuation: environment ready, waiting for manual Metro
+
+On 2026-11-24 the existing B06/`f299540` working tree and all previous evidence
+were preserved. The task-owned retained DB, backend and source FastAPI were
+restarted in the same simulated-provider HTTP configuration; readiness/health
+returned 200. Pixel_7 booted Android 16/API 36 with Expo Go 57.0.9. New synthetic
+password-login Students and a catalog/40g test portion were prepared solely for
+device QA. This is setup evidence, not app or specialist validation.
+
+Metro is not listening on 18081. No policy-rejected launch was retried or worked
+around. The user has the exact package/runbook command to start it manually;
+the agent must observe readiness before proceeding with app work. Runtime is
+left running for that handoff. All actual app/device scenarios, including
+pending-request session switch and process death, remain NOT RUN. Historical
+103/103 mock and 8/8 HTTP results were not repeated or relabelled. See the
+[Mobile handoff](../07-development/phase-2-dev-b-f06-mobile-handoff.md) and its
+preparation JSON for the command, checks and next step. No milestone/release
+gate or PR state changed; new documentation remains unstaged/uncommitted.
+
+### Metro now verified; actual app launch still pending
+
+The user started Metro manually. Host verification returned HTTP 200 and
+`packager-status:running` on localhost:18081 (IPv6 loopback listener). A combined
+command containing Expo Go's ADB VIEW launch was rejected by automatic approval
+review before execution (`blocked by policy`, no detailed subcommand reason).
+The agent did not retry launch through another mechanism and requested a manual
+Expo Go open. Foreground remains the Android launcher at the last check, so all
+requested F06 app scenarios remain NOT RUN. This is not a new product finding
+or PASS Pixel_7. See the Mobile handoff/Metro JSON for evidence and manual step.
+Runtime is retained for this paused QA; cleanup has not yet been performed.
+No source, dependency, Git commit or PR state changed.
+
+### Actual Pixel_7 open failed before project load
+
+After the user manually opened Expo Go on emulator-5580, the observed native
+error log showed `java.io.IOException: Failed to download remote update`.
+Host Metro status returns HTTP 200 but listens only on IPv6 `::1:18081`.
+An emulator HTTP probe reaches backend `10.0.2.2:18080` with HTTP 200, while
+the Metro probe over existing ADB reverse receives no HTTP response. This is
+an environment/transport blocker (IPv4/IPv6 mismatch hypothesis), not evidence
+of a F06 source defect or app/backend integration success. F06 app scenarios
+remain NOT RUN. Screenshots, UI dump, reproduction and manual IPv4-priority
+Metro handoff are recorded in the existing Mobile handoff and pixel7 evidence
+folder. Runtime is retained pending that manual step; no code/dependency/Git/PR
+mutation or new Pixel_7 PASS/release claim occurred.
+
+### IPv4 Metro recheck; app verification remains pending
+
+After the user's IPv4-first Metro restart, host listener `127.0.0.1:18081`
+(PID 39000) and emulator direct `10.0.2.2:18081/status` both return HTTP 200 /
+`packager-status:running`. ADB reverse localhost still yields no HTTP response
+after recreating its existing mapping; its root cause remains unresolved.
+The agent has not reloaded the old project URL and requested manual Expo Go open
+of the verified direct route `exp://10.0.2.2:18081`, respecting the prior app-open
+approval rejection. F06 app scenarios remain NOT RUN, not device PASS. Existing
+runtime/DB are retained; no cleanup, source/dependency/Git/PR change or suite
+rerun occurred. See the Mobile handoff and `pixel7/ipv4-recheck.json` for checks.
+
+Follow-up observation at 2026-11-24 16:06 UTC still shows the original native
+Expo Go error log. Host Android manifest fetch returns HTTP 200 with runtime
+`exposdk:57.0.0` and direct emulator-host bundle URL; app loading remains
+unverified. User authorization does not override the prior `blocked by policy`
+project-open rejection, and this session has no approval-escalation mechanism.
+The agent did not retry/bypass that action. Manual direct-URL open is still
+required; all F06 app scenarios remain NOT RUN. Evidence is recorded in the
+Mobile handoff and `pixel7/manual-open-gate.json`; runtime is retained.
+
+The user's subsequent manual direct-URL open reached the actual app sign-in
+screen (see `pixel7/04-app-login.png`/XML). F06 login/mutations remain untested.
+Pixel_7 reports `windowtype=headless`, explaining the absent desktop window;
+no second emulator was started. The choice to restart this same AVD visibly or
+retain its current memory state is pending; other task runtime is retained.

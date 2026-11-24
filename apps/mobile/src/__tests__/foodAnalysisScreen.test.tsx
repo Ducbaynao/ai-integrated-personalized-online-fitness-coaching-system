@@ -151,7 +151,17 @@ const mockReceipt: FoodAnalysisConfirmationReceipt = {
 function press(tree: renderer.ReactTestRenderer, label: string) {
   const elements = tree.root.findAll((node) => node.props.label === label && typeof node.props.onPress === 'function');
   expect(elements.length).toBeGreaterThan(0);
-  elements[0].props.onPress();
+  // Exercise the real WorkoutButton -> Pressable boundary, including the event
+  // React Native supplies. Calling the action without arguments hid P7-019.
+  const buttons = elements[0].findAll(node => node.props.accessibilityRole === 'button'
+    && node.props.accessibilityLabel === label && typeof node.props.onPress === 'function');
+  expect(buttons.length).toBeGreaterThan(0);
+  buttons[0].props.onPress({
+    nativeEvent: { target: 1, timestamp: 123, pageX: 10, pageY: 20 },
+    currentTarget: 1,
+    target: 1,
+    persist: jest.fn(),
+  });
 }
 
 function input(tree: renderer.ReactTestRenderer, label: string, value: string) {
@@ -333,6 +343,38 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
       })
     );
     expect(setQueryData).toHaveBeenCalledWith(['food-analysis', 'student-1', 'draft', 'draft-101'], updatedDraft);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('native Correct press sends 1.25 with exact revisions/body and retries the saved intent after form edits', async () => {
+    (foodTextAnalysisApi.correctItem as jest.Mock)
+      .mockRejectedValueOnce(new ApiError(0, 'offline'))
+      .mockResolvedValueOnce(mockDraftReady);
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<FoodAnalysisScreen />); });
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '1.25');
+    await renderer.act(async () => press(tree, 'Lưu chỉnh sửa'));
+
+    const expected = {
+      commandKey: 'mock-command-key',
+      expectedDraftRevision: 0,
+      expectedItemRevision: 0,
+      selectedFoodId: 'catalog-food-1',
+      selectedRevisionId: 'rev-cat-1',
+      quantity: 1.25,
+      quantityBasis: 'SERVING',
+      portionId: 'portion-1',
+    };
+    expect(foodTextAnalysisApi.correctItem).toHaveBeenCalledWith('draft-101', 'item-1', expected);
+    expect(createCommandKey).toHaveBeenCalledTimes(1);
+    const originalBody = (foodTextAnalysisApi.correctItem as jest.Mock).mock.calls[0][2];
+    input(tree, 'Số lượng', '9');
+    await renderer.act(async () => press(tree, 'Thử lại lưu món'));
+    expect(foodTextAnalysisApi.correctItem).toHaveBeenCalledTimes(2);
+    expect((foodTextAnalysisApi.correctItem as jest.Mock).mock.calls[1]).toEqual(['draft-101', 'item-1', expected]);
+    expect((foodTextAnalysisApi.correctItem as jest.Mock).mock.calls[1][2]).toBe(originalBody);
+    expect(createCommandKey).toHaveBeenCalledTimes(1);
     renderer.act(() => tree.unmount());
   });
 
@@ -855,6 +897,137 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
     renderer.act(() => tree.unmount());
     await renderer.act(async () => old.resolve(mockDraftReady));
     expect(setQueryData).not.toHaveBeenCalled();
+  });
+
+  it('P7-021 dirty quantity cannot Confirm the old snapshot or create another Preview', async () => {
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValue(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockResolvedValue(mockReceipt);
+    const tree = mount(); selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '2');
+    const oldConfirm = tree.root.findAll(n => n.props.label === 'Xác nhận ghi vào nhật ký');
+    if (oldConfirm.length) await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+    expect(foodTextAnalysisApi.confirm).not.toHaveBeenCalled();
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    expect(foodTextAnalysisApi.preview).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(tree.toJSON())).toContain('Có chỉnh sửa chưa lưu');
+    expect(foodTextAnalysisApi.correctItem).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each(['food', 'revision', 'basis', 'portion'] as const)(
+    'P7-021 dirty %s cannot bypass the new Confirm/Preview guard', async field => {
+      const catalog = [
+        { ...mockCatalogFoods[0], portions: [...mockCatalogFoods[0].portions,
+          { ...mockCatalogFoods[0].portions[0], id: 'portion-2', label: 'Khẩu phần khác' }] },
+        { ...mockCatalogFoods[0], id: 'food-2', name: 'Món khác', revisionId: 'rev-2' },
+      ];
+      (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
+        data: queryKey.includes('published') ? catalog : { ...mockDraftReady,
+          items: [{ ...mockDraftItem, candidates: [{ foodId: 'catalog-food-1', revisionId: 'rev-2', name: 'Bản mới' }] }] },
+        isPending: false, isError: false, error: null, refetch: jest.fn(),
+      }));
+      (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValue(mockPreview);
+      const tree = mount(); selectFirst(tree);
+      await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+      renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+      const label = { food: 'Chọn món danh mục Món khác', revision: 'Chọn gợi ý Bản mới',
+        basis: 'Chọn đơn vị Gam (g)', portion: 'Chọn khẩu phần Khẩu phần khác' }[field];
+      renderer.act(() => tree.root.findByProps({ accessibilityLabel: label }).props.onPress());
+      expect(JSON.stringify(tree.toJSON())).not.toContain('Xác nhận ghi vào nhật ký');
+      await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+      expect(foodTextAnalysisApi.preview).toHaveBeenCalledTimes(1);
+      expect(foodTextAnalysisApi.confirm).not.toHaveBeenCalled();
+      expect(JSON.stringify(tree.toJSON())).toContain('Có chỉnh sửa chưa lưu');
+      renderer.act(() => tree.unmount());
+    }
+  );
+
+  it.each(['Cancel', 'revert'] as const)('P7-021 %s does not resurrect the old preview; a fresh matching Preview permits Confirm', async action => {
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValue(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockResolvedValue(mockReceipt);
+    const tree = mount(); selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '2');
+    if (action === 'Cancel') renderer.act(() => press(tree, 'Hủy'));
+    else input(tree, 'Số lượng', '1');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Xác nhận ghi vào nhật ký');
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+    expect((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[0][1].selectedItems[0].quantity).toBe(1);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-021 successful Save requires a new Preview and Confirms the new saved quantity/revisions', async () => {
+    let current = mockDraftReady; serveDraft(() => current);
+    const updated = { ...mockDraftReady, draftRevision: 1, items: [{ ...mockDraftItem, itemRevision: 1, quantity: 2 }] };
+    const nextPreview = { ...mockPreview, draftRevision: 1, previewRevision: 2,
+      items: [{ ...mockPreview.items[0], selection: { ...mockPreview.items[0].selection, itemRevision: 1, quantity: 2 } }] };
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview).mockResolvedValueOnce(nextPreview);
+    (foodTextAnalysisApi.correctItem as jest.Mock).mockImplementationOnce(async () => { current = updated; return updated; });
+    (foodTextAnalysisApi.confirm as jest.Mock).mockResolvedValue(mockReceipt);
+    const tree = mount(); selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '2');
+    await renderer.act(async () => press(tree, 'Lưu chỉnh sửa'));
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Xác nhận ghi vào nhật ký');
+    expect(foodTextAnalysisApi.confirm).not.toHaveBeenCalled();
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+    expect((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[0][1]).toEqual(expect.objectContaining({
+      expectedDraftRevision: 1, expectedPreviewRevision: 2,
+      selectedItems: [expect.objectContaining({ quantity: 2, itemRevision: 1 })],
+    }));
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-021 late Preview cannot authorize Confirm after the editor changed or Cancel', async () => {
+    const pending = deferred<FoodAnalysisPreview>();
+    (foodTextAnalysisApi.preview as jest.Mock).mockReturnValueOnce(pending.promise);
+    const tree = mount(); selectFirst(tree);
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    renderer.act(() => press(tree, 'Xem trước dinh dưỡng'));
+    input(tree, 'Số lượng', '2');
+    renderer.act(() => press(tree, 'Hủy'));
+    await renderer.act(async () => pending.resolve(mockPreview));
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Xác nhận ghi vào nhật ký');
+    expect(foodTextAnalysisApi.confirm).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-021 saved Preview retry keeps its old key/body after dirty edits without authorizing Confirm', async () => {
+    (foodTextAnalysisApi.preview as jest.Mock).mockRejectedValueOnce(new ApiError(0, 'offline')).mockResolvedValueOnce(mockPreview);
+    const tree = mount(); selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    const original = (foodTextAnalysisApi.preview as jest.Mock).mock.calls[0][1];
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '2');
+    await renderer.act(async () => press(tree, 'Thử lại xem trước'));
+    expect((foodTextAnalysisApi.preview as jest.Mock).mock.calls[1][1]).toBe(original);
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Xác nhận ghi vào nhật ký');
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each([false, true])('P7-021 dirty editor with Cancel=%s preserves exact timed-out Confirm replay', async cancel => {
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockRejectedValueOnce(new FoodTextAnalysisTimeoutError()).mockResolvedValueOnce(mockReceipt);
+    const tree = mount(); selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+    const original = (foodTextAnalysisApi.confirm as jest.Mock).mock.calls[0][1];
+    const keys = (createCommandKey as jest.Mock).mock.calls.length;
+    renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+    input(tree, 'Số lượng', '2');
+    if (cancel) renderer.act(() => press(tree, 'Hủy'));
+    await renderer.act(async () => press(tree, 'Gửi lại xác nhận (thử lại an toàn)'));
+    expect((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[1][1]).toBe(original);
+    expect(original.selectedItems[0].quantity).toBe(1);
+    expect(createCommandKey).toHaveBeenCalledTimes(keys);
+    expect(JSON.stringify(tree.toJSON())).toContain('Biên lai xác nhận nhật ký');
+    renderer.act(() => tree.unmount());
   });
 
   it('a detail authority error hides cached data and revokes pending callbacks in the same session', async () => {

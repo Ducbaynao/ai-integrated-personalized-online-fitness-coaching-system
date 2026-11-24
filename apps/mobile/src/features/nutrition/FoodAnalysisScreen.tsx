@@ -211,6 +211,15 @@ function FoodAnalysisSession() {
     if (authorityError && !denied.current) clearAccess();
   });
   const draft = !accessDenied && !authorityError && draftQuery.data?.studentId === actor ? draftQuery.data : null;
+  const savedEditingItem = editingItem ? draft?.items.find(i => i.itemId === editingItem.itemId) : null;
+  const editorDirty = Boolean(editingItem && (!savedEditingItem
+    || editingItem.itemRevision !== savedEditingItem.itemRevision
+    || editFoodId !== (savedEditingItem.selectedFoodId ?? '')
+    || editRevisionId !== (savedEditingItem.selectedRevisionId ?? '')
+    || (editQuantity.trim() === '' ? null : Number(editQuantity)) !== (savedEditingItem.quantity ?? null)
+    || editBasis !== (savedEditingItem.quantityBasis ?? 'GRAM')
+    || editPortionId !== (savedEditingItem.portionId ?? '')));
+  const unsavedEditorMessage = 'Có chỉnh sửa chưa lưu. Hãy Lưu chỉnh sửa rồi Xem trước lại trước khi xác nhận.';
 
   // Resolve ISO instant for consumedAt
   const resolveConsumedAt = (): string | null => {
@@ -470,6 +479,7 @@ function FoodAnalysisSession() {
     if (confirmIntent || correctionIntent) {
       setMessage('Lệnh sửa/xác nhận trước chưa rõ kết quả. Hãy thử lại đúng lệnh đã lưu trước.'); return;
     }
+    if (!retryIntent && editorDirty) { setMessage(unsavedEditorMessage); return; }
     let intent: NonNullable<typeof previewIntent>;
     if (retryIntent) {
       intent = retryIntent;
@@ -535,6 +545,9 @@ function FoodAnalysisSession() {
     if (!retryIntent && (confirmIntent || correctionIntent)) {
       setMessage('Lệnh trước chưa rõ kết quả. Hãy thử lại đúng intent đã lưu trước.'); return;
     }
+    // A dirty editor cannot authorize a NEW command from an older snapshot.
+    // Exact replay of a previously sent Confirm must remain available.
+    if (!retryIntent && editorDirty) { setMessage(unsavedEditorMessage); return; }
     const currentDraftId = retryIntent?.draftId ?? draft?.draftId;
     if (!currentDraftId) return;
 
@@ -645,7 +658,7 @@ function FoodAnalysisSession() {
         placeholderTextColor={theme.textSecondary}
         value={value}
         onChangeText={(value) => {
-          if (label !== 'Số lượng') invalidatePreview();
+          invalidatePreview();
           onChange(value);
         }}
         keyboardType={keyboardType}
@@ -976,6 +989,9 @@ function FoodAnalysisSession() {
           <Text style={[styles.h2, { color: theme.textPrimary }]}>
             {`Chỉnh sửa: ${editingItem.detectedName ?? 'Món ăn'}`}
           </Text>
+          {editorDirty ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.textPrimary }]}>
+            {unsavedEditorMessage}
+          </Text> : null}
 
           {/* AI Candidate Suggestions */}
           {editingItem.candidates && editingItem.candidates.length > 0 ? (
@@ -988,6 +1004,7 @@ function FoodAnalysisSession() {
                   accessibilityLabel={`Chọn gợi ý ${cand.name}`}
                   accessibilityState={{ checked: editFoodId === cand.foodId }}
                   onPress={() => {
+                    invalidatePreview();
                     setEditFoodId(cand.foodId);
                     setEditRevisionId(cand.revisionId);
                   }}
@@ -1010,6 +1027,7 @@ function FoodAnalysisSession() {
                 accessibilityLabel={`Chọn món danh mục ${food.name}`}
                 accessibilityState={{ checked: editFoodId === food.id }}
                 onPress={() => {
+                  invalidatePreview();
                   setEditFoodId(food.id);
                   setEditRevisionId(food.revisionId);
                   if (food.portions.length > 0 && !editPortionId) {
@@ -1038,7 +1056,7 @@ function FoodAnalysisSession() {
                 accessibilityRole="radio"
                 accessibilityLabel={`Chọn đơn vị ${basisLabels[b]}`}
                 accessibilityState={{ checked: editBasis === b }}
-                onPress={() => setEditBasis(b)}
+                onPress={() => { invalidatePreview(); setEditBasis(b); }}
                 style={{
                   paddingHorizontal: 12,
                   paddingVertical: 8,
@@ -1066,7 +1084,7 @@ function FoodAnalysisSession() {
                     accessibilityRole="radio"
                     accessibilityLabel={`Chọn khẩu phần ${p.label}`}
                     accessibilityState={{ checked: editPortionId === p.id }}
-                    onPress={() => setEditPortionId(p.id)}
+                    onPress={() => { invalidatePreview(); setEditPortionId(p.id); }}
                     style={{ paddingVertical: 4 }}>
                     <Text style={[styles.body, { color: theme.textPrimary }]}>
                       {editPortionId === p.id ? '◉ ' : '○ '} {p.label}
@@ -1079,7 +1097,7 @@ function FoodAnalysisSession() {
           {/* Quantity Input */}
           {inputField('Số lượng', editQuantity, setEditQuantity, 'decimal-pad', 'Ví dụ: 100 hoặc 1.5')}
 
-          <WorkoutButton label="Lưu chỉnh sửa" disabled={busy} onPress={handleSaveCorrection} />
+          <WorkoutButton label="Lưu chỉnh sửa" disabled={busy} onPress={() => handleSaveCorrection()} />
           <WorkoutButton label="Hủy" secondary onPress={() => setEditingItem(null)} />
         </WorkoutCard>
       ) : null}
@@ -1092,7 +1110,7 @@ function FoodAnalysisSession() {
           </Text>
           <WorkoutButton
             label={busy ? 'Đang tính toán...' : 'Xem trước dinh dưỡng'}
-            disabled={busy}
+            disabled={busy || editorDirty}
             onPress={() => handlePreview()}
           />
 
@@ -1118,7 +1136,7 @@ function FoodAnalysisSession() {
               <View style={{ marginTop: 12 }}>
                 <WorkoutButton
                   label={busy ? 'Đang xác nhận...' : 'Xác nhận ghi vào nhật ký'}
-                  disabled={busy}
+                  disabled={busy || editorDirty}
                   onPress={() => handleConfirm()}
                 />
               </View>

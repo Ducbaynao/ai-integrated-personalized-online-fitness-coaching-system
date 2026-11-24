@@ -1,0 +1,31 @@
+{
+  "observedAtUtc": "2026-11-24T17:29:31.479207+00:00",
+  "actorFixture": "Synthetic F06 B",
+  "receipts": [
+    {
+      "createdAt": "2026-11-24T17:26:04.851448+00:00",
+      "receiptId": "be5e4a7c-960c-437b-94d1-c242613c3d93",
+      "commandName": "FOOD_ANALYSIS_CORRECT"
+    },
+    {
+      "createdAt": "2026-11-24T17:26:27.380546+00:00",
+      "receiptId": "ad57df99-e437-402c-a8dc-848e0582dd91",
+      "commandName": "FOOD_ANALYSIS_PREVIEW"
+    },
+    {
+      "createdAt": "2026-11-24T17:25:19.480165+00:00",
+      "receiptId": "97475817-44ce-4420-898a-255d8732848d",
+      "commandName": "FOOD_ANALYSIS_PREVIEW"
+    },
+    {
+      "createdAt": "2026-11-24T17:24:26.954185+00:00",
+      "receiptId": "22480f26-36f6-4ca5-81c0-dbf21ebc55d3",
+      "commandName": "FOOD_ANALYSIS_CORRECT"
+    },
+    {
+      "createdAt": "2026-11-24T17:26:52.501962+00:00",
+      "receiptId": "dc279d57-da3e-4a5c-8daa-475274911275",
+      "commandName": "FOOD_ANALYSIS_CONFIRM"
+    }
+  ]
+}

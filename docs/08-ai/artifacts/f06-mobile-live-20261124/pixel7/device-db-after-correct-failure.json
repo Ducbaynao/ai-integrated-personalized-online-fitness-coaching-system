@@ -1,0 +1,22 @@
+{
+  "drafts": [
+    {
+      "id": "446d2d57-7535-4760-8d12-6ab8bfe7c61f",
+      "status": "READY_FOR_CONFIRMATION",
+      "draft_revision": 1,
+      "log_date": "2026-11-24",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "consumed_at": "2026-11-24T16:47:00+00:00",
+      "meal_type": "OTHER",
+      "item_id": "e6a0d5a4-5ac9-4a96-a8a5-3578e57f5741",
+      "item_revision": 0,
+      "quantity": null,
+      "quantity_basis": null,
+      "selected_food_id": null,
+      "confirmed_food_log_item_id": null
+    }
+  ],
+  "preview_count": 0,
+  "confirmed_items": 0,
+  "observedAtUtc": "2026-11-24T16:52:25.406412+00:00"
+}

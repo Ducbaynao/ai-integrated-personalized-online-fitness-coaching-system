@@ -1,0 +1,19 @@
+{
+  "dayCounts": [
+    {
+      "log_date": "2026-11-24",
+      "confirmed_count": 1
+    },
+    {
+      "log_date": "2026-11-25",
+      "confirmed_count": 1
+    }
+  ],
+  "confirmReceipts": [
+    {
+      "createdAt": "2026-11-24T17:57:49.219525+00:00",
+      "receiptId": "84518bd5-3526-47ab-86aa-d987a7ed8557"
+    }
+  ],
+  "observedAtUtc": "2026-11-24T18:00:53.852544+00:00"
+}
