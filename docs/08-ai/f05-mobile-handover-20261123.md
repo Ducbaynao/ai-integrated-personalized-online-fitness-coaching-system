@@ -136,8 +136,8 @@ Các kiểm tra đã chạy thành công trong phiên làm việc:
      * [ui_03_trainer_apply_success.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_03_trainer_apply_success.png)
      * [ui_04_reject_preserved.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_04_reject_preserved.png)
      * [ui_05_conflict_toast.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_05_conflict_toast.png)
-     * [ui_06_appointment_nav.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_06_appointment_nav.png)
-     * [ui_07_replay_safe.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_07_replay_safe.png)
+     * [ui_06_appointment_two_sided_flow.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_06_appointment_two_sided_flow.png)
+     * [ui_07_ui_retry_response_drop.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_07_ui_retry_response_drop.png)
 
 ---
 

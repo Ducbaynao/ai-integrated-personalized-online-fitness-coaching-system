@@ -72,11 +72,6 @@ function RescheduleModalContent({
   const isMountedRef = useRef(true);
 
   useEffect(() => {
-    activeStudentIdRef.current = studentId;
-    activeOccurrenceIdRef.current = occurrenceId;
-  }, [studentId, occurrenceId]);
-
-  useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
@@ -104,7 +99,7 @@ function RescheduleModalContent({
   const [isRejected, setIsRejected] = useState<boolean>(false);
   const [isStaleConflict, setIsStaleConflict] = useState<boolean>(false);
 
-  // Reset form when user clicks recreate
+  // Reset form when user clicks recreate or occurrence changes
   const resetForm = () => {
     setProposal(null);
     setActiveCommandKey(createCommandKey());
@@ -122,6 +117,14 @@ function RescheduleModalContent({
     setReason('');
     setPreferredTimeOfDay('MORNING');
   };
+
+  useEffect(() => {
+    if (activeOccurrenceIdRef.current !== occurrenceId || activeStudentIdRef.current !== studentId) {
+      activeOccurrenceIdRef.current = occurrenceId;
+      activeStudentIdRef.current = studentId;
+      resetForm();
+    }
+  }, [studentId, occurrenceId]);
 
   // Fetch initial recommendation if passed
   useEffect(() => {

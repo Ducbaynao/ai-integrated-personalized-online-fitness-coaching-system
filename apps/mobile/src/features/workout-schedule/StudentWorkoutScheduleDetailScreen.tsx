@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,10 +41,16 @@ export function StudentWorkoutScheduleDetailScreen({
   const studentId = user?.id ?? '';
   const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
   const relationshipsQuery = useRelationships();
-  const hasActiveCoach = useMemo(() => {
-    const items = relationshipsQuery.data?.pages.flatMap((p) => p.items) ?? [];
-    return items.some((rel) => rel.status === 'ACTIVE');
-  }, [relationshipsQuery.data]);
+  // Fail-safe principle: While loading, on error, or if relationship data is not yet verified,
+  // safely treat as HUMAN_COACH to never prematurely grant SELF_DIRECTED authority.
+  const coachingMode = useMemo(() => {
+    if (relationshipsQuery.isSuccess && relationshipsQuery.data) {
+      const items = relationshipsQuery.data.pages.flatMap((p) => p.items);
+      const hasActive = items.some((rel) => rel.status === 'ACTIVE');
+      return hasActive ? 'HUMAN_COACH' : 'SELF_DIRECTED';
+    }
+    return 'HUMAN_COACH';
+  }, [relationshipsQuery.isSuccess, relationshipsQuery.data]);
   const [permissionLost, setPermissionLost] = useState(false);
   const query = useWorkoutScheduleDetail(studentId, occurrenceId, allowed && !permissionLost);
   const item = query.data;
@@ -61,6 +67,11 @@ export function StudentWorkoutScheduleDetailScreen({
   const [activeRecommendationId, setActiveRecommendationId] = useState<string | undefined>(initialRecommendationId);
   const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
   const [lastAppliedSuccessorId, setLastAppliedSuccessorId] = useState<string | null>(null);
+
+  const handleOpenRescheduleModal = useCallback(() => {
+    setLastAppliedSuccessorId(null);
+    setIsRescheduleModalVisible(true);
+  }, []);
 
   const planId = item?.planSummary?.planId ?? '';
   const planVersionId = item?.planSummary?.planVersionId ?? '';
@@ -210,7 +221,7 @@ export function StudentWorkoutScheduleDetailScreen({
       {needsReview ? <WorkoutState testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} /> : null}
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
         {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
-        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={() => setIsRescheduleModalVisible(true)} /> : null}
+        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={handleOpenRescheduleModal} /> : null}
         {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination(EMPTY_DESTINATION); resetCommand(); }} /> : null}
         {item.availableActions.includes('CANCEL') ? <WorkoutButton testID="schedule-cancel" label="Hủy buổi này" danger onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} /> : null}
       </View> : null}
@@ -307,7 +318,8 @@ export function StudentWorkoutScheduleDetailScreen({
         currentPlannedStartAt={item.plannedStartAt}
         timezone={item.timezone || user?.timezone || undefined}
         linkedAppointmentId={item.linkedAppointmentId}
-        coachingMode={hasActiveCoach ? 'HUMAN_COACH' : 'SELF_DIRECTED'}
+        linkedAppointmentVersion={item.linkedAppointmentVersion}
+        coachingMode={coachingMode}
         onClose={async () => {
           setIsRescheduleModalVisible(false);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });

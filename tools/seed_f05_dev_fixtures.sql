@@ -183,6 +183,6 @@ INSERT INTO fitness.appointments (
 )
 ON CONFLICT (id) DO UPDATE SET
     status = 'CONFIRMED',
-    version = 1,
+    version = fitness.appointments.version + 1,
     start_at = EXCLUDED.start_at,
     end_at = EXCLUDED.end_at;

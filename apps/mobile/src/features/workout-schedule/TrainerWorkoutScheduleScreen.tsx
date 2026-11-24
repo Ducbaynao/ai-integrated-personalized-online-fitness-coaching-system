@@ -165,6 +165,7 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
       currentPlannedStartAt={aiRescheduleOccurrence?.plannedStartAt}
       timezone={aiRescheduleOccurrence?.timezone || undefined}
       linkedAppointmentId={aiRescheduleOccurrence?.linkedAppointmentId}
+      linkedAppointmentVersion={aiRescheduleOccurrence?.linkedAppointmentVersion}
       isTrainer={true}
       coachingMode="HUMAN_COACH"
       onClose={async () => {

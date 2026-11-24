@@ -19,8 +19,18 @@ export function resolveApiBaseUrl(
   const trimmed = envUrl?.trim();
   if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
     const sanitized = trimmed.replace(/\/+$/, '');
-    if (platformOS === 'web' && sanitized.includes('10.0.2.2')) {
-      return sanitized.replace('10.0.2.2', 'localhost');
+    if (platformOS === 'web') {
+      try {
+        const parsed = new URL(sanitized);
+        if (parsed.hostname === '10.0.2.2') {
+          parsed.hostname = 'localhost';
+          return parsed.toString().replace(/\/+$/, '');
+        }
+      } catch {
+        if (sanitized.includes('10.0.2.2')) {
+          return sanitized.replace('10.0.2.2', 'localhost');
+        }
+      }
     }
     return sanitized;
   }
