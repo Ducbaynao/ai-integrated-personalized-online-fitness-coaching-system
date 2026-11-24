@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-11-24T10:46:44.030637+00:00",
+  "environment": "Expo Web (Chromium) -> Spring Boot (8080) -> FastAPI AI Service (8000) -> PostgreSQL (5433)",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "scenariosTotal": 7,
+  "scenariosPassed": 7,
+  "results": [
+    {
+      "scenario": "1. Student SELF_DIRECTED Reschedule",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "73a3ed40-3480-4cfe-928d-fe6777cdb4b5",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_01_student_self_directed_receipt.png",
+      "dbOldStatus": "RESCHEDULED",
+      "dbSuccessor": "3b43e7c5-d0cc-43a7-a33d-68915e5cf564",
+      "details": "Proposal generated with AI reasoning and heuristic disclaimer; accepted by student; receipt displayed resulting entity; DB successor created."
+    },
+    {
+      "scenario": "2. Student HUMAN_COACH Authority Guard",
+      "status": "PASS",
+      "actor": "smoke.student@example.com",
+      "occurrenceId": "e0bbcaf6-ec9f-440f-95db-cb3c11a63a5c",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_02_student_human_coach_blocked.png",
+      "alertVisible": true,
+      "acceptButtonCount": 0,
+      "details": "Alert box informs student that Trainer authority is required under HUMAN_COACH; Accept button is hidden/disabled."
+    },
+    {
+      "scenario": "3. Trainer HUMAN_COACH Apply",
+      "status": "PASS",
+      "actor": "smoke.trainer@example.com",
+      "relationshipId": "95501599-414d-4d0d-b663-296978c402a5",
+      "occurrenceId": "c54ec12a-d1a5-4a36-9966-5ffa8884b37a",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_03_trainer_apply_success.png",
+      "dbSuccessor": "ffb85307-0229-4d2b-bf44-0470fedcf957",
+      "details": "Trainer with MANAGE sharing grant successfully reviewed proposal and executed Accept & Apply; receipt displayed; successor created."
+    },
+    {
+      "scenario": "4. Reject Proposal",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "fb1a3d4c-4e2c-4a96-9cf7-59a033e2e45d",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_04_reject_preserved.png",
+      "dbStatus": "SCHEDULED",
+      "details": "Proposal rejected with decision note; rejected receipt displayed; original workout remains SCHEDULED without change."
+    },
+    {
+      "scenario": "5. Stale Source Conflict",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "23e943b2-6bfe-4b44-8334-a77f8aa21d19",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_05_conflict_toast.png",
+      "details": "Controlled version bump caused 409 conflict on apply; UI displayed clear conflict state and offered regenerate button."
+    },
+    {
+      "scenario": "6. Appointment Linked Navigation",
+      "status": "PASS",
+      "actor": "smoke.trainer@example.com",
+      "appointmentId": "89c1bf34-6c2e-4377-9362-1ee8cffb503e",
+      "targetUrl": "http://localhost:8081/coaching/95501599-414d-4d0d-b663-296978c402a5/workout-schedule",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_06_appointment_nav.png",
+      "details": "Appointment detail displays guidance about linked workout and button 'Mở lịch tập học viên liên kết'; clicking routes to student workout schedule."
+    },
+    {
+      "scenario": "7. Replay / Applied Receipt Verification",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "eabc0446-fc26-4d6c-be53-b2b899d28f87",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_07_replay_safe.png",
+      "replayed": true,
+      "successorCount": 1,
+      "details": "Verified accept button execution, applied receipt rendering, browser fetch idempotent replay (HTTP 200, replayed=true), and single successor preservation in DB."
+    }
+  ]
+}

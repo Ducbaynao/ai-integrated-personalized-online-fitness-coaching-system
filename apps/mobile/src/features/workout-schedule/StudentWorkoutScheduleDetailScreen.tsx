@@ -11,6 +11,7 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from '@/features/workout-plan/components/AiWorkoutAdjustmentModal';
 import { AiWorkoutRescheduleModal } from './components/AiWorkoutRescheduleModal';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
+import { useRelationships } from '@/features/coaching/coachingQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -39,6 +40,11 @@ export function StudentWorkoutScheduleDetailScreen({
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
   const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
+  const relationshipsQuery = useRelationships();
+  const hasActiveCoach = useMemo(() => {
+    const items = relationshipsQuery.data?.pages.flatMap((p) => p.items) ?? [];
+    return items.some((rel) => rel.status === 'ACTIVE');
+  }, [relationshipsQuery.data]);
   const [permissionLost, setPermissionLost] = useState(false);
   const query = useWorkoutScheduleDetail(studentId, occurrenceId, allowed && !permissionLost);
   const item = query.data;
@@ -54,6 +60,7 @@ export function StudentWorkoutScheduleDetailScreen({
   const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(Boolean(initialRecommendationId));
   const [activeRecommendationId, setActiveRecommendationId] = useState<string | undefined>(initialRecommendationId);
   const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
+  const [lastAppliedSuccessorId, setLastAppliedSuccessorId] = useState<string | null>(null);
 
   const planId = item?.planSummary?.planId ?? '';
   const planVersionId = item?.planSummary?.planVersionId ?? '';
@@ -300,16 +307,22 @@ export function StudentWorkoutScheduleDetailScreen({
         currentPlannedStartAt={item.plannedStartAt}
         timezone={item.timezone || user?.timezone || undefined}
         linkedAppointmentId={item.linkedAppointmentId}
-        coachingMode="SELF_DIRECTED"
-        onClose={() => setIsRescheduleModalVisible(false)}
-        onRescheduleApplied={async (result) => {
+        coachingMode={hasActiveCoach ? 'HUMAN_COACH' : 'SELF_DIRECTED'}
+        onClose={async () => {
           setIsRescheduleModalVisible(false);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
-          if (result.resultingEntityId) {
+          if (lastAppliedSuccessorId) {
+            const nextId = lastAppliedSuccessorId;
+            setLastAppliedSuccessorId(null);
             AccessibilityInfo.announceForAccessibility('Đã đổi lịch. Đang mở buổi tập mới.');
-            router.replace(`/workouts/schedule/${result.resultingEntityId}` as never);
+            router.replace(`/workouts/schedule/${nextId}` as never);
           } else {
             await query.refetch();
+          }
+        }}
+        onRescheduleApplied={(result) => {
+          if (result.resultingEntityId) {
+            setLastAppliedSuccessorId(result.resultingEntityId);
           }
         }}
       />

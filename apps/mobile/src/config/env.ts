@@ -18,7 +18,11 @@ export function resolveApiBaseUrl(
 ): string {
   const trimmed = envUrl?.trim();
   if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
-    return trimmed.replace(/\/+$/, '');
+    const sanitized = trimmed.replace(/\/+$/, '');
+    if (platformOS === 'web' && sanitized.includes('10.0.2.2')) {
+      return sanitized.replace('10.0.2.2', 'localhost');
+    }
+    return sanitized;
   }
 
   // Fallback when environment variable is absent or invalid

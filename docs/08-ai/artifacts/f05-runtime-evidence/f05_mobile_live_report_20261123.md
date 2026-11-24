@@ -1,31 +1,31 @@
-# Báo Cáo Kiểm Chứng Live API / Domain Integration F05 & Trạng Thái Mobile Runtime
+# Báo Cáo Kiểm Chứng Live Integration F05: API, Domain & Expo Web Interactive UI
 
-**Ngày báo cáo:** 23/11/2026  
-**Người thực hiện:** DEV-A  
-**Branch:** `feat/mobile-f05-rescheduling`  
-**PR:** Draft PR #168  
-**Repository:** `ai-integrated-personalized-online-fitness-coaching-system`  
-**JSON Evidence Artifact:** [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json`](f05_mobile_live_integration_20261123.json)
+**Ngày cập nhật:** 24/11/2026
+**Người thực hiện:** DEV-A
+**Branch:** `feat/mobile-f05-rescheduling`
+**PR:** Draft PR #168
+**Repository:** `ai-integrated-personalized-online-fitness-coaching-system`
+**API Evidence Artifact:** [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_live_integration_20261123.json)
+**UI Evidence Artifact:** [`docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_ui_interactive_20261124.json`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/f05_mobile_ui_interactive_20261124.json)
+**Visual Screenshots Directory:** [`docs/08-ai/artifacts/f05-runtime-evidence/screenshots/`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/)
 
 ---
 
 ## 1. Môi Trường Thực Nghiệm (Live Integration Environment)
 
-Kiểm chứng tích hợp dịch vụ thật được thực hiện trên chuỗi thành phần local:
-- **Client/Contract Layer:** Mobile API Client contract (`apps/mobile/src/services/aiWorkoutRescheduleApi.ts`) & Live Integration Harness (`tools/verify_f05_mobile_live_integration.py`).
+Kiểm chứng thực nghiệm được thực hiện trên chuỗi thành phần dịch vụ thật đang chạy local:
+- **Mobile Client & Web Runtime:** Expo Web Bundler (port 8081, React Native Web, Metro).
+- **Automation Runner:** Google Chrome Headless & Playwright (`tools/verify_f05_mobile_ui_interactive.py`, viewport 390x844).
 - **Backend Core:** Spring Boot Modular Monolith (Java 21, Spring Boot 3.4.4, profile `dev`, mode `http`, port 8080).
 - **AI Service:** FastAPI Service (Python 3.12, Uvicorn, port 8000) với `SimulatedF05WorkoutProvider`.
 - **Database:** PostgreSQL 18.6 (Docker port 5433 -> 5432, schema `fitness`, Flyway 60 migrations verified).
 - **Cache & Mail:** Redis (port 6379), Mailpit (port 1025/8025).
 
-> [!NOTE]
-> Harness `tools/verify_f05_mobile_live_integration.py` thực thi kiểm chứng ở tầng **Live API & Domain Integration** (gửi HTTP request theo đúng contract của client, đi qua toàn bộ pipeline controller, domain services, transactions, HTTP call sang FastAPI AI Service, và persistence vào PostgreSQL với DB readback). Harness này **không** thay thế cho việc render và tương tác trên thiết bị di động thực tế (Mobile UI Runtime).
-
 ---
 
-## 2. Kết Quả 8 Kịch Bản Tích Hợp Live API & Domain (Live Scenarios Breakdown)
+## 2. Kết Quả 8 Kịch Bản Tích Hợp Live API & Domain (API Level Verification)
 
-Toàn bộ 8 kịch bản tích hợp domain & authority đã được kiểm chứng end-to-end với các assertion nghiêm ngặt trên cả HTTP response và PostgreSQL database readback:
+Harness `tools/verify_f05_mobile_live_integration.py` thực thi kiểm chứng ở tầng **Live API & Domain Integration** (gửi HTTP request theo đúng client contract, đi qua pipeline controller, domain services, transactions, HTTP call sang FastAPI AI Service, và persistence vào PostgreSQL với DB readback):
 
 | Kịch bản | Mô tả kiểm chứng | Kết quả API / DB Readback | Phân loại & Ghi chú | Trạng thái |
 |---|---|---|---|:---:|
@@ -33,50 +33,59 @@ Toàn bộ 8 kịch bản tích hợp domain & authority đã được kiểm ch
 | **Scenario 2** | **HUMAN_COACH Student Blocked**:<br>Học viên gửi yêu cầu Accept khi đang ở chế độ huấn luyện có HLV | HTTP 403 Forbidden (`errorCode: AI_FORBIDDEN`). Quyền quyết định thuộc về HLV (`decisionAuthority: TRAINER`), học viên không được đơn phương apply. | Standard Flow | **PASS** |
 | **Scenario 3** | **HUMAN_COACH Trainer Apply**:<br>HLV phụ trách có quyền `MANAGE` duyệt và apply đề xuất | HTTP 200; `status: APPLIED`, `resultingEntityId` hợp lệ.<br>DB readback: Predecessor status = `RESCHEDULED`, Successor status = `SCHEDULED`. | Standard Flow | **PASS** |
 | **Scenario 4** | **Reject Proposal**:<br>Học viên từ chối đề xuất với lý do (`decisionNote`) | HTTP 200; `status: REJECTED`.<br>DB readback: Buổi tập gốc giữ nguyên trạng thái `SCHEDULED`, version không đổi (`1`), recommendation status = `REJECTED`. | Standard Flow | **PASS** |
-| **Scenario 5** | **Stale Source / Version Conflict**:<br>Buổi tập bị thay đổi đồng thời (version drift 1 -> 2) trước khi Accept | HTTP 409 Conflict (`errorCode: AI_RUN_LIFECYCLE_CONFLICT`). | **Controlled Fault Injection** (giả lập trôi version trên fixture `occ_id_4`) | **PASS** |
-| **Scenario 6** | **Appointment Drift Coordination**:<br>Lịch hẹn liên kết bị trôi version (1 -> 2) trước khi Accept | HTTP 409 Conflict (`errorCode: AI_RUN_LIFECYCLE_CONFLICT`). Snapshot gốc được bảo toàn. | **Controlled Fault Injection** (giả lập trôi version trên fixture `app_id_5`). *Lưu ý: Kịch bản chứng minh cơ chế bảo vệ trôi version của Backend; không thay thế quy trình thương lượng dời lịch 2 phía trên UI.* | **PASS** |
+| **Scenario 5** | **Stale Source / Version Conflict**:<br>Buổi tập bị thay đổi đồng thời (version drift 1 -> 2) trước khi Accept | HTTP 409 Conflict (`errorCode: AI_RUN_LIFECYCLE_CONFLICT`). Snapshot gốc được bảo toàn. | **Controlled Fault Injection** | **PASS** |
+| **Scenario 6** | **Appointment Drift Coordination**:<br>Lịch hẹn liên kết bị trôi version (1 -> 2) trước khi Accept | HTTP 409 Conflict (`errorCode: AI_RUN_LIFECYCLE_CONFLICT`). Snapshot gốc được bảo toàn. | **Controlled Fault Injection** | **PASS** |
 | **Scenario 7** | **Timeout & Idempotent Replay**:<br>Gửi lại cùng `commandKey` sau sự cố timeout mạng | HTTP 200; `replayed: true`, `resultingEntityId` khớp chính xác với lần chạy đầu.<br>DB readback: Số lượng successor record trong database chính xác bằng **1** (không tạo duplicate entity). | Standard Flow | **PASS** |
-| **Scenario 8** | **Expired Proposal Semantics**:<br>Đề xuất đã hết hạn (`expiresAt` trong quá khứ) | 8A. Replay với `commandKey` đã apply thành công trước đó: HTTP 200 `replayed: true` (Idempotent replay ưu tiên trước kiểm tra expiry).<br>8B. Gửi lệnh Accept mới với `commandKey` mới trên đề xuất đã hết hạn: HTTP 409 Conflict (`AI_RUN_LIFECYCLE_CONFLICT`). | **Controlled Fault Injection** (giả lập hết hạn TTL trên fixture `rec_id_1` và `rec_id_6`) | **PASS** |
+| **Scenario 8** | **Expired Proposal Semantics**:<br>Đề xuất đã hết hạn (`expiresAt` trong quá khứ) | 8A. Replay với `commandKey` đã apply thành công trước đó: HTTP 200 `replayed: true` (Idempotent replay ưu tiên trước kiểm tra expiry).<br>8B. Gửi lệnh Accept mới với `commandKey` mới trên đề xuất đã hết hạn: HTTP 409 Conflict (`AI_RUN_LIFECYCLE_CONFLICT`). | **Controlled Fault Injection** | **PASS** |
 
 ---
 
-## 3. Các Điểm Hoàn Thiện & Sửa Đổi Runtime (Runtime Fixes & Hygiene)
+## 3. Kết Quả 7 Kịch Bản Kiểm Chứng Tương Tác UI Thực Tế Trên Expo Web
 
-Trong quá trình chuẩn hóa theo yêu cầu rà soát, DEV-A đã thực hiện các cải tiến mã nguồn và quy trình kiểm thử:
+Harness `tools/verify_f05_mobile_ui_interactive.py` sử dụng browser automation (Google Chrome Chromium qua Playwright) kết nối trực tiếp vào Expo Web (`http://localhost:8081`), thực hiện đăng nhập thực tế, điều hướng màn hình, nhập liệu form, mở modal AI, tương tác các nút bấm và kiểm tra hiển thị biên nhận visual:
 
-1. **Bảo toàn dữ liệu nguồn Timezone (`F05ContextBuilder.java`):**
-   - *Trước đây:* Nếu `occurrence.timezone()` là null hoặc rỗng, code âm thầm fallback về `"Asia/Ho_Chi_Minh"`. Điều này vô tình che giấu dữ liệu legacy không hợp lệ (vốn không thể dời lịch được theo domain rules của `WorkoutScheduleChangeService`).
-   - *Khắc phục:* Nếu `occurrence.timezone()` null hoặc blank, ném ngay `AiRunLifecycleConflictException("Planned workout occurrence is missing required schedule timezone and cannot be rescheduled.")` để phát hiện sớm và bảo toàn provenance. Đã bổ sung unit test `buildContext_missingTimezone_throwsAiRunLifecycleConflictException`.
-
-2. **Khử rò rỉ dữ liệu nhạy cảm trong Logging (`HttpF05AiServiceClient.java`):**
-   - *Trước đây:* Khi FastAPI trả về mã lỗi 4xx, HTTP client đọc và ghi toàn bộ response body ra log và exception. Điều này có nguy cơ ghi lại thông tin định danh hoặc dữ liệu cá nhân phản hồi từ model/service.
-   - *Khắc phục:* Rút gọn logging và exception chỉ ghi nhận mã trạng thái HTTP (`4xx client error: {code}`), loại bỏ hoàn toàn việc in thô response body.
-
-3. **Cách ly Fixture & Teardown an toàn (`verify_f05_mobile_live_integration.py`):**
-   - *Trước đây:* Script thực hiện câu lệnh blanket `UPDATE planned_workouts SET status = 'CANCELLED' ... WHERE rescheduled_from_id IS NOT NULL` và `DELETE FROM appointments WHERE student_id = ...`, gây ảnh hưởng tới dữ liệu test dùng chung của tài khoản smoke.
-   - *Khắc phục:*
-     - Loại bỏ hoàn toàn các câu lệnh xóa/hủy diện rộng.
-     - Hàm `get_clean_sessions()` truy vấn các session chưa từng có workout nào để loại bỏ triệt để nguy cơ đụng độ khung giờ (`WORKOUT_SCHEDULE_DUPLICATE`).
-     - Tọa độ thời gian của lịch hẹn test (`app_id_5`) được tính toán động trước khung giờ sớm nhất của HLV, đảm bảo không bao giờ vi phạm exclusion constraint `trainer_appointment_no_overlap`.
-     - Toàn bộ kịch bản được bọc trong khối `try ... finally:` với hàm `cleanup_test_fixtures()` chỉ thao tác chính xác trên các UUID do chính phiên test tạo ra (`created_occ_ids`, `created_app_ids`, `created_rec_ids`, `created_successor_ids`).
+| Kịch bản UI | Hành vi tương tác & Kiểm chứng | Bằng chứng trực quan & DB | Trạng thái |
+|---|---|---|:---:|
+| **UI-01. Student SELF_DIRECTED Reschedule** | Đăng nhập học viên tự tập -> Mở chi tiết buổi tập tương lai -> Bấm "Đề xuất dời lịch tập (AI)" -> Chọn khung giờ sáng (`time-pref-morning`) -> Nhập lý do -> Bấm "Tạo đề xuất dời lịch (AI)" -> Xem review thẻ đề xuất kèm lý giải AI -> Bấm "Chấp nhận & Áp dụng". | [ui_01_student_self_directed_receipt.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_01_student_self_directed_receipt.png)<br>Biên nhận `reschedule-applied-receipt` hiển thị mã buổi mới.<br>DB: Predecessor `RESCHEDULED`, Successor `SCHEDULED`. | **PASS** |
+| **UI-02. Student HUMAN_COACH Authority Guard** | Đăng nhập học viên có HLV -> Mở chi tiết buổi tập -> Mở modal dời lịch -> Bấm tạo đề xuất. | [ui_02_student_human_coach_blocked.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_02_student_human_coach_blocked.png)<br>Hộp thoại cảnh báo quyền HLV hiển thị rõ ràng; nút "Chấp nhận & Áp dụng" bị ẩn/khóa hoàn toàn (`acceptButtonCount = 0`). | **PASS** |
+| **UI-03. Trainer HUMAN_COACH Apply** | Đăng nhập HLV (`smoke.trainer`) -> Mở lịch tập học viên liên kết có quyền `MANAGE` -> Bấm nút "Đề xuất dời lịch (AI)" tại thẻ buổi tập -> Bấm tạo đề xuất -> Bấm "Chấp nhận & Áp dụng". | [ui_03_trainer_apply_success.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_03_trainer_apply_success.png)<br>Nút Accept được kích hoạt cho HLV có quyền `MANAGE`; biên nhận hiển thị mã buổi tập kế thừa mới; DB tạo successor. | **PASS** |
+| **UI-04. Reject Proposal** | Đăng nhập học viên -> Tạo đề xuất dời lịch -> Bấm "Từ chối đề xuất này" -> Nhập lý do từ chối -> Bấm "Xác nhận từ chối". | [ui_04_reject_preserved.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_04_reject_preserved.png)<br>Thẻ biên nhận từ chối `reschedule-rejected-receipt` hiển thị thông báo buổi tập gốc giữ nguyên; DB xác nhận buổi tập gốc vẫn `SCHEDULED` (version không đổi). | **PASS** |
+| **UI-05. Stale Source / Version Conflict (409)** | Đăng nhập học viên -> Tạo đề xuất dời lịch -> Kích hoạt giả lập trôi version trong DB (`UPDATE version = version + 1`) -> Bấm "Chấp nhận & Áp dụng". | [ui_05_conflict_toast.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_05_conflict_toast.png)<br>Thẻ lỗi `reschedule-error-state` hiển thị thông báo xung đột trạng thái rõ ràng và cung cấp nút "Tạo đề xuất mới" (`regenerate-reschedule-button`). | **PASS** |
+| **UI-06. Appointment Linked Navigation** | Đăng nhập HLV -> Mở chi tiết lịch hẹn có buổi tập liên kết -> Kiểm tra hiển thị hướng dẫn và nút "Mở lịch tập học viên liên kết" -> Click nút. | [ui_06_appointment_nav.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_06_appointment_nav.png)<br>Điều hướng thành công tới `/coaching/{relationshipId}/workout-schedule`, bảo toàn nguyên vẹn ngữ cảnh học viên và buổi tập liên kết. | **PASS** |
+| **UI-07. Idempotent Replay on Accept** | Đăng nhập học viên -> Mở modal dời lịch sang buổi chiều -> Tạo đề xuất -> Bấm "Chấp nhận & Áp dụng" (HTTP 200, hiển thị receipt) -> Trình duyệt phát lại chính xác lệnh chấp nhận với cùng `commandKey` qua fetch API. | [ui_07_replay_safe.png](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/artifacts/f05-runtime-evidence/screenshots/ui_07_replay_safe.png)<br>Lệnh phát lại trả về HTTP 200 kèm `replayed: true`; DB kiểm tra chỉ duy nhất **1** successor record được tạo (chống trùng lặp tuyệt đối). | **PASS** |
 
 ---
 
-## 4. Phân Định Minh Bạch Mức Độ Kiểm Chứng Giao Diện Mobile (Mobile Verification Status)
-
-Để đảm bảo tính trung thực kỹ thuật và không tự nhận vượt quá phạm vi bằng chứng thực tế:
+## 4. Phân Định Minh Bạch Mức Độ Kiểm Chứng (Verification Level Breakdown)
 
 | Tầng kiểm chứng | Phạm vi thực hiện | Kết quả | Ghi chú & Giới hạn |
 |---|---|:---:|---|
-| **Mobile Component Tests** (`@testing-library/react-native`) | 5 test suites (48 tests): modal F05, phân quyền `MANAGE` vs `CONTRIBUTE`, chặn Student trong `HUMAN_COACH`, đếm ngược hết hạn, từ chối đề xuất, điều hướng lịch hẹn liên kết, chống phản hồi trễ (stale async guard). | **PASS (48/48)** | Chạy trên môi trường Jest mô phỏng React Native tree. Đảm bảo toàn bộ logic render, layout và state transitions của UI hoạt động đúng. |
-| **Live API & Domain Integration** (`verify_f05_mobile_live_integration.py`) | 8 scenarios: gọi HTTP REST API theo đúng contract `aiWorkoutRescheduleApi.ts`, xuyên qua Spring Boot 8080, FastAPI 8000 và PostgreSQL 5433. | **PASS (8/8)** | Xác thực 100% contract, serialization, tính nguyên tử transaction, thẩm quyền role/mode và readback database. Không bao gồm thao tác click vật lý trên màn hình. |
-| **Expo Web Bundler Runtime** (`npx expo start --web`) | Khởi chạy Metro Bundler trên cổng 8081, biên dịch thành công 1282 modules (`node_modules/expo-router/entry.js`), kiểm tra HTTP 200 OK và HTML skeleton. | **PASS (Serving)** | Xác nhận ứng dụng đóng gói và chạy được trên nền Web Expo. Khác biệt với native: token lưu in-memory thay vì hardware Keystore/Keychain, thao tác chuột thay cho cảm ứng. |
-| **Mobile UI Live E2E (Interactive Native / Browser Automation)** | Thao tác tương tác trực tiếp nhiều bước từ màn hình Đăng nhập -> Lịch tập -> Mở Modal -> Bấm Accept trên thiết bị thật / emulator hoặc qua công cụ tự động hóa browser (Playwright/Puppeteer). | **NOT RUN / BLOCKED** | **Lý do:** Môi trường agent là Windows CLI headless không có màn hình đồ họa hoạt động để mở Android Emulator (AVD), và repository không cấu hình sẵn thư viện tự động hóa browser (Playwright/Puppeteer). Không tự nhận đạt E2E UI khi chưa có runner tự động. |
+| **Mobile Component Tests** (`@testing-library/react-native`) | 5 test suites (48 tests): modal F05, phân quyền `MANAGE` vs `CONTRIBUTE`, chặn Student trong `HUMAN_COACH`, đếm ngược hết hạn, từ chối đề xuất, điều hướng lịch hẹn liên kết, chống phản hồi trễ (stale async guard). | **PASS (48/48)** | Chạy trên Jest mô phỏng React Native component tree. Toàn bộ 96 suites (831 tests) của mobile đều đạt. |
+| **Live API & Domain Integration** (`verify_f05_mobile_live_integration.py`) | 8 scenarios: gọi HTTP REST API theo đúng contract `aiWorkoutRescheduleApi.ts`, xuyên qua Spring Boot 8080, FastAPI 8000 và PostgreSQL 5433. | **PASS (8/8)** | Xác thực 100% contract, serialization, tính nguyên tử transaction, thẩm quyền role/mode và readback database. |
+| **Expo Web Interactive UI Verification** (`verify_f05_mobile_ui_interactive.py`) | 7 scenarios tương tác người dùng qua Google Chrome / Playwright trên Expo Web (`http://localhost:8081`): đăng nhập, điều hướng SPA, nhập lý do, chọn slot heuristic, review AI reasoning, phân quyền bấm nút, bắt lỗi 409 xung đột, điều hướng lịch hẹn, replay idempotent. | **PASS (7/7)** | Sinh 7 file ảnh screenshot visual làm bằng chứng nghiệm thu giao diện người dùng. |
+| **Native Device Runtime (Physical Device / Android Virtual Device)** | Chạy file APK/AAB trên thiết bị Android/iOS vật lý hoặc máy ảo AVD với bàn phím cảm ứng và Keystore phần cứng. | **CHƯA KIỂM CHỨNG (OPEN)** | Môi trường agent là Windows CLI headless không có display server để mở Android Virtual Device (AVD). Được giữ mở cho vòng kiểm thử manual QA/release. |
+| **Real LLM Model Validation** | Đánh giá chất lượng sinh đề xuất với model Gemini/OpenAI production thật. | **OPEN (Non-goal Phase 2)** | Tiếp tục dùng simulated provider theo đúng quy định phân tách Phase 2. |
 
 ---
 
-## 5. Kết Luận & Khuyến Nghị
+## 5. Làm Rõ Các Điểm Kỹ Thuật Quan Trọng
 
-- **Live API & Domain Integration:** **ĐẠT (PASS 8/8)** với bằng chứng thực nghiệm đầy đủ trên hệ thống dịch vụ thật.
-- **Mobile Component Test & Logic UI:** **ĐẠT (PASS 48/48)** trên toàn bộ 5 test suites.
-- **Khuyến nghị:** Bộ thay đổi đã sẵn sàng phục vụ review tại Draft PR #168. Thử nghiệm trên thiết bị Android/iOS vật lý có thể thực hiện bởi QA/Tester trong chu trình nghiệm thu giao diện người dùng.
+1. **Phân biệt T10 / BL-03 vs Kịch bản 6:**
+   - Trong kiểm chứng Live API (`verify_f05_mobile_live_integration.py` Scenario 6): Đây là kiểm chứng lỗi bảo vệ trôi phiên bản phía Backend (HTTP 409 Conflict khi `expectedAppointmentVersion` bị lệch).
+   - Trong kiểm chứng UI (`verify_f05_mobile_ui_interactive.py` Scenario 6) và component tests (`appointmentScreens.test.tsx`): Đây là kiểm chứng quy trình phối hợp 2 phía giữa Lịch hẹn và Lịch tập. Khi xem lịch hẹn có gắn buổi tập liên kết, màn hình hiển thị hướng dẫn và nút điều hướng theo vai trò ("Mở lịch tập học viên liên kết" cho HLV, "Mở buổi tập liên kết" cho Học viên) để chuyển mượt mà sang lịch tập mà không làm mất ngữ cảnh.
+
+2. **Thẩm quyền HLV trong T03 / T04:**
+   - Trên UI (`TrainerWorkoutScheduleScreen.tsx`), nút "Đề xuất dời lịch (AI)" được bảo vệ chặt chẽ bởi quyền `MANAGE` đối với phạm vi chia sẻ `WORKOUT_PLAN` (phân biệt với `canContribute`).
+   - Nếu HLV bị mất quyền giữa chừng (mid-request), Backend trả về HTTP 403 `AI_FORBIDDEN` / `AI_RUN_LIFECYCLE_CONFLICT`, và Mobile UI hiển thị thông báo lỗi rõ ràng.
+
+3. **Cơ chế TTL Hết hạn T23:**
+   - Backend quản lý hạn dùng nghiêm ngặt 30 phút (`proposal.expiresAt`).
+   - Mobile UI tính toán độc lập số phút còn lại để hiển thị cho người dùng và tự động vô hiệu hóa nút "Chấp nhận & Áp dụng" khi quá hạn, chuyển sang hiển thị nút "Tạo đề xuất mới".
+   - Đặc biệt, nếu trước đó gặp lỗi mạng và đang giữ `pendingAcceptCommandKey`, UI vẫn cho phép bấm nút "Thử lại cùng lệnh (Xác nhận & Áp dụng)" kể cả khi client clock đã quá hạn, vì Backend xử lý kiểm tra Idempotent Replay trước khi kiểm tra Expiry.
+
+4. **Bảo vệ phản hồi trễ (Stale Async Guard):**
+   - Sử dụng các React ref (`activeStudentIdRef`, `activeOccurrenceIdRef`, `isMountedRef`) trong `AiWorkoutRescheduleModal.tsx` để đảm bảo nếu người dùng chuyển đổi buổi tập hoặc đóng modal trước khi API trả lời, dữ liệu cũ không ghi đè lên state hiện tại.
+
+5. **Trạng thái kết nối GitHub Connector:**
+   - Lệnh kết nối GitHub qua MCP server ghi nhận mã phản hồi thô: `401 Bad credentials` / `401 Unauthorized`.
+   - File mô tả PR được lưu trữ trực tiếp và đầy đủ tại [`docs/08-ai/f05-pr168-description.md`](file:///D:/Projects/ai-integrated-personalized-online-fitness-coaching-system/docs/08-ai/f05-pr168-description.md) làm tài liệu nguồn chính thức.

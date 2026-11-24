@@ -37,7 +37,13 @@ WHERE target_entity_id IN (
 );
 
 -- 3. Delete any previous test appointments
-DELETE FROM fitness.appointments WHERE planned_workout_id = 'f3000000-0000-4000-8000-000000000005';
+DELETE FROM fitness.appointments WHERE planned_workout_id IN (
+    'f3000000-0000-4000-8000-000000000011',
+    'f3000000-0000-4000-8000-000000000012',
+    'f3000000-0000-4000-8000-000000000003',
+    'f3000000-0000-4000-8000-000000000004',
+    'f3000000-0000-4000-8000-000000000005'
+) OR id = 'a5000000-0000-4000-8000-000000000005';
 
 -- 4. Insert or ensure test occurrences exist with full schedule & session metadata
 INSERT INTO fitness.planned_workouts (
@@ -58,8 +64,8 @@ INSERT INTO fitness.planned_workouts (
     '9c0bad94-120a-437f-a6a7-d1d439f382cf',
     'SELF_ALLOWED',
     1,
-    TO_CHAR(NOW() - INTERVAL '3 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
-    TO_CHAR(NOW() - INTERVAL '2 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '3 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '2 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
     'Asia/Ho_Chi_Minh',
     '+07:00',
     '+07:00'
@@ -76,8 +82,8 @@ INSERT INTO fitness.planned_workouts (
     '1cb982ef-b7e6-493c-86f9-fe4994f8ad93',
     'SELF_ALLOWED',
     1,
-    TO_CHAR(NOW() - INTERVAL '4 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
-    TO_CHAR(NOW() - INTERVAL '3 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '4 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '3 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
     'Asia/Ho_Chi_Minh',
     '+07:00',
     '+07:00'
@@ -94,8 +100,8 @@ INSERT INTO fitness.planned_workouts (
     '9c0bad94-120a-437f-a6a7-d1d439f382cf',
     'SELF_ALLOWED',
     1,
-    TO_CHAR(NOW() - INTERVAL '5 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
-    TO_CHAR(NOW() - INTERVAL '4 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '5 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '4 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
     'Asia/Ho_Chi_Minh',
     '+07:00',
     '+07:00'
@@ -112,8 +118,8 @@ INSERT INTO fitness.planned_workouts (
     '9c0bad94-120a-437f-a6a7-d1d439f382cf',
     'SELF_ALLOWED',
     1,
-    TO_CHAR(NOW() - INTERVAL '6 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
-    TO_CHAR(NOW() - INTERVAL '5 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '6 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '5 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
     'Asia/Ho_Chi_Minh',
     '+07:00',
     '+07:00'
@@ -130,13 +136,25 @@ INSERT INTO fitness.planned_workouts (
     '1cb982ef-b7e6-493c-86f9-fe4994f8ad93',
     'COACH_REQUIRED',
     1,
-    TO_CHAR(NOW() - INTERVAL '7 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
-    TO_CHAR(NOW() - INTERVAL '6 hours' AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '7 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
+    TO_CHAR((NOW() - INTERVAL '6 hours') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD"T"HH24:MI:SS'),
     'Asia/Ho_Chi_Minh',
     '+07:00',
     '+07:00'
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+    status = EXCLUDED.status,
+    version = fitness.planned_workouts.version + 1,
+    planned_start_at = EXCLUDED.planned_start_at,
+    planned_end_at = EXCLUDED.planned_end_at,
+    original_planned_start_at = EXCLUDED.original_planned_start_at,
+    schedule_local_start = EXCLUDED.schedule_local_start,
+    schedule_local_end = EXCLUDED.schedule_local_end,
+    schedule_timezone = EXCLUDED.schedule_timezone,
+    schedule_start_utc_offset = EXCLUDED.schedule_start_utc_offset,
+    schedule_end_utc_offset = EXCLUDED.schedule_end_utc_offset,
+    rescheduled_from_id = NULL,
+    schedule_change_id = NULL;
 
 -- 5. Insert linked appointment in fitness.appointments
 INSERT INTO fitness.appointments (
@@ -163,4 +181,8 @@ INSERT INTO fitness.appointments (
     '+07:00',
     '1cb982ef-b7e6-493c-86f9-fe4994f8ad93'
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+    status = 'CONFIRMED',
+    version = 1,
+    start_at = EXCLUDED.start_at,
+    end_at = EXCLUDED.end_at;

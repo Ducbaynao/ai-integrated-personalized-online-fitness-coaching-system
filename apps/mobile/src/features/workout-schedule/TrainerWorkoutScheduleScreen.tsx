@@ -167,11 +167,13 @@ export function TrainerWorkoutScheduleScreen({ relationshipId }: { relationshipI
       linkedAppointmentId={aiRescheduleOccurrence?.linkedAppointmentId}
       isTrainer={true}
       coachingMode="HUMAN_COACH"
-      onClose={() => setAiRescheduleOccurrence(null)}
-      onRescheduleApplied={async () => {
+      onClose={async () => {
         setAiRescheduleOccurrence(null);
         await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.trainer(trainerId, studentId) });
         await query.refetch();
+      }}
+      onRescheduleApplied={() => {
+        // Keeps receipt open until Trainer clicks close
       }}
     />
   </ScrollView>;

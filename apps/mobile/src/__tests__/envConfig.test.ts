@@ -4,6 +4,9 @@ describe('resolveApiBaseUrl configuration tests', () => {
   it('Web + valid env URL -> uses env URL', () => {
     const url = resolveApiBaseUrl('https://api.example.com/api/v1', 'web');
     expect(url).toBe('https://api.example.com/api/v1');
+
+    const mappedUrl = resolveApiBaseUrl('http://10.0.2.2:8080/api/v1', 'web');
+    expect(mappedUrl).toBe('http://localhost:8080/api/v1');
   });
 
   it('Web without env -> uses 127.0.0.1 fallback', () => {
