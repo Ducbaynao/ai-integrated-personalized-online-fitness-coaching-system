@@ -184,6 +184,7 @@ export function NutritionScreen() {
     contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng</Text>
     <WorkoutButton label="Mục tiêu dinh dưỡng và đề xuất" secondary onPress={() => router.push('/nutrition/strategy' as never)} />
+    <WorkoutButton testID="entry-food-text-analysis" label="Ước tính từ mô tả bữa ăn (AI)" secondary onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: { day, timezone, mealType } } as never)} />
     <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu bạn tự khai báo. Chưa biết không có nghĩa là 0.</Text>
     <WorkoutCard>
       {input('Ngày ghi (YYYY-MM-DD)', day, (value) => { setDay(value); setConfirmedContext(false); })}
