@@ -150,6 +150,65 @@ describe('aiKnowledgeApi', () => {
         signal: expect.any(Object),
       });
     });
+
+    it('transmits studentId and includePersonalContext according to personalized contract', async () => {
+      (request as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      await aiKnowledgeApi.queryKnowledge({
+        question: 'Tôi nên nghỉ bao lâu giữa các hiệp Squat?',
+        language: 'vi',
+        studentId: '55555555-5555-5555-5555-555555555555',
+        includePersonalContext: true,
+      });
+
+      expect(request).toHaveBeenCalledWith('/ai/knowledge/query', {
+        method: 'POST',
+        body: {
+          question: 'Tôi nên nghỉ bao lâu giữa các hiệp Squat?',
+          language: 'vi',
+          studentId: '55555555-5555-5555-5555-555555555555',
+          includePersonalContext: true,
+        },
+        signal: expect.any(Object),
+      });
+    });
+
+    it('supports external AbortSignal cancellation', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        aiKnowledgeApi.queryKnowledge(
+          { question: 'Câu hỏi cần hủy bỏ' },
+          { signal: controller.signal }
+        )
+      ).rejects.toThrow('Yêu cầu đã bị hủy.');
+    });
+  });
+
+  describe('getRun readback API', () => {
+    it('throws validation error when runId is empty', async () => {
+      await expect(aiKnowledgeApi.getRun('')).rejects.toThrow(AiKnowledgeValidationError);
+      await expect(aiKnowledgeApi.getRun('   ')).rejects.toThrow('Run ID không được để trống.');
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it('fetches run detail by runId from /ai/runs/{runId}', async () => {
+      const mockRunDetail = {
+        runId: '11111111-1111-1111-1111-111111111111',
+        runStatus: 'SUCCEEDED',
+        requestType: 'F01_KNOWLEDGE_QUERY',
+        correlationId: '22222222-2222-2222-2222-222222222222',
+      };
+      (request as jest.Mock).mockResolvedValueOnce(mockRunDetail);
+
+      const res = await aiKnowledgeApi.getRun('11111111-1111-1111-1111-111111111111');
+      expect(res).toEqual(mockRunDetail);
+      expect(request).toHaveBeenCalledWith(
+        '/ai/runs/11111111-1111-1111-1111-111111111111',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
   });
 
   describe('getAiKnowledgeErrorMessage', () => {
@@ -209,6 +268,27 @@ describe('aiKnowledgeApi', () => {
       const err = new ApiError(403, 'Forbidden');
       expect(getAiKnowledgeErrorMessage(err)).toBe(
         'Bạn không có quyền truy cập tính năng tra cứu kiến thức AI.'
+      );
+    });
+
+    it('handles ApiError 403 AI_FORBIDDEN for unauthorized student context', () => {
+      const err = new ApiError(403, 'Forbidden', { errorCode: 'AI_FORBIDDEN' } as any);
+      expect(getAiKnowledgeErrorMessage(err)).toBe(
+        'Bạn không có quyền truy cập dữ liệu cá nhân của học viên này.'
+      );
+    });
+
+    it('handles ApiError 503 feature disabled by admin', () => {
+      const err = new ApiError(503, 'Service Unavailable', { errorCode: 'FEATURE_DISABLED' } as any);
+      expect(getAiKnowledgeErrorMessage(err)).toBe(
+        'Tính năng Trợ lý Kiến thức Thể hình tạm thời gián đoạn theo lịch vận hành hệ thống.'
+      );
+    });
+
+    it('handles ApiError 400 validation failed for missing student in trainer query', () => {
+      const err = new ApiError(400, 'studentId is required', { errorCode: 'VALIDATION_FAILED' } as any);
+      expect(getAiKnowledgeErrorMessage(err)).toBe(
+        'Yêu cầu không hợp lệ. Vui lòng kiểm tra lại câu hỏi hoặc thông tin học viên.'
       );
     });
 
