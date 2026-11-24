@@ -1,6 +1,7 @@
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
 import {
+  AiRunResponse,
   F01KnowledgeQueryRequest,
   F01KnowledgeQueryResponse,
 } from '@/types/aiKnowledge';
@@ -26,7 +27,7 @@ export function countCodePoints(str: string): number {
 
 /**
  * Normalizes user-facing error message based on ApiError, raw data, status, or exception type.
- * Avoids collapsing all 502s to model errors when the failure may be output validation.
+ * Aligned with docs/08-ai/f01-personalized-knowledge-mobile-handover.md Section 5.
  */
 export function getAiKnowledgeErrorMessage(error: unknown): string {
   if (error instanceof AiKnowledgeValidationError) {
@@ -38,6 +39,9 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
     error instanceof Error &&
     (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('timeout'))
   ) {
+    if (error.message.includes('bị hủy')) {
+      return error.message;
+    }
     return 'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.';
   }
 
@@ -68,8 +72,24 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
     }
 
     // 2. HTTP Status Code Mappings
+    const errorCode = error.errorResponse?.errorCode;
+    if (error.status === 400) {
+      if (errorCode === 'VALIDATION_FAILED' || (error.message && error.message.includes('studentId'))) {
+        return 'Yêu cầu không hợp lệ. Vui lòng kiểm tra lại câu hỏi hoặc thông tin học viên.';
+      }
+      return error.message || 'Yêu cầu không hợp lệ. Vui lòng kiểm tra lại câu hỏi.';
+    }
     if (error.status === 401) {
       return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+    }
+    if (errorCode === 'AI_FORBIDDEN' || (error.message && error.message.includes('học viên'))) {
+      if (error.errorResponse?.message) {
+        return error.errorResponse.message;
+      }
+      if (error.message && !error.message.startsWith('Request failed with status') && error.message !== 'Forbidden') {
+        return error.message;
+      }
+      return 'Bạn không có quyền truy cập dữ liệu cá nhân của học viên này.';
     }
     if (error.status === 403) {
       return 'Bạn không có quyền truy cập tính năng tra cứu kiến thức AI.';
@@ -77,11 +97,14 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
     if (error.status === 404) {
       return 'Bài tập hoặc tài liệu tham chiếu không tồn tại trong hệ thống.';
     }
+    if (error.status === 503) {
+      return 'Tính năng Trợ lý Kiến thức Thể hình tạm thời gián đoạn theo lịch vận hành hệ thống.';
+    }
     if (error.status === 504) {
       return 'Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.';
     }
     if (error.status === 502) {
-      return 'Dịch vụ AI phản hồi không hợp lệ hoặc không vượt qua kiểm định an toàn.';
+      return 'Hệ thống AI đang bảo trì hoặc gặp sự cố phản hồi. Vui lòng thử lại sau ít phút.';
     }
     if (error.status === 500) {
       return 'Lỗi hệ thống trong quá trình xử lý câu hỏi. Vui lòng thử lại sau.';
@@ -104,15 +127,16 @@ export function getAiKnowledgeErrorMessage(error: unknown): string {
 
 export interface QueryKnowledgeOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export const aiKnowledgeApi = {
   /**
-   * Submits a general fitness knowledge inquiry to Spring Boot backend.
+   * Submits a fitness knowledge inquiry to Spring Boot backend.
    * Path: POST /api/v1/ai/knowledge/query
    *
    * @param params Query parameters conforming to F01KnowledgeQueryRequest
-   * @param options Optional client settings (e.g. timeoutMs)
+   * @param options Optional client settings (e.g. timeoutMs, signal)
    * @returns F01KnowledgeQueryResponse
    */
   async queryKnowledge(
@@ -139,28 +163,70 @@ export const aiKnowledgeApi = {
       language: params.language ?? 'vi',
       ...(params.exerciseId ? { exerciseId: params.exerciseId } : {}),
       ...(params.correlationId ? { correlationId: params.correlationId } : {}),
+      ...(params.studentId ? { studentId: params.studentId } : {}),
+      ...(typeof params.includePersonalContext === 'boolean'
+        ? { includePersonalContext: params.includePersonalContext }
+        : {}),
     };
+
+    const externalSignal = options.signal;
+    if (externalSignal?.aborted) {
+      throw new Error('Yêu cầu đã bị hủy.');
+    }
 
     // Client-side timeout using AbortController
     const timeoutMs = options.timeoutMs ?? F01_DEFAULT_TIMEOUT_MS;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const abortHandler = () => {
       controller.abort();
-    }, timeoutMs);
+    };
+    if (externalSignal) {
+      externalSignal.addEventListener('abort', abortHandler, { once: true });
+    }
 
     try {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
       return await request<F01KnowledgeQueryResponse>('/ai/knowledge/query', {
         method: 'POST',
         body: payload,
         signal: controller.signal,
       });
     } catch (err: unknown) {
+      if (externalSignal?.aborted) {
+        throw new Error('Yêu cầu đã bị hủy.');
+      }
       if (controller.signal.aborted) {
-        throw new Error('Yêu cầu tra cứu quá thời gian chờ. Vui lòng thử lại sau.');
+        throw new Error('Yêu cầu phản hồi quá thời gian chờ. Vui lòng thử lại câu hỏi ngắn gọn hơn.');
       }
       throw err;
     } finally {
       clearTimeout(timeoutId);
+      if (externalSignal) {
+        externalSignal.removeEventListener('abort', abortHandler);
+      }
     }
+  },
+
+  /**
+   * Retrieves an AI run by runId for readback / audit validation.
+   * Path: GET /api/v1/ai/runs/{runId}
+   *
+   * @param runId UUID of the AI Run
+   * @param signal Optional AbortSignal
+   * @returns AiRunResponse
+   */
+  async getRun(runId: string, signal?: AbortSignal): Promise<AiRunResponse> {
+    if (!runId || !runId.trim()) {
+      throw new AiKnowledgeValidationError('Run ID không được để trống.');
+    }
+    return await request<AiRunResponse>(`/ai/runs/${encodeURIComponent(runId.trim())}`, {
+      method: 'GET',
+      signal,
+    });
   },
 };
