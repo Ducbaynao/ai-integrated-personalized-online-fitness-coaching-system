@@ -16,12 +16,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,15 +35,18 @@ public class NutritionBasicService {
     private final ObjectMapper mapper;
     private final NutritionTargetDayService targetDays;
     private final NutritionCatalogService catalog;
+    private final NutritionStrategyCommands commands;
 
     public NutritionBasicService(JdbcTemplate jdbc, UserAccountStatusQuery accounts,
                                  StudentCapabilityQuery students, CoachingAuthorityQuery coaching,
                                  AuditService audit, ObjectMapper mapper,
-                                 NutritionTargetDayService targetDays, NutritionCatalogService catalog) {
+                                 NutritionTargetDayService targetDays, NutritionCatalogService catalog,
+                                 NutritionStrategyCommands commands) {
         this.jdbc = jdbc; this.accounts = accounts; this.students = students;
         this.coaching = coaching; this.audit = audit; this.mapper = mapper;
         this.targetDays = targetDays;
         this.catalog = catalog;
+        this.commands = commands;
     }
 
     public record FoodInput(String name, String servingLabel, BigDecimal energyKcal,
@@ -172,19 +172,9 @@ public class NutritionBasicService {
                 throw fail("NUTRITION_CATALOG_VERSION_CONFLICT", 409);
             NutritionCatalogService.Portion portion = input.portionId() == null ? null : food.portions().stream()
                     .filter(p -> p.id().equals(input.portionId())).findFirst().orElse(null);
-            BigDecimal grams;
-            if ("GRAM".equals(input.quantityBasis())) {
-                if (input.portionId() != null) throw fail("VALIDATION_FAILED", 400);
-                grams = input.quantity();
-            } else if ("SERVING".equals(input.quantityBasis()) && portion != null
-                    && portion.gramsPerServing() != null) {
-                grams = input.quantity().multiply(portion.gramsPerServing());
-            } else if ("MILLILITRE".equals(input.quantityBasis()) && portion != null
-                    && portion.gramsPerMl() != null) {
-                grams = input.quantity().multiply(portion.gramsPerMl());
-            } else throw fail("NUTRITION_CONVERSION_UNKNOWN", 409);
-            BigDecimal storedGrams = storedAmount(grams);
-            if (storedGrams.signum() <= 0) throw fail("NUTRITION_CONVERSION_UNKNOWN", 409);
+            var calculation = NutritionCatalogCalculation.calculate(food, input.quantity(),
+                    input.quantityBasis(), input.portionId());
+            BigDecimal storedGrams = calculation.grams();
             ensureDay(actor, day, input.timezone());
             targetDays.freezeInCurrentTransaction(actor, day, input.timezone(), "FIRST_LOG");
             UUID mealId = UUID.randomUUID();
@@ -208,11 +198,12 @@ public class NutritionBasicService {
                     """, itemId, mealId, food.name(), input.quantity(), unit(unitCode),
                     storedGrams, food.revisionId(), input.portionId(), input.quantityBasis(),
                     portion == null ? null : portion.label());
-            BigDecimal[] per100 = {food.energyKcalPer100g(), food.proteinGPer100g(),
-                    food.carbohydrateGPer100g(), food.fatGPer100g()};
+            var calculated = calculation.nutrients();
+            BigDecimal[] amounts = {calculated.energyKcal(), calculated.proteinG(),
+                    calculated.carbohydrateG(), calculated.fatG()};
             for (int i = 0; i < NUTRIENTS.size(); i++) {
-                if (per100[i] == null) continue;
-                BigDecimal amount = storedAmount(per100[i].multiply(grams).movePointLeft(2));
+                if (amounts[i] == null) continue;
+                BigDecimal amount = amounts[i];
                 jdbc.update("""
                         INSERT INTO fitness.food_log_item_nutrients
                           (food_log_item_id,nutrient_id,amount,unit_id,calculation_source)
@@ -535,14 +526,11 @@ public class NutritionBasicService {
     }
 
     private void requireStudent(UUID actor) {
-        if (actor == null || accounts.getAccountStatus(actor).orElse(null) != AccountStatus.ACTIVE
-                || !students.hasProfile(actor)) throw fail("NUTRITION_ACCESS_DENIED", 403);
+        commands.requireStudent(actor);
     }
 
     private void lockStudent(UUID student) {
-        // Nutrition-owned transaction advisory lock; no direct read of Student persistence.
-        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 707))",
-                rs -> { while (rs.next()) { /* hold until transaction end */ } }, student.toString());
+        commands.lockStudent(student);
     }
 
     private static void checkItemShape(UUID foodId, String description, BigDecimal servings) {
@@ -585,25 +573,17 @@ public class NutritionBasicService {
 
     private <T> T receipt(UUID actor, String key, String command, Object payload, Class<T> type,
                           java.util.function.Supplier<T> work) {
-        if (key == null || key.isBlank() || key.length() > 120) throw fail("VALIDATION_FAILED", 400);
-        String hash = sha(json(payload));
-        var rows = jdbc.query("""
-                SELECT command_name,payload_hash,response_json::text FROM fitness.nutrition_command_receipts
-                WHERE actor_id=? AND command_key=? FOR UPDATE
-                """, (rs, n) -> new Receipt(rs.getString(1), rs.getString(2), rs.getString(3)), actor, key);
-        if (!rows.isEmpty()) {
-            var prior = rows.getFirst();
-            if (!prior.command().equals(command) || !prior.hash().equals(hash))
-                throw fail("NUTRITION_IDEMPOTENCY_CONFLICT", 409);
-            try { return mapper.readValue(prior.response(), type); }
-            catch (Exception invalid) { throw new IllegalStateException("Invalid nutrition receipt", invalid); }
-        }
-        T result = work.get();
-        jdbc.update("""
-                INSERT INTO fitness.nutrition_command_receipts(actor_id,command_key,command_name,payload_hash,response_json)
-                VALUES (?,?,?,?,?::jsonb)
-                """, actor, key, command, hash, json(result));
-        return result;
+        return commands.receipt(actor, key, command, payload, type, work);
+    }
+
+    /** Internal F06 composition, called with the Student lock in the enclosing confirmation transaction. */
+    void prepareAnalysisDay(UUID student, LocalDate day, String timezone) {
+        ensureDay(student, day, timezone);
+        targetDays.freezeInCurrentTransaction(student, day, timezone, "FIRST_LOG");
+    }
+
+    void recalculateAnalysisDay(UUID student, LocalDate day) {
+        recalculate(student, day, false);
     }
 
     private void audit(UUID actor, String action, String type, UUID target) {
@@ -621,11 +601,6 @@ public class NutritionBasicService {
         try { return mapper.writeValueAsString(value); }
         catch (Exception invalid) { throw new IllegalStateException("Cannot serialize nutrition command", invalid); }
     }
-    private static String sha(String value) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8))); }
-        catch (Exception impossible) { throw new IllegalStateException(impossible); }
-    }
     private static NutritionFailure fail(String code, int status) { return new NutritionFailure(code, status); }
     private record DayState(String timezone, String completeness, long version, boolean noIntakeConfirmed) {}
     private record ItemOwner(LocalDate day, String timezone, String kind, String name,
@@ -633,5 +608,4 @@ public class NutritionBasicService {
                              UUID catalogRevisionId, UUID catalogPortionId, String quantityBasis,
                              BigDecimal gramWeight) {}
     private record ItemCorrectionSnapshot(ItemOwner item, List<Nutrient> nutrientFacts) {}
-    private record Receipt(String command, String hash, String response) {}
 }

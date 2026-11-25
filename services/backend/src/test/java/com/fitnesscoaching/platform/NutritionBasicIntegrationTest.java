@@ -4,6 +4,7 @@ import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionBasicService.*;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionFailure;
 import com.fitnesscoaching.platform.modules.nutrition.NutritionCatalogService;
+import com.jayway.jsonpath.JsonPath;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingLifecycleUseCase;
 import com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase;
 import com.fitnesscoaching.platform.modules.coaching.domain.DataAccessLevel;
@@ -58,10 +59,117 @@ class NutritionBasicIntegrationTest {
     @Autowired NutritionCatalogService catalog;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
+    @Autowired org.springframework.context.ApplicationContext context;
     @Autowired CoachingLifecycleUseCase lifecycle;
     @Autowired CoachingSharingUseCase sharing;
     private static final LocalDate DAY = LocalDate.of(2026, 10, 13);
     private static final Instant AT = Instant.parse("2026-10-13T12:00:00Z");
+
+    @Test void lateTextProviderCannotPublishAfterTimeoutRecovery() throws Exception {
+        UUID owner = student();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var real = context.getBean(com.fitnesscoaching.platform.modules.ai.application.port.out.F06AiServiceClient.class);
+        var service = new com.fitnesscoaching.platform.modules.nutrition.FoodTextAnalysisService(
+                jdbc,
+                context.getBean(com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery.class),
+                context.getBean(com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery.class),
+                text -> {
+                    entered.countDown();
+                    try {
+                        if (!release.await(20, java.util.concurrent.TimeUnit.SECONDS))
+                            throw new IllegalStateException("provider test timed out");
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(interrupted);
+                    }
+                    return real.estimateTextJson(text);
+                },
+                context.getBean(com.fitnesscoaching.platform.modules.audit.AuditService.class),
+                context.getBean(tools.jackson.databind.ObjectMapper.class),
+                context.getBean(org.springframework.transaction.support.TransactionTemplate.class),
+                context.getBean(com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence.class));
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var future = executor.submit(() -> service.create(owner,
+                    new com.fitnesscoaching.platform.modules.nutrition.FoodTextAnalysisController.CreateRequest(
+                            "oats", DAY, "Etc/UTC", AT, "BREAKFAST", "late-provider")));
+            try {
+                assertThat(entered.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                jdbc.update("""
+                        UPDATE fitness.food_analysis_requests SET updated_at=clock_timestamp()-INTERVAL '10 minutes'
+                        WHERE student_id=? AND command_key='late-provider'
+                        """, owner);
+                assertThat(service.recover(owner, "late-provider").analysisStatus()).isEqualTo("FAILED");
+            } finally {
+                release.countDown();
+            }
+            var result = future.get(20, java.util.concurrent.TimeUnit.SECONDS).draft();
+            assertThat(result.analysisStatus()).isEqualTo("FAILED");
+            assertThat(result.items()).isEmpty();
+        }
+    }
+
+    @Test void textEstimateRecoveryTerminatesOrphanedProcessingWithoutRegeneration() throws Exception {
+        UUID owner = student();
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.food_analysis_requests
+                  (id,student_id,input_type,input_text,status,command_key,request_fingerprint,
+                   log_date,timezone,consumed_at,meal_type,updated_at)
+                VALUES (?,?,'TEXT','oats','PROCESSING','orphan',?,?,'Etc/UTC',?,'BREAKFAST',
+                        clock_timestamp()-INTERVAL '10 minutes')
+                """, id, owner, "0".repeat(64), DAY, java.sql.Timestamp.from(AT));
+        mvc.perform(get("/api/v1/nutrition/food-analyses/by-command-key/orphan")
+                        .with(jwt().jwt(j -> j.subject(owner.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.draftId").value(id.toString()))
+                .andExpect(jsonPath("$.analysisStatus").value("FAILED"))
+                .andExpect(jsonPath("$.items").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT failure_reason FROM fitness.food_analysis_requests WHERE id=?",
+                String.class, id)).isEqualTo("PROCESSING_TIMEOUT");
+        mvc.perform(get("/api/v1/nutrition/food-analyses/" + id)
+                        .with(jwt().jwt(j -> j.subject(owner.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysisStatus").value("FAILED"));
+    }
+
+    @Test void textEstimateIsRecoverableOwnerScopedAndDoesNotWriteFoodLog() throws Exception {
+        UUID owner = student();
+        UUID another = student();
+        String body = """
+                {"text":"oats with milk","day":"2026-10-13","timezone":"Etc/UTC",
+                 "consumedAt":"2026-10-13T12:00:00Z","mealType":"BREAKFAST",
+                 "commandKey":"f06-generate-1"}
+                """;
+        String created = mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultType").value("ESTIMATE"))
+                .andExpect(jsonPath("$.analysisStatus").value("READY"))
+                .andExpect(jsonPath("$.items[0].quantity").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.draftId");
+        mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftId").value(id));
+        mvc.perform(get("/api/v1/nutrition/food-analyses/by-command-key/f06-generate-1")
+                        .with(jwt().jwt(j -> j.subject(owner.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.draftId").value(id));
+        mvc.perform(post("/api/v1/nutrition/food-analyses")
+                        .with(jwt().jwt(j -> j.subject(owner.toString())))
+                        .contentType("application/json")
+                        .content(body.replace("oats with milk", "different food")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("NUTRITION_IDEMPOTENCY_CONFLICT"));
+        mvc.perform(get("/api/v1/nutrition/food-analyses/" + id)
+                        .with(jwt().jwt(j -> j.subject(another.toString()))))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fitness.food_log_items i
+                JOIN fitness.meals m ON m.id=i.meal_id WHERE m.student_id=?
+                """, Integer.class, owner)).isZero();
+    }
 
     @Test void privateFoodFactsAreFrozenAndCorrectionsRecalculate() {
         UUID student = student();

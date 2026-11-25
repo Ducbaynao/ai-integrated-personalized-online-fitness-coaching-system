@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/ai/f06-food-text-estimate.schema.json",
+  "title": "F06 Food Text Estimate",
+  "description": "Untrusted text recognition output. Spring matches food catalog identities and calculates nutrients only after Student review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resultType", "items", "missingData", "limitations"],
+  "properties": {
+    "resultType": { "const": "ESTIMATE" },
+    "items": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["detectedName", "candidateNames", "quantity", "unitText", "confidence", "missingData", "limitations"],
+        "properties": {
+          "detectedName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "candidateNames": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+          },
+          "quantity": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+          "unitText": { "type": ["string", "null"], "minLength": 1, "maxLength": 80 },
+          "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "missingData": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+          "limitations": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "missingData": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

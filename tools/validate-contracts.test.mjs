@@ -21,6 +21,19 @@ function setupAjv() {
 }
 
 const ajv = setupAjv();
+test('F06 estimate enforces item limit, candidate bounds and unique missing data', () => {
+  const validate = ajv.getSchema('https://fitness-coaching.local/schemas/ai/f06-food-text-estimate.schema.json');
+  const item = { detectedName: 'oats', candidateNames: ['a'.repeat(200)], quantity: null,
+    unitText: null, confidence: null, missingData: [], limitations: [] };
+  const output = (items, missingData = []) => ({ resultType: 'ESTIMATE', items, missingData, limitations: [] });
+  assert.equal(validate(output(Array(20).fill(item))), true);
+  assert.equal(validate(output(Array(21).fill(item))), false);
+  for (const candidateNames of [[''], ['a'.repeat(201)], ['oats', 'oats']]) {
+    assert.equal(validate(output([{ ...item, candidateNames }])), false);
+  }
+  assert.equal(validate(output([{ ...item, missingData: ['UNIT', 'UNIT'] }])), false);
+  assert.equal(validate(output([item], ['UNIT', 'UNIT'])), false);
+});
 const requestSchema = ajv.getSchema('https://fitness-coaching.local/schemas/ai/f01-knowledge-query-request.schema.json');
 const envelopeSchema = ajv.getSchema('https://fitness-coaching.local/schemas/ai/f01-internal-context-envelope.schema.json');
 const resultSchema = ajv.getSchema('https://fitness-coaching.local/schemas/ai/f01-knowledge-query-result.schema.json');

@@ -284,6 +284,29 @@ if (fs.existsSync(f05FixturesDir)) {
   }
 }
 
+// F06 recognition is an ESTIMATE, never a catalog or nutrient authority.
+const f06FixturesDir = path.join(schemasDir, 'fixtures', 'f06');
+const f06Validator = compiledSchemas.get('f06-food-text-estimate.schema.json');
+const f06Cases = [
+  ['valid-known-text-estimate.json', true],
+  ['valid-unknown-quantity.json', true],
+  ['invalid-model-nutrients.json', false],
+  ['invalid-zero-quantity.json', false],
+];
+for (const [file, expectValid] of f06Cases) {
+  const fixturePath = path.join(f06FixturesDir, file);
+  if (!fs.existsSync(fixturePath) || !f06Validator) {
+    failures.push(`F06 schema or fixture missing: ${file}`);
+    continue;
+  }
+  const data = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+  const isValid = f06Validator(data);
+  fixtureCount++;
+  if (isValid !== expectValid) {
+    failures.push(`F06 fixture ${file} ${isValid ? 'passed' : 'failed'} unexpectedly: ${ajv.errorsText(f06Validator.errors)}`);
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI schema and contract validation failed:');
   for (const failure of failures) {

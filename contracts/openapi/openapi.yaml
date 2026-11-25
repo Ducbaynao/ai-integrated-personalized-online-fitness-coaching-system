@@ -551,6 +551,102 @@ paths:
         '200': { description: Current published revision and approved portion evidence, content: { application/json: { schema: { $ref: '#/components/schemas/NutritionCatalogFood' } } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /nutrition/food-analyses:
+    post:
+      tags: [Food Analysis]
+      operationId: createStudentFoodTextAnalysis
+      summary: Owning Student starts one text ESTIMATE; no Food Log is written
+      description: >-
+        Spring persists the actor-scoped command identity before calling AI. The same
+        commandKey and normalized request replay the same analysis; a different request
+        with that key conflicts. The caller can recover a lost response by commandKey.
+        Trainer and Admin cannot create or read a Student's private analysis.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FoodTextAnalysisRequest' } } } }
+      responses:
+        '201': { description: Created analysis, including a durable draft ID, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisDraft' } } } }
+        '200': { description: Exact command replay, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisDraft' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/food-analyses/by-command-key/{commandKey}:
+    get:
+      tags: [Food Analysis]
+      operationId: recoverStudentFoodAnalysisByCommandKey
+      summary: Recover the owning Student's durable analysis after a lost generation response
+      parameters: [{ name: commandKey, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 120 } }]
+      responses:
+        '200': { description: Current analysis detail, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisDraft' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /nutrition/food-analyses/{draftId}:
+    get:
+      tags: [Food Analysis]
+      operationId: getStudentFoodAnalysisDraft
+      summary: Read the owning Student's private draft and latest preview
+      parameters: [{ name: draftId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Draft with ESTIMATE items and confirmation state, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisDraft' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+  /nutrition/food-analyses/{draftId}/items/{itemId}:
+    put:
+      tags: [Food Analysis]
+      operationId: correctStudentFoodAnalysisItem
+      summary: Correct one unconfirmed estimate item without writing a Food Log
+      parameters:
+        - { name: draftId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisItemCorrectionRequest' } } } }
+      responses:
+        '200': { description: Updated draft; previous preview is invalid, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisDraft' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/food-analyses/{draftId}/previews:
+    post:
+      tags: [Food Analysis]
+      operationId: previewStudentFoodAnalysisSelection
+      summary: Persist a server-calculated preview for a selected item group
+      description: >-
+        Catalog identity, current revision, approved conversion and nullable nutrients
+        are checked by Spring. A changed catalog or draft invalidates this preview.
+        Preview never writes confirmed intake or marks a day COMPLETE.
+      parameters: [{ name: draftId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisPreviewRequest' } } } }
+      responses:
+        '200': { description: Exact command replay, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisPreview' } } } }
+        '201': { description: Immutable preview, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisPreview' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
+  /nutrition/food-analyses/{draftId}/confirmations:
+    post:
+      tags: [Food Analysis]
+      operationId: confirmStudentFoodAnalysisSelection
+      summary: Atomically confirm only the selected estimate items into Food Logs
+      description: >-
+        Student-only Nutrition command, not AI Recommendation Apply. Exact committed
+        intent replay returns its original receipt before expiry/current catalog guards,
+        after current read authority. A changed payload for the same commandKey returns
+        409. A new intent checks draft, preview, item and catalog revisions. One invalid
+        selected item rolls back the whole group; unselected items remain draft.
+      parameters: [{ name: draftId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisConfirmRequest' } } } }
+      responses:
+        '200': { description: Exact command replay with saved nutrient snapshots, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisConfirmationReceipt' } } } }
+        '201': { description: Atomic confirmation receipt, content: { application/json: { schema: { $ref: '#/components/schemas/FoodAnalysisConfirmationReceipt' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NutritionForbidden' }
+        '404': { $ref: '#/components/responses/NutritionConcealed' }
+        '409': { $ref: '#/components/responses/NutritionConflict' }
   /admin/nutrition/catalog/foods:
     get:
       tags: [Nutrition Catalog]
@@ -7622,6 +7718,184 @@ components:
         quantityBasis: { type: string, enum: [SERVING, GRAM, MILLILITRE] }
         quantity: { type: number, exclusiveMinimum: 0 }
         commandKey: { type: string, minLength: 1, maxLength: 120 }
+    FoodTextAnalysisRequest:
+      type: object
+      additionalProperties: false
+      required: [text, day, timezone, consumedAt, mealType, commandKey]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 4000 }
+        day: { type: string, format: date }
+        timezone: { type: string, minLength: 1, description: Student-confirmed IANA timezone. }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+    FoodAnalysisCandidate:
+      type: object
+      additionalProperties: false
+      required: [foodId, revisionId, name]
+      properties:
+        foodId: { type: string, format: uuid }
+        revisionId: { type: string, format: uuid }
+        name: { type: string }
+    FoodAnalysisItem:
+      type: object
+      additionalProperties: false
+      required: [itemId, itemRevision, detectedName, candidates, selectedFoodId, selectedRevisionId, quantity, quantityBasis, portionId, confidence, missingData, limitations, confirmedFoodLogItemId]
+      properties:
+        itemId: { type: string, format: uuid }
+        itemRevision: { type: integer, format: int64, minimum: 0 }
+        detectedName: { type: [string, 'null'] }
+        candidates: { type: array, items: { $ref: '#/components/schemas/FoodAnalysisCandidate' } }
+        selectedFoodId: { type: [string, 'null'], format: uuid }
+        selectedRevisionId: { type: [string, 'null'], format: uuid }
+        quantity: { type: [number, 'null'], exclusiveMinimum: 0 }
+        quantityBasis:
+          oneOf: [{ type: string, enum: [GRAM, SERVING, MILLILITRE] }, { type: 'null' }]
+        portionId: { type: [string, 'null'], format: uuid }
+        confidence: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        missingData: { type: array, items: { type: string } }
+        limitations: { type: array, items: { type: string } }
+        confirmedFoodLogItemId: { type: [string, 'null'], format: uuid }
+    FoodAnalysisDraft:
+      type: object
+      additionalProperties: false
+      description: >-
+        Private Student-owned ESTIMATE, separate from confirmed Food Log. No Trainer
+        draft access follows from nutrition-log sharing. Unknown amounts remain null.
+      required: [draftId, studentId, commandKey, resultType, analysisStatus, confirmationStatus, draftRevision, day, timezone, consumedAt, mealType, runId, expiresAt, items, latestPreview, createdAt, updatedAt]
+      properties:
+        draftId: { type: string, format: uuid }
+        studentId: { type: string, format: uuid }
+        commandKey: { type: string }
+        resultType: { type: string, enum: [ESTIMATE] }
+        analysisStatus: { type: string, enum: [PROCESSING, READY, BLOCKED, FAILED] }
+        confirmationStatus: { type: string, enum: [DRAFT, PARTIALLY_CONFIRMED, CONFIRMED] }
+        draftRevision: { type: integer, format: int64, minimum: 0 }
+        day: { type: string, format: date }
+        timezone: { type: string }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        runId: { type: [string, 'null'], format: uuid }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        items: { type: array, items: { $ref: '#/components/schemas/FoodAnalysisItem' } }
+        latestPreview:
+          oneOf: [{ $ref: '#/components/schemas/FoodAnalysisPreview' }, { type: 'null' }]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FoodAnalysisItemCorrectionRequest:
+      type: object
+      additionalProperties: false
+      description: >-
+        Nullable selection fields permit an unresolved item to remain draft. A fully
+        selected item must name a published food revision and explicit quantity basis;
+        Spring validates compatible portion/conversion evidence before preview.
+      required: [commandKey, expectedDraftRevision, expectedItemRevision, selectedFoodId, selectedRevisionId, quantity, quantityBasis, portionId]
+      properties:
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+        expectedDraftRevision: { type: integer, format: int64, minimum: 0 }
+        expectedItemRevision: { type: integer, format: int64, minimum: 0 }
+        selectedFoodId: { type: [string, 'null'], format: uuid }
+        selectedRevisionId: { type: [string, 'null'], format: uuid }
+        quantity: { type: [number, 'null'], exclusiveMinimum: 0 }
+        quantityBasis:
+          oneOf: [{ type: string, enum: [GRAM, SERVING, MILLILITRE] }, { type: 'null' }]
+        portionId: { type: [string, 'null'], format: uuid }
+    FoodAnalysisSelectedItem:
+      type: object
+      additionalProperties: false
+      required: [itemId, itemRevision, foodId, catalogRevisionId, quantity, quantityBasis, portionId]
+      properties:
+        itemId: { type: string, format: uuid }
+        itemRevision: { type: integer, format: int64, minimum: 0 }
+        foodId: { type: string, format: uuid }
+        catalogRevisionId: { type: string, format: uuid }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        quantityBasis: { type: string, enum: [GRAM, SERVING, MILLILITRE] }
+        portionId: { type: [string, 'null'], format: uuid }
+    FoodAnalysisPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [commandKey, expectedDraftRevision, day, timezone, consumedAt, mealType, selectedItems]
+      properties:
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+        expectedDraftRevision: { type: integer, format: int64, minimum: 0 }
+        day: { type: string, format: date }
+        timezone: { type: string }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        selectedItems: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/FoodAnalysisSelectedItem' } }
+    FoodAnalysisNutrients:
+      type: object
+      additionalProperties: false
+      required: [energyKcal, proteinG, carbohydrateG, fatG]
+      properties:
+        energyKcal: { type: [number, 'null'], minimum: 0 }
+        proteinG: { type: [number, 'null'], minimum: 0 }
+        carbohydrateG: { type: [number, 'null'], minimum: 0 }
+        fatG: { type: [number, 'null'], minimum: 0 }
+    FoodAnalysisPreviewItem:
+      type: object
+      additionalProperties: false
+      required: [selection, nutrients, catalogSource]
+      properties:
+        selection: { $ref: '#/components/schemas/FoodAnalysisSelectedItem' }
+        nutrients: { $ref: '#/components/schemas/FoodAnalysisNutrients' }
+        catalogSource: { type: string, description: Pinned source record/version for provenance. }
+    FoodAnalysisPreview:
+      type: object
+      additionalProperties: false
+      required: [previewId, previewRevision, draftId, draftRevision, items, totalNutrients, createdAt]
+      properties:
+        previewId: { type: string, format: uuid }
+        previewRevision: { type: integer, format: int64, minimum: 1 }
+        draftId: { type: string, format: uuid }
+        draftRevision: { type: integer, format: int64, minimum: 0 }
+        items: { type: array, minItems: 1, items: { $ref: '#/components/schemas/FoodAnalysisPreviewItem' } }
+        totalNutrients: { $ref: '#/components/schemas/FoodAnalysisNutrients' }
+        createdAt: { type: string, format: date-time }
+    FoodAnalysisConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [commandKey, expectedDraftRevision, previewId, expectedPreviewRevision, day, timezone, consumedAt, mealType, selectedItems]
+      properties:
+        commandKey: { type: string, minLength: 1, maxLength: 120 }
+        expectedDraftRevision: { type: integer, format: int64, minimum: 0 }
+        previewId: { type: string, format: uuid }
+        expectedPreviewRevision: { type: integer, format: int64, minimum: 1 }
+        day: { type: string, format: date }
+        timezone: { type: string }
+        consumedAt: { type: string, format: date-time }
+        mealType: { type: string, enum: [BREAKFAST, LUNCH, DINNER, SNACK, OTHER] }
+        selectedItems: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/FoodAnalysisSelectedItem' } }
+    FoodAnalysisConfirmedItem:
+      type: object
+      additionalProperties: false
+      required: [itemId, itemRevision, foodLogItemId, mealId, foodId, catalogRevisionId, quantity, quantityBasis, portionId, nutrients, catalogSource]
+      properties:
+        itemId: { type: string, format: uuid }
+        itemRevision: { type: integer, format: int64, minimum: 0 }
+        foodLogItemId: { type: string, format: uuid }
+        mealId: { type: string, format: uuid }
+        foodId: { type: string, format: uuid }
+        catalogRevisionId: { type: string, format: uuid }
+        quantity: { type: number, exclusiveMinimum: 0 }
+        quantityBasis: { type: string, enum: [GRAM, SERVING, MILLILITRE] }
+        portionId: { type: [string, 'null'], format: uuid }
+        nutrients: { $ref: '#/components/schemas/FoodAnalysisNutrients' }
+        catalogSource: { type: string }
+    FoodAnalysisConfirmationReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptId, commandKey, draftId, committedAt, replayed, confirmedItems, resultingDraftRevision, remainingDraftItemIds]
+      properties:
+        receiptId: { type: string, format: uuid }
+        commandKey: { type: string }
+        draftId: { type: string, format: uuid }
+        committedAt: { type: string, format: date-time }
+        replayed: { type: boolean }
+        confirmedItems: { type: array, minItems: 1, items: { $ref: '#/components/schemas/FoodAnalysisConfirmedItem' } }
+        resultingDraftRevision: { type: integer, format: int64, minimum: 0 }
+        remainingDraftItemIds: { type: array, items: { type: string, format: uuid } }
     NutritionFoodRequest:
       type: object
       additionalProperties: false
