@@ -30,11 +30,6 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Quản trị viên',
 };
 
-const MEASUREMENT_LABELS: Record<string, string> = {
-  METRIC: 'Hệ mét',
-  IMPERIAL: 'Hệ Anh',
-};
-
 export function HomeScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -266,28 +261,6 @@ export function HomeScreen() {
             </Pressable>
           </View>
         )}
-
-        {/* Preferences Card */}
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Tùy chọn</Text>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Hệ đo lường</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.settings?.measurementSystem
-                ? MEASUREMENT_LABELS[user.settings.measurementSystem] ??
-                  user.settings.measurementSystem
-                : 'Hệ mét'}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Ngày bắt đầu tuần</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.settings?.weekStartsOn === 1 ? 'Thứ Hai' : 'Chủ Nhật'}
-            </Text>
-          </View>
-        </View>
 
         {/* Logout Action */}
         <Pressable

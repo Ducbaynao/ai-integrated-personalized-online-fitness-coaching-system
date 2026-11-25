@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment-timezone';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -179,9 +180,17 @@ export function NutritionScreen() {
       <TextInput accessibilityLabel={label} value={value} onChangeText={change} keyboardType={keyboardType}
         style={{ borderWidth: 1, borderColor: theme.border, color: theme.textPrimary, minHeight: 48, padding: 10, borderRadius: 8 }} /></View>;
 
-  if (activeCapability !== 'STUDENT') return <WorkoutState title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />;
-  return <ScrollView testID="nutrition-student-screen" style={[styles.screen, { backgroundColor: theme.canvas }]}
-    contentContainerStyle={styles.content}>
+  if (activeCapability !== 'STUDENT') {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+        <WorkoutState title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />
+      </SafeAreaView>
+    );
+  }
+  return (
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+      <ScrollView testID="nutrition-student-screen" style={styles.screen}
+        contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng</Text>
     <WorkoutButton label="Mục tiêu dinh dưỡng và đề xuất" secondary onPress={() => router.push('/nutrition/strategy' as never)} />
     <WorkoutButton testID="entry-food-text-analysis" label="Ước tính từ mô tả bữa ăn (AI)" secondary onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: { day, timezone, mealType } } as never)} />
@@ -316,5 +325,7 @@ export function NutritionScreen() {
         <WorkoutButton label="Ghi thực phẩm trong danh mục" disabled={busy || !validContext} onPress={addCatalogItem} />
       </> : null}
     </WorkoutCard>
-  </ScrollView>;
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
