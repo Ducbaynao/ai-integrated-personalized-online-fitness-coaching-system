@@ -43,7 +43,7 @@ const clients: QueryClient[] = [];
 
 function setup(level = 'VIEW') {
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
-  relationshipResult = { data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } } },
+  relationshipResult = { data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } }, currentPeriod: { mode: 'HUMAN_COACH' } },
     isPending: false, isError: false, refetch: jest.fn() };
   relationshipResult.refetch.mockResolvedValue(relationshipResult);
   sharingResult = { data: { items: [{ dataScope: 'WORKOUT_PLAN', state: 'ALLOWED', accessLevel: level }] },

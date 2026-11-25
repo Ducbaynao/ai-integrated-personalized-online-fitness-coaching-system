@@ -1,16 +1,42 @@
 import { request } from '@/services/apiClient';
 import { localizedServerMessage } from '@/localization/displayLabels';
 import { createCommandKey } from '@/services/coachingApi';
+import type { AiWorkoutRescheduleDetail } from '@/types/aiWorkoutReschedule';
+import { ApiError } from '@/types/auth';
 import {
-  WorkoutRescheduleApiRequest,
-  WorkoutRescheduleApiResponse,
-  AiWorkoutRescheduleDetail,
   AcceptRescheduleApiRequest,
   AcceptRescheduleApiResponse,
   RejectRescheduleApiRequest,
   RejectRescheduleApiResponse,
+  WorkoutRescheduleApiRequest,
+  WorkoutRescheduleApiResponse,
+  WorkoutRescheduleDetailApiResponse,
+  WorkoutRescheduleFailureKind,
 } from '@/types/aiWorkoutReschedule';
-import { ApiError } from '@/types/auth';
+
+/** Preserve the underlying ApiError (including errorCode/fieldErrors) for consumers. */
+export function getWorkoutRescheduleFailureKind(error: unknown): WorkoutRescheduleFailureKind {
+  if (error instanceof ApiError) {
+    if (error.status === 400) return 'VALIDATION';
+    if (error.status === 401) return 'AUTHENTICATION';
+    if (error.status === 403) return 'AUTHORITY';
+    if (error.status === 404) return 'NOT_FOUND';
+    if (error.status === 409) return 'CONFLICT';
+    if (error.status === 408 || error.status === 504 || error.errorResponse?.errorCode === 'TIMEOUT') return 'TIMEOUT';
+    if (error.status === 0) return 'NETWORK';
+  }
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') return 'CANCELLED';
+    if (error.name === 'TimeoutError' || /timeout|timed out/i.test(error.message)) return 'TIMEOUT';
+  }
+  return 'OTHER';
+}
+
+function requireCommandKey(commandKey: string): void {
+  if (!commandKey?.trim()) {
+    throw new Error('commandKey is required for this workout reschedule intent.');
+  }
+}
 
 export function getWorkoutRescheduleFieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ApiError && error.errorResponse?.fieldErrors) {
@@ -95,37 +121,39 @@ export function getWorkoutRescheduleErrorMessage(error: unknown): string {
 }
 
 export const aiWorkoutRescheduleApi = {
-  generate(
-    input: Omit<WorkoutRescheduleApiRequest, 'commandKey'>,
-    commandKey = createCommandKey()
-  ) {
+  generate(input: WorkoutRescheduleApiRequest | Omit<WorkoutRescheduleApiRequest, 'commandKey'>, commandKey?: string) {
+    const body = 'commandKey' in input ? input : { ...input, commandKey: commandKey ?? createCommandKey() };
+    requireCommandKey(body.commandKey);
     return request<WorkoutRescheduleApiResponse>('/ai/workout-reschedules', {
       method: 'POST',
-      body: { ...input, commandKey },
+      body,
     });
   },
 
   getDetail(recommendationId: string) {
-    return request<AiWorkoutRescheduleDetail>(`/ai/workout-reschedules/${encodeURIComponent(recommendationId)}`, {
-      method: 'GET',
-    });
+    return request<AiWorkoutRescheduleDetail>(`/ai/workout-reschedules/${encodeURIComponent(recommendationId)}`, { method: 'GET' });
   },
 
-  accept(
-    recommendationId: string,
-    input: Omit<AcceptRescheduleApiRequest, 'commandKey'>,
-    commandKey = createCommandKey()
-  ) {
-    return request<AcceptRescheduleApiResponse>(`/ai/workout-reschedules/${encodeURIComponent(recommendationId)}/accept`, {
-      method: 'POST',
-      body: { ...input, commandKey },
-    });
+  getRecommendation(recommendationId: string) {
+    return request<WorkoutRescheduleDetailApiResponse>(
+      `/ai/workout-reschedules/${encodeURIComponent(recommendationId)}`,
+      { method: 'GET' }
+    );
   },
 
-  reject(recommendationId: string, input?: RejectRescheduleApiRequest) {
-    return request<RejectRescheduleApiResponse>(`/ai/workout-reschedules/${encodeURIComponent(recommendationId)}/reject`, {
-      method: 'POST',
-      body: input ?? {},
-    });
+  accept(recommendationId: string, input: AcceptRescheduleApiRequest | Omit<AcceptRescheduleApiRequest, 'commandKey'>, commandKey?: string) {
+    const body = 'commandKey' in input ? input : { ...input, commandKey: commandKey ?? createCommandKey() };
+    requireCommandKey(body.commandKey);
+    return request<AcceptRescheduleApiResponse>(
+      `/ai/workout-reschedules/${encodeURIComponent(recommendationId)}/accept`,
+      { method: 'POST', body }
+    );
+  },
+
+  reject(recommendationId: string, body?: RejectRescheduleApiRequest) {
+    return request<RejectRescheduleApiResponse>(
+      `/ai/workout-reschedules/${encodeURIComponent(recommendationId)}/reject`,
+      { method: 'POST', ...(body === undefined ? {} : { body }) }
+    );
   },
 };

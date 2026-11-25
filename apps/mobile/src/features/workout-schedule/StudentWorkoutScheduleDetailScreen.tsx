@@ -9,9 +9,9 @@ import { ApiError } from '@/types/auth';
 import type { CancelPlannedWorkoutRequest, ReschedulePlannedWorkoutRequest, WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from '@/features/workout-plan/components/AiWorkoutAdjustmentModal';
-import { AiWorkoutRescheduleModal } from './components/AiWorkoutRescheduleModal';
+import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWorkoutRescheduleModal';
+import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
-import { useRelationships } from '@/features/coaching/coachingQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -40,17 +40,6 @@ export function StudentWorkoutScheduleDetailScreen({
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
   const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
-  const relationshipsQuery = useRelationships();
-  // Fail-safe principle: While loading, on error, or if relationship data is not yet verified,
-  // safely treat as HUMAN_COACH to never prematurely grant SELF_DIRECTED authority.
-  const coachingMode = useMemo(() => {
-    if (relationshipsQuery.isSuccess && relationshipsQuery.data) {
-      const items = relationshipsQuery.data.pages.flatMap((p) => p.items);
-      const hasActive = items.some((rel) => rel.status === 'ACTIVE');
-      return hasActive ? 'HUMAN_COACH' : 'SELF_DIRECTED';
-    }
-    return 'HUMAN_COACH';
-  }, [relationshipsQuery.isSuccess, relationshipsQuery.data]);
   const [permissionLost, setPermissionLost] = useState(false);
   const query = useWorkoutScheduleDetail(studentId, occurrenceId, allowed && !permissionLost);
   const item = query.data;
@@ -118,9 +107,14 @@ export function StudentWorkoutScheduleDetailScreen({
   useEffect(() => {
     if (!permissionLost && query.error instanceof ApiError && [403, 404].includes(query.error.status)) {
       client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+      client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
       queueMicrotask(() => setPermissionLost(true));
     }
   }, [client, permissionLost, query.error, studentId]);
+
+  useEffect(() => {
+    if (!allowed && studentId) client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
+  }, [allowed, client, studentId]);
 
   const resetCommand = () => { setRetryCommand(null); setPreview(false); setError(''); };
   const editDestination = (patch: Partial<WorkoutScheduleChangeDestination>) => {
@@ -131,6 +125,7 @@ export function StudentWorkoutScheduleDetailScreen({
     setPermissionLost(true);
     setRetryCommand(null);
     client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+    client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
   };
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
@@ -309,17 +304,13 @@ export function StudentWorkoutScheduleDetailScreen({
           await query.refetch();
         }}
       />
-      <AiWorkoutRescheduleModal
-        visible={isRescheduleModalVisible}
+      {isRescheduleModalVisible ? <AiWorkoutRescheduleModal
+        visible={true}
+        actorId={studentId}
+        capability="STUDENT"
         studentId={studentId}
-        occurrenceId={occurrenceId}
-        occurrenceVersion={item.occurrenceVersion}
-        sessionName={item.sessionSummary?.name || undefined}
-        currentPlannedStartAt={item.plannedStartAt}
-        timezone={item.timezone || user?.timezone || undefined}
-        linkedAppointmentId={item.linkedAppointmentId}
-        linkedAppointmentVersion={item.linkedAppointmentVersion}
-        coachingMode={coachingMode}
+        occurrence={item}
+        authorized={allowed && !permissionLost}
         onClose={async () => {
           setIsRescheduleModalVisible(false);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
@@ -332,12 +323,8 @@ export function StudentWorkoutScheduleDetailScreen({
             await query.refetch();
           }
         }}
-        onRescheduleApplied={(result) => {
-          if (result.resultingEntityId) {
-            setLastAppliedSuccessorId(result.resultingEntityId);
-          }
-        }}
-      />
+        onApplied={(result) => setLastAppliedSuccessorId(result.resultingEntityId || null)}
+      /> : null}
     </> : null}
   </ScrollView>;
 }
