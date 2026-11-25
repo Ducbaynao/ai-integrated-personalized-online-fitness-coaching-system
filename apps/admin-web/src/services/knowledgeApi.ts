@@ -63,6 +63,51 @@ export interface ArchiveKnowledgeVersionInput {
   reason?: string
 }
 
+export interface ImportKnowledgeItemRequest {
+  documentCode: string
+  sourceId: string
+  title: string
+  sourceName?: string
+  sourceUrl?: string
+  author?: string
+  documentType?: string
+  language?: string
+  versionLabel: string
+  versionNumber?: number
+  contentHash: string
+  contentPath?: string
+  sourceBytes?: number
+  reviewEvidenceId?: string
+  technicalReadiness?: 'DRAFT_STAGED' | 'TECHNICAL_VERIFICATION_PASSED' | 'HELD_AS_DRAFT'
+  holdReason?: string
+  lineageBaseDocumentId?: string
+  lineageBaseVersion?: string
+  lineageBaseHash?: string
+  content: string
+}
+
+export interface ImportCorpusBundleRequest {
+  formatVersion?: number
+  purpose?: string
+  bundleName?: string
+  items: ImportKnowledgeItemRequest[]
+}
+
+export interface ImportCorpusResponse {
+  totalItems: number
+  importedCount: number
+  skippedCount: number
+  importedItems: Array<{
+    documentId: string
+    versionId: string
+    documentCode: string
+    versionLabel: string
+    status: string
+    technicalReadiness: string
+  }>
+  skippedItems: string[]
+}
+
 export const knowledgeApi = {
   listDocuments: (page = 0, size = 50) =>
     apiRequest<KnowledgeDocument[]>(`/admin/content/knowledge/documents?page=${page}&size=${size}`),
@@ -75,6 +120,12 @@ export const knowledgeApi = {
 
   getVersion: (versionId: string) =>
     apiRequest<KnowledgeVersion>(`/admin/content/knowledge/versions/${versionId}`),
+
+  importCorpus: (input: ImportCorpusBundleRequest) =>
+    apiRequest<ImportCorpusResponse>('/admin/content/knowledge/import', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 
   reviewVersion: (versionId: string, input: ReviewKnowledgeVersionInput) =>
     apiRequest<void>(`/admin/content/knowledge/versions/${versionId}/review`, {

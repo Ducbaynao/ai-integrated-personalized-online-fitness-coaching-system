@@ -766,5 +766,87 @@
     "pythonRuff": "PASS",
     "contractsValidation": "PASS",
     "workingTreeChangesCommitted": false
+  },
+  "handoverVerification20261120": {
+    "verifiedOn": "2026-11-20",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "verifiedCommit": "be5925872bbf0d08d7188a611a0fad616a115a84",
+    "ciRunId": 44231122900,
+    "ciConclusion": "success",
+    "technicalHandoverEvidence": "VERIFIED",
+    "fullFeatureAcceptance": "OPEN",
+    "evidenceRecord": "handover_verification_20261120.json",
+    "acceptanceChecklist": "../../f05-handover-acceptance-checklist-20261120.md",
+    "localFunctionalTestsRerun": false
+  },
+  "f05Bl01AndBl02IntegrationVerification": {
+    "verifiedOn": "2026-11-23",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "branch": "fix/f05-continuity-source",
+    "baseCommit": "673ce513762613f41ee568073ea95ea1882c39d3",
+    "dockerEnvironmentRestored": true,
+    "livePostgresTestcontainers": "pgvector/pgvector:pg18",
+    "suites": [
+      {
+        "name": "com.fitnesscoaching.platform.AiWorkoutRescheduleIntegrationTest",
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "com.fitnesscoaching.platform.WorkoutScheduleChangeIntegrationTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "com.fitnesscoaching.platform.AiWorkoutRescheduleRealFastApiIntegrationTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "com.fitnesscoaching.platform.modules.ai.application.service.AiWorkoutRescheduleServiceUnitTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "com.fitnesscoaching.platform.modules.ai.application.service.F05ContextBuilderUnitTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "com.fitnesscoaching.platform.modules.ai.application.service.F05RuntimeOutputValidatorUnitTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "services.ai-service.tests.test_f05_provider",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS"
+      }
+    ],
+    "f05Bl01TrainingContinuityProvenance": "VERIFIED",
+    "f05Bl02InFlightRevocationT04": "VERIFIED",
+    "recoveryGateD06OD3": "OPEN",
+    "workingTreeChangesCommitted": false
   }
 }

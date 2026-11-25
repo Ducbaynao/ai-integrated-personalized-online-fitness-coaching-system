@@ -28,7 +28,7 @@ class SimulatedF05WorkoutProvider:
         # Handle timezone
         tz_name = request.timezone or "Asia/Ho_Chi_Minh"
         try:
-            tz = ZoneInfo(tz_name)
+            tz = UTC if tz_name == "UTC" else ZoneInfo(tz_name)
         except (ZoneInfoNotFoundError, ValueError):
             try:
                 tz = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -59,6 +59,26 @@ class SimulatedF05WorkoutProvider:
 
         utc_start = local_start.astimezone(UTC)
         utc_end = local_end.astimezone(UTC)
+
+        if request.hasLinkedAppointment and request.appointmentStartAt and request.appointmentEndAt:
+            app_start = datetime.fromisoformat(request.appointmentStartAt)
+            app_end = datetime.fromisoformat(request.appointmentEndAt)
+            if app_start.tzinfo is None or app_end.tzinfo is None or app_end <= app_start:
+                raise ValueError("Appointment interval must contain ordered, timezone-aware instants")
+            duration = timedelta(hours=1)
+            if request.plannedEndAt:
+                duration = datetime.fromisoformat(request.plannedEndAt) - planned_dt
+            aligned_end = app_start + duration
+            if (duration > timedelta(0) and now_utc < app_start <= now_utc + timedelta(days=90)
+                    and app_start != planned_dt and aligned_end <= app_end):
+                utc_start = app_start.astimezone(UTC)
+                utc_end = aligned_end.astimezone(UTC)
+                local_start = utc_start.astimezone(tz)
+                local_end = utc_end.astimezone(tz)
+                start_offset = local_start.strftime("%z")
+                end_offset = local_end.strftime("%z")
+                start_offset_formatted = f"{start_offset[:3]}:{start_offset[3:]}"
+                end_offset_formatted = f"{end_offset[:3]}:{end_offset[3:]}"
 
         destination = RescheduleDestinationSchema(
             localStart=local_start.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -103,16 +123,30 @@ class SimulatedF05WorkoutProvider:
             destination=destination,
         )
 
+        missing_data: list[str] = []
+        limitations: list[str] = [
+            "Reschedules one occurrence at a time (Phase 2 release scope baseline).",
+            "Proposal expires in 30 minutes.",
+        ]
+
+        if request.continuityState == "PROLONGED_INACTIVITY":
+            limitations.append("Prolonged inactivity detected (>= 100 days); return-to-training adaptation protocol applies.")
+            reasoning.append("Prolonged inactivity observed; scheduling preserves gradual return spacing.")
+        elif request.continuityState in ("UNKNOWN_HISTORY", "RESTRICTED_HISTORY"):
+            missing_data.append("trainingContinuity")
+            limitations.append(f"Training continuity status is {request.continuityState}; unrecorded training history cannot be verified.")
+        elif request.continuityState == "CONFIRMED_NEW":
+            reasoning.append("Confirmed beginner trainee with no prior workout history.")
+        elif request.continuityState in ("RECENT_ACTIVITY_OBSERVED", "RECENT_CONSISTENT"):
+            reasoning.append("Recent workout activity observed within normal training cadence.")
+
         return F05WorkoutRescheduleResponse(
             recommendationType="WORKOUT_RESCHEDULE_PROPOSAL",
             summary=f"Reschedule workout to {local_start.strftime('%Y-%m-%d %H:%M')} ({tz_name})",
             reasoning=reasoning,
             usedData=used_data,
-            missingData=[],
-            limitations=[
-                "Reschedules one occurrence at a time (Phase 2 release scope baseline).",
-                "Proposal expires in 30 minutes.",
-            ],
+            missingData=missing_data,
+            limitations=limitations,
             confidence=0.95,
             reschedule=payload,
         )

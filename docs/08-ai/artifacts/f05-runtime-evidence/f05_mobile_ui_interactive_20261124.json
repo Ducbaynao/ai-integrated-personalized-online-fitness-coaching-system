@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-11-24T13:35:36.084951+00:00",
+  "environment": "Expo Web (Chromium) -> Spring Boot (8080) -> FastAPI AI Service (8000) -> PostgreSQL (5433)",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "scenariosTotal": 7,
+  "scenariosPassed": 7,
+  "results": [
+    {
+      "scenario": "1. Student SELF_DIRECTED Reschedule",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "5ad1eba1-2c86-4542-bd7d-b807ba7df689",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_01_student_self_directed_receipt.png",
+      "dbOldStatus": "RESCHEDULED",
+      "dbSuccessor": "769c4bc2-711c-4911-877c-d6886f9ad8b3",
+      "details": "Proposal generated with AI reasoning and heuristic disclaimer; accepted by student; receipt displayed resulting entity; DB successor created."
+    },
+    {
+      "scenario": "2. Student HUMAN_COACH Authority Guard",
+      "status": "PASS",
+      "actor": "smoke.student@example.com",
+      "occurrenceId": "08a431b4-03e6-4ae6-98b6-9aa2a0841fa5",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_02_student_human_coach_blocked.png",
+      "alertVisible": true,
+      "acceptButtonCount": 0,
+      "details": "Alert box informs student that Trainer authority is required under HUMAN_COACH; Accept button is hidden/disabled."
+    },
+    {
+      "scenario": "3. Trainer HUMAN_COACH Apply",
+      "status": "PASS",
+      "actor": "smoke.trainer@example.com",
+      "relationshipId": "95501599-414d-4d0d-b663-296978c402a5",
+      "occurrenceId": "ed3bae48-2ccd-4d16-9459-798682ee7d52",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_03_trainer_apply_success.png",
+      "dbSuccessor": "7ff92d20-8a7e-4c59-9225-af4ab09925b9",
+      "details": "Trainer with MANAGE sharing grant successfully reviewed proposal and executed Accept & Apply; receipt displayed; successor created."
+    },
+    {
+      "scenario": "4. Reject Proposal",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "6f5c81c9-6c87-4c4c-9c00-bdfc7bf71791",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_04_reject_preserved.png",
+      "dbStatus": "SCHEDULED",
+      "details": "Proposal rejected with decision note; rejected receipt displayed; original workout remains SCHEDULED without change."
+    },
+    {
+      "scenario": "5. Stale Source Conflict",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "4ca228cf-6d0f-4d4c-81b9-042090e69505",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_05_conflict_toast.png",
+      "details": "Controlled version bump caused 409 conflict on apply; UI displayed clear conflict state and offered regenerate button."
+    },
+    {
+      "scenario": "6. Two-Sided Appointment Workflow & Coordination",
+      "status": "PASS",
+      "actor": "Student (smoke.student@example.com) + Trainer (smoke.trainer@example.com)",
+      "appointmentId": "8bf02ff9-c41f-4e12-a757-ddca5767ed88",
+      "occurrenceId": "53aef137-a823-4a56-a09f-f92b5104c074",
+      "successorId": "3ef31b3e-1ece-408f-893b-b1093bb3edc0",
+      "appointmentFinalVersion": "2",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_06_appointment_two_sided_flow.png",
+      "details": "Full bilateral appointment reschedule (Student requested -> Trainer accepted -> Appointment version 2), role-based navigation to student schedule, F05 proposal generated and applied by Trainer with MANAGE authority, appointment relinked to successor in DB."
+    },
+    {
+      "scenario": "7. Real UI Retry After Response Drop",
+      "status": "PASS",
+      "actor": "student.f02.runtime@example.com",
+      "occurrenceId": "e2f9f400-eaa3-46b9-b3a7-51074cf5ec68",
+      "screenshot": "docs\\08-ai\\artifacts\\f05-runtime-evidence\\screenshots\\ui_07_ui_retry_response_drop.png",
+      "commandKey": "13bb66f2-17c1-4116-84d6-5df7f3b9c8b1",
+      "retryCommandKey": "13bb66f2-17c1-4116-84d6-5df7f3b9c8b1",
+      "attempts": 2,
+      "successorCount": 1,
+      "details": "Controlled client response drop after backend commit -> UI displayed error state & 'Thử lại cùng lệnh (Xác nhận & Áp dụng)' button -> Real UI click on retry button sent identical commandKey -> Backend returned cached receipt with replayed=true -> Receipt rendered replay notice -> Exactly 1 successor in DB."
+    }
+  ]
+}

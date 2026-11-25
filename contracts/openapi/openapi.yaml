@@ -5515,7 +5515,14 @@ paths:
         have no execution seal or linked Actual Workout log, and either start in the future or have
         a known valid planned end that has passed. Eligibility and source version are checked at
         generation and rechecked by the Workout domain during atomic apply.
-        Preserves recovery intervals, supervision requirement, and timezone constraints.
+        Preserves supervision and timezone constraints; physiological recovery rules remain subject to D06/OD-3 review.
+        A linked Appointment is never moved by this operation. Use the separate Schedule bilateral reschedule request
+        when its time must change; after acceptance, POST again with a new commandKey and review the new recommendation.
+        The old recommendation and source snapshot remain unchanged and cannot be applied after source version drift.
+        Simulated providers may align the workout to the current CONFIRMED Appointment interval while retaining workout
+        duration. Pending/rejected/expired/cancelled requests do not authorize their proposed time.
+        Schedule still blocks an Appointment move that would leave a SCHEDULED COACH_REQUIRED occurrence outside its
+        qualifying interval. This workflow does not bypass that dependency or change a recurring series.
       security:
         - bearerAuth: []
       requestBody:
@@ -12499,9 +12506,11 @@ components:
         expectedAppointmentVersion:
           type: integer
           format: int64
+          description: Optional observed linked Appointment version; rechecked at apply and included in retry identity.
         expectedAppointmentId:
           type: string
           format: uuid
+          description: Optional observed linked Appointment ID; must match the proposal source and retry intent.
 
     AcceptRescheduleApiResponse:
       type: object

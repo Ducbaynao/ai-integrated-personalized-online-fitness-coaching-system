@@ -42,7 +42,7 @@ class F05WorkoutRescheduleRequest(BaseModel):
     supervisionRequirement: Literal[
         "SELF_PERFORMABLE", "COACH_OPTIONAL", "COACH_REQUIRED", "SELF_ALLOWED", "COACH_PREFERRED"
     ] = "SELF_PERFORMABLE"
-    timezone: str = "Asia/Ho_Chi_Minh"
+    timezone: str | None = "Asia/Ho_Chi_Minh"
     originalPlannedStartAt: str | None = None
     plannedStartAt: str
     plannedEndAt: str | None = None
@@ -51,6 +51,8 @@ class F05WorkoutRescheduleRequest(BaseModel):
     continuityState: str | None = None
     hasLinkedAppointment: bool = False
     appointmentId: UUID | None = None
+    appointmentStartAt: str | None = None
+    appointmentEndAt: str | None = None
 
 
 class F05WorkoutRescheduleResponse(BaseModel):

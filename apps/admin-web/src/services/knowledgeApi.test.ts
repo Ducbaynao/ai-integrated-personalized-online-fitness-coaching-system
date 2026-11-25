@@ -17,6 +17,16 @@ describe('knowledgeApi transport', () => {
     expect(apiRequest).toHaveBeenCalledWith('/admin/content/knowledge/documents/doc-123')
   })
 
+  it('posts an import bundle as JSON without publishing it', async () => {
+    const bundle = { bundleName: 'pilot', items: [{ documentCode: 'DOC-1', sourceId: 'source-1',
+      title: 'Strength', versionLabel: 'v1', contentHash: 'abc', content: 'content' }] }
+    await knowledgeApi.importCorpus(bundle)
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+    expect(apiRequest).toHaveBeenCalledWith('/admin/content/knowledge/import', {
+      method: 'POST', body: JSON.stringify(bundle),
+    })
+  })
+
   it('lists versions for a document', async () => {
     await knowledgeApi.listVersions('doc-123')
     expect(apiRequest).toHaveBeenCalledWith('/admin/content/knowledge/documents/doc-123/versions')

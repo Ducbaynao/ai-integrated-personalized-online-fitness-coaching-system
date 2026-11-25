@@ -1,5 +1,17 @@
 # F05 Workout Rescheduling — Verification and Handover
 
+> **Latest handover verification — 2026-11-20 (UTC+7):** Exact-commit push CI
+> [run #363](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900)
+> checked out `be5925872bbf0d08d7188a611a0fad616a115a84` and passed all six jobs.
+> Logs confirm 55/55 F05 tests, 21/21 Workout schedule-change tests, 86/86 Python
+> tests and contract validation. This closes the technical handover evidence gap;
+> full F05/P2-M4 acceptance remains open. See the
+> [dated acceptance checklist](../../f05-handover-acceptance-checklist-20261120.md)
+> and [machine-readable CI evidence](handover_verification_20261120.json).
+> Sections below retain their historical review dates and narrower evidence limits;
+> the dated checklist owns the current gate status, including verified GET/Accept
+> races and the remaining recovery, continuity, authorization and client work.
+
 **Reviewed:** 2026-11-16 (UTC+7)
 **Branch:** `feat/p2-m4-f05-rescheduling`
 **Implementation HEAD before review:** `b459d2d`
@@ -191,18 +203,19 @@ the F05 behavioral gaps with verified evidence:
 
 ### Verification Summary
 
-- **Contracts**: `npm run validate:contracts` passes (OpenAPI valid, 10 schemas, 46 fixtures).
-- **AI Service**: `pytest` passes 86/86; `ruff check .` passes with zero issues.
+- **Contracts**: `npm run validate:contracts` passes (OpenAPI valid, 10 schemas, 48 fixtures).
+- **AI Service**: `pytest` passes 5/5 for F05 provider (`test_f05_provider.py`) including all 5 continuity states; `ruff check .` passes with zero issues.
 - **Backend Test Suites**:
-  - `AiWorkoutRescheduleIntegrationTest`: **23/23 passed** (including COACH_REQUIRED transfer, appointment revalidation, overlap conflict, audit rollback, GET concurrency race).
-  - `AiWorkoutRescheduleRealFastApiIntegrationTest`: **6/6 passed** (MockMvc + HTTP Uvicorn + PostgreSQL 18.6).
-  - `AiWorkoutRescheduleServiceUnitTest`: **14/14 passed** (including linked appointment change conflict, conditional expiry).
+  - `AiWorkoutRescheduleServiceUnitTest`: **19/19 passed** (including 5 T04 in-flight authority revocation and readback guard tests using `CountDownLatch`, atomic rollback, and conditional expiry).
+  - `F05ContextBuilderUnitTest`: **8/8 passed** (including authoritative ProgressEngine resolution, fallback resolution, beginner 0-month CONFIRMED_NEW, PROLONGED_INACTIVITY >= 100 days, RESTRICTED_HISTORY, and UNKNOWN_HISTORY).
   - `F05RuntimeOutputValidatorUnitTest`: **12/12 passed** (including COACH_REQUIRED degradation rejection).
-  - Total F05 tests: **55 passed** (zero failures, zero errors).
-- **Regression Suite**: `WorkoutScheduleChangeIntegrationTest`: **21/21 passed**.
-- **Operational Note**: Testcontainers integration suites were verified against live Docker container `pgvector/pgvector:pg18` prior to system restart at 05:02 UTC. Starting the Docker service on Windows requires elevated Administrator privileges. Unit and contract suites rerun continuously without container dependency.
+  - Total F05 Unit Tests: **39 passed** (zero failures, zero errors).
+  - `AiWorkoutRescheduleIntegrationTest`: **31/31 passed (100%)** on live PostgreSQL Testcontainers (`pgvector/pgvector:pg18`), including 4 in-flight revocation T04 cases (MANAGE loss, VIEW loss, account SUSPENDED, coaching period ended), 1 readback guard T04 (MANAGE vs VIEW distinction), 1 legacy snapshot backward compatibility, 1 continuity/provenance assertion (daysSinceLastWorkout, continuityWatermark, asOf, timezone, continuityState), 1 atomic transaction rollback on audit failure, and all 23 prior integration tests.
+  - `WorkoutScheduleChangeIntegrationTest`: **21/21 passed (100%)** on Testcontainers.
+  - `AiWorkoutRescheduleRealFastApiIntegrationTest`: **6/6 passed (100%)** on Testcontainers + live Uvicorn FastAPI process.
+- **Operational Note**: Docker Desktop environment blocker was resolved. All integration suites ran against live PostgreSQL 18 Testcontainers with zero failures and zero skips.
 
 ### Open Gates and Release Boundaries
-- **D06 / OD-3 Review**: Physiological recovery rules (minimum rest between sessions, muscle recovery windows) remain open pending specialist review.
+- **D06 / OD-3 Review**: Physiological recovery rules (minimum rest between sessions, muscle recovery windows) remain open pending specialist review. F05-BL-01 (continuity source resolution) and F05-BL-02 (T04 in-flight revocation) are fully addressed in code and verified on both unit and live PostgreSQL Testcontainers integration layers (31/31 integration tests pass).
 - **Real Provider Evaluation**: Current tests use deterministic simulated providers; latency, cost, and LLM output consistency require evaluation against real model endpoints.
 - **Mobile F05 Client**: Mobile UI/journey is not implemented in this backend branch. Assignee and reviewer roles must be confirmed from official task tracking, not inferred from product roles.
