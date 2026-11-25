@@ -43,7 +43,7 @@ const clients: QueryClient[] = [];
 
 function setup(level = 'VIEW') {
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-1' }, activeCapability: 'TRAINER' });
-  relationshipResult = { data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } } },
+  relationshipResult = { data: { relationship: { studentId: 'student-1', trainerId: 'trainer-1', status: 'ACTIVE', counterparty: { displayName: 'An' } }, currentPeriod: { mode: 'HUMAN_COACH' } },
     isPending: false, isError: false, refetch: jest.fn() };
   relationshipResult.refetch.mockResolvedValue(relationshipResult);
   sharingResult = { data: { items: [{ dataScope: 'WORKOUT_PLAN', state: 'ALLOWED', accessLevel: level }] },
@@ -136,6 +136,28 @@ describe('Trainer read-only Planned Workout calendar', () => {
     setup('VIEW');
     const view = await render();
     expect(view.tree.root.findAllByProps({ testID: 'trainer-propose-change-occurrence-new' })).toHaveLength(0);
+    renderer.act(() => view.tree.unmount());
+  });
+
+  it('shows AI Reschedule button only with MANAGE authority, not with CONTRIBUTE or VIEW', async () => {
+    // 1. MANAGE level: AI reschedule button should be present
+    setup('MANAGE');
+    const manageView = await render();
+    expect(manageView.tree.root.findByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toBeTruthy();
+    renderer.act(() => manageView.tree.unmount());
+
+    // 2. CONTRIBUTE level: Manual proposal button present, but AI reschedule button MUST NOT be present
+    setup('CONTRIBUTE');
+    const contributeView = await render();
+    expect(contributeView.tree.root.findByProps({ testID: 'trainer-propose-change-occurrence-new' })).toBeTruthy();
+    expect(contributeView.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toHaveLength(0);
+    renderer.act(() => contributeView.tree.unmount());
+
+    // 3. VIEW level: Neither button present
+    setup('VIEW');
+    const view = await render();
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-propose-change-occurrence-new' })).toHaveLength(0);
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occurrence-new' })).toHaveLength(0);
     renderer.act(() => view.tree.unmount());
   });
 });

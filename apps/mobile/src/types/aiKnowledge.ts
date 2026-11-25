@@ -61,6 +61,19 @@ export interface F01KnowledgeQueryRequest {
   language?: 'vi' | 'en';
   exerciseId?: string;
   correlationId?: string;
+  studentId?: string;
+  includePersonalContext?: boolean;
+}
+
+export interface AiRunResponse {
+  runId: string;
+  runStatus: F01RunStatus | string;
+  requestType: string;
+  correlationId?: string;
+  queuedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt?: string;
 }
 
 export interface F01KnowledgeQueryResponse {
