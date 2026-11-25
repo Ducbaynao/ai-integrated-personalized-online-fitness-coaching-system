@@ -1,0 +1,25 @@
+{
+    "observedAtUtc":  "2026-11-24T15:51:12.7526715Z",
+    "checkpoint":  "f299540367b9b883414a4ac2bec06daee8e155c4",
+    "serial":  "emulator-5580",
+    "avd":  "Pixel_7",
+    "api":  36,
+    "expoGo":  "57.0.9",
+    "foreground":  "host.exp.exponent.experience.ErrorActivity",
+    "error":  "Uncaught Error: java.io.IOException: Failed to download remote update",
+    "screenshots":  [
+                        "01-expo-open-error.png",
+                        "02-expo-error-log.png"
+                    ],
+    "uiDump":  "02-expo-error-log.xml",
+    "hostMetro":  "HTTP200 packager-status:running on localhost:18081; listener ::1 only",
+    "adbReverse":  "tcp:18081 -\u003e tcp:18081",
+    "emulatorMetroProbe":  "toybox nc GET /status to 127.0.0.1:18081 returned no HTTP response",
+    "emulatorBackendProbe":  "toybox nc GET /actuator/health/readiness to 10.0.2.2:18080 returned HTTP/1.1 200",
+    "classification":  "Environment/transport blocker; IPv4/IPv6 mismatch is a supported hypothesis, not yet confirmed by successful IPv4 restart",
+    "sourceDefectConfirmed":  false,
+    "appScenarios":  "NOT RUN: project did not reach sign-in",
+    "manualNextStep":  "User restarts Metro with NODE_OPTIONS --dns-result-order=ipv4first; observe listener and emulator HTTP before project reload",
+    "codeChanged":  false,
+    "runtimeDisposition":  "retained while waiting for manual Metro handoff"
+}

@@ -1,0 +1,87 @@
+{
+  "observedAtUtc": "2026-11-25T04:01:00.000000+00:00",
+  "baseHead": "f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c",
+  "sourceState": "uncommitted working tree; P7-019/P7-021 retained; P7-022 (Promise.allSettled delete settle + serial storage queue + session-epoch guards) and P7-023 fixed in working tree, independently reviewed by Codex; checkpoint authorized",
+  "p1IndependentReviewNote": "Codex independent review confirmed native write serialization passed and identified Promise.all early-rejection in storage.ts clearTokens while sibling delete remained pending, plus clarified that serialization orders operations without guaranteeing failure-atomic two-key writes (partial write with pre-existing refresh token can make getTokens() return {new-access, old-refresh}, not null). Both clearTokens settling via Promise.allSettled and documentation limits are updated; Independent Codex re-verification passed both symmetric deferred-delete cases and 179/179 tests; see the current handoff.",
+  "filesSha256": {
+    "apps/mobile/src/services/storage.ts": "37a09a6a27b6f57583c0b9e2bda70282ea879d7e2049bcce935fed24a0fd3321",
+    "apps/mobile/src/services/apiClient.ts": "1b8d310e19acfec4ecbd5b03f63bed48977a5eb0bdd2a05835723b8ff39c8e5a",
+    "apps/mobile/src/features/auth/AuthContext.tsx": "88a4ba83b365d5a826aeda51671eaf4dc57e643db43f4465ddceeddffef59bf5",
+    "apps/mobile/src/features/nutrition/FoodAnalysisScreen.tsx": "a61fa1be8e577ff30a8138efc1e4dd9f2dc6ead45333a760aefd427aaa712cc2",
+    "apps/mobile/src/__tests__/authNativeStorageRace.test.tsx": "953361ed39615b90a39d4e762885b83274b37d7813ed433ef96c8e5cbfef89bf",
+    "apps/mobile/src/__tests__/authSessionRace.test.tsx": "771d707f0391b0cfb6fdb226f84cdf96734b8dfabb81f91b878fb2aa8b4bec62",
+    "apps/mobile/src/__tests__/foodAnalysisScreen.test.tsx": "57182716bafbb14431c6f6eb1377c9a7a700ff9a9ff92074bcda8c124738d409",
+    "apps/mobile/src/services/foodTextAnalysisApi.ts": "e2b9e97ba1336651017868f2292cb1d23712678191f743e605e3f6dd85aa5353",
+    "apps/mobile/src/types/foodTextAnalysis.ts": "f44169af46952fd56dbe2c796e5136c329350a19ca0ca5c2679b653e64537695"
+  },
+  "commands": [
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest --runInBand src/__tests__/authNativeStorageRace.test.tsx",
+      "when": "before clearTokens Promise.allSettled fix",
+      "exitCode": 1,
+      "tests": {
+        "failed": 2,
+        "passed": 5,
+        "skipped": 0,
+        "total": 7
+      },
+      "log": "p7022-p1-delete-reject-jest-before.log.txt"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest --runInBand src/__tests__/authNativeStorageRace.test.tsx src/__tests__/authSessionRace.test.tsx src/__tests__/authProviderCapabilities.test.tsx src/__tests__/queryCacheLifecycle.test.tsx src/__tests__/authFlow.test.ts src/__tests__/sessionRestorationNavigation.test.tsx src/__tests__/storage.test.ts src/__tests__/foodTextAnalysisApi.test.ts src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/apiClient.test.ts",
+      "when": "after latest clearTokens Promise.allSettled fix",
+      "exitCode": 0,
+      "tests": {
+        "passed": 179,
+        "suites": 11,
+        "skipped": 0
+      },
+      "log": "p7022-p1-delete-reject-jest-after.log.txt"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx tsc --noEmit",
+      "when": "after latest fix",
+      "exitCode": 0,
+      "log": "p7022-p1-delete-reject-typecheck.log.txt"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx expo lint",
+      "when": "after latest fix (0 errors, 0 warnings)",
+      "exitCode": 0,
+      "log": "p7022-p1-delete-reject-lint.log.txt"
+    },
+    {
+      "cwd": "worktree root",
+      "command": "git diff --check",
+      "when": "after latest fix",
+      "exitCode": 0,
+      "note": "LF/CRLF warnings only; no whitespace errors"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest (prior revisions: 177/177 before clearTokens fix; 172/172 before storage queue; 126/126 before P1 fix)",
+      "when": "historical prior-revision baselines superseded by latest 11-suite 179/179 run above",
+      "exitCode": 0
+    }
+  ],
+  "limitations": {
+    "partialNativeWrite": "Serialization protects operation ordering, NOT crash/failure-atomic persistence. If SecureStore.setItemAsync(accessToken) succeeds and setItemAsync(refreshToken) rejects when an older refresh token was already present, getTokens() can return {new-access, old-refresh} (not null). Pre-existing partial-write behavior; no new atomic storage design introduced for this finding."
+  },
+  "device": {
+    "serial": "emulator-5580",
+    "model": "Pixel_7",
+    "api": 36,
+    "expoGo": "57.0.9",
+    "preP1DeviceChecks": "Retained as evidence for FoodAnalysisScreen a61fa1b... before AuthContext/apiClient/storage edits.",
+    "notRunForP1Fix": [
+      "Device retest of native SecureStore latency / delete-reject / account switch while refresh or clear is in flight (NOT RUN: Metro 18081 is down after earlier server restart and environment was not reopened per handoff instruction; verified automatically via deferred SecureStore suite)",
+      "Process death (am kill left Expo Go PID 3260 alive)",
+      "Live TalkBack audio sweep (enabled_accessibility_services=null)"
+    ]
+  },
+  "runtime": "Spring 18080 PID 17804 HTTP 200 readiness UP, FastAPI 18001 PID 20912, PostgreSQL 15486 PID 25400 (f06-mobile-qa-20261124), Pixel_7 emulator-5580 attached; Metro 18081 not running; no cleanup, no stage/commit/push/PR edits"
+}

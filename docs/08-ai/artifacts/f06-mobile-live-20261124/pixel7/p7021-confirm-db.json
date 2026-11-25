@@ -1,0 +1,181 @@
+{
+  "day": "2026-11-24",
+  "items": [
+    {
+      "basis": "SERVING",
+      "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+      "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+      "quantity": 2.0,
+      "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+      "itemRevision": 3,
+      "confirmedFoodLogItemId": "4d0d4ab8-1724-42ec-943d-b58f266e9cd4"
+    }
+  ],
+  "status": "CONFIRMED",
+  "draftId": "ba169412-ba59-4093-96ef-23db7874101b",
+  "foodLogs": [
+    {
+      "id": "4d0d4ab8-1724-42ec-943d-b58f266e9cd4",
+      "basis": "SERVING",
+      "grams": 80.0,
+      "quantity": 2.0,
+      "catalogRevision": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+    }
+  ],
+  "mealType": "LUNCH",
+  "previews": [
+    {
+      "revision": 3,
+      "nutrients": {
+        "items": [
+          {
+            "nutrients": {
+              "fatG": null,
+              "proteinG": 0.0,
+              "energyKcal": 320.0,
+              "carbohydrateG": null
+            },
+            "selection": {
+              "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+              "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+              "quantity": 2,
+              "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+              "itemRevision": 2,
+              "quantityBasis": "SERVING",
+              "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+            },
+            "catalogSource": "{\"sourceRelease\":\"Synthetic device QA\",\"sourceName\":\"USDA FoodData Central\",\"fdcId\":991125,\"revisionId\":\"cc8a8ca5-4d06-42b6-94cc-5e20b8767c93\",\"sourceUrl\":\"https://fdc.nal.usda.gov/food-details/991125/nutrients\",\"sourceRecordVersion\":\"synthetic-device-v1\"}"
+          }
+        ],
+        "draftId": "ba169412-ba59-4093-96ef-23db7874101b",
+        "createdAt": "2026-11-24T17:57:31.573459Z",
+        "previewId": "a437cda5-4557-43a1-98ef-f9f60490d837",
+        "draftRevision": 3,
+        "totalNutrients": {
+          "fatG": null,
+          "proteinG": 0.0,
+          "energyKcal": 320.0,
+          "carbohydrateG": null
+        },
+        "previewRevision": 3
+      },
+      "previewId": "a437cda5-4557-43a1-98ef-f9f60490d837",
+      "selection": [
+        {
+          "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+          "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+          "quantity": 2,
+          "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+          "itemRevision": 2,
+          "quantityBasis": "SERVING",
+          "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+        }
+      ],
+      "draftRevision": 3
+    },
+    {
+      "revision": 2,
+      "nutrients": {
+        "items": [
+          {
+            "nutrients": {
+              "fatG": null,
+              "proteinG": 0.0,
+              "energyKcal": 200.0,
+              "carbohydrateG": null
+            },
+            "selection": {
+              "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+              "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+              "quantity": 1.25,
+              "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+              "itemRevision": 1,
+              "quantityBasis": "SERVING",
+              "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+            },
+            "catalogSource": "{\"sourceRelease\":\"Synthetic device QA\",\"sourceName\":\"USDA FoodData Central\",\"fdcId\":991125,\"revisionId\":\"cc8a8ca5-4d06-42b6-94cc-5e20b8767c93\",\"sourceUrl\":\"https://fdc.nal.usda.gov/food-details/991125/nutrients\",\"sourceRecordVersion\":\"synthetic-device-v1\"}"
+          }
+        ],
+        "draftId": "ba169412-ba59-4093-96ef-23db7874101b",
+        "createdAt": "2026-11-24T17:56:16.559696Z",
+        "previewId": "c29a37d0-667a-4d7c-b118-5c5a579f9251",
+        "draftRevision": 2,
+        "totalNutrients": {
+          "fatG": null,
+          "proteinG": 0.0,
+          "energyKcal": 200.0,
+          "carbohydrateG": null
+        },
+        "previewRevision": 2
+      },
+      "previewId": "c29a37d0-667a-4d7c-b118-5c5a579f9251",
+      "selection": [
+        {
+          "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+          "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+          "quantity": 1.25,
+          "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+          "itemRevision": 1,
+          "quantityBasis": "SERVING",
+          "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+        }
+      ],
+      "draftRevision": 2
+    },
+    {
+      "revision": 1,
+      "nutrients": {
+        "items": [
+          {
+            "nutrients": {
+              "fatG": null,
+              "proteinG": 0.0,
+              "energyKcal": 200.0,
+              "carbohydrateG": null
+            },
+            "selection": {
+              "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+              "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+              "quantity": 1.25,
+              "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+              "itemRevision": 1,
+              "quantityBasis": "SERVING",
+              "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+            },
+            "catalogSource": "{\"sourceRelease\":\"Synthetic device QA\",\"sourceName\":\"USDA FoodData Central\",\"fdcId\":991125,\"revisionId\":\"cc8a8ca5-4d06-42b6-94cc-5e20b8767c93\",\"sourceUrl\":\"https://fdc.nal.usda.gov/food-details/991125/nutrients\",\"sourceRecordVersion\":\"synthetic-device-v1\"}"
+          }
+        ],
+        "draftId": "ba169412-ba59-4093-96ef-23db7874101b",
+        "createdAt": "2026-11-24T17:54:57.507710Z",
+        "previewId": "0cfb5c6f-8add-4231-8455-0d45d9222283",
+        "draftRevision": 2,
+        "totalNutrients": {
+          "fatG": null,
+          "proteinG": 0.0,
+          "energyKcal": 200.0,
+          "carbohydrateG": null
+        },
+        "previewRevision": 1
+      },
+      "previewId": "0cfb5c6f-8add-4231-8455-0d45d9222283",
+      "selection": [
+        {
+          "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+          "itemId": "00bd339c-e6c3-451a-9dd7-2c1bcef339b2",
+          "quantity": 1.25,
+          "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+          "itemRevision": 1,
+          "quantityBasis": "SERVING",
+          "catalogRevisionId": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+        }
+      ],
+      "draftRevision": 2
+    }
+  ],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "consumedAt": "2026-11-23T17:53:00+00:00",
+  "draftRevision": 4,
+  "observedAtUtc": "2026-11-24T17:57:53.158935+00:00",
+  "baseHead": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "workingTreeSourceSha256": "6385a6b0cd4a16b04aaefe906b8c41da5722ad782c66d646b713fac3af01679d"
+}

@@ -1,0 +1,108 @@
+{
+  "08-f06-entry": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-24"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "field": "Giờ ăn địa phương (HH:mm)",
+      "value": "23:46"
+    },
+    {
+      "field": "Mô tả bữa ăn",
+      "value": "Ví dụ: 1 bát phở bò tái chín, 2 cái quẩy, 1 ly trà đá"
+    }
+  ],
+  "26-dot-quantity": [
+    {
+      "field": "Số lượng",
+      "value": "1.25"
+    }
+  ],
+  "34-dst-zone-retry": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-01"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "America/New_York"
+    },
+    {
+      "field": "Giờ ăn địa phương (HH:mm)",
+      "value": "01:30"
+    },
+    {
+      "field": "Mô tả bữa ăn",
+      "value": "Synthetic oát and tea"
+    }
+  ],
+  "38-dst-confirmed": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-01"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "America/New_York"
+    },
+    {
+      "field": "Giờ ăn địa phương (HH:mm)",
+      "value": "01:30"
+    },
+    {
+      "field": "Mô tả bữa ăn",
+      "value": "Synthetic oát and tea"
+    }
+  ],
+  "42-resumed": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-01"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "America/New_York"
+    },
+    {
+      "field": "Giờ ăn địa phương (HH:mm)",
+      "value": "01:30"
+    },
+    {
+      "field": "Mô tả bữa ăn",
+      "value": "Synthetic oát and tea"
+    }
+  ],
+  "49-day-empty": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-24"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "Asia/Ho_Chi_Minh"
+    }
+  ],
+  "50-reentry-memory-limit": [
+    {
+      "field": "Ngày ghi (YYYY-MM-DD)",
+      "value": "2026-11-24"
+    },
+    {
+      "field": "Múi giờ IANA",
+      "value": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "field": "Giờ ăn địa phương (HH:mm)",
+      "value": "23:57"
+    },
+    {
+      "field": "Mô tả bữa ăn",
+      "value": "Ví dụ: 1 bát phở bò tái chín, 2 cái quẩy, 1 ly trà đá"
+    }
+  ]
+}

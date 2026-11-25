@@ -1,0 +1,34 @@
+{
+  "day": "2026-11-24",
+  "items": [
+    {
+      "basis": "SERVING",
+      "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+      "itemId": "ad1448a4-db55-4c6e-abb5-37c24dba2f1d",
+      "quantity": 1.0,
+      "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+      "itemRevision": 1,
+      "confirmedFoodLogItemId": null
+    },
+    {
+      "basis": "SERVING",
+      "foodId": "e86d0ab4-fe1e-4601-8868-a7ab867c2e02",
+      "itemId": "57e83930-472b-4433-8524-7c17319885f0",
+      "quantity": 0.5,
+      "portionId": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+      "itemRevision": 0,
+      "confirmedFoodLogItemId": null
+    }
+  ],
+  "status": "READY_FOR_CONFIRMATION",
+  "draftId": "c361a55c-f8a3-4807-b0c1-c4dc76d764c4",
+  "foodLogs": [],
+  "mealType": "OTHER",
+  "previews": [],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "consumedAt": "2026-11-23T19:13:00+00:00",
+  "draftRevision": 4,
+  "observedAtUtc": "2026-11-24T19:18:18.193480+00:00",
+  "baseHead": "f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c",
+  "workingTreeSourceSha256": "6385a6b0cd4a16b04aaefe906b8c41da5722ad782c66d646b713fac3af01679d"
+}

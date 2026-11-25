@@ -1,0 +1,71 @@
+{
+  "checkpoint": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "backendDependency": "17c485fa6d248fff58c7dac00c931536ff6c7720",
+  "startedAt": "2026-11-24T14:12:30.824765+00:00",
+  "cases": [
+    {
+      "name": "Generate -> recovery/detail, unknown estimate, no pre-confirm intake",
+      "status": "PASS",
+      "draftId": "178bfe78-c6b0-4600-bfc2-73a78dbf30cf",
+      "generateStatus": 201,
+      "recoveryStatus": 200,
+      "provider": "HTTP FastAPI simulated fallback"
+    },
+    {
+      "name": "Different Student session cannot read draft",
+      "status": "PASS",
+      "statusCode": 404
+    },
+    {
+      "name": "Correct -> persisted Preview/replay using explicit test portion",
+      "status": "PASS",
+      "previewId": "04c37515-0edf-439a-a3c7-0f6d83b3b8e6",
+      "nutrients": {
+        "energyKcal": 200.0,
+        "proteinG": 0.0,
+        "carbohydrateG": null,
+        "fatG": null
+      },
+      "catalogRevisionId": "f7e44b4b-88c9-42e0-8b1f-f7fd08b031ac"
+    },
+    {
+      "name": "Controlled downstream response loss AFTER upstream commit -> exact Confirm replay",
+      "status": "PASS",
+      "upstreamStatus": 201,
+      "committedReceiptCountBeforeDrop": "1",
+      "receiptId": "37a4d7a2-8378-43df-a0fc-f5909bc37c89",
+      "foodLogItemIds": [
+        "b08e6b11-6cb3-42cc-b076-35b731bb86f7"
+      ],
+      "replayed": true,
+      "foodLogCount": 1
+    },
+    {
+      "name": "Partial selection leaves unselected draft; nullable nutrient snapshots; day not COMPLETE",
+      "status": "PASS",
+      "confirmationStatus": "PARTIALLY_CONFIRMED",
+      "remainingDraftItemIds": [
+        "1ed2cd98-90ee-432e-acbd-ad5d08080868"
+      ],
+      "dayCompleteness": "PARTIAL"
+    },
+    {
+      "name": "Exact receipt replay after expiry and catalog retirement",
+      "status": "PASS",
+      "receiptId": "37a4d7a2-8378-43df-a0fc-f5909bc37c89",
+      "foodLogCount": 1
+    },
+    {
+      "name": "Changed payload with same commandKey conflicts",
+      "status": "PASS",
+      "statusCode": 409
+    },
+    {
+      "name": "Account revoked while request held at harness transport boundary -> replay denied, no new intake",
+      "status": "PASS",
+      "statusCode": 401,
+      "boundary": "before forwarding into Spring, NOT mid-transaction/client session UI"
+    }
+  ],
+  "finishedAt": "2026-11-24T14:12:35.726169+00:00"
+}

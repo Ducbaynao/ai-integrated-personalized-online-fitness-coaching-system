@@ -1,0 +1,6 @@
+{
+  "draftId": "c361a55c-f8a3-4807-b0c1-c4dc76d764c4",
+  "revision": 4,
+  "itemCount": 2,
+  "note": "Initial fixture attempt selected status READY, matched zero rows but bumped revision; corrected here to exact test draft. No log/receipt created by fixture SQL."
+}

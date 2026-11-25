@@ -1,0 +1,132 @@
+{
+  "items": [
+    {
+      "basis": "SERVING",
+      "order": 1,
+      "itemId": "71559e65-feb0-48aa-aa83-ff9ebc31cb54",
+      "quantity": 1.0,
+      "detectedName": "pho",
+      "itemRevision": 2,
+      "confirmedFoodLogItemId": "ea1e2f8e-3500-4b49-b9c9-137b0f30e57f"
+    },
+    {
+      "basis": "SERVING",
+      "order": 2,
+      "itemId": "3fd7f232-0828-4bf7-8384-b4689b48341b",
+      "quantity": 0.5,
+      "detectedName": "Retest fixture item 2",
+      "itemRevision": 1,
+      "confirmedFoodLogItemId": "7aef4476-9602-46a9-87c0-dfec5c43c70f"
+    }
+  ],
+  "mealId": "30afc291-fed3-4828-8861-104e61945c32",
+  "status": "CONFIRMED",
+  "draftId": "ee072172-6ccb-46f7-884f-583e7dd36dc4",
+  "logDate": "2026-11-25",
+  "foodLogs": [
+    {
+      "id": "ea1e2f8e-3500-4b49-b9c9-137b0f30e57f",
+      "notes": "{\"previewRevision\":1,\"draftItemId\":\"71559e65-feb0-48aa-aa83-ff9ebc31cb54\",\"confirmedBy\":\"475a47d5-8d91-41dc-836b-a07d6943f597\",\"previewId\":\"2abd1e95-a02d-425c-aa2b-02ff61351bd6\",\"analysisDraftId\":\"ee072172-6ccb-46f7-884f-583e7dd36dc4\",\"receiptId\":\"0f9b0b23-fab8-4801-96fb-1f66550b09dc\",\"catalogSource\":\"{\\\"sourceRelease\\\":\\\"Synthetic device QA\\\",\\\"sourceRecordVersion\\\":\\\"synthetic-device-v1\\\",\\\"sourceUrl\\\":\\\"https://fdc.nal.usda.gov/food-details/991125/nutrients\\\",\\\"revisionId\\\":\\\"cc8a8ca5-4d06-42b6-94cc-5e20b8767c93\\\",\\\"fdcId\\\":991125,\\\"sourceName\\\":\\\"USDA FoodData Central\\\"}\"}",
+      "food_id": null,
+      "meal_id": "30afc291-fed3-4828-8861-104e61945c32",
+      "unit_id": 1,
+      "quantity": 1.0,
+      "created_at": "2026-11-25T03:02:09.740364+00:00",
+      "deleted_at": null,
+      "entry_kind": "CATALOG_QUANTIFIED",
+      "updated_at": "2026-11-25T03:02:09.740364+00:00",
+      "gram_weight": 40.0,
+      "confirmed_at": "2026-11-25T03:02:09.793482+00:00",
+      "entry_source": "TEXT_AI",
+      "item_version": 0,
+      "quantity_basis": "SERVING",
+      "private_food_id": null,
+      "confidence_score": null,
+      "estimation_state": "USER_CONFIRMED",
+      "confirmed_by_user": true,
+      "food_name_snapshot": "Synthetic device QA oats",
+      "private_food_version": null,
+      "serving_label_snapshot": "Synthetic test cup 40g",
+      "nutrition_catalog_portion_id": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+      "nutrition_catalog_revision_id": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+    },
+    {
+      "id": "7aef4476-9602-46a9-87c0-dfec5c43c70f",
+      "notes": "{\"previewRevision\":2,\"draftItemId\":\"3fd7f232-0828-4bf7-8384-b4689b48341b\",\"confirmedBy\":\"475a47d5-8d91-41dc-836b-a07d6943f597\",\"previewId\":\"cb29a4de-8647-40cf-b675-fad0b8f29da4\",\"analysisDraftId\":\"ee072172-6ccb-46f7-884f-583e7dd36dc4\",\"receiptId\":\"7a7efd1e-fb47-40f8-8a6a-55ad72a2c3d3\",\"catalogSource\":\"{\\\"sourceRelease\\\":\\\"Synthetic device QA\\\",\\\"sourceRecordVersion\\\":\\\"synthetic-device-v1\\\",\\\"sourceUrl\\\":\\\"https://fdc.nal.usda.gov/food-details/991125/nutrients\\\",\\\"revisionId\\\":\\\"cc8a8ca5-4d06-42b6-94cc-5e20b8767c93\\\",\\\"fdcId\\\":991125,\\\"sourceName\\\":\\\"USDA FoodData Central\\\"}\"}",
+      "food_id": null,
+      "meal_id": "30afc291-fed3-4828-8861-104e61945c32",
+      "unit_id": 1,
+      "quantity": 0.5,
+      "created_at": "2026-11-25T03:03:06.052701+00:00",
+      "deleted_at": null,
+      "entry_kind": "CATALOG_QUANTIFIED",
+      "updated_at": "2026-11-25T03:03:06.052701+00:00",
+      "gram_weight": 20.0,
+      "confirmed_at": "2026-11-25T03:03:06.097358+00:00",
+      "entry_source": "TEXT_AI",
+      "item_version": 0,
+      "quantity_basis": "SERVING",
+      "private_food_id": null,
+      "confidence_score": null,
+      "estimation_state": "USER_CONFIRMED",
+      "confirmed_by_user": true,
+      "food_name_snapshot": "Synthetic device QA oats",
+      "private_food_version": null,
+      "serving_label_snapshot": "Synthetic test cup 40g",
+      "nutrition_catalog_portion_id": "412cc9fa-1bfb-49a0-bf00-846b4e6e5dc6",
+      "nutrition_catalog_revision_id": "cc8a8ca5-4d06-42b6-94cc-5e20b8767c93"
+    }
+  ],
+  "mealType": "OTHER",
+  "previews": [
+    {
+      "createdAt": "2026-11-25T03:01:47.153784+00:00",
+      "previewId": "2abd1e95-a02d-425c-aa2b-02ff61351bd6",
+      "draftRevision": 2,
+      "previewRevision": 1
+    },
+    {
+      "createdAt": "2026-11-25T03:02:55.984715+00:00",
+      "previewId": "cb29a4de-8647-40cf-b675-fad0b8f29da4",
+      "draftRevision": 3,
+      "previewRevision": 2
+    }
+  ],
+  "receipts": [
+    {
+      "createdAt": "2026-11-25T03:01:19.471341+00:00",
+      "receiptId": "e35a2169-87a7-4fe6-a393-40bc953a8752",
+      "commandKey": "b9ec4f6d-46af-4bbe-bda1-ab717f998965",
+      "commandName": "FOOD_ANALYSIS_CORRECT"
+    },
+    {
+      "createdAt": "2026-11-25T03:01:47.11554+00:00",
+      "receiptId": "97ac3d87-9272-4f65-8526-49ef2e6a894e",
+      "commandKey": "b017c991-8ea6-4bb5-9a2b-8c25570c3385",
+      "commandName": "FOOD_ANALYSIS_PREVIEW"
+    },
+    {
+      "createdAt": "2026-11-25T03:02:09.740364+00:00",
+      "receiptId": "0f9b0b23-fab8-4801-96fb-1f66550b09dc",
+      "commandKey": "1baa9eb3-1180-43c1-833d-d56fb4d665ec",
+      "commandName": "FOOD_ANALYSIS_CONFIRM"
+    },
+    {
+      "createdAt": "2026-11-25T03:02:55.96691+00:00",
+      "receiptId": "03ed58cd-0a73-412b-9d5b-15b334ee2450",
+      "commandKey": "749c4bd1-1b90-433c-a3ea-87255a6bb053",
+      "commandName": "FOOD_ANALYSIS_PREVIEW"
+    },
+    {
+      "createdAt": "2026-11-25T03:03:06.052701+00:00",
+      "receiptId": "7a7efd1e-fb47-40f8-8a6a-55ad72a2c3d3",
+      "commandKey": "b4bb3938-91c2-4f28-a0da-2b3da0380920",
+      "commandName": "FOOD_ANALYSIS_CONFIRM"
+    }
+  ],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "draftRevision": 4,
+  "observedAtUtc": "2026-11-25T03:04:25.378398+00:00",
+  "baseHead": "f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c",
+  "workingTreeSourceSha256": "a61fa1be8e577ff30a8138efc1e4dd9f2dc6ead45333a760aefd427aaa712cc2"
+}

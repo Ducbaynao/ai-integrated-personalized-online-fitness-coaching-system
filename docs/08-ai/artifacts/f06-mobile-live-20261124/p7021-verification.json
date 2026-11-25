@@ -1,0 +1,78 @@
+{
+  "observedAtUtc": "2026-11-24T18:02:37.553725+00:00",
+  "baseHead": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "sourceState": "uncommitted working tree; P7-019 retained; P7-021 self verified, not independently Anti reviewed",
+  "filesSha256": {
+    "apps/mobile/src/features/nutrition/FoodAnalysisScreen.tsx": "6385a6b0cd4a16b04aaefe906b8c41da5722ad782c66d646b713fac3af01679d",
+    "apps/mobile/src/__tests__/foodAnalysisScreen.test.tsx": "ddffa845c0caf716529a21db26806e27bc8b04e7611dce0ad00ed66f261530e2"
+  },
+  "commands": [
+    {
+      "cwd": "apps/mobile",
+      "command": "npm test -- --runInBand src/__tests__/foodAnalysisScreen.test.tsx --testNamePattern=\"P7-021\"",
+      "when": "before production fix",
+      "exitCode": 1,
+      "tests": {
+        "failed": 9,
+        "passed": 3,
+        "skipped": 40,
+        "total": 52
+      },
+      "log": "p7021-jest-before.log"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npm test -- --runInBand src/__tests__/foodTextAnalysisApi.test.ts src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/apiClient.test.ts",
+      "when": "after fix",
+      "exitCode": 0,
+      "tests": {
+        "passed": 116,
+        "suites": 4,
+        "skipped": 0
+      },
+      "log": "p7021-jest-after.log"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "log": "p7021-typecheck.log"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "log": "p7021-lint.log"
+    },
+    {
+      "cwd": "worktree root",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "note": "LF/CRLF warnings only; no whitespace errors"
+    }
+  ],
+  "device": {
+    "serial": "emulator-5580",
+    "model": "Pixel_7",
+    "api": 36,
+    "expoGo": "57.0.9",
+    "provider": "source FastAPI simulated fallback; no recognition/model validation",
+    "account": "Synthetic F06 B",
+    "draftId": "ba169412-ba59-4093-96ef-23db7874101b",
+    "pass": [
+      "new quantity dirty guard",
+      "Cancel requires fresh Preview",
+      "basis dirty/revert",
+      "Save2 -> new Preview320 -> Confirm -> receipt -> Nutrition",
+      "unknown nutrients vs protein0; PARTIAL; single new Log; prior fixture preserved"
+    ],
+    "notRun": [
+      "food/revision/portion variations on device",
+      "partial multi-item",
+      "fault timeout/replay/account switch",
+      "process death",
+      "screen reader"
+    ]
+  },
+  "runtime": "retained; no cleanup; no stage/commit/push, branch or PR changes"
+}
