@@ -57,6 +57,31 @@ describe('authenticated admin foundation', () => {
     renderApp('/')
 
     expect(await screen.findByRole('link', { name: 'Bài tập' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Hồ sơ HLV' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Trang quản trị' })).toBeInTheDocument())
+  })
+
+  it.each(['/trainer-applications', '/trainer-applications/2c5f9430-c360-4b32-b70a-d6f92b76bfd4'])(
+    'does not infer trainer verification permission from the ADMIN role on %s',
+    async (path) => {
+      const user = createCurrentUser({ roles: ['ADMIN'], permissions: [] })
+      writeSession(createTokenPair(user))
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(user)))
+
+      renderApp(path)
+
+      expect(await screen.findByRole('heading', { name: 'Bạn không có quyền truy cập' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Hồ sơ HLV' })).not.toBeInTheDocument()
+    },
+  )
+
+  it('shows trainer verification navigation only with the effective TRAINER_VERIFY permission', async () => {
+    const user = createCurrentUser({ permissions: ['TRAINER_VERIFY'] })
+    writeSession(createTokenPair(user))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(user)))
+
+    renderApp('/')
+
+    expect(await screen.findByRole('link', { name: 'Hồ sơ HLV' })).toBeInTheDocument()
   })
 })

@@ -79,18 +79,25 @@ public class AdminTrainerApplicationController {
         UUID adminUserId = UUID.fromString(jwt.getSubject());
 
         TrainerVerificationStatus verificationStatus = null;
+        boolean allStatuses = false;
         if (status != null && !status.isBlank()) {
-            try {
-                verificationStatus = TrainerVerificationStatus.valueOf(status.trim().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new ApplicationValidationException("Invalid status parameter: " + status,
-                        List.of(new FieldErrorDto("status", "Invalid", "Status must be a valid verification status")));
+            String normalizedStatus = status.trim().toUpperCase();
+            if ("ALL".equals(normalizedStatus)) {
+                allStatuses = true;
+            } else {
+                try {
+                    verificationStatus = TrainerVerificationStatus.valueOf(normalizedStatus);
+                } catch (IllegalArgumentException e) {
+                    throw new ApplicationValidationException("Invalid status parameter: " + status,
+                            List.of(new FieldErrorDto("status", "Invalid", "Status must be a valid verification status or ALL")));
+                }
             }
         }
 
         GetAdminTrainerApplicationsQuery query = new GetAdminTrainerApplicationsQuery(
                 adminUserId,
                 verificationStatus,
+                allStatuses,
                 page,
                 size
         );

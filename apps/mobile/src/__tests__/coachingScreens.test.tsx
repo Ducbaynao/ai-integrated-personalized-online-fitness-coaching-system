@@ -121,6 +121,33 @@ describe('coaching screens', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('clarifies verified and acceptingStudents requirement on TrainerDirectoryScreen and supports pull-to-refresh', () => {
+    const refetch = jest.fn();
+    (useTrainerDirectory as jest.Mock).mockReturnValue({
+      data: { pages: [{ items: [] }] },
+      isPending: false,
+      isError: false,
+      isRefetching: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      refetch,
+      fetchNextPage: jest.fn(),
+    });
+    const tree = renderWithQueryClient(<TrainerDirectoryScreen />);
+    expect(
+      tree.root.findAll(
+        (n) =>
+          typeof n.props.children === 'string' &&
+          n.props.children.includes('Chỉ liệt kê huấn luyện viên đã được Admin xác minh và đang mở nhận học viên.'),
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(tree.root.findByProps({ testID: 'trainer-no-results' })).toBeTruthy();
+    const scrollView = tree.root.findByProps({ testID: 'trainer-directory-screen' });
+    renderer.act(() => scrollView.props.refreshControl.props.onRefresh());
+    expect(refetch).toHaveBeenCalledTimes(1);
+    renderer.act(() => tree.unmount());
+  });
+
   it('requires an exact valid email lookup before a Trainer invitation', async () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { ...student, id: 'trainer-1' }, activeCapability: 'TRAINER' });
     (coachingApi.lookupStudent as jest.Mock).mockResolvedValue({ studentId: 'student-1', displayName: 'Học viên Bình' });

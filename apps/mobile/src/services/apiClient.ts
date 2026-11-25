@@ -25,17 +25,42 @@ export function registerSessionExpiredHandler(handler: SessionExpiredHandler | n
 // Single-flight refresh mutex to prevent concurrent refresh requests (avoiding refresh replay detection)
 let refreshPromise: Promise<TokenPairResponse> | null = null;
 let tokenEpoch = 0;
+let capabilityEpoch = 0;
 
 /** Invalidates any in-flight token refresh or session-bound retry from writing storage/expiring a newer session. */
 export function invalidateAuthSession(): void {
   tokenEpoch += 1;
+  capabilityEpoch += 1;
   refreshPromise = null;
+}
+
+export function invalidateCapabilitySession(): void {
+  capabilityEpoch += 1;
+}
+
+export interface AuthSessionBinding {
+  authEpoch: number;
+  capabilityEpoch: number;
+}
+
+export function getAuthSessionBinding(): AuthSessionBinding {
+  return { authEpoch: tokenEpoch, capabilityEpoch };
 }
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   requiresAuth?: boolean;
   body?: unknown;
   _isRetry?: boolean;
+  expectedAuthEpoch?: number;
+  expectedCapabilityEpoch?: number;
+  retryOn401?: boolean;
+  shouldContinue?: () => boolean;
+}
+
+function createAbortError(): Error {
+  const abortError = new Error('The operation was aborted');
+  abortError.name = 'AbortError';
+  return abortError;
 }
 
 /**
@@ -143,8 +168,27 @@ async function performTokenRefresh(expectedEpoch: number): Promise<TokenPairResp
  * Core HTTP request runner with automatic Bearer token injection and single-flight 401 refresh.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { requiresAuth = true, body, _isRetry = false, headers = {}, ...rest } = options;
-  const requestEpoch = tokenEpoch;
+  const {
+    requiresAuth = true,
+    body,
+    _isRetry = false,
+    expectedAuthEpoch,
+    expectedCapabilityEpoch,
+    retryOn401 = true,
+    shouldContinue,
+    headers = {},
+    ...rest
+  } = options;
+  const isSessionBindingValid = () =>
+    (expectedAuthEpoch === undefined || expectedAuthEpoch === tokenEpoch) &&
+    (expectedCapabilityEpoch === undefined || expectedCapabilityEpoch === capabilityEpoch);
+  if (!isSessionBindingValid()) {
+    throw staleAuthSessionError();
+  }
+  if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+    throw createAbortError();
+  }
+  const requestEpoch = expectedAuthEpoch ?? tokenEpoch;
 
   const requestHeaders: Record<string, string> = {
     Accept: 'application/json',
@@ -157,12 +201,19 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (requiresAuth) {
     const accessToken = await tokenStorage.getAccessToken();
-    if (requestEpoch !== tokenEpoch) {
+    if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
       throw staleAuthSessionError();
+    }
+    if (shouldContinue && !shouldContinue()) {
+      throw createAbortError();
     }
     if (accessToken) {
       requestHeaders.Authorization = `Bearer ${accessToken}`;
     }
+  }
+
+  if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+    throw createAbortError();
   }
 
   const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
@@ -183,13 +234,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   // Intercept 401 for authenticated requests (and only if not already retried)
   if (response.status === 401 && requiresAuth && !_isRetry) {
-    if (requestEpoch !== tokenEpoch) {
+    if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
       throw staleAuthSessionError();
     }
-    if (rest.signal?.aborted) {
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-      throw abortError;
+    if (!retryOn401) {
+      return parseResponse<T>(response);
+    }
+    if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+      throw createAbortError();
     }
 
     try {
@@ -203,14 +255,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       }
       await refreshPromise;
 
-      if (requestEpoch !== tokenEpoch) {
+      if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
         throw staleAuthSessionError();
       }
 
-      if (rest.signal?.aborted) {
-        const abortError = new Error('The operation was aborted');
-        abortError.name = 'AbortError';
-        throw abortError;
+      if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+        throw createAbortError();
       }
 
       // Retry request once with the new access token

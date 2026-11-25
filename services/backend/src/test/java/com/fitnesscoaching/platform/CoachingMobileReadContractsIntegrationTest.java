@@ -63,9 +63,15 @@ class CoachingMobileReadContractsIntegrationTest {
         person("TRAINER", "M2E Paging Bravo", "paging.bravo@example.com");
         UUID notAccepting = person("TRAINER", "M2E Paging Hidden Availability", "hidden.availability@example.com");
         UUID pending = person("TRAINER", "M2E Paging Hidden Verification", "hidden.verification@example.com");
+        UUID rejected = person("TRAINER", "M2E Paging Hidden Rejected", "hidden.rejected@example.com");
+        UUID inactive = person("TRAINER", "M2E Paging Hidden Inactive", "hidden.inactive@example.com");
+        UUID revokedRole = person("TRAINER", "M2E Paging Hidden RevokedRole", "hidden.revoked@example.com");
         UUID suspended = person("TRAINER", "M2E Paging Hidden Account", "hidden.account@example.com");
         jdbc.update("UPDATE fitness.trainer_profiles SET is_accepting_students=false WHERE user_id=?", notAccepting);
         jdbc.update("UPDATE fitness.trainer_profiles SET verification_status='PENDING' WHERE user_id=?", pending);
+        jdbc.update("UPDATE fitness.trainer_profiles SET verification_status='REJECTED' WHERE user_id=?", rejected);
+        jdbc.update("UPDATE fitness.trainer_profiles SET activity_status='INACTIVE' WHERE user_id=?", inactive);
+        jdbc.update("UPDATE fitness.user_roles SET revoked_at=now() WHERE user_id=?", revokedRole);
         jdbc.update("UPDATE fitness.users SET status='SUSPENDED' WHERE id=?", suspended);
 
         mvc.perform(get("/api/v1/coaching/trainers")
@@ -77,6 +83,7 @@ class CoachingMobileReadContractsIntegrationTest {
                 .andExpect(jsonPath("$.items[0].displayName").value("M2E Paging Alpha"))
                 .andExpect(jsonPath("$.items[0].trainerId").isNotEmpty())
                 .andExpect(jsonPath("$.items[0].email").doesNotExist())
+                .andExpect(jsonPath("$.items[0].publicSlug").doesNotExist())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1));
 

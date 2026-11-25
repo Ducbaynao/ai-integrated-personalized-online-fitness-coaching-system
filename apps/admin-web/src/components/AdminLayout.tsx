@@ -12,9 +12,7 @@ export function AdminLayout() {
   const canManageAi =
     (auth.user?.roles.includes('ADMIN') ?? false) ||
     (auth.user?.permissions.includes('SYSTEM_CONFIG_MANAGE') ?? false)
-  const canManageTrainers =
-    (auth.user?.roles.includes('ADMIN') ?? false) ||
-    (auth.user?.permissions.includes('TRAINER_VERIFY') ?? false)
+  const canManageTrainers = auth.user?.permissions.includes('TRAINER_VERIFY') ?? false
   const canManageUsers =
     (auth.user?.roles.includes('ADMIN') ?? false) ||
     (auth.user?.permissions.includes('USER_SUSPEND') ?? false) ||

@@ -1289,8 +1289,8 @@ class AuthSessionIntegrationTest {
         Map<String, Object> loginUser = (Map<String, Object>) session.get("user");
         List<String> expectedAdminPermissions = List.of(
                 "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
-                "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
-                "USER_ROLE_MANAGE", "USER_SUSPEND"
+                "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "TRAINER_VERIFY",
+                "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
         );
         assertThat(loginUser.get("permissions")).isEqualTo(expectedAdminPermissions);
 

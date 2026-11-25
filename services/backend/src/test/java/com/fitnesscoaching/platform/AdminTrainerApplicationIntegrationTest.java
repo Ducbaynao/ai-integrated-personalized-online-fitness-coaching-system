@@ -1091,4 +1091,66 @@ class AdminTrainerApplicationIntegrationTest {
                 .andExpect(jsonPath("$.items[1].documentMediaIds", hasSize(1)))
                 .andExpect(jsonPath("$.items[1].documentMediaIds[0]", is(media2.toString())));
     }
+
+    @Test
+    @DisplayName("30. GET /admin/trainer-applications?status=ALL trả về cả hồ sơ PENDING và đã duyệt/từ chối")
+    void getApplications_allStatus_returnsPendingAndDecidedApplications() throws Exception {
+        UUID adminId = createActiveUser("admin-all-status@example.com");
+        assignRole(adminId, "ADMIN");
+
+        UUID trainerPending = createActiveUser("trainer-all-pending@example.com");
+        assignRole(trainerPending, "TRAINER");
+        createTrainerProfile(trainerPending, "coach-all-pending", TrainerVerificationStatus.PENDING);
+        UUID pendingApp = createApplication(trainerPending, TrainerVerificationStatus.PENDING, Instant.now().minus(2, ChronoUnit.HOURS));
+
+        UUID trainerVerified = createActiveUser("trainer-all-verified@example.com");
+        assignRole(trainerVerified, "TRAINER");
+        createTrainerProfile(trainerVerified, "coach-all-verified", TrainerVerificationStatus.VERIFIED);
+        UUID verifiedApp = createApplication(trainerVerified, TrainerVerificationStatus.VERIFIED, Instant.now().minus(1, ChronoUnit.HOURS));
+
+        UUID trainerRejected = createActiveUser("trainer-all-rejected@example.com");
+        assignRole(trainerRejected, "TRAINER");
+        createTrainerProfile(trainerRejected, "coach-all-rejected", TrainerVerificationStatus.REJECTED);
+        UUID rejectedApp = createApplication(trainerRejected, TrainerVerificationStatus.REJECTED, Instant.now());
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications")
+                        .param("status", "ALL")
+                        .with(adminJwt(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(3)))
+                .andExpect(jsonPath("$.items", hasSize(3)))
+                .andExpect(jsonPath("$.items[0].id", is(pendingApp.toString())))
+                .andExpect(jsonPath("$.items[1].id", is(verifiedApp.toString())))
+                .andExpect(jsonPath("$.items[2].id", is(rejectedApp.toString())));
+    }
+
+    @Test
+    @DisplayName("31. Admin có role ADMIN nhưng bị thu hồi quyền TRAINER_VERIFY bị từ chối 403 ACCESS_DENIED")
+    void getApplications_missingTrainerVerifyPermission_returns403() throws Exception {
+        UUID adminId = createActiveUser("admin-no-verify-perm@example.com");
+        assignRole(adminId, "ADMIN");
+        jdbcTemplate.update("""
+                DELETE FROM fitness.role_permissions rp
+                USING fitness.roles r, fitness.permissions p
+                WHERE rp.role_id = r.id
+                  AND rp.permission_id = p.id
+                  AND r.code = 'ADMIN'
+                  AND p.code = 'TRAINER_VERIFY'
+                """);
+        try {
+            mockMvc.perform(get("/api/v1/admin/trainer-applications")
+                            .with(adminJwt(adminId)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode", is("ACCESS_DENIED")));
+        } finally {
+            jdbcTemplate.update("""
+                    INSERT INTO fitness.role_permissions (role_id, permission_id)
+                    SELECT r.id, p.id
+                    FROM fitness.roles r
+                    JOIN fitness.permissions p ON p.code = 'TRAINER_VERIFY'
+                    WHERE r.code = 'ADMIN'
+                    ON CONFLICT DO NOTHING
+                    """);
+        }
+    }
 }

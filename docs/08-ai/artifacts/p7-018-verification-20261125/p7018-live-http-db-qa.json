@@ -1,0 +1,45 @@
+{
+  "targetBackend": "http://127.0.0.1:18080/api/v1",
+  "disposableDbContainer": "f06-mobile-qa-20261124",
+  "tag": "67eebebc",
+  "checks": {
+    "v63MigrationAndPermission": {
+      "status": "PASS",
+      "v63": "63:true",
+      "grant": "ADMIN:TRAINER_VERIFY"
+    },
+    "documentUploadWithoutScannerFixture": {
+      "status": "NOT_RUN_CLEAN_FIXTURE_503_VERIFIED",
+      "detail": "ClamAV/S3 not configured in QA dev profile; backend honestly rejected PDF/PNG/JPEG with 503 SCANNER_UNAVAILABLE without bypass.",
+      "probes": {
+        "pdf": {
+          "httpStatus": 503,
+          "errorCode": "SCANNER_UNAVAILABLE"
+        },
+        "png": {
+          "httpStatus": 503,
+          "errorCode": "SCANNER_UNAVAILABLE"
+        },
+        "jpeg": {
+          "httpStatus": 503,
+          "errorCode": "SCANNER_UNAVAILABLE"
+        }
+      }
+    },
+    "endToEndJourneyHttpDb": {
+      "status": "PASS",
+      "stepsVerified": [
+        "nonAdmin403OnAdminQueue",
+        "submitApplicationPendingHiddenInDirectory",
+        "adminQueueStatusAllVisible",
+        "adminRejectAndReviewNotesHiddenFromTrainer",
+        "trainerAmendAndResubmitPending",
+        "adminApproveVerified",
+        "usersMeCanCoachTrue",
+        "hiddenWhileAcceptingStudentsFalse",
+        "visibleByDisplayNameAfterAcceptingStudentsTrue",
+        "publicSlugNotExposedOrSearchable"
+      ]
+    }
+  }
+}

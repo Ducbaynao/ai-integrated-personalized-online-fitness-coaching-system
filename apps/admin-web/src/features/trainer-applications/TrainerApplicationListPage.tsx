@@ -8,7 +8,7 @@ import type { TrainerVerificationStatus } from '../../types/trainerApplication.t
 const PAGE_SIZE = 15
 
 export function TrainerApplicationListPage() {
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [page, setPage] = useState(0)
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -17,7 +17,7 @@ export function TrainerApplicationListPage() {
       trainerApplicationApi.getApplications({
         page,
         size: PAGE_SIZE,
-        status: statusFilter || undefined,
+        status: statusFilter || 'ALL',
       }),
     retry: false,
   })
@@ -79,7 +79,7 @@ export function TrainerApplicationListPage() {
             }}
             className="select-input"
           >
-            <option value="">Tất cả trạng thái</option>
+            <option value="ALL">Tất cả trạng thái</option>
             <option value="PENDING">Chờ xét duyệt (PENDING)</option>
             <option value="VERIFIED">Đã phê duyệt (VERIFIED)</option>
             <option value="REJECTED">Đã từ chối (REJECTED)</option>

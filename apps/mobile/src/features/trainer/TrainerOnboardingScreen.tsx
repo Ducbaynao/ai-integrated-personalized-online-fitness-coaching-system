@@ -202,7 +202,7 @@ export function TrainerOnboardingScreen() {
               Định danh hồ sơ công khai
             </Text>
             <Text style={[styles.fieldHint, { color: themeColors.textSecondary }]}>
-              Định danh URL tùy chọn (ví dụ: coach-alex). Chỉ dùng chữ thường không dấu, chữ số và dấu gạch nối.
+              Định danh URL tùy chọn (ví dụ: coach-alex), không phải mã xác minh và không thay thế việc nộp hồ sơ xác minh để học viên tìm theo tên. Chỉ dùng chữ thường không dấu, chữ số và dấu gạch nối.
             </Text>
             <TextInput
               testID="trainer-slug-input"
