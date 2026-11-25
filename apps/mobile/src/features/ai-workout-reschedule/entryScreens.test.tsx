@@ -8,8 +8,9 @@ import { useWorkoutPlan, useWorkoutPlanVersion } from '@/features/workout-plan/w
 import { StudentWorkoutScheduleDetailScreen } from '@/features/workout-schedule/StudentWorkoutScheduleDetailScreen';
 import { TrainerWorkoutScheduleScreen } from '@/features/workout-schedule/TrainerWorkoutScheduleScreen';
 
+const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: mockReplace }),
   useFocusEffect: (callback: () => void | (() => void)) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
 }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
@@ -24,9 +25,9 @@ jest.mock('@/features/workout-plan/workoutPlanQueries', () => {
 });
 jest.mock('@/features/workout-plan/components/AiWorkoutAdjustmentModal', () => ({ AiWorkoutAdjustmentModal: () => null }));
 jest.mock('./AiWorkoutRescheduleModal', () => ({
-  AiWorkoutRescheduleModal: () => {
+  AiWorkoutRescheduleModal: (props: object) => {
     const { View } = jest.requireActual('react-native');
-    return <View testID="f05-mounted" />;
+    return <View testID="f05-mounted" {...props} />;
   },
 }));
 
@@ -60,9 +61,13 @@ describe('F05 entry screens', () => {
     (useWorkoutPlan as jest.Mock).mockReturnValue({ data: null });
     (useWorkoutPlanVersion as jest.Mock).mockReturnValue({ data: null });
     const { tree, client } = await render(<StudentWorkoutScheduleDetailScreen occurrenceId="occ-1" />);
-    expect(tree.root.findAllByProps({ testID: 'f05-student-open' }).length).toBeGreaterThan(0);
-    await renderer.act(async () => { tree.root.findByProps({ testID: 'f05-student-open' }).props.onPress(); });
+    expect(tree.root.findAllByProps({ testID: 'ai-workout-reschedule-button' }).length).toBeGreaterThan(0);
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'ai-workout-reschedule-button' }).props.onPress(); });
     expect(tree.root.findAllByProps({ testID: 'f05-mounted' }).length).toBeGreaterThan(0);
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'f05-mounted' }).props.onApplied({ resultingEntityId: 'successor-1' }); });
+    await renderer.act(async () => { await tree.root.findByProps({ testID: 'f05-mounted' }).props.onClose(); });
+    expect(mockReplace).toHaveBeenCalledWith('/workouts/schedule/successor-1');
+    expect(tree.root.findAllByProps({ testID: 'f05-mounted' })).toHaveLength(0);
     renderer.act(() => tree.unmount()); client.clear();
   });
 
@@ -80,13 +85,13 @@ describe('F05 entry screens', () => {
     (useTrainerWorkoutSchedule as jest.Mock).mockReturnValue({ data: { pages: [{ items: [occurrence], totalItems: 1 }] },
       isPending: false, isError: false, isFetching: false, hasNextPage: false, error: null, refetch: jest.fn() });
     const view = await render(<TrainerWorkoutScheduleScreen relationshipId="rel-1" />);
-    expect(view.tree.root.findAllByProps({ testID: 'f05-trainer-open-occ-1' })).toHaveLength(0);
+    expect(view.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occ-1' })).toHaveLength(0);
     renderer.act(() => view.tree.unmount()); view.client.clear();
 
     level = 'MANAGE'; sharing.data.items[0].accessLevel = level;
     const manage = await render(<TrainerWorkoutScheduleScreen relationshipId="rel-1" />);
-    expect(manage.tree.root.findAllByProps({ testID: 'f05-trainer-open-occ-1' }).length).toBeGreaterThan(0);
-    await renderer.act(async () => { manage.tree.root.findByProps({ testID: 'f05-trainer-open-occ-1' }).props.onPress(); });
+    expect(manage.tree.root.findAllByProps({ testID: 'trainer-ai-reschedule-occ-1' }).length).toBeGreaterThan(0);
+    await renderer.act(async () => { manage.tree.root.findByProps({ testID: 'trainer-ai-reschedule-occ-1' }).props.onPress(); });
     expect(manage.tree.root.findAllByProps({ testID: 'f05-mounted' }).length).toBeGreaterThan(0);
     renderer.act(() => manage.tree.unmount()); manage.client.clear();
   });

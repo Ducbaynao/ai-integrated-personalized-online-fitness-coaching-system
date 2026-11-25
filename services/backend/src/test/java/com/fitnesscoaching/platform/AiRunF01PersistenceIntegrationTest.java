@@ -113,12 +113,8 @@ class AiRunF01PersistenceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean up ai and exercise records
-        jdbcTemplate.execute("DELETE FROM fitness.ai_runs");
-        jdbcTemplate.execute("DELETE FROM fitness.user_roles");
-        jdbcTemplate.execute("DELETE FROM fitness.student_profiles");
-        jdbcTemplate.execute("DELETE FROM fitness.trainer_profiles");
-        jdbcTemplate.execute("DELETE FROM fitness.users");
+        // Clean up ai and user records cleanly with CASCADE
+        jdbcTemplate.execute("TRUNCATE TABLE fitness.ai_runs, fitness.users CASCADE");
 
         // Seed users
         seedUser(STUDENT_USER_ID, "student1@fitplatform.local", "STUDENT");
@@ -501,6 +497,76 @@ class AiRunF01PersistenceIntegrationTest {
         // And HTTP polling returns 403 AI_FORBIDDEN
         mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
                         .header("Authorization", bearer(STUDENT_USER_ID, "STUDENT")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("9. Trainer readback of student personalized run executes T04 coaching authority revalidation and PostgreSQL row locking")
+    void getF01Run_trainerPersonalizedReadback_executesCoachingAuthorityAndRowLocking() throws Exception {
+        // 1. Seed active coaching relationship and period between TRAINER and STUDENT
+        UUID relationshipId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.coaching_relationships
+                (id, student_id, trainer_id, status, requested_by, requested_at, accepted_at, started_at)
+                VALUES (?, ?, ?, 'ACTIVE', ?, clock_timestamp() - interval '2 days',
+                        clock_timestamp() - interval '2 days', clock_timestamp() - interval '2 days')
+                """, relationshipId, STUDENT_USER_ID, TRAINER_USER_ID, STUDENT_USER_ID);
+
+        UUID periodId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.coaching_periods
+                (id, student_id, mode, coaching_relationship_id, trainer_id, started_at, created_by)
+                VALUES (?, ?, 'HUMAN_COACH', ?, ?, clock_timestamp() - interval '2 days', ?)
+                """, periodId, STUDENT_USER_ID, relationshipId, TRAINER_USER_ID, TRAINER_USER_ID);
+
+        UUID permissionId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id, relationship_id, student_id, trainer_id, data_scope, decision, access_level, valid_from, granted_by)
+                VALUES (?, ?, ?, ?, 'FITNESS_GOAL', 'ALLOW', 'VIEW'::fitness.data_access_level,
+                        clock_timestamp() - interval '1 day', ?)
+                """, permissionId, relationshipId, STUDENT_USER_ID, TRAINER_USER_ID, STUDENT_USER_ID);
+
+        // 2. Trainer creates a personalized F01 run for the student
+        CreateF01AiRunCommand cmd = new CreateF01AiRunCommand(
+                "Thời gian nghỉ giữa các hiệp tập Squat nên là bao lâu?",
+                "vi",
+                activeExerciseId,
+                UUID.randomUUID(),
+                STUDENT_USER_ID,
+                true
+        );
+
+        AiRun run = aiRunUseCase.createF01Run(TRAINER_USER_ID, cmd);
+        assertThat(run.requestedBy()).isEqualTo(TRAINER_USER_ID);
+
+        // 3. Trainer reads back their own personalized run via getF01Run (T04 revalidation executes SELECT ... FOR SHARE on PostgreSQL)
+        AiRun fetched = aiRunUseCase.getF01Run(TRAINER_USER_ID, run.id());
+        assertThat(fetched.id()).isEqualTo(run.id());
+
+        // And via HTTP API polling -> 200 OK
+        mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId", is(run.id().toString())))
+                .andExpect(jsonPath("$.runStatus", is("QUEUED")));
+
+        // 4. Revoke coaching authority: Terminate coaching relationship and end period
+        jdbcTemplate.update("""
+                UPDATE fitness.coaching_relationships
+                SET status = 'ENDED', version = version + 1, ended_at = clock_timestamp(), termination_reason = 'STUDENT_INITIATED'
+                WHERE id = ?
+                """, relationshipId);
+        jdbcTemplate.update("UPDATE fitness.coaching_periods SET ended_at = clock_timestamp() WHERE id = ?", periodId);
+
+        // Now Trainer readback must fail closed with 403 AI_FORBIDDEN because trainer lacks active coaching relationship
+        assertThatThrownBy(() -> aiRunUseCase.getF01Run(TRAINER_USER_ID, run.id()))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.AiRunAccessDeniedException.class)
+                .hasMessageContaining("lacks active coaching relationship");
+
+        mockMvc.perform(get("/api/v1/ai/runs/" + run.id())
+                        .header("Authorization", bearer(TRAINER_USER_ID, "TRAINER")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode", is("AI_FORBIDDEN")));
     }

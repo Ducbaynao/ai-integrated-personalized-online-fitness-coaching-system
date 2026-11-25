@@ -1,0 +1,234 @@
+{
+  "verifiedOn": "2026-11-20",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "scope": "F05 / P2-M4 technical handover verification; not full feature or milestone acceptance",
+  "verifiedCommit": "be5925872bbf0d08d7188a611a0fad616a115a84",
+  "localHeadAtReview": "673ce513762613f41ee568073ea95ea1882c39d3",
+  "sourceComparison": {
+    "method": "git diff --exit-code be59258 HEAD -- <reviewed paths>",
+    "exitCode": 0,
+    "reviewedPaths": [
+      "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/F05ContextBuilder.java",
+      "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/AiWorkoutRescheduleService.java",
+      "services/backend/src/main/java/com/fitnesscoaching/platform/modules/ai/application/service/F05RuntimeOutputValidator.java",
+      "services/backend/src/main/java/com/fitnesscoaching/platform/modules/workout",
+      "services/backend/src/main/java/com/fitnesscoaching/platform/modules/schedule",
+      "services/backend/src/test/java/com/fitnesscoaching/platform/AiWorkoutRescheduleIntegrationTest.java",
+      "services/backend/src/test/java/com/fitnesscoaching/platform/AiWorkoutRescheduleRealFastApiIntegrationTest.java",
+      "services/backend/src/test/java/com/fitnesscoaching/platform/WorkoutScheduleChangeIntegrationTest.java",
+      "services/backend/src/test/java/com/fitnesscoaching/platform/modules/ai/application/service/AiWorkoutRescheduleServiceUnitTest.java",
+      "services/backend/src/test/java/com/fitnesscoaching/platform/modules/ai/application/service/F05RuntimeOutputValidatorUnitTest.java",
+      "services/ai-service/app/integrations/simulated_f05_provider.py",
+      "services/ai-service/tests/test_f05_provider.py"
+    ]
+  },
+  "method": "Read exact-commit GitHub Actions run, checkout SHA, job steps and decoded logs; compare relevant local test/implementation sources with verified commit. No local functional tests rerun.",
+  "workflow": {
+    "id": 44231122900,
+    "runNumber": 363,
+    "attempt": 1,
+    "event": "push",
+    "headBranch": "main",
+    "headSha": "be5925872bbf0d08d7188a611a0fad616a115a84",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900",
+    "startedAtUtc": "2026-11-18T03:32:21Z",
+    "updatedAtUtc": "2026-11-18T03:44:29Z",
+    "jobs": [
+      {
+        "id": 134556155446,
+        "name": "Client Admin Web",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155446"
+      },
+      {
+        "id": 134556155815,
+        "name": "Database Migrations Check",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155815"
+      },
+      {
+        "id": 134556155880,
+        "name": "Client Mobile",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155880"
+      },
+      {
+        "id": 134556155932,
+        "name": "Backend",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155932"
+      },
+      {
+        "id": 134556155951,
+        "name": "Contracts & Docs Validation",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155951"
+      },
+      {
+        "id": 134556156055,
+        "name": "AI Service",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556156055"
+      }
+    ]
+  },
+  "backend": {
+    "f05Tests": 55,
+    "workoutScheduleChangeRegressionTests": 21,
+    "suites": [
+      {
+        "suite": "AiWorkoutRescheduleIntegrationTest",
+        "tests": 23,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "AiWorkoutRescheduleRealFastApiIntegrationTest",
+        "displayName": "F05 Runtime Verification against Real FastAPI Process and PostgreSQL",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "AiWorkoutRescheduleServiceUnitTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "F05RuntimeOutputValidatorUnitTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "WorkoutScheduleChangeIntegrationTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "wholeBackend": {
+      "tests": 2039,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 5,
+      "passed": 2034
+    },
+    "unrelatedSkippedSuites": [
+      "WHO-01 Real Embedding Testbed Integration Test (2)",
+      "OpenAI Embedding Live Smoke Test (Controlled) (1)",
+      "Eligible Corpus Real Embedding Testbed Integration Test (1)",
+      "ClamdDisposableIntegrationTest (1)"
+    ],
+    "database": "PostgreSQL 18.7",
+    "migrationVersion": "V60",
+    "migrations": 60
+  },
+  "aiService": {
+    "pytestPassed": 86,
+    "ruff": "PASS",
+    "provider": "simulated"
+  },
+  "contracts": {
+    "openapi": "PASS",
+    "schemas": 10,
+    "fixtures": 46,
+    "contractTestsPassed": 21,
+    "uxDocs": "PASS",
+    "knowledgeValidation": "PASS",
+    "knowledgeTestsPassed": 25
+  },
+  "logExcerpts": [
+    {
+      "jobId": 134556155932,
+      "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155932",
+      "lines": [
+        "2026-11-18T03:32:29.6141277Z be5925872bbf0d08d7188a611a0fad616a115a84",
+        "2026-11-18T03:33:26.9218308Z 2026-11-18T03:33:26.890Z  INFO 2535 --- [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:32769/ai_f05_slice_test?loggerLevel=OFF (PostgreSQL 18.7)",
+        "2026-11-18T03:33:34.0102286Z [INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.26 s -- in com.fitnesscoaching.platform.AiWorkoutRescheduleIntegrationTest",
+        "2026-11-18T03:37:54.0701565Z [INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.fitnesscoaching.platform.modules.ai.application.service.F05RuntimeOutputValidatorUnitTest",
+        "2026-11-18T03:37:54.9923547Z [INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.469 s -- in com.fitnesscoaching.platform.modules.ai.application.service.AiWorkoutRescheduleServiceUnitTest",
+        "2026-11-18T03:38:22.1759810Z [WARNING] Tests run: 2, Failures: 0, Errors: 0, Skipped: 2, Time elapsed: 0.001 s -- in WHO-01 Real Embedding Testbed Integration Test",
+        "2026-11-18T03:38:26.3824862Z [WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.005 s -- in OpenAI Embedding Live Smoke Test (Controlled)",
+        "2026-11-18T03:38:26.4026394Z [WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0 s -- in Eligible Corpus Real Embedding Testbed Integration Test",
+        "2026-11-18T03:38:40.2837657Z [WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.001 s -- in com.fitnesscoaching.platform.modules.chat.ClamdDisposableIntegrationTest",
+        "2026-11-18T03:39:05.0010713Z 2026-11-18T03:39:04.929Z  INFO 2535 --- [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:32838/ai_f05_real_fastapi_integration?loggerLevel=OFF (PostgreSQL 18.7)",
+        "2026-11-18T03:39:07.2984516Z [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.852 s -- in F05 Runtime Verification against Real FastAPI Process and PostgreSQL",
+        "2026-11-18T03:43:11.0128967Z [INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.383 s -- in com.fitnesscoaching.platform.WorkoutScheduleChangeIntegrationTest",
+        "2026-11-18T03:44:26.8534428Z [INFO] Tests run: 2039, Failures: 0, Errors: 0, Skipped: 5",
+        "2026-11-18T03:44:26.8563572Z [INFO] BUILD SUCCESS"
+      ]
+    },
+    {
+      "jobId": 134556156055,
+      "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556156055",
+      "lines": [
+        "2026-11-18T03:32:28.7981897Z be5925872bbf0d08d7188a611a0fad616a115a84",
+        "2026-11-18T03:32:43.3008588Z All checks passed!",
+        "2026-11-18T03:32:44.6770687Z collected 86 items",
+        "2026-11-18T03:32:44.7854672Z tests/test_f05_provider.py ....                                          [ 44%]",
+        "2026-11-18T03:32:47.9580709Z ============================== 86 passed in 3.72s =============================="
+      ]
+    },
+    {
+      "jobId": 134556155951,
+      "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155951",
+      "lines": [
+        "2026-11-18T03:32:28.8062771Z be5925872bbf0d08d7188a611a0fad616a115a84",
+        "2026-11-18T03:32:37.4446232Z \u001b[39m\u001b[32mWoohoo! Your API description is valid. 🎉",
+        "2026-11-18T03:32:38.1656129Z AI schema and contract validation passed (10 schemas, 46 contract fixtures verified with Ajv 2020).",
+        "2026-11-18T03:32:38.6518340Z # tests 21",
+        "2026-11-18T03:32:38.6524260Z # pass 21",
+        "2026-11-18T03:32:38.6524574Z # fail 0",
+        "2026-11-18T03:32:38.6525582Z # skipped 0",
+        "2026-11-18T03:32:38.8073333Z UX documentation validation passed (18 required files).",
+        "2026-11-18T03:32:41.9301209Z # tests 25",
+        "2026-11-18T03:32:41.9301855Z # pass 25",
+        "2026-11-18T03:32:41.9302311Z # fail 0",
+        "2026-11-18T03:32:41.9303231Z # skipped 0"
+      ]
+    },
+    {
+      "jobId": 134556155815,
+      "url": "https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900/job/134556155815",
+      "lines": [
+        "2026-11-18T03:32:30.7813943Z be5925872bbf0d08d7188a611a0fad616a115a84",
+        "2026-11-18T03:32:49.7032659Z postgres-1  | waiting for server to start....2026-11-18 03:32:49.702 UTC [53] LOG:  starting PostgreSQL 18.7 (Debian 18.7-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+        "2026-11-18T03:32:49.9766697Z postgres-1  | 2026-11-18 03:32:49.976 UTC [1] LOG:  starting PostgreSQL 18.7 (Debian 18.7-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+        "2026-11-18T03:32:53.6273203Z flyway-1    | Database: jdbc:postgresql://postgres:5432/digital_fitness (PostgreSQL 18.7)",
+        "2026-11-18T03:32:55.0414204Z flyway-1    | Successfully applied 60 migrations to schema \"fitness\", now at version v60 (execution time 00:00.836s)",
+        "2026-11-18T03:32:55.3635996Z Migration check passed and disposable database cleaned up successfully."
+      ]
+    }
+  ],
+  "openGates": [
+    "D06/OD-3 physiological recovery rules and specialist review",
+    "Full availability/continuity against authority matrix section 6; F05ContextBuilder currently hardcodes RECENT_CONSISTENT instead of deriving continuity from source data",
+    "Mobile F05 Student/Trainer journeys and official assignee/reviewer",
+    "Real provider quality/latency/usage/cost",
+    "Dedicated F05 in-flight revocation evidence (T04); existing revoked read/accept tests are narrower",
+    "Full Appointment two-party change request -> proposal refresh -> F05 accept journey",
+    "Remaining failure/recovery drills and feature/milestone sign-off"
+  ],
+  "limitations": [
+    "Historical runtime JSON remains historical; this record does not relabel it as generated at be59258.",
+    "CI evidence proves the tested MockMvc -> Spring -> real HTTP Uvicorn/FastAPI -> simulated provider -> Workout domain -> PostgreSQL boundary, not external HTTP into Spring or a live model.",
+    "Current local HEAD contains later F01 changes; exact-commit CI is the authority for be59258.",
+    "Docker local probe was denied in sandbox; no local rerun is claimed or required to establish the existing exact-commit CI results.",
+    "No Git mutations, commits, pushes, branch changes, deployment or GitHub messages performed."
+  ]
+}

@@ -89,8 +89,8 @@ public class F05RuntimeOutputValidator {
         if (outputSupervision.isBlank()) {
             return ValidationResult.invalid("supervisionRequirement is required in reschedule payload.");
         }
-        if ("COACH_REQUIRED".equals(sourceSnapshot.supervisionRequirement()) && "SELF_PERFORMABLE".equals(outputSupervision)) {
-            return ValidationResult.invalid("COACH_REQUIRED supervision requirement cannot be degraded to SELF_PERFORMABLE");
+        if ("COACH_REQUIRED".equals(sourceSnapshot.supervisionRequirement()) && !"COACH_REQUIRED".equals(outputSupervision)) {
+            return ValidationResult.invalid("COACH_REQUIRED supervision requirement cannot be degraded to " + outputSupervision);
         }
 
         // 5. Validate destination object

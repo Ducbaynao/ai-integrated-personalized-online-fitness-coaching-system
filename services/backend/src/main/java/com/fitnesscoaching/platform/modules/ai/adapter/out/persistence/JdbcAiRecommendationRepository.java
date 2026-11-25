@@ -190,6 +190,44 @@ public class JdbcAiRecommendationRepository implements AiRecommendationRepositor
     }
 
     @Override
+    public boolean updateDecisionIfStatus(
+            UUID id,
+            AiRecommendationStatus expectedStatus,
+            AiRecommendationStatus newStatus,
+            UUID decidedBy,
+            Instant decidedAt,
+            String decisionNote,
+            String targetEntityType,
+            UUID targetEntityId
+    ) {
+        String sql = """
+            UPDATE fitness.ai_recommendations
+            SET status = ?::fitness.recommendation_status,
+                decided_by = ?,
+                decided_at = ?,
+                decision_note = ?,
+                target_entity_type = ?,
+                target_entity_id = ?,
+                updated_at = ?
+            WHERE id = ? AND status = ?::fitness.recommendation_status
+            """;
+
+        int updated = jdbcTemplate.update(
+                sql,
+                newStatus.name(),
+                decidedBy,
+                decidedAt != null ? Timestamp.from(decidedAt) : null,
+                decisionNote,
+                targetEntityType,
+                targetEntityId,
+                Timestamp.from(Instant.now()),
+                id,
+                expectedStatus.name()
+        );
+        return updated == 1;
+    }
+
+    @Override
     public void updateDraft(
             UUID id,
             int newRevision,

@@ -1,5 +1,17 @@
 # F05 Workout Rescheduling — Verification and Handover
 
+> **Latest handover verification — 2026-11-20 (UTC+7):** Exact-commit push CI
+> [run #363](https://github.com/Ducbaynao/ai-integrated-personalized-online-fitness-coaching-system/actions/runs/44231122900)
+> checked out `be5925872bbf0d08d7188a611a0fad616a115a84` and passed all six jobs.
+> Logs confirm 55/55 F05 tests, 21/21 Workout schedule-change tests, 86/86 Python
+> tests and contract validation. This closes the technical handover evidence gap;
+> full F05/P2-M4 acceptance remains open. See the
+> [dated acceptance checklist](../../f05-handover-acceptance-checklist-20261120.md)
+> and [machine-readable CI evidence](handover_verification_20261120.json).
+> Sections below retain their historical review dates and narrower evidence limits;
+> the dated checklist owns the current gate status, including verified GET/Accept
+> races and the remaining recovery, continuity, authorization and client work.
+
 **Reviewed:** 2026-11-16 (UTC+7)
 **Branch:** `feat/p2-m4-f05-rescheduling`
 **Implementation HEAD before review:** `b459d2d`
@@ -165,3 +177,45 @@ The generated missed-source runtime payload is retained separately at
 It was produced by MockMvc -> Spring -> HTTP Uvicorn with simulated provider ->
 Workout domain -> PostgreSQL. Test evidence now writes to target/f05-runtime-evidence
 so reruns preserve the retained repository artifacts.
+
+## Recovery, availability, and appointment coordination verified 2026-11-17
+
+A dedicated continuation sprint on branch `feat/f05-recovery-availability-appointment`
+(based on `origin/main` at `ff7cfc7c5076fe92bd8457d2a0c31709fb712652`) addressed
+the F05 behavioral gaps with verified evidence:
+
+1. **Slot Selection & Schedule Availability (Heuristic Slot & Domain Overlap)**:
+   - `simulated_f05_provider.py` and `SimulatedF05AiServiceClient.java` map `preferredTimeOfDay` case-insensitively (`MORNING` -> 09:00, `AFTERNOON` -> 14:00, `EVENING` -> 18:00) as heuristic simulated defaults.
+   - Candidate slots are bounded and strictly future-calculated relative to current UTC time with a maximum 90-iteration search, preventing past slots and clamping candidates within the 90-day domain horizon.
+   - Preserves timezone offset and validates DST transition gaps.
+   - **Crucial Boundary Clarification**: The verified availability scope covers only candidate slot generation, timezone/DST validation, and domain schedule overlap prevention (`WORKOUT_SCHEDULE_OVERLAP`). It does **not** claim physiological recovery rules (such as muscle group fatigue, minimum rest periods, or systemic readiness), which remain open pending specialist review under D06/OD-3.
+
+2. **Appointment Coordination and Supervision (`COACH_REQUIRED`)**:
+   - **Revalidation on Accept**: `AiWorkoutRescheduleService.doAcceptReschedule` checks `liveOccurrence.linkedAppointmentId()` and `liveOccurrence.linkedAppointmentVersion()` against `sourceSnapshot`. Any appointment cancellation, reschedule, or re-link between proposal generation and application aborts with `AiRunLifecycleConflictException` (HTTP 409).
+   - **Supervision Invariant Guard**: `F05RuntimeOutputValidator` enforces that an occurrence with `COACH_REQUIRED` supervision cannot be degraded to optional/self-directed in the proposal.
+   - **Domain Transfer**: When a `COACH_REQUIRED` session has a qualifying confirmed appointment, `workoutScheduleChangeUseCase.reschedule` atomically transfers the appointment link (`fitness.appointments.planned_workout_id`) to the successor occurrence (`replacementId`).
+   - **Missing Appointment Guard**: Rescheduling a `COACH_REQUIRED` session without a qualifying confirmed appointment aborts with `WORKOUT_SCHEDULE_COACH_REQUIRED_RESCHEDULE_UNSUPPORTED` (HTTP 409).
+
+3. **Concurrency and Transactional Failure Verification**:
+   - **GET vs. Decision Concurrency**: `updateDecisionIfStatus` conditionally updates recommendation status from `PENDING` to `EXPIRED` only if the recommendation is still `PENDING` at database level, preventing concurrent GET calls from overwriting an `APPLIED` or `REJECTED` decision. Verified both in sequence and in multi-threaded concurrent race (`concurrentGetAndAcceptNearExpiry_resolvesToConsistentTerminalState`).
+   - **Destination Overlap Race**: An overlapping planned workout scheduled on the destination slot between proposal generation and accept aborts with `WORKOUT_SCHEDULE_OVERLAP` (HTTP 409), leaving the original occurrence in `SCHEDULED`.
+   - **Audit Failure Rollback**: Simulating an insert failure on `fitness.audit_logs` triggers an atomic transaction rollback: no replacement workout is created, old occurrence remains `SCHEDULED`, and recommendation status remains unchanged.
+
+### Verification Summary
+
+- **Contracts**: `npm run validate:contracts` passes (OpenAPI valid, 10 schemas, 48 fixtures).
+- **AI Service**: `pytest` passes 5/5 for F05 provider (`test_f05_provider.py`) including all 5 continuity states; `ruff check .` passes with zero issues.
+- **Backend Test Suites**:
+  - `AiWorkoutRescheduleServiceUnitTest`: **19/19 passed** (including 5 T04 in-flight authority revocation and readback guard tests using `CountDownLatch`, atomic rollback, and conditional expiry).
+  - `F05ContextBuilderUnitTest`: **8/8 passed** (including authoritative ProgressEngine resolution, fallback resolution, beginner 0-month CONFIRMED_NEW, PROLONGED_INACTIVITY >= 100 days, RESTRICTED_HISTORY, and UNKNOWN_HISTORY).
+  - `F05RuntimeOutputValidatorUnitTest`: **12/12 passed** (including COACH_REQUIRED degradation rejection).
+  - Total F05 Unit Tests: **39 passed** (zero failures, zero errors).
+  - `AiWorkoutRescheduleIntegrationTest`: **31/31 passed (100%)** on live PostgreSQL Testcontainers (`pgvector/pgvector:pg18`), including 4 in-flight revocation T04 cases (MANAGE loss, VIEW loss, account SUSPENDED, coaching period ended), 1 readback guard T04 (MANAGE vs VIEW distinction), 1 legacy snapshot backward compatibility, 1 continuity/provenance assertion (daysSinceLastWorkout, continuityWatermark, asOf, timezone, continuityState), 1 atomic transaction rollback on audit failure, and all 23 prior integration tests.
+  - `WorkoutScheduleChangeIntegrationTest`: **21/21 passed (100%)** on Testcontainers.
+  - `AiWorkoutRescheduleRealFastApiIntegrationTest`: **6/6 passed (100%)** on Testcontainers + live Uvicorn FastAPI process.
+- **Operational Note**: Docker Desktop environment blocker was resolved. All integration suites ran against live PostgreSQL 18 Testcontainers with zero failures and zero skips.
+
+### Open Gates and Release Boundaries
+- **D06 / OD-3 Review**: Physiological recovery rules (minimum rest between sessions, muscle recovery windows) remain open pending specialist review. F05-BL-01 (continuity source resolution) and F05-BL-02 (T04 in-flight revocation) are fully addressed in code and verified on both unit and live PostgreSQL Testcontainers integration layers (31/31 integration tests pass).
+- **Real Provider Evaluation**: Current tests use deterministic simulated providers; latency, cost, and LLM output consistency require evaluation against real model endpoints.
+- **Mobile F05 Client**: Mobile UI/journey is not implemented in this backend branch. Assignee and reviewer roles must be confirmed from official task tracking, not inferred from product roles.

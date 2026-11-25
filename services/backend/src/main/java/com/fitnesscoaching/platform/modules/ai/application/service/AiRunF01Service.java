@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,29 @@ public class AiRunF01Service implements AiRunF01UseCase {
     private final UserRoleQuery userRoleQuery;
     private final ExerciseCatalogRepository exerciseCatalogRepository;
     private final F01InternalEnvelopeBuilder envelopeBuilder;
+    private final F01PersonalContextBuilder personalContextBuilder;
     private final ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiRunF01Service(
+            AiRunRepository runRepository,
+            AiProvenanceRepository provenanceRepository,
+            UserAccountStatusQuery accountStatusQuery,
+            UserRoleQuery userRoleQuery,
+            ExerciseCatalogRepository exerciseCatalogRepository,
+            F01InternalEnvelopeBuilder envelopeBuilder,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) F01PersonalContextBuilder personalContextBuilder,
+            ObjectMapper objectMapper
+    ) {
+        this.runRepository = runRepository;
+        this.provenanceRepository = provenanceRepository;
+        this.accountStatusQuery = accountStatusQuery;
+        this.userRoleQuery = userRoleQuery;
+        this.exerciseCatalogRepository = exerciseCatalogRepository;
+        this.envelopeBuilder = envelopeBuilder;
+        this.personalContextBuilder = personalContextBuilder;
+        this.objectMapper = objectMapper;
+    }
 
     public AiRunF01Service(
             AiRunRepository runRepository,
@@ -60,13 +83,7 @@ public class AiRunF01Service implements AiRunF01UseCase {
             F01InternalEnvelopeBuilder envelopeBuilder,
             ObjectMapper objectMapper
     ) {
-        this.runRepository = runRepository;
-        this.provenanceRepository = provenanceRepository;
-        this.accountStatusQuery = accountStatusQuery;
-        this.userRoleQuery = userRoleQuery;
-        this.exerciseCatalogRepository = exerciseCatalogRepository;
-        this.envelopeBuilder = envelopeBuilder;
-        this.objectMapper = objectMapper;
+        this(runRepository, provenanceRepository, accountStatusQuery, userRoleQuery, exerciseCatalogRepository, envelopeBuilder, null, objectMapper);
     }
 
     @Override
@@ -126,7 +143,36 @@ public class AiRunF01Service implements AiRunF01UseCase {
         if (command.correlationId() != null) {
             inputMap.put("correlationId", command.correlationId().toString());
         }
+        if (command.studentId() != null) {
+            inputMap.put("studentId", command.studentId().toString());
+        }
+        if (command.includePersonalContext() != null) {
+            inputMap.put("includePersonalContext", command.includePersonalContext());
+        }
         String inputPayloadJson = toJson(inputMap);
+
+        // 6a. Resolve acting role for dual-role accounts (STUDENT + TRAINER)
+        String actingRole;
+        if (command.studentId() != null && !command.studentId().equals(actorId)) {
+            // Requesting for another student: must act as TRAINER if permitted
+            actingRole = isTrainer ? "TRAINER" : "STUDENT";
+        } else {
+            // Requesting for self or general query
+            actingRole = isStudent ? "STUDENT" : "TRAINER";
+        }
+
+        // 6b. Build personal context only if explicitly requested
+        F01InternalContextEnvelope.PersonalContext personalContext = null;
+        if (Boolean.TRUE.equals(command.includePersonalContext()) && personalContextBuilder != null) {
+            personalContext = personalContextBuilder.buildPersonalContext(
+                    actorId,
+                    actingRole,
+                    command.studentId()
+            );
+        } else if ("STUDENT".equals(actingRole) && command.studentId() != null && !command.studentId().equals(actorId)) {
+            // Even when includePersonalContext is false/omitted, a Student must not query with another Student's ID
+            throw new AiRunAccessDeniedException("Student is not authorized to query another student's personal context");
+        }
 
         UUID runId = UUID.randomUUID();
         Instant now = Instant.now();
@@ -150,11 +196,12 @@ public class AiRunF01Service implements AiRunF01UseCase {
         F01InternalContextEnvelope envelope = envelopeBuilder.build(
                 runId,
                 actorId,
-                isStudent ? "STUDENT" : "TRAINER",
+                actingRole,
                 trimmedQuestion,
                 language,
                 command.correlationId(),
-                exerciseDetail
+                exerciseDetail,
+                personalContext
         );
 
         String contextPayloadJson = toJson(envelope);
@@ -173,10 +220,15 @@ public class AiRunF01Service implements AiRunF01UseCase {
         );
         provenanceRepository.saveSnapshot(snapshot);
 
+        List<AiRunInputReference> inputReferences = new java.util.ArrayList<>();
         if (command.exerciseId() != null) {
-            provenanceRepository.saveInputReferences(runId, List.of(
-                    new AiRunInputReference(runId, "EXERCISE", command.exerciseId(), "CATALOG_SUBJECT")
-            ));
+            inputReferences.add(new AiRunInputReference(runId, "EXERCISE", command.exerciseId(), "CATALOG_SUBJECT"));
+        }
+        if (personalContext != null) {
+            inputReferences.add(new AiRunInputReference(runId, "STUDENT", personalContext.studentId(), "PERSONAL_CONTEXT_SUBJECT"));
+        }
+        if (!inputReferences.isEmpty()) {
+            provenanceRepository.saveInputReferences(runId, inputReferences);
         }
 
         return new CreatedF01RunContext(created, envelope);
@@ -189,7 +241,8 @@ public class AiRunF01Service implements AiRunF01UseCase {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    // Trainer readback checks use Coaching authority's FOR SHARE boundary, requiring a read-write transaction in PostgreSQL.
+    @Transactional
     public AiRun getF01Run(UUID actorId, UUID runId) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authenticated actor ID is required");
@@ -206,6 +259,39 @@ public class AiRunF01Service implements AiRunF01UseCase {
         // Enforce ownership: only the user who requested the run can view it
         if (run.requestedBy() == null || !run.requestedBy().equals(actorId)) {
             throw new AiRunAccessDeniedException("Access denied: only the run owner can access this AI Run");
+        }
+
+        // T04 Readback Guard: If the run contained personal context for a student other than the actor,
+        // verify that the actor STILL retains active TRAINER capability, active coaching authority over that student,
+        // and granular sharing permissions for any context data sources included in the run.
+        if (personalContextBuilder != null) {
+            List<AiRunInputReference> inputRefs = provenanceRepository.findInputReferencesByRunId(runId);
+            for (AiRunInputReference ref : inputRefs) {
+                if ("STUDENT".equals(ref.entityType()) && !actorId.equals(ref.entityId())) {
+                    if (!userRoleQuery.hasActiveRole(actorId, "TRAINER")) {
+                        throw new AiRunAccessDeniedException("Access denied: active trainer role required to access student context");
+                    }
+                    personalContextBuilder.validateTrainerAuthority(actorId, ref.entityId());
+
+                    // Check snapshot to determine if goal or plan was included in this run's context
+                    boolean hadGoal = false;
+                    boolean hadPlan = false;
+                    Optional<AiContextSnapshot> snapshotOpt = provenanceRepository.findSnapshotByRunId(runId);
+                    if (snapshotOpt.isPresent() && snapshotOpt.get().contextPayload() != null) {
+                        try {
+                            JsonNode root = objectMapper.readTree(snapshotOpt.get().contextPayload());
+                            JsonNode personalCtxNode = root.get("personalContext");
+                            if (personalCtxNode != null && !personalCtxNode.isNull()) {
+                                hadGoal = personalCtxNode.hasNonNull("activeGoal");
+                                hadPlan = personalCtxNode.hasNonNull("currentActivePlanName");
+                            }
+                        } catch (Exception e) {
+                            log.debug("Failed to inspect context snapshot for run {}: {}", runId, e.getMessage());
+                        }
+                    }
+                    personalContextBuilder.validateGranularSharingAuthority(actorId, ref.entityId(), hadGoal, hadPlan);
+                }
+            }
         }
 
         return run;

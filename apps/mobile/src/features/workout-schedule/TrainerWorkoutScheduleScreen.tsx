@@ -33,10 +33,13 @@ function TrainerOccurrenceCard({ item, relationshipId, canContribute, canManage,
     <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {item.planSummary?.planName?.trim() || 'Chưa có tên kế hoạch trong bản ghi cũ'}{item.planSummary ? ` · Phiên bản ${item.planSummary.planVersionNumber}` : ''}</Text>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi: {item.sessionSummary ? `Tuần ${item.sessionSummary.weekNumber}, ngày ${item.sessionSummary.dayNumber}, thứ tự ${item.sessionSummary.sequenceNumber}` : 'Chưa có tóm tắt buổi tập trong bản ghi cũ'}</Text>
     {item.sessionSummary?.focus ? <Text style={[styles.body, { color: theme.textSecondary }]}>Trọng tâm: {item.sessionSummary.focus}</Text> : null}
-    {canContribute && item.status === 'SCHEDULED' ? <WorkoutButton testID={`trainer-propose-change-${item.occurrenceId}`} label="Đề xuất đổi hoặc hủy buổi này" secondary
-      onPress={() => router.push(`/coaching/${relationshipId}/change-proposals/new?occurrenceId=${encodeURIComponent(item.occurrenceId)}` as never)} /> : null}
-    {canManage && item.status === 'SCHEDULED' ? <WorkoutButton testID={`f05-trainer-open-${item.occurrenceId}`}
-      label="AI đề xuất xếp lại buổi tập" secondary onPress={() => onAiReschedule(item)} /> : null}
+    {item.status === 'SCHEDULED' ? <View style={styles.row}>
+      {canManage ? <WorkoutButton testID={`trainer-ai-reschedule-${item.occurrenceId}`}
+        label="Đề xuất dời lịch (AI)" secondary onPress={() => onAiReschedule(item)} /> : null}
+      {canContribute ? <WorkoutButton testID={`trainer-propose-change-${item.occurrenceId}`}
+        label="Đề xuất đổi hoặc hủy buổi này" secondary
+        onPress={() => router.push(`/coaching/${relationshipId}/change-proposals/new?occurrenceId=${encodeURIComponent(item.occurrenceId)}` as never)} /> : null}
+    </View> : null}
   </WorkoutCard>;
 }
 

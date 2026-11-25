@@ -25,6 +25,17 @@ public interface AiRecommendationRepository {
             UUID targetEntityId
     );
 
+    boolean updateDecisionIfStatus(
+            UUID id,
+            AiRecommendationStatus expectedStatus,
+            AiRecommendationStatus newStatus,
+            UUID decidedBy,
+            Instant decidedAt,
+            String decisionNote,
+            String targetEntityType,
+            UUID targetEntityId
+    );
+
     void updateDraft(
             UUID id,
             int newRevision,

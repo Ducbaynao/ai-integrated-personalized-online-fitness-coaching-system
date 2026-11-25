@@ -54,6 +54,7 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
     private final AiServiceProperties aiProperties;
     private final F01RuntimeOutputValidator runtimeValidator;
     private final AiFeatureControlUseCase featureControlUseCase;
+    private final F01PersonalContextBuilder personalContextBuilder;
 
     @org.springframework.beans.factory.annotation.Autowired
     public AiKnowledgeOrchestrationService(
@@ -65,7 +66,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
             ObjectMapper objectMapper,
             AiServiceProperties aiProperties,
             F01RuntimeOutputValidator runtimeValidator,
-            AiFeatureControlUseCase featureControlUseCase
+            AiFeatureControlUseCase featureControlUseCase,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) F01PersonalContextBuilder personalContextBuilder
     ) {
         this.aiRunUseCase = aiRunUseCase;
         this.aiServiceClient = aiServiceClient;
@@ -76,6 +78,32 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
         this.aiProperties = aiProperties;
         this.runtimeValidator = runtimeValidator;
         this.featureControlUseCase = featureControlUseCase;
+        this.personalContextBuilder = personalContextBuilder;
+    }
+
+    public AiKnowledgeOrchestrationService(
+            AiRunF01UseCase aiRunUseCase,
+            F01AiServiceClient aiServiceClient,
+            AiProvenanceRepository provenanceRepository,
+            KnowledgeRetrievalUseCase retrievalUseCase,
+            F01RunEvidenceTracker evidenceTracker,
+            ObjectMapper objectMapper,
+            AiServiceProperties aiProperties,
+            F01RuntimeOutputValidator runtimeValidator,
+            AiFeatureControlUseCase featureControlUseCase
+    ) {
+        this(
+                aiRunUseCase,
+                aiServiceClient,
+                provenanceRepository,
+                retrievalUseCase,
+                evidenceTracker,
+                objectMapper,
+                aiProperties,
+                runtimeValidator,
+                featureControlUseCase,
+                null
+        );
     }
 
     public AiKnowledgeOrchestrationService(
@@ -97,7 +125,8 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                 objectMapper,
                 aiProperties,
                 runtimeValidator,
-                new StaticAiFeatureControl(aiProperties)
+                new StaticAiFeatureControl(aiProperties),
+                null
         );
     }
 
@@ -112,7 +141,9 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                 request.question(),
                 request.language(),
                 request.exerciseId(),
-                request.correlationId()
+                request.correlationId(),
+                request.studentId(),
+                request.includePersonalContext()
         );
 
         // 1. Transaction 1: Create AI Run and persist initial context snapshot
@@ -349,6 +380,15 @@ public class AiKnowledgeOrchestrationService implements AiKnowledgeQueryUseCase 
                 // Pre-delivery revalidation: verify actor is still ACTIVE and retains STUDENT or TRAINER capability
                 // before releasing AI generated answer and citations to the caller.
                 aiRunUseCase.revalidateActorAuthorization(actorId);
+
+                // If personalized context was included for a student under human coaching, re-verify Trainer authority and granular permissions (T04)
+                if (envelope.personalContext() != null && "TRAINER".equals(envelope.actor().role()) && personalContextBuilder != null) {
+                    UUID studentId = envelope.personalContext().studentId();
+                    personalContextBuilder.validateTrainerAuthority(actorId, studentId);
+                    boolean hadGoal = envelope.personalContext().activeGoal() != null;
+                    boolean hadPlan = envelope.personalContext().currentActivePlanName() != null;
+                    personalContextBuilder.validateGranularSharingAuthority(actorId, studentId, hadGoal, hadPlan);
+                }
 
                 return serviceResponse;
             } else {

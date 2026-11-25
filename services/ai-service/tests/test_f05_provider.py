@@ -1,6 +1,8 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -9,6 +11,28 @@ from app.main import app
 from app.schemas.f05_schemas import F05WorkoutRescheduleRequest
 
 client = TestClient(app)
+
+
+@pytest.mark.parametrize("zone,offset", [("Asia/Ho_Chi_Minh", "+07:00"), ("UTC", "+00:00")])
+def test_appointment_alignment_preserves_workout_duration_and_offsets(zone, offset):
+    from datetime import timezone
+
+    start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=10)
+    appointment_start = start + timedelta(days=1)
+    request = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID, mode="HUMAN_COACH", occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0, timezone=zone,
+        plannedStartAt=start.isoformat(), plannedEndAt=(start + timedelta(minutes=45)).isoformat(),
+        hasLinkedAppointment=True, appointmentId=SESSION_ID,
+        appointmentStartAt=appointment_start.isoformat(),
+        appointmentEndAt=(appointment_start + timedelta(hours=3)).isoformat(),
+    )
+    destination = asyncio.run(SimulatedF05WorkoutProvider().generate_reschedule(request)).reschedule.destination
+    assert datetime.fromisoformat(destination.proposedStartAt) == appointment_start
+    assert datetime.fromisoformat(destination.proposedEndAt) == appointment_start + timedelta(minutes=45)
+    local = appointment_start.astimezone(timezone(timedelta(hours=7)) if offset == "+07:00" else UTC)
+    assert datetime.fromisoformat(destination.localStart) == local.replace(tzinfo=None)
+    assert destination.startUtcOffset == offset
 
 STUDENT_ID = UUID("11111111-1111-4111-8111-111111111111")
 OCCURRENCE_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -66,6 +90,61 @@ def test_simulated_f05_provider_preserves_coach_required_invariant():
     assert response.reschedule.supervisionRequirement == "COACH_REQUIRED"
 
 
+def test_simulated_f05_provider_preferred_time_of_day_and_future_slot():
+    provider = SimulatedF05WorkoutProvider()
+    request_afternoon = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Afternoon Conditioning",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        preferredTimeOfDay="AFTERNOON",
+    )
+    response_afternoon = asyncio.run(provider.generate_reschedule(request_afternoon))
+    assert response_afternoon.reschedule.destination.localStart.endswith("T14:00:00")
+    assert response_afternoon.reschedule.destination.localEnd.endswith("T15:00:00")
+
+    request_evening = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Evening Mobility",
+        supervisionRequirement="COACH_OPTIONAL",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        preferredTimeOfDay="evening",  # Test case-insensitivity
+    )
+    response_evening = asyncio.run(provider.generate_reschedule(request_evening))
+    assert response_evening.reschedule.destination.localStart.endswith("T18:00:00")
+    assert response_evening.reschedule.destination.localEnd.endswith("T19:00:00")
+    assert response_evening.reschedule.supervisionRequirement == "COACH_OPTIONAL"
+
+    # Test edge case: source far in future clamped to within 90-day horizon
+    request_far = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Far Future",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2027-11-16T02:00:00Z",
+        preferredTimeOfDay="morning",
+    )
+    response_far = asyncio.run(provider.generate_reschedule(request_far))
+    start_dt = datetime.fromisoformat(response_far.reschedule.destination.proposedStartAt)
+    now_dt = datetime.now(UTC)
+    assert start_dt > now_dt
+    assert start_dt < now_dt + timedelta(days=90)
+
+
 def test_internal_workout_reschedule_endpoint():
     req_body = {
         "studentId": str(STUDENT_ID),
@@ -92,3 +171,94 @@ def test_internal_workout_reschedule_endpoint():
     assert data["recommendationType"] == "WORKOUT_RESCHEDULE_PROPOSAL"
     assert data["reschedule"]["occurrenceId"] == str(OCCURRENCE_ID)
     assert data["reschedule"]["destination"]["timezone"] == "Asia/Ho_Chi_Minh"
+
+
+def test_simulated_f05_provider_continuity_states():
+    """Verify F05 simulated provider handles continuity states consistently."""
+    provider = SimulatedF05WorkoutProvider()
+
+    # 1. RECENT_ACTIVITY_OBSERVED
+    req_recent = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Upper Body",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        continuityState="RECENT_ACTIVITY_OBSERVED",
+    )
+    resp_recent = asyncio.run(provider.generate_reschedule(req_recent))
+    assert any("continuityState: RECENT_ACTIVITY_OBSERVED" in u for u in resp_recent.usedData)
+    assert any("Recent workout activity observed" in r for r in resp_recent.reasoning)
+    assert resp_recent.missingData == []
+
+    # 2. PROLONGED_INACTIVITY
+    req_prolonged = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Return Session",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        continuityState="PROLONGED_INACTIVITY",
+    )
+    resp_prolonged = asyncio.run(provider.generate_reschedule(req_prolonged))
+    assert any("continuityState: PROLONGED_INACTIVITY" in u for u in resp_prolonged.usedData)
+    assert any("Prolonged inactivity detected" in l for l in resp_prolonged.limitations)
+    assert any("Prolonged inactivity observed" in r for r in resp_prolonged.reasoning)
+
+    # 3. UNKNOWN_HISTORY
+    req_unknown = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Unknown Session",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        continuityState="UNKNOWN_HISTORY",
+    )
+    resp_unknown = asyncio.run(provider.generate_reschedule(req_unknown))
+    assert "trainingContinuity" in resp_unknown.missingData
+    assert any("UNKNOWN_HISTORY" in l for l in resp_unknown.limitations)
+
+    # 4. RESTRICTED_HISTORY
+    req_restricted = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="HUMAN_COACH",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Restricted Session",
+        supervisionRequirement="COACH_OPTIONAL",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        continuityState="RESTRICTED_HISTORY",
+    )
+    resp_restricted = asyncio.run(provider.generate_reschedule(req_restricted))
+    assert "trainingContinuity" in resp_restricted.missingData
+    assert any("RESTRICTED_HISTORY" in l for l in resp_restricted.limitations)
+
+    # 5. CONFIRMED_NEW
+    req_new = F05WorkoutRescheduleRequest(
+        studentId=STUDENT_ID,
+        mode="SELF_DIRECTED",
+        occurrenceId=OCCURRENCE_ID,
+        occurrenceVersion=0,
+        planSessionId=SESSION_ID,
+        sessionName="Beginner First Session",
+        supervisionRequirement="SELF_PERFORMABLE",
+        timezone="Asia/Ho_Chi_Minh",
+        plannedStartAt="2026-11-16T02:00:00Z",
+        continuityState="CONFIRMED_NEW",
+    )
+    resp_new = asyncio.run(provider.generate_reschedule(req_new))
+    assert any("Confirmed beginner trainee" in r for r in resp_new.reasoning)

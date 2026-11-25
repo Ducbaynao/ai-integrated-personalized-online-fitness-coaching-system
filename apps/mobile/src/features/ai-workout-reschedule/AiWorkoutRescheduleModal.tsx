@@ -52,6 +52,8 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
   const occurrenceId = occurrence.occurrenceId;
   const [recommendationId, setRecommendationId] = useState<string | null>(initialRecommendationId ?? null);
   const [reason, setReason] = useState('');
+  const [preferredTimeOfDay, setPreferredTimeOfDay] = useState<'MORNING' | 'AFTERNOON' | 'EVENING'>('MORNING');
+  const [decisionNote, setDecisionNote] = useState('');
   const [error, setError] = useState('');
   const [generationUnknown, setGenerationUnknown] = useState(false);
   const [acceptUnknown, setAcceptUnknown] = useState(false);
@@ -94,7 +96,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
 
   const close = () => {
     setRecommendationId(null); setError(''); setGenerationUnknown(false); setAcceptUnknown(false);
-    setAcceptIntent(null); setReceipt(null); setConcealed(false); setReason(''); setConflictReview(false);
+    setAcceptIntent(null); setReceipt(null); setConcealed(false); setReason(''); setPreferredTimeOfDay('MORNING'); setDecisionNote(''); setConflictReview(false);
     client.removeQueries({ queryKey: rescheduleQueryKeys.scope(actorId, capability, studentId) });
     onClose();
   };
@@ -109,7 +111,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
     retry: false,
     mutationFn: (commandKey: string) => aiWorkoutRescheduleApi.generate({
       studentId, occurrenceId, expectedOccurrenceVersion: occurrence.occurrenceVersion,
-      commandKey, ...(reason.trim() ? { reason: reason.trim() } : {}),
+      commandKey, preferredTimeOfDay, ...(reason.trim() ? { reason: reason.trim() } : {}),
     }),
     onSuccess: (result) => { setRecommendationId(result.recommendationId); setError(''); },
     onError: async (cause) => {
@@ -148,7 +150,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
 
   const reject = useMutation({
     retry: false,
-    mutationFn: () => aiWorkoutRescheduleApi.reject(recommendationId!),
+    mutationFn: () => aiWorkoutRescheduleApi.reject(recommendationId!, decisionNote.trim() ? { decisionNote: decisionNote.trim() } : undefined),
     onSuccess: async () => {
       setError(''); setAcceptIntent(null);
       await client.invalidateQueries({ queryKey: rescheduleQueryKeys.occurrence(actorId, capability, studentId, occurrenceId) });
@@ -204,6 +206,7 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
         message="Dữ liệu đề xuất đã được ẩn. Hãy kiểm tra lại quyền và lịch tập." /> : <>
         <WorkoutCard>
           <Text style={[styles.body, { color: theme.textPrimary }]}>AI chỉ đề xuất đổi một Planned Workout. Lịch hẹn với Huấn luyện viên cần được xử lý riêng.</Text>
+          <Text style={[styles.label, { color: theme.textPrimary }]}>{occurrence.sessionSummary?.name?.trim() || 'Buổi tập theo lịch'}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi hiện tại: {formatScheduleTime(occurrence.plannedStartAt, occurrence.timezone)}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Yêu cầu giám sát: {occurrence.sessionSummary?.supervisionRequirement
             ? supervisionLabels[occurrence.sessionSummary.supervisionRequirement] : 'Chưa xác định'}</Text>
@@ -221,6 +224,13 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
           <Text style={[styles.label, { color: theme.textPrimary }]}>Lý do bỏ lỡ hoặc cần đổi lịch (tùy chọn)</Text>
           <TextInput accessibilityLabel="Lý do cần xếp lại buổi tập" value={reason} onChangeText={setReason}
             multiline maxLength={1000} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+          <View style={styles.row}>
+            {(['MORNING', 'AFTERNOON', 'EVENING'] as const).map((time) => <WorkoutButton key={time}
+              testID={`time-pref-${time.toLowerCase()}`} label={{ MORNING: 'Buổi sáng (09:00)', AFTERNOON: 'Buổi chiều (14:00)', EVENING: 'Buổi tối (18:00)' }[time]}
+              secondary={preferredTimeOfDay !== time} disabled={generate.isPending || generationUnknown}
+              onPress={() => setPreferredTimeOfDay(time)} />)}
+          </View>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Các mốc giờ gợi ý không phải lịch rảnh đã xác nhận của Huấn luyện viên hay cơ sở.</Text>
           <WorkoutButton testID="f05-generate" label="Tạo đề xuất AI" busy={generate.isPending}
             disabled={generate.isPending || generationUnknown || conflictReview} onPress={() => {
               if (submitting.current) return;
@@ -255,10 +265,12 @@ export function AiWorkoutRescheduleModal({ visible, actorId, capability, student
             message="Mốc lịch gốc không còn khớp đề xuất. Hãy tải lại buổi tập trước khi quyết định." /> : null}
           {conflictReview ? <WorkoutState testID="f05-conflict-review" title="Lịch đã thay đổi"
             message="Hãy đóng đề xuất, tải lại buổi tập và tạo quyết định mới sau khi xem dữ liệu hiện tại." /> : null}
+          {canDecide ? <TextInput accessibilityLabel="Ghi chú quyết định" value={decisionNote} onChangeText={setDecisionNote}
+            maxLength={1000} multiline style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} /> : null}
           {canDecide ? <View style={styles.row}>
             <WorkoutButton testID="f05-accept" label="Xác nhận đổi Planned Workout" busy={accept.isPending}
               disabled={accept.isPending || reject.isPending} onPress={() => runAccept({
-                commandKey: createCommandKey(), expectedRevision: detail.data.revision,
+                commandKey: createCommandKey(), ...(decisionNote.trim() ? { decisionNote: decisionNote.trim() } : {}), expectedRevision: detail.data.revision,
                 expectedOccurrenceVersion: occurrence.occurrenceVersion,
                 ...(occurrence.linkedAppointmentId ? { expectedAppointmentId: occurrence.linkedAppointmentId } : {}),
                 ...(occurrence.linkedAppointmentVersion != null ? { expectedAppointmentVersion: occurrence.linkedAppointmentVersion } : {}),

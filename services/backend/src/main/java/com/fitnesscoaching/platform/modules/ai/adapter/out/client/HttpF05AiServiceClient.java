@@ -54,7 +54,7 @@ public class HttpF05AiServiceClient implements F05AiServiceClient {
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
                         int code = resp.getStatusCode().value();
-                        log.warn("FastAPI AI service returned 4xx: {}", code);
+                        log.warn("FastAPI AI service returned 4xx client error: {}", code);
                         throw new AiProviderException("FastAPI AI service client error (" + code + ")");
                     })
                     .onStatus(HttpStatusCode::is5xxServerError, (req, resp) -> {

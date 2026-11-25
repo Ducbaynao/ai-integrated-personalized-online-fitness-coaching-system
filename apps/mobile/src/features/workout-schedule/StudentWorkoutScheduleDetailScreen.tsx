@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -54,7 +54,13 @@ export function StudentWorkoutScheduleDetailScreen({
   const submitting = useRef(false);
   const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(Boolean(initialRecommendationId));
   const [activeRecommendationId, setActiveRecommendationId] = useState<string | undefined>(initialRecommendationId);
-  const [rescheduleAiVisible, setRescheduleAiVisible] = useState(false);
+  const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
+  const [lastAppliedSuccessorId, setLastAppliedSuccessorId] = useState<string | null>(null);
+
+  const handleOpenRescheduleModal = useCallback(() => {
+    setLastAppliedSuccessorId(null);
+    setIsRescheduleModalVisible(true);
+  }, []);
 
   const planId = item?.planSummary?.planId ?? '';
   const planVersionId = item?.planSummary?.planVersionId ?? '';
@@ -210,7 +216,7 @@ export function StudentWorkoutScheduleDetailScreen({
       {needsReview ? <WorkoutState testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} /> : null}
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
         {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
-        {item.status === 'SCHEDULED' ? <WorkoutButton testID="f05-student-open" label="AI đề xuất xếp lại buổi tập" secondary onPress={() => setRescheduleAiVisible(true)} /> : null}
+        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={handleOpenRescheduleModal} /> : null}
         {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination(EMPTY_DESTINATION); resetCommand(); }} /> : null}
         {item.availableActions.includes('CANCEL') ? <WorkoutButton testID="schedule-cancel" label="Hủy buổi này" danger onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} /> : null}
       </View> : null}
@@ -298,18 +304,26 @@ export function StudentWorkoutScheduleDetailScreen({
           await query.refetch();
         }}
       />
-      {rescheduleAiVisible ? <AiWorkoutRescheduleModal
-        visible={rescheduleAiVisible}
+      {isRescheduleModalVisible ? <AiWorkoutRescheduleModal
+        visible={true}
         actorId={studentId}
         capability="STUDENT"
         studentId={studentId}
         occurrence={item}
         authorized={allowed && !permissionLost}
-        onClose={() => setRescheduleAiVisible(false)}
-        onApplied={async () => {
+        onClose={async () => {
+          setIsRescheduleModalVisible(false);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
-          await query.refetch();
+          if (lastAppliedSuccessorId) {
+            const nextId = lastAppliedSuccessorId;
+            setLastAppliedSuccessorId(null);
+            AccessibilityInfo.announceForAccessibility('Đã đổi lịch. Đang mở buổi tập mới.');
+            router.replace(`/workouts/schedule/${nextId}` as never);
+          } else {
+            await query.refetch();
+          }
         }}
+        onApplied={(result) => setLastAppliedSuccessorId(result.resultingEntityId || null)}
       /> : null}
     </> : null}
   </ScrollView>;

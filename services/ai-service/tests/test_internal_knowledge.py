@@ -200,3 +200,35 @@ def test_retrieval_enabled_backend_unreachable_fails_without_fixture(monkeypatch
     assert data["error"]["code"] == "UPSTREAM_RETRIEVAL_FAILED"
     assert "citations" not in data or data["citations"] is None
 
+
+def test_query_knowledge_with_personal_context(monkeypatch):
+    monkeypatch.setattr(settings, "backend_internal_retrieval_enabled", False)
+    envelope = dict(VALID_ENVELOPE)
+    envelope["personalContext"] = {
+        "studentId": "11111111-1111-4111-8111-111111111111",
+        "coachingMode": "SELF_DIRECTED",
+        "trainingExperience": "BEGINNER",
+        "activeGoal": {
+            "goalType": "HYPERTROPHY",
+            "targetSummary": "Gain 3kg lean mass",
+            "version": 1,
+        },
+        "injuriesOrLimitations": ["Lower back tightness"],
+        "availableEquipment": ["Dumbbells", "Pull-up bar"],
+        "currentActivePlanName": "Beginner Upper/Lower Split",
+    }
+    response = client.post(
+        "/internal/v1/knowledge/query",
+        headers=VALID_AUTH_HEADER,
+        json=envelope,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["runStatus"] == "SUCCEEDED"
+    assert data["resultType"] == "INFORMATION"
+    assert "Áp dụng cho học viên" in data["answer"]
+    assert "HYPERTROPHY" in data["answer"]
+    assert "BEGINNER" in data["answer"]
+    assert len(data["citations"]) >= 1
+
+
