@@ -18,6 +18,7 @@ import com.fitnesscoaching.platform.modules.trainer.application.port.out.Trainer
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerApplication;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +61,9 @@ class AdminTrainerVerificationServiceUnitTest {
     private UserRoleQuery userRoleQuery;
 
     @Mock
+    private UserPermissionQuery userPermissionQuery;
+
+    @Mock
     private AuditService auditService;
 
     @Mock
@@ -81,6 +85,7 @@ class AdminTrainerVerificationServiceUnitTest {
                 trainerProfilePort,
                 userAccountStatusQuery,
                 userRoleQuery,
+                userPermissionQuery,
                 auditService,
                 documentStorageService,
                 clock
@@ -90,6 +95,7 @@ class AdminTrainerVerificationServiceUnitTest {
     private void mockActiveAdmin(UUID adminId) {
         when(userAccountStatusQuery.getAccountStatus(adminId)).thenReturn(Optional.of(AccountStatus.ACTIVE));
         when(userRoleQuery.hasActiveRole(adminId, "ADMIN")).thenReturn(true);
+        when(userPermissionQuery.hasActivePermission(adminId, "TRAINER_VERIFY")).thenReturn(true);
     }
 
     private TrainerApplication createPendingApp() {
@@ -143,6 +149,18 @@ class AdminTrainerVerificationServiceUnitTest {
                 .hasMessageContaining("active ADMIN role");
     }
 
+    @Test
+    @DisplayName("Admin check: throws AccessDeniedException when TRAINER_VERIFY permission is missing")
+    void authorization_missingTrainerVerifyPermission_throwsAccessDenied() {
+        when(userAccountStatusQuery.getAccountStatus(ADMIN_ID)).thenReturn(Optional.of(AccountStatus.ACTIVE));
+        when(userRoleQuery.hasActiveRole(ADMIN_ID, "ADMIN")).thenReturn(true);
+        when(userPermissionQuery.hasActivePermission(ADMIN_ID, "TRAINER_VERIFY")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getApplicationDetail(ADMIN_ID, APP_ID))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("TRAINER_VERIFY");
+    }
+
     // --- Query Tests ---
 
     @Test
@@ -165,6 +183,26 @@ class AdminTrainerVerificationServiceUnitTest {
         assertThat(result.size()).isEqualTo(20);
         assertThat(result.totalItems()).isEqualTo(1L);
         assertThat(result.totalPages()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("getApplications: queries all statuses without defaulting to PENDING when allStatuses is true")
+    void getApplications_allStatuses_queriesNullStatus() {
+        mockActiveAdmin(ADMIN_ID);
+        TrainerApplication app = createPendingApp();
+
+        when(trainerApplicationPort.findApplications(null, 0L, 20))
+                .thenReturn(List.of(app));
+        when(trainerApplicationPort.countApplications(null))
+                .thenReturn(1L);
+
+        GetAdminTrainerApplicationsQuery query = new GetAdminTrainerApplicationsQuery(
+                ADMIN_ID, null, true, 0, 20);
+        AdminTrainerApplicationPage result = service.getApplications(query);
+
+        assertThat(result.items()).hasSize(1);
+        verify(trainerApplicationPort).findApplications(null, 0L, 20);
+        verify(trainerApplicationPort).countApplications(null);
     }
 
     @Test

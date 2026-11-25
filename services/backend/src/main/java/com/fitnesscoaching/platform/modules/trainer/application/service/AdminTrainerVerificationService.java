@@ -22,6 +22,7 @@ import com.fitnesscoaching.platform.modules.trainer.application.port.out.Trainer
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerApplication;
 import com.fitnesscoaching.platform.modules.trainer.domain.TrainerVerificationStatus;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.UserPermissionQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserRoleQuery;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -42,10 +43,13 @@ public class AdminTrainerVerificationService implements
         com.fitnesscoaching.platform.modules.trainer.application.port.in.DownloadAdminTrainerApplicationDocumentUseCase,
         com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationCertificatesUseCase {
 
+    private static final String REQUIRED_PERMISSION = "TRAINER_VERIFY";
+
     private final TrainerApplicationPort trainerApplicationPort;
     private final TrainerProfilePort trainerProfilePort;
     private final UserAccountStatusQuery userAccountStatusQuery;
     private final UserRoleQuery userRoleQuery;
+    private final UserPermissionQuery userPermissionQuery;
     private final AuditService auditService;
     private final TrainerDocumentStorageService documentStorageService;
     private final Clock clock;
@@ -55,6 +59,7 @@ public class AdminTrainerVerificationService implements
             TrainerProfilePort trainerProfilePort,
             UserAccountStatusQuery userAccountStatusQuery,
             UserRoleQuery userRoleQuery,
+            UserPermissionQuery userPermissionQuery,
             AuditService auditService,
             TrainerDocumentStorageService documentStorageService,
             Clock clock
@@ -63,6 +68,7 @@ public class AdminTrainerVerificationService implements
         this.trainerProfilePort = trainerProfilePort;
         this.userAccountStatusQuery = userAccountStatusQuery;
         this.userRoleQuery = userRoleQuery;
+        this.userPermissionQuery = userPermissionQuery;
         this.auditService = auditService;
         this.documentStorageService = documentStorageService;
         this.clock = clock;
@@ -85,9 +91,9 @@ public class AdminTrainerVerificationService implements
                     List.of(new FieldErrorDto("size", "Range", "Page size must be between 1 and 100")));
         }
 
-        TrainerVerificationStatus status = query.status() != null
-                ? query.status()
-                : TrainerVerificationStatus.PENDING;
+        TrainerVerificationStatus status = query.allStatuses()
+                ? null
+                : (query.status() != null ? query.status() : TrainerVerificationStatus.PENDING);
 
         long offset;
         try {
@@ -271,6 +277,10 @@ public class AdminTrainerVerificationService implements
 
         if (!userRoleQuery.hasActiveRole(adminUserId, "ADMIN")) {
             throw new AccessDeniedException("User does not possess an active ADMIN role");
+        }
+
+        if (!userPermissionQuery.hasActivePermission(adminUserId, REQUIRED_PERMISSION)) {
+            throw new AccessDeniedException("Administrator lacks required permission: " + REQUIRED_PERMISSION);
         }
     }
 

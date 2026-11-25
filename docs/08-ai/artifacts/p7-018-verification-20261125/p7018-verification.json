@@ -1,0 +1,116 @@
+{
+  "observedAtUtc": "2026-11-25T12:17:30.000000+00:00",
+  "scope": "P7-018 Trainer Verification, Admin Review & Student Directory + Upload Token-Read Unmount Guard P2 Fix",
+  "baseHead": "da45ba4d218419010ccd9d0ca2135f8473c3b293",
+  "branch": "fix/p7-018-trainer-verification",
+  "baseBranch": "feature/p2-dev-b-f06-mobile-client-20261124",
+  "dependency": "Requires auth/storage checkpoint on feature/p2-dev-b-f06-mobile-client-20261124 (PR #169 at da45ba4d218419010ccd9d0ca2135f8473c3b293)",
+  "reviewStatus": "code_checkpoint_accepted_by_codex_qa_open",
+  "codexReview": {
+    "hashesVerifiedMatched": 30,
+    "hashesTotal": 30,
+    "suiteResult": "17 suites, 188/188 PASS; typecheck/lint/git diff --check PASS",
+    "reviewLogRef": "C:\\Users\\ADMIN\\.codex\\tmp\\p7018-token-unmount-review-tests.log"
+  },
+  "filesSha256": {
+    "apps/admin-web/src/App.tsx": "5c4bb4c4385c5beb4aa7908befef8b558b4e0854e98db06043ce1ac2de23d251",
+    "apps/admin-web/src/components/AdminLayout.tsx": "1ce932d4a5abadf1a76e83c5065ce25880f9d6a3beb2e81e61c12a70d6bf8a03",
+    "apps/admin-web/src/features/auth/AuthFoundation.test.tsx": "d9ec3006d848fc61079203eccac3b8b69aac5d72a452ec5f134c53c92003b1b4",
+    "apps/admin-web/src/features/trainer-applications/TrainerApplicationListPage.tsx": "ff1ed4c47796daa2d1c8979170de0a1daac2b4e8f1ba15bf815a625cff67d6a7",
+    "apps/admin-web/src/features/trainer-applications/TrainerApplicationPages.test.tsx": "b032e96f1a9cfa4b5e1c85a9dc8fe95b139f5ad7594df54c04c0e220369a43cf",
+    "apps/mobile/src/__tests__/TrainerHomeScreen.test.tsx": "f6b117e2219b7265f8f76657fa2c892159c0f75f98a8be230bcdc97d51f29f72",
+    "apps/mobile/src/__tests__/TrainerProfileScreen.test.tsx": "97404d1c297eb258a6db3ea4e557fcce09a10287f5bf290084daa9ad521550e8",
+    "apps/mobile/src/__tests__/coachingScreens.test.tsx": "0256a413584149c57f3461a2c12ebd05776195895f9d2b0e54069f697dc9152b",
+    "apps/mobile/src/__tests__/displayLabels.test.ts": "a2ae414b5fdf1e0906c630e099fae01be9133b8a9462d7c927d9ebd594c5e427",
+    "apps/mobile/src/__tests__/trainerApplicationApi.test.ts": "a8dc7074d7296e771197dfd72b4f563dd96e1572c5a4f5982b95ca11186cdc9e",
+    "apps/mobile/src/__tests__/trainerApplicationUploadSessionRace.test.ts": "a8781fac360829ff8a99d817ee65a928a342b094171818ad427f5e88be70bd70",
+    "apps/mobile/src/__tests__/trainerProfileUploadSessionRace.test.tsx": "7a9c7d64ab0c11fd3bccde5f4fb97dc59a3c6191316f80aae941060e0270fa84",
+    "apps/mobile/src/features/auth/AuthContext.tsx": "200045980c1bd82d962acb6bdd94c01a8615fba41aadf479711c0796e9676665",
+    "apps/mobile/src/features/coaching/TrainerDirectoryScreen.tsx": "2d426049ccc0d11624fdc12c01f56cec5ca4bd9e3217346b4249f7382b4016d6",
+    "apps/mobile/src/features/trainer/TrainerHomeScreen.tsx": "a0abc5600212735091c450e7bf5697e0a8dd01b02059e53943c064f7a6809db6",
+    "apps/mobile/src/features/trainer/TrainerOnboardingScreen.tsx": "a9f378dd0fdde8d8e16a5be3f601a171ead4887f155b6ea33f25553ae99a6ae5",
+    "apps/mobile/src/features/trainer/TrainerProfileScreen.tsx": "a66bfbbe08de38a91855308749b7be054408b2aa6542d409494ea0ae2dd29175",
+    "apps/mobile/src/localization/displayLabels.ts": "eb624b7ec70b0f1440575dd3337eba2fd128af135e9a8f908764cb09caed08a4",
+    "apps/mobile/src/services/apiClient.ts": "aca45cdbc289053dd60b3bc784559fecfe7d63424bec77dcdb18aeff2d93c8a2",
+    "apps/mobile/src/services/trainerApplicationApi.ts": "7a02c101fe232bfbd1e093eb45fb0189ac885ee7d59708446424d48b603f1cd0",
+    "contracts/openapi/openapi.yaml": "c15b3e2520fd5b8c98c0969f9fbed4d26c2b0884a5523ff3ed993c171a6e791e",
+    "docs/06-ui-ux/trainer/trainer-flows.md": "063e191994a6fc994e19588a6c2bc511063e211463c1c37f1425e9188fcd0136",
+    "services/backend/src/main/java/com/fitnesscoaching/platform/modules/trainer/adapter/in/web/AdminTrainerApplicationController.java": "3a02dd2380ccf595660016df128d0c9cae32aa9056f327aae84d25076a2e018c",
+    "services/backend/src/main/java/com/fitnesscoaching/platform/modules/trainer/application/port/in/GetAdminTrainerApplicationsQuery.java": "ec56d05262fb74f27e9edb98b3eee256a0714572297dba2658b5e651e9fc78a4",
+    "services/backend/src/main/java/com/fitnesscoaching/platform/modules/trainer/application/service/AdminTrainerVerificationService.java": "9bbcce11b24950afe4991330b6077f2f31555a11498549328af32e7a2d8bc834",
+    "services/backend/src/main/resources/db/migration/V63__trainer_verify_permission.sql": "50a47988e48806819f93bb860133bb3380dd4659b0e9a91c5e272c3e300b7b2a",
+    "services/backend/src/test/java/com/fitnesscoaching/platform/AdminTrainerApplicationIntegrationTest.java": "37e93a5d0ce455ecca3fde153ad418ce88bc818b6bcbfa71c6ecf30a4dc2033b",
+    "services/backend/src/test/java/com/fitnesscoaching/platform/CoachingMobileReadContractsIntegrationTest.java": "d62a80fb6ab709d5495cc3b5adb6ebfd640d802a47cb9809f0594abca87074f7",
+    "services/backend/src/test/java/com/fitnesscoaching/platform/modules/trainer/adapter/in/web/AdminTrainerApplicationControllerUnitTest.java": "6f02d3311f59aff22f477b466bc71db3457afdc3ec166eb99252cd7c3ce59b4a",
+    "services/backend/src/test/java/com/fitnesscoaching/platform/modules/trainer/application/service/AdminTrainerVerificationServiceUnitTest.java": "59301b88d1875d1d35581af7d038e421040def43897eabf570be87407b5bfacd"
+  },
+  "commands": [
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest --runInBand --no-color src/__tests__/trainerProfileUploadSessionRace.test.tsx",
+      "when": "before upload UI initial-binding fix (real reproduction FAIL A-D)",
+      "exitCode": 1,
+      "tests": {
+        "failed": 4,
+        "passed": 1,
+        "skipped": 0,
+        "total": 5
+      },
+      "log": "p7018-upload-ui-regression-before.log.txt"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest --runInBand --no-color src/__tests__/trainerProfileUploadSessionRace.test.tsx",
+      "when": "before shouldContinue passthrough to apiClient.request (real reproduction FAIL G)",
+      "exitCode": 1,
+      "tests": {
+        "failed": 1,
+        "passed": 6,
+        "skipped": 0,
+        "total": 7
+      },
+      "log": "p7018-upload-unmount-token-read-before.log.txt"
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npx jest --runInBand src/__tests__/trainerProfileUploadSessionRace.test.tsx src/__tests__/TrainerProfileScreen.test.tsx src/__tests__/TrainerHomeScreen.test.tsx src/__tests__/trainerApplicationUploadSessionRace.test.ts src/__tests__/trainerApplicationApi.test.ts src/__tests__/trainerProfileApi.test.ts src/__tests__/TrainerOnboardingScreen.test.tsx src/__tests__/apiClient.test.ts src/__tests__/authSessionRace.test.tsx src/__tests__/authNativeStorageRace.test.tsx src/__tests__/authProviderCapabilities.test.tsx src/__tests__/storage.test.ts src/__tests__/authFlow.test.ts src/__tests__/sessionRestorationNavigation.test.tsx src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/coachingScreens.test.tsx src/__tests__/displayLabels.test.ts",
+      "when": "after final apiClient + trainerApplicationApi shouldContinue unmount guard fix",
+      "exitCode": 0,
+      "suites": 17,
+      "tests": 188,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npm run typecheck",
+      "when": "after final edit",
+      "exitCode": 0
+    },
+    {
+      "cwd": "apps/mobile",
+      "command": "npm run lint",
+      "when": "after final edit",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "cwd": "worktree root",
+      "command": "git diff --check",
+      "when": "after final edit",
+      "exitCode": 0
+    },
+    {
+      "cwd": "historical-pre-unmount-guard-fix",
+      "command": "Prior Codex 194/194, Mobile 187/187, Backend 186/186, Admin Web 151/151, validate:openapi, validate:ux-docs",
+      "when": "prior revisions before shouldContinue passthrough to apiClient.request",
+      "exitCode": 0
+    }
+  ],
+  "runtimeNotRun": {
+    "deviceEmulator": "NOT RUN (native DocumentPicker/live upload not run; adb devices empty; Metro 18081 DOWN; Spring 18080 DOWN; PostgreSQL container f06-mobile-qa-20261124 untouched)",
+    "httpDbLiveQa": "NOT RUN (runtime untouched)"
+  },
+  "eofWhitespaceTrimNote": "Trimmed 1 trailing blank EOF line in V63__trainer_verify_permission.sql and TrainerHomeScreen.test.tsx so git diff --cached --check exits 0; TrainerHomeScreen.test.tsx re-run 6/6 PASS."
+}

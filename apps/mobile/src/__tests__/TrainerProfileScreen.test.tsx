@@ -10,6 +10,8 @@ import { ApiError } from '@/types/auth';
 import { useAuth } from '@/features/auth/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
 import { trainerApplicationApi } from '@/services/trainerApplicationApi';
+import { queryClient } from '@/services/queryClient';
+import { coachingQueryKeys } from '@/features/coaching/coachingQueries';
 
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -70,10 +72,14 @@ describe('TrainerProfileScreen Component', () => {
     updatedAt: '2026-09-20T10:00:00Z',
   };
 
+  const mockRefreshUser = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRefreshUser.mockResolvedValue(undefined);
     (useAuth as jest.Mock).mockReturnValue({
       user: mockUser,
+      refreshUser: mockRefreshUser,
     });
   });
 
@@ -547,6 +553,14 @@ describe('TrainerProfileScreen Component', () => {
       'file:///data/cert1.pdf',
       'cert1.pdf',
       'application/pdf',
+      undefined,
+      expect.objectContaining({
+        sessionBinding: expect.objectContaining({
+          authEpoch: expect.any(Number),
+          capabilityEpoch: expect.any(Number),
+        }),
+        shouldContinue: expect.any(Function),
+      }),
     );
     expect(root.findByProps({ testID: 'uploaded-doc-item-doc-uuid-1' })).toBeDefined();
 
@@ -559,6 +573,14 @@ describe('TrainerProfileScreen Component', () => {
       'file:///data/cert2.png',
       'cert2.png',
       'image/png',
+      undefined,
+      expect.objectContaining({
+        sessionBinding: expect.objectContaining({
+          authEpoch: expect.any(Number),
+          capabilityEpoch: expect.any(Number),
+        }),
+        shouldContinue: expect.any(Function),
+      }),
     );
     expect(root.findByProps({ testID: 'uploaded-doc-item-doc-uuid-2' })).toBeDefined();
 
@@ -621,5 +643,246 @@ describe('TrainerProfileScreen Component', () => {
     expect(
       errorNode.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('giới hạn 10 MB')).length
     ).toBeGreaterThan(0);
+  });
+
+  it('syncs auth capability and coaching cache on VERIFIED load, and prompts to enable acceptingStudents when off', async () => {
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+    const verifiedNotAccepting: TrainerProfileResponse = {
+      ...mockProfile,
+      acceptingStudents: false,
+      verificationStatus: 'VERIFIED',
+      coachingEligibility: {
+        eligible: true,
+        blockingReasons: [],
+      },
+      verifiedAt: '2026-09-25T10:00:00Z',
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(verifiedNotAccepting);
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValueOnce(null);
+
+    try {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<TrainerProfileScreen />);
+      });
+      const root = tree.root;
+
+      expect(mockRefreshUser).toHaveBeenCalled();
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: coachingQueryKeys.all });
+      expect(root.findByProps({ testID: 'trainer-accepting-students-notice' })).toBeDefined();
+
+      const enableBtn = root.findByProps({ testID: 'trainer-enable-accepting-button' });
+      renderer.act(() => {
+        enableBtn.props.onPress();
+      });
+      expect(root.findByProps({ testID: 'trainer-profile-accepting-switch' })).toBeDefined();
+    } finally {
+      invalidateSpy.mockRestore();
+    }
+  });
+
+  it('renders SUSPENDED verification banner when profile is suspended', async () => {
+    const suspendedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'SUSPENDED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['VERIFICATION_REVOKED'],
+      },
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValueOnce(suspendedProfile);
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValueOnce(null);
+
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+
+    expect(tree.root.findByProps({ testID: 'trainer-application-suspended-banner' })).toBeDefined();
+  });
+
+  it('surfaces SCANNER_UNAVAILABLE error clearly and re-syncs on 409 TRAINER_APPLICATION_ALREADY_ACTIVE', async () => {
+    const makeApiError = (status: number, errorCode: string, message: string) =>
+      new ApiError(status, message, {
+        timestamp: '2026-09-25T10:00:00Z',
+        requestId: 'req-1',
+        errorCode,
+        message,
+        fieldErrors: [],
+      });
+
+    const unsubmittedProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: {
+        eligible: false,
+        blockingReasons: ['APPLICATION_NOT_SUBMITTED'],
+      },
+    };
+    const pendingProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      verificationStatus: 'PENDING',
+    };
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(unsubmittedProfile)
+      .mockResolvedValueOnce(pendingProfile);
+    (trainerApplicationApi.getCurrentApplication as jest.Mock)
+      .mockRejectedValueOnce(makeApiError(404, 'TRAINER_APPLICATION_NOT_FOUND', 'Not found'))
+      .mockResolvedValueOnce({
+        id: 'app-existing-1',
+        trainerId: 'user-trainer-1',
+        status: 'PENDING',
+        submittedAt: '2026-09-25T10:00:00Z',
+        reviewedAt: null,
+        rejectionReason: null,
+        applicantNote: null,
+        certificateIds: [],
+        documentMediaIds: [],
+        createdAt: '2026-09-25T10:00:00Z',
+        updatedAt: '2026-09-25T10:00:00Z',
+      });
+    (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///data/cert.pdf', name: 'cert.pdf', mimeType: 'application/pdf', size: 1024 }],
+    });
+    (trainerApplicationApi.uploadDocument as jest.Mock).mockRejectedValueOnce(
+      makeApiError(503, 'SCANNER_UNAVAILABLE', 'Scanner down'),
+    );
+    (trainerApplicationApi.submitApplication as jest.Mock).mockRejectedValueOnce(
+      makeApiError(409, 'TRAINER_APPLICATION_ALREADY_ACTIVE', 'Already active'),
+    );
+
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree.root;
+
+    await renderer.act(async () => {
+      await root.findByProps({ testID: 'trainer-document-upload-button' }).props.onPress();
+    });
+    const uploadErr = root.findByProps({ testID: 'trainer-document-upload-error' });
+    expect(uploadErr.findAll((n) => typeof n.props.children === 'string' && n.props.children.includes('quét an toàn')).length).toBeGreaterThan(0);
+
+    await renderer.act(async () => {
+      await root.findByProps({ testID: 'trainer-application-submit-button' }).props.onPress();
+    });
+
+    expect(root.findByProps({ testID: 'trainer-application-pending-banner' })).toBeDefined();
+    expect(mockRefreshUser).toHaveBeenCalled();
+  });
+
+  it('preserves dirty editor draft when a pending refresh resolves mid-edit and keeps cancel/save behavior', async () => {
+    let resolveRefresh!: (value: TrainerProfileResponse) => void;
+    const pendingRefresh = new Promise<TrainerProfileResponse>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    const initialProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      bio: 'original bio',
+      verificationStatus: 'NOT_SUBMITTED',
+      coachingEligibility: { eligible: false, blockingReasons: ['APPLICATION_NOT_SUBMITTED'] },
+    };
+    const refreshedServerProfile: TrainerProfileResponse = {
+      ...initialProfile,
+      bio: 'server refreshed bio',
+    };
+    const savedProfile: TrainerProfileResponse = {
+      ...refreshedServerProfile,
+      bio: 'unsaved new draft',
+    };
+
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(initialProfile)
+      .mockReturnValueOnce(pendingRefresh);
+    (trainerProfileApi.updateMyTrainerProfile as jest.Mock).mockResolvedValueOnce(savedProfile);
+
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree.root;
+
+    let refreshPromise!: Promise<void>;
+    renderer.act(() => {
+      refreshPromise = root.findByProps({ testID: 'trainer-profile-screen' }).props.refreshControl.props.onRefresh();
+    });
+
+    renderer.act(() => {
+      root.findByProps({ testID: 'trainer-profile-edit-button' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'trainer-profile-bio-input' }).props.onChangeText('unsaved new draft');
+    });
+    expect(root.findByProps({ testID: 'trainer-profile-bio-input' }).props.value).toBe('unsaved new draft');
+
+    await renderer.act(async () => {
+      resolveRefresh(refreshedServerProfile);
+      await refreshPromise;
+    });
+
+    expect(root.findByProps({ testID: 'trainer-profile-bio-input' }).props.value).toBe('unsaved new draft');
+
+    await renderer.act(async () => {
+      await root.findByProps({ testID: 'trainer-profile-save-button' }).props.onPress();
+    });
+    expect(trainerProfileApi.updateMyTrainerProfile).toHaveBeenCalledWith({ bio: 'unsaved new draft' });
+    expect(root.findByProps({ testID: 'trainer-profile-success-banner' })).toBeDefined();
+  });
+
+  it('ignores stale pre-save refresh resolution after save completes', async () => {
+    let resolveStaleRefresh!: (value: TrainerProfileResponse) => void;
+    const pendingRefresh = new Promise<TrainerProfileResponse>((resolve) => {
+      resolveStaleRefresh = resolve;
+    });
+
+    const initialProfile: TrainerProfileResponse = {
+      ...mockProfile,
+      bio: 'initial bio',
+      verificationStatus: 'VERIFIED',
+      coachingEligibility: { eligible: true, blockingReasons: [] },
+    };
+    const savedProfile: TrainerProfileResponse = {
+      ...initialProfile,
+      bio: 'newly saved bio',
+    };
+
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock)
+      .mockResolvedValueOnce(initialProfile)
+      .mockReturnValueOnce(pendingRefresh);
+    (trainerProfileApi.updateMyTrainerProfile as jest.Mock).mockResolvedValueOnce(savedProfile);
+
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<TrainerProfileScreen />);
+    });
+    const root = tree.root;
+
+    let refreshPromise!: Promise<void>;
+    renderer.act(() => {
+      refreshPromise = root.findByProps({ testID: 'trainer-profile-screen' }).props.refreshControl.props.onRefresh();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'trainer-profile-edit-button' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'trainer-profile-bio-input' }).props.onChangeText('newly saved bio');
+    });
+    await renderer.act(async () => {
+      await root.findByProps({ testID: 'trainer-profile-save-button' }).props.onPress();
+    });
+
+    await renderer.act(async () => {
+      resolveStaleRefresh(initialProfile);
+      await refreshPromise;
+    });
+
+    expect(
+      root.findAll((n) => typeof n.props.children === 'string' && n.props.children === 'newly saved bio').length,
+    ).toBeGreaterThan(0);
+    expect(
+      root.findAll((n) => typeof n.props.children === 'string' && n.props.children === 'initial bio'),
+    ).toHaveLength(0);
   });
 });

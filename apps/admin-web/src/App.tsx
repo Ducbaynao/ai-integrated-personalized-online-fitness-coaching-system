@@ -112,7 +112,7 @@ function App() {
           <Route
             path="trainer-applications"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute permission="TRAINER_VERIFY">
                 <TrainerApplicationListPage />
               </ProtectedRoute>
             }
@@ -120,7 +120,7 @@ function App() {
           <Route
             path="trainer-applications/:applicationId"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute permission="TRAINER_VERIFY">
                 <TrainerApplicationDetailPage />
               </ProtectedRoute>
             }

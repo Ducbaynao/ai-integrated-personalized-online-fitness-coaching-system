@@ -1,5 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { authApi, invalidateAuthSession, registerSessionExpiredHandler } from '@/services/apiClient';
+import {
+  authApi,
+  invalidateAuthSession,
+  invalidateCapabilitySession,
+  registerSessionExpiredHandler,
+} from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
 import { clearQueryCache } from '@/services/queryClient';
 import { pushApi } from '@/services/pushApi';
@@ -343,6 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (capability: ActiveCapability): Promise<void> => {
       const startedSessionEpoch = sessionEpochRef.current;
       capabilityEpochRef.current += 1;
+      invalidateCapabilitySession?.();
       const targetCapabilityEpoch = capabilityEpochRef.current;
       const currentUser = userRef.current;
       const resolved = resolveActiveCapability(currentUser, capability);

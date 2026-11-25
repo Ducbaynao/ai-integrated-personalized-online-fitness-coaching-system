@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ScrollView, Text, TextInput, useColorScheme } from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -23,14 +23,16 @@ export function TrainerDirectoryScreen() {
     await queryClient.invalidateQueries({ queryKey: coachingQueryKeys.relationships() });
     if (result.relationship) router.replace(`/coaching/${result.relationship.id}` as never);
   }});
-  return <ScrollView testID="trainer-directory-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
+  return <ScrollView testID="trainer-directory-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}
+    refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Tìm huấn luyện viên</Text>
     <Text style={[styles.label, { color: theme.textPrimary }]}>Tên hiển thị</Text>
+    <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ liệt kê huấn luyện viên đã được Admin xác minh và đang mở nhận học viên.</Text>
     <TextInput testID="trainer-search-input" accessibilityLabel="Tìm theo tên huấn luyện viên" value={search} onChangeText={setSearch}
       placeholder="Nhập tên huấn luyện viên" placeholderTextColor={theme.textSecondary} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
     {query.isPending ? <CoachingState busy title="Đang tìm huấn luyện viên" message="Danh sách được lọc bởi hệ thống." /> : null}
     {query.isError ? <CoachingState title="Chưa thể tải danh sách" message={coachingErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
-    {!query.isPending && !query.isError && items.length === 0 ? <CoachingState testID="trainer-no-results" title={debounced ? 'Không có kết quả' : 'Chưa có huấn luyện viên khả dụng'} message={debounced ? 'Hãy thử tên hiển thị khác.' : 'Vui lòng quay lại sau.'} /> : null}
+    {!query.isPending && !query.isError && items.length === 0 ? <CoachingState testID="trainer-no-results" title={debounced ? 'Không có kết quả' : 'Chưa có huấn luyện viên khả dụng'} message={debounced ? 'Không tìm thấy HLV đã xác minh và đang nhận học viên khớp với tên này.' : 'Hiện chưa có huấn luyện viên nào đã xác minh và đang bật nhận học viên.'} /> : null}
     {requestMutation.isError ? <CoachingState testID="request-trainer-error" title="Chưa thể gửi yêu cầu" message={coachingErrorMessage(requestMutation.error)} /> : null}
     {items.map((trainer) => <CoachingCard key={trainer.trainerId} testID={`trainer-${trainer.trainerId}`}>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{trainer.displayName}</Text>

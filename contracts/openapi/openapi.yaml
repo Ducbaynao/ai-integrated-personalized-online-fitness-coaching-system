@@ -2372,8 +2372,9 @@ paths:
           in: query
           required: false
           schema:
-            $ref: '#/components/schemas/TrainerVerificationStatus'
-          description: Filter applications by verification status. Defaults to PENDING if omitted.
+            type: string
+            enum: [ALL, NOT_SUBMITTED, PENDING, VERIFIED, REJECTED, SUSPENDED]
+          description: Filter applications by verification status or ALL for all statuses. Defaults to PENDING if omitted.
         - name: page
           in: query
           required: false
