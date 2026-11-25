@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from app.api.routes.internal_knowledge import router as internal_knowledge_router
 from app.api.routes.internal_food_text_estimate import router as internal_food_text_estimate_router
+from app.api.routes.internal_knowledge import router as internal_knowledge_router
 from app.api.routes.internal_progress_summary import router as internal_progress_summary_router
 from app.api.routes.internal_workout_adjustment import router as internal_workout_adjustment_router
 from app.api.routes.internal_workout_proposal import router as internal_workout_proposal_router

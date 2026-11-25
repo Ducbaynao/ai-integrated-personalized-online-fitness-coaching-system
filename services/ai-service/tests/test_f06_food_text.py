@@ -1,11 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.main import app
-import pytest
-from pydantic import ValidationError
 from app.schemas.f06_schemas import F06FoodTextEstimateResponse, F06FoodTextItem
-
 
 client = TestClient(app)
 PATH = "/internal/v1/food-text-estimates/generate"
