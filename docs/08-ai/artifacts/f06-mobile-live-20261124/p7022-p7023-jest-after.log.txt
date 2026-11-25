@@ -1,0 +1,17 @@
+node.exe : PASS src/__tests__/foodAnalysisScreen.test.tsx
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS src/__test...Screen.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+PASS src/__tests__/nutritionScreens.test.tsx
+PASS src/__tests__/foodTextAnalysisApi.test.ts
+PASS src/__tests__/apiClient.test.ts
+
+Test Suites: 4 passed, 4 total
+Tests:       126 passed, 126 total
+Snapshots:   0 total
+Time:        5.935 s
+Ran all test suites matching /src\\__tests__\\foodTextAnalysisApi.test.ts|src\\__tests__\\foodAnalysisScreen.test.tsx|s
+rc\\__tests__\\nutritionScreens.test.tsx|src\\__tests__\\apiClient.test.ts/i.

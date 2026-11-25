@@ -176,6 +176,7 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.values(foodTextAnalysisApi).forEach((fn) => (fn as jest.Mock).mockReset());
     moment.now = () => Date.parse('2026-11-24T12:00:00Z');
     (useAuth as jest.Mock).mockReturnValue({
       user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
@@ -1048,6 +1049,409 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
     await renderer.act(async () => old.resolve(mockReceipt));
     expect(refresh).not.toHaveBeenCalled();
     expect(JSON.stringify(tree.toJSON())).not.toContain('Biên lai xác nhận nhật ký');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-022 401 expired access token on Confirm refreshes session without wiping saved intent or draft, allowing exact retry', async () => {
+    const refreshUser = jest.fn().mockResolvedValue({ id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' });
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+      activeCapability: 'STUDENT',
+      refreshUser,
+    });
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock)
+      .mockRejectedValueOnce(new ApiError(401, 'Token expired'))
+      .mockResolvedValueOnce(mockReceipt);
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(removeQueries).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Không thể truy cập bản nháp');
+    expect(JSON.stringify(tree.toJSON())).toContain('Gửi lại xác nhận (thử lại an toàn)');
+
+    const firstBody = (foodTextAnalysisApi.confirm as jest.Mock).mock.calls[0][1];
+    await renderer.act(async () => press(tree, 'Gửi lại xác nhận (thử lại an toàn)'));
+
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(2);
+    expect((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[1][1]).toBe(firstBody);
+    expect(JSON.stringify(tree.toJSON())).toContain('Biên lai xác nhận nhật ký');
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each(['correct', 'preview'] as const)(
+    'P7-022 401 expired access token on %s refreshes session and preserves exact saved intent for retry',
+    async (kind) => {
+      const refreshUser = jest.fn().mockResolvedValue({ id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' });
+      (useAuth as jest.Mock).mockReturnValue({
+        user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+        activeCapability: 'STUDENT',
+        refreshUser,
+      });
+      const tree = mount();
+      if (kind === 'correct') {
+        (foodTextAnalysisApi.correctItem as jest.Mock)
+          .mockRejectedValueOnce(new ApiError(401, 'Token expired'))
+          .mockResolvedValueOnce({ ...mockDraftReady, draftRevision: 1 });
+        renderer.act(() => press(tree, 'Chỉnh sửa / định lượng'));
+        input(tree, 'Số lượng', '2');
+        await renderer.act(async () => press(tree, 'Lưu chỉnh sửa'));
+        expect(refreshUser).toHaveBeenCalledTimes(1);
+        expect(removeQueries).not.toHaveBeenCalled();
+        const firstBody = (foodTextAnalysisApi.correctItem as jest.Mock).mock.calls[0][2];
+        await renderer.act(async () => press(tree, 'Thử lại lưu món'));
+        expect((foodTextAnalysisApi.correctItem as jest.Mock).mock.calls[1][2]).toBe(firstBody);
+        expect(JSON.stringify(tree.toJSON())).toContain('Đã cập nhật định lượng món ăn.');
+      } else {
+        (foodTextAnalysisApi.preview as jest.Mock)
+          .mockRejectedValueOnce(new ApiError(401, 'Token expired'))
+          .mockResolvedValueOnce(mockPreview);
+        selectFirst(tree);
+        await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+        expect(refreshUser).toHaveBeenCalledTimes(1);
+        expect(removeQueries).not.toHaveBeenCalled();
+        const firstBody = (foodTextAnalysisApi.preview as jest.Mock).mock.calls[0][1];
+        await renderer.act(async () => press(tree, 'Thử lại xem trước'));
+        expect((foodTextAnalysisApi.preview as jest.Mock).mock.calls[1][1]).toBe(firstBody);
+        expect(JSON.stringify(tree.toJSON())).toContain('Tổng dinh dưỡng ước tính:');
+      }
+      renderer.act(() => tree.unmount());
+    }
+  );
+
+  it('P7-022 401 when refreshUser fails with 401/403 revokes access; network refresh failure preserves intent', async () => {
+    const refreshUser = jest.fn()
+      .mockRejectedValueOnce(new ApiError(0, 'offline'))
+      .mockRejectedValueOnce(new ApiError(401, 'refresh revoked'));
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+      activeCapability: 'STUDENT',
+      refreshUser,
+    });
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock)
+      .mockRejectedValueOnce(new ApiError(401, 'Token expired'))
+      .mockRejectedValueOnce(new ApiError(401, 'Token expired'));
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(removeQueries).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Gửi lại xác nhận (thử lại an toàn)');
+
+    await renderer.act(async () => press(tree, 'Gửi lại xác nhận (thử lại an toàn)'));
+    expect(removeQueries).toHaveBeenCalledWith({ queryKey: ['food-analysis', 'student-1'] });
+    expect(JSON.stringify(tree.toJSON())).toContain('Không thể truy cập bản nháp');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-022 403/404 on Confirm clears access immediately without calling refreshUser', async () => {
+    const refreshUser = jest.fn();
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+      activeCapability: 'STUDENT',
+      refreshUser,
+    });
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockRejectedValueOnce(new ApiError(403, 'forbidden'));
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(refreshUser).not.toHaveBeenCalled();
+    expect(removeQueries).toHaveBeenCalledWith({ queryKey: ['food-analysis', 'student-1'] });
+    expect(JSON.stringify(tree.toJSON())).toContain('Không thể truy cập bản nháp');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-023 partial confirm receipt lets student continue confirming remaining draft items', async () => {
+    const item2 = {
+      ...mockDraftItem,
+      itemId: 'item-2',
+      detectedName: 'Trứng luộc',
+      quantity: 0.5,
+    };
+    let current: FoodAnalysisDraft = {
+      ...mockDraftReady,
+      items: [mockDraftItem, item2],
+    };
+    serveDraft(() => current);
+
+    const partialReceipt: FoodAnalysisConfirmationReceipt = {
+      ...mockReceipt,
+      confirmedItems: [mockReceipt.confirmedItems[0]],
+      remainingDraftItemIds: ['item-2'],
+    };
+    const item2Preview: FoodAnalysisPreview = {
+      ...mockPreview,
+      previewId: 'prev-2',
+      previewRevision: 2,
+      draftRevision: 1,
+      items: [{
+        ...mockPreview.items[0],
+        selection: { ...mockPreview.items[0].selection, itemId: 'item-2', quantity: 0.5 },
+      }],
+    };
+    const item2Receipt: FoodAnalysisConfirmationReceipt = {
+      ...mockReceipt,
+      receiptId: 'receipt-2',
+      commandKey: 'confirm-key-2',
+      confirmedItems: [{ ...mockReceipt.confirmedItems[0], itemId: 'item-2', foodLogItemId: 'log-item-2', quantity: 0.5 }],
+      resultingDraftRevision: 2,
+      remainingDraftItemIds: [],
+    };
+
+    (foodTextAnalysisApi.preview as jest.Mock)
+      .mockResolvedValueOnce(mockPreview)
+      .mockResolvedValueOnce(item2Preview);
+    (foodTextAnalysisApi.confirm as jest.Mock)
+      .mockImplementationOnce(async () => {
+        current = {
+          ...current,
+          draftRevision: 1,
+          confirmationStatus: 'PARTIALLY_CONFIRMED',
+          items: [
+            { ...mockDraftItem, itemRevision: 1, confirmedFoodLogItemId: 'log-item-1' },
+            item2,
+          ],
+        };
+        return partialReceipt;
+      })
+      .mockResolvedValueOnce(item2Receipt);
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(JSON.stringify(tree.toJSON())).toContain('Còn 1 món chưa xác nhận');
+    expect(JSON.stringify(tree.toJSON())).toContain('Tiếp tục xác nhận món còn lại');
+
+    await renderer.act(async () => press(tree, 'Tiếp tục xác nhận món còn lại'));
+    expect(JSON.stringify(tree.toJSON())).toContain('Đã xác nhận một phần');
+    expect(JSON.stringify(tree.toJSON())).toContain('✓ Đã ghi nhật ký');
+
+    const item2Checkbox = tree.root.findByProps({ accessibilityLabel: 'Chọn món Trứng luộc' });
+    renderer.act(() => item2Checkbox.props.onPress());
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(tree.toJSON())).toContain('Biên lai xác nhận nhật ký');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Tiếp tục xác nhận món còn lại');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-022 audit: refreshUser returning changed actor or lost STUDENT capability revokes session without keeping retry open', async () => {
+    const refreshUser = jest.fn().mockResolvedValue({
+      id: 'student-1',
+      timezone: 'Asia/Ho_Chi_Minh',
+      capabilities: { hasStudentProfile: false, hasTrainerProfile: false },
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+      activeCapability: 'STUDENT',
+      refreshUser,
+    });
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockRejectedValueOnce(new ApiError(401, 'Token expired'));
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(removeQueries).toHaveBeenCalledWith({ queryKey: ['food-analysis', 'student-1'] });
+    expect(JSON.stringify(tree.toJSON())).toContain('Không thể truy cập bản nháp');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Gửi lại xác nhận (thử lại an toàn)');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-022 audit: 401 on Generate preserves exact generation commandKey after refreshUser for explicit recovery', async () => {
+    const refreshUser = jest.fn().mockResolvedValue({
+      id: 'student-1',
+      timezone: 'Asia/Ho_Chi_Minh',
+      capabilities: { hasStudentProfile: true, hasTrainerProfile: false },
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+      activeCapability: 'STUDENT',
+      refreshUser,
+    });
+    (createCommandKey as jest.Mock).mockReturnValueOnce('gen-401-key').mockReturnValueOnce('unexpected-new-key');
+    (foodTextAnalysisApi.generate as jest.Mock).mockRejectedValueOnce(new ApiError(401, 'Token expired'));
+    (foodTextAnalysisApi.recoverByCommandKey as jest.Mock).mockResolvedValueOnce(mockDraftReady);
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<FoodAnalysisScreen />); });
+    generateFromForm(tree);
+    await renderer.act(async () => {});
+
+    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(removeQueries).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Khôi phục kết quả phân tích');
+
+    await renderer.act(async () => press(tree, 'Khôi phục kết quả phân tích'));
+    expect(foodTextAnalysisApi.recoverByCommandKey).toHaveBeenCalledWith('gen-401-key');
+    expect(JSON.stringify(tree.toJSON())).toContain('Đã khôi phục bản nháp');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-023 audit: hides continue action when authoritative draft is already CONFIRMED despite replayed partial receipt', async () => {
+    const item2 = {
+      ...mockDraftItem,
+      itemId: 'item-2',
+      detectedName: 'Trứng luộc',
+      quantity: 0.5,
+      itemRevision: 1,
+      confirmedFoodLogItemId: 'log-item-2',
+    };
+    const confirmedDraft: FoodAnalysisDraft = {
+      ...mockDraftReady,
+      draftRevision: 2,
+      confirmationStatus: 'CONFIRMED',
+      items: [
+        { ...mockDraftItem, itemRevision: 1, confirmedFoodLogItemId: 'log-item-1' },
+        item2,
+      ],
+    };
+    let current: FoodAnalysisDraft = {
+      ...mockDraftReady,
+      items: [mockDraftItem, { ...item2, itemRevision: 0, confirmedFoodLogItemId: null }],
+    };
+    serveDraft(() => current);
+
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValueOnce(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockImplementationOnce(async () => {
+      current = confirmedDraft;
+      return {
+        ...mockReceipt,
+        replayed: true,
+        resultingDraftRevision: 1,
+        remainingDraftItemIds: ['item-2'],
+      };
+    });
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(JSON.stringify(tree.toJSON())).toContain('Biên lai xác nhận nhật ký');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Tiếp tục xác nhận món còn lại');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('P7-023 audit: blocks stale draft reveal on refetch failure and distinguishes preserved prior receipt rounds without auto-confirm', async () => {
+    const item2 = {
+      ...mockDraftItem,
+      itemId: 'item-2',
+      detectedName: 'Trứng luộc',
+      quantity: 0.5,
+    };
+    let current: FoodAnalysisDraft = {
+      ...mockDraftReady,
+      items: [mockDraftItem, item2],
+    };
+    const refetchDraft = jest.fn();
+    (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
+      data: queryKey.includes('published') ? mockCatalogFoods : current,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: queryKey.includes('published') ? jest.fn() : refetchDraft,
+    }));
+
+    const partialReceipt: FoodAnalysisConfirmationReceipt = {
+      ...mockReceipt,
+      receiptId: 'receipt-round-1',
+      commandKey: 'confirm-key-1',
+      committedAt: '2026-11-24T12:02:00Z',
+      confirmedItems: [mockReceipt.confirmedItems[0]],
+      resultingDraftRevision: 1,
+      remainingDraftItemIds: ['item-2'],
+    };
+    const round2Preview: FoodAnalysisPreview = {
+      ...mockPreview,
+      previewId: 'prev-round-2',
+      previewRevision: 2,
+      draftRevision: 1,
+      items: [{
+        ...mockPreview.items[0],
+        selection: { ...mockPreview.items[0].selection, itemId: 'item-2', quantity: 0.5 },
+      }],
+    };
+    const round2Receipt: FoodAnalysisConfirmationReceipt = {
+      ...mockReceipt,
+      receiptId: 'receipt-round-2',
+      commandKey: 'confirm-key-2',
+      committedAt: '2026-11-24T12:05:00Z',
+      confirmedItems: [{ ...mockReceipt.confirmedItems[0], itemId: 'item-2', foodLogItemId: 'log-item-2', quantity: 0.5 }],
+      resultingDraftRevision: 2,
+      remainingDraftItemIds: [],
+    };
+
+    (foodTextAnalysisApi.preview as jest.Mock)
+      .mockResolvedValueOnce(mockPreview)
+      .mockResolvedValueOnce(round2Preview);
+    (foodTextAnalysisApi.confirm as jest.Mock)
+      .mockResolvedValueOnce(partialReceipt)
+      .mockResolvedValueOnce(round2Receipt);
+
+    const tree = mount();
+    selectFirst(tree);
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    // Authoritative draft refetch fails while cached draft is still stale (draftRevision 0 < resultingDraftRevision 1)
+    refetchDraft.mockResolvedValueOnce({ data: current, isError: true, error: new ApiError(0, 'offline') });
+    await renderer.act(async () => press(tree, 'Tiếp tục xác nhận món còn lại'));
+
+    expect(refetchDraft).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(tree.toJSON())).toContain('Biên lai xác nhận nhật ký');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Đã xác nhận một phần');
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(1);
+
+    // Server returns updated authoritative PARTIALLY_CONFIRMED draft on next click
+    const updatedDraft: FoodAnalysisDraft = {
+      ...current,
+      draftRevision: 1,
+      confirmationStatus: 'PARTIALLY_CONFIRMED',
+      items: [
+        { ...mockDraftItem, itemRevision: 1, confirmedFoodLogItemId: 'log-item-1' },
+        item2,
+      ],
+    };
+    current = updatedDraft;
+    refetchDraft.mockResolvedValueOnce({ data: updatedDraft, isError: false, error: null });
+    await renderer.act(async () => press(tree, 'Tiếp tục xác nhận món còn lại'));
+
+    expect(refetchDraft).toHaveBeenCalledTimes(2);
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(1); // Never auto-confirms
+    expect(JSON.stringify(tree.toJSON())).toContain('Đã xác nhận một phần');
+    expect(JSON.stringify(tree.toJSON())).toContain('receipt-round-1');
+    expect(JSON.stringify(tree.toJSON())).toContain('✓ Đã ghi nhật ký');
+
+    const item2Checkbox = tree.root.findByProps({ accessibilityLabel: 'Chọn món Trứng luộc' });
+    renderer.act(() => item2Checkbox.props.onPress());
+    await renderer.act(async () => press(tree, 'Xem trước dinh dưỡng'));
+    await renderer.act(async () => press(tree, 'Xác nhận ghi vào nhật ký'));
+
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(2);
+    const jsonAfterRound2 = JSON.stringify(tree.toJSON());
+    expect(jsonAfterRound2).toContain('receipt-round-1');
+    expect(jsonAfterRound2).toContain('receipt-round-2');
+    expect(jsonAfterRound2).toContain('Lượt 1');
+    expect(jsonAfterRound2).toContain('Lượt 2');
     renderer.act(() => tree.unmount());
   });
 });

@@ -1,5 +1,264 @@
 # Dev-B F06 Mobile checkpoint — 2026-11-24
 
+## Independent Codex review accepted — 2026-11-25 ICT
+
+P7-022/P7-023 and the session/native-storage P1 follow-ups are independently
+reviewed with no remaining blocking finding in this scope. Fresh verification:
+11 auth/storage/F06 suites, 179/179 tests (exit 0); npm run typecheck, npm run
+lint (zero warnings), git diff --check all exit 0. A separate reviewer harness
+using the current storage implementation and deferred native SecureStore passed
+both access-reject/refresh-pending and refresh-reject/access-pending cases:
+clear remains pending until both deletes settle, preserves the original error,
+then queued save B completes with the matched B token pair. No sleep/timer was
+used as evidence. Previous independently verified session/write races remain covered.
+
+The actual authNativeStorageRace.test.tsx SHA256 is
+953361ed39615b90a39d4e762885b83274b37d7813ed433ef96c8e5cbfef89bf;
+the handoff prompt/manifest contained a different hash. The current file was
+read and tested directly; only the evidence hash was corrected, not test code.
+FoodAnalysisScreen and its P7-019/P7-021 protections remain unchanged from the
+reviewed P7-022/P7-023 source. P7-023 has no separate finding.
+
+Native-device auth/storage race, process death, TalkBack, and true
+mid-transaction revoke remain NOT RUN. Pre-P1 device captures are historical:
+latest F06 retest draft ee072172-6ccb-46f7-884f-583e7dd36dc4 used a simulated
+provider and SQL second-item fixture. Two receipts/Logs share one meal; unknown
+nutrients and real zero stay distinct. Proxy 401 then /users/me 200 does not
+prove real token expiry on the same intent. Receipt/intent recovery is memory
+only; two-key storage serialization does not provide failure-atomic persistence.
+P7-020 stays deferred; no whole F06/milestone/release completion is claimed.
+
+This record supersedes earlier awaiting-review statements below. Selected
+publication excludes login captures, private setup files, the ignored backlog,
+and five pre-existing Vietnamese scripts. Original FAIL evidence remains intact;
+credential-shaped fixture excerpts in older session/native-write failure logs
+stay local, while the delete-reject original FAIL log is published.
+
+## P1 clearTokens Promise.allSettled fix & storage semantics correction (for Codex review) — 2026-11-25 ICT
+
+Updated the working tree on `feature/p2-dev-b-f06-mobile-client-20261124`
+(`HEAD` unchanged at `f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c`) to address
+Codex's follow-up P1 finding on `clearTokens()` (**awaiting independent Codex
+review**; do not close P1, commit/push, or sync backend PR `#169` before review):
+
+- **Root cause & narrow fix (`apps/mobile/src/services/storage.ts`):**
+  `tokenStorage.clearTokens()` previously used `Promise.all([deleteItemAsync(access), deleteItemAsync(refresh)])`.
+  When one native delete rejected while the sibling delete stayed pending,
+  `Promise.all` rejected fast and released `enqueueTokenOp`, letting a queued
+  `saveTokens(B)` complete and then letting the still-pending old delete erase
+  B's token. Replaced with `Promise.allSettled` followed by rethrowing the first
+  rejected reason after **all** started native deletes settle (without swallowing
+  errors or adding blind B rollback). Audited remaining queue paths in `storage.ts`:
+  no other parallel `Promise.all` native calls exist (`saveTokens` and `getTokens`
+  run sequentially per key).
+- **Clarification of serialization vs atomicity (correcting inaccurate prior notes):**
+  Per-domain serialization (`enqueueTokenOp`, `enqueueCapabilityOp`) protects
+  **operation ordering** across concurrent callers; it is **not** failure-atomic
+  native persistence across two keys. As Codex proved, if `setItemAsync(accessToken)`
+  succeeds and `setItemAsync(refreshToken)` rejects when an older `refreshToken`
+  is already stored, `getTokens()` can return `{ new-access, old-refresh }` (not
+  always `null`). Implementing new atomic native storage is out of scope for this
+  finding.
+- **Verification (latest working tree; prior `177/177`, `172/172`, `126/126` were earlier revisions):**
+  - Before `clearTokens` fix (`authNativeStorageRace.test.tsx`): **2 failed, 5 passed, 7 total**,
+    exit `1` (`p7022-p1-delete-reject-jest-before.log.txt`; both symmetric delete-reject cases failed).
+  - After fix (11 auth + storage + F06 suites): **179/179 passed, 0 skips**,
+    exit `0` (`p7022-p1-delete-reject-jest-after.log.txt`),
+    `npx tsc --noEmit` exit `0` (`p7022-p1-delete-reject-typecheck.log.txt`),
+    `npx expo lint` exit `0` with **0 errors, 0 warnings** (`p7022-p1-delete-reject-lint.log.txt`),
+    `git diff --check` exit `0`.
+  - Device pending-storage retest: **NOT RUN** (Metro `18081` down; prior F06 captures preserved).
+  - Updated logs & manifest SHA-256 hashes: [p7022-p1-delete-reject-jest-after.log.txt](../08-ai/artifacts/f06-mobile-live-20261124/p7022-p1-delete-reject-jest-after.log.txt) and [p7022-p7023-verification.json](../08-ai/artifacts/f06-mobile-live-20261124/p7022-p7023-verification.json).
+
+## P1 native SecureStore ordering fix (for Codex review) — 2026-11-25 ICT
+
+Updated the working tree on `feature/p2-dev-b-f06-mobile-client-20261124`
+(`HEAD` unchanged at `f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c`) to address
+Codex's independent finding that suspended native `SecureStore` writes from a
+stale session could resume after `logout`/`login` finished (**awaiting independent
+Codex review**; no stage/commit/push or PR edits; PR `#169` Ruff status unchanged
+until backend commit `2c1021c` sync).
+
+### Mechanism, protected call sites & publication invariant
+
+1. **Serialized per-domain queues + in-queue guards (`apps/mobile/src/services/storage.ts`):**
+   - `enqueueTokenOp` serializes all `tokenStorage` operations (`saveTokens`,
+     `clearTokens`, `getTokens`, `getAccessToken`, `getRefreshToken`) so each
+     `(access, refresh)` pair's operations run in strict sequence relative to
+     other callers (this guarantees ordering, **not** failure-atomic two-key
+     writes on hardware/write failure) without wedging the queue when an op
+     rejects (`tail = run.then(() => undefined, () => undefined)`). Web `clearTokens`
+     now deletes only token keys rather than clearing `ACTIVE_CAPABILITY_KEY`.
+   - `enqueueCapabilityOp` applies the same serialization and non-blocking error
+     recovery to `capabilityStorage` (`saveActiveCapability`, `getActiveCapability`,
+     `clearActiveCapability`).
+   - All mutation methods accept `StorageMutationOptions.shouldApply`, checked
+     synchronously inside the serialized queue immediately before touching
+     `SecureStore`.
+2. **All protected write/clear paths & session publication ordering:**
+   - `apps/mobile/src/services/apiClient.ts`: `performTokenRefresh`, `authApi.login`,
+     and `authApi.logout` pass `shouldApply: () => expectedEpoch === tokenEpoch`
+     to `saveTokens`/`clearTokens` and re-check `tokenEpoch` afterward.
+   - `apps/mobile/src/features/auth/AuthContext.tsx`: `restoreSession`, `login`,
+     `logout`, `handleSessionExpired`, `refreshUser`, and `setActiveCapability`
+     pass session/capability epoch `shouldApply` guards to `tokenStorage.clearTokens`,
+     `safeSaveActiveCapability`, and `safeClearActiveCapability`; additionally,
+     `logout()` aborts before `await authApi.logout()` if a newer `login()`
+     already superseded `logoutEpoch` during `await pushApi.unregister()`.
+   - Because `AuthContext.login(B)` awaits `authApi.login()` (queued behind any
+     pending `saveTokens`/`clearTokens` in `enqueueTokenOp`) and capability
+     persistence (`enqueueCapabilityOp`) before committing `setUser(B)` and
+     `setStatus('AUTHENTICATED')`, B is never published `AUTHENTICATED` until its
+     credentials finish persisting.
+3. **Remaining risks & boundaries (corrected):**
+   - **Partial-write limitation (existing behavior retained):** Serialization
+     protects operation ordering, not atomic persistence on write failure. If
+     `setItemAsync(accessToken)` succeeds and `setItemAsync(refreshToken)` rejects
+     when an older `refreshToken` already exists in `SecureStore`, `getTokens()`
+     can return `{ new-access, old-refresh }` (not always `null`). Implementing
+     new atomic native storage is out of scope for this finding.
+   - `pushApi.ts` writes only its unrelated device key to `SecureStore` outside
+     auth token/capability storage.
+
+### Verification (superseded by `p7022-p1-delete-reject-jest-after.log.txt` above)
+
+- **Before storage fix (`authNativeStorageRace.test.tsx`, deferred `SecureStore`):**
+  **4 failed, 1 passed, 5 total**, exit `1` (`p7022-p1-native-storage-jest-before.log.txt`).
+- **After latest fix (11 suites: `authNativeStorageRace`, `authSessionRace`, `authProviderCapabilities`, `queryCacheLifecycle`, `authFlow`, `sessionRestorationNavigation`, `storage`, `foodTextAnalysisApi`, `foodAnalysisScreen`, `nutritionScreens`, `apiClient`):**
+  **177/177 passed, 0 skips**, exit `0` (`p7022-p1-native-storage-jest-after.log.txt`),
+  `npx tsc --noEmit` exit `0` (`p7022-p1-native-storage-typecheck.log.txt`),
+  `npx expo lint` exit `0` with **0 errors, 0 warnings** (`p7022-p1-native-storage-lint.log.txt`),
+  `git diff --check` exit `0`.
+- **Device status for native-storage race:** **NOT RUN** (Metro `18081` exited
+  on earlier server restart and was not reopened per instructions; prior
+  Pixel_7 captures for F06 remain intact).
+- **Updated manifest & SHA-256 hashes:** [p7022-p7023-verification.json](../08-ai/artifacts/f06-mobile-live-20261124/p7022-p7023-verification.json).
+
+## P1 auth session-epoch race fix (for Codex re-review) — 2026-11-25 ICT
+
+Resumed on `feature/p2-dev-b-f06-mobile-client-20261124` (`HEAD` unchanged at
+`f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c`) to address **Codex's independent P1
+finding** on the uncommitted `P7-022` fix (**awaiting Codex re-review; not yet
+independently reviewed**). PR `#169` Ruff status awaits backend commit `2c1021c`
+sync cleanly without modifying imports or backend in this turn.
+
+- **Finding:** `FoodAnalysisScreen.tsx` checked `isCurrent(token)` after
+  `await refreshUser()`, while `AuthContext.refreshUser()` mutated `userRef`,
+  `queryClient`, `capabilityStorage`, `setUser`, and `setActiveCapabilityState`
+  before returning; `apiClient.ts` `performTokenRefresh()` also lacked epoch/token
+  ownership checks before `saveTokens()`, `clearTokens()`, and `sessionExpiredHandler()`.
+- **Narrow fix across session owners:**
+  - `apps/mobile/src/services/apiClient.ts`: Added `tokenEpoch` + exported
+    `invalidateAuthSession()`, cleared/scoped `refreshPromise` (`refreshPromise === activeRefresh`
+    on `.finally()`), and verified `expectedEpoch === tokenEpoch && (await tokenStorage.getRefreshToken()) === refreshToken`
+    before `saveTokens()`, `clearTokens()`, or `sessionExpiredHandler()` in both
+    success and failure paths (plus `request()` and `downloadAuthenticated()` retry guards).
+  - `apps/mobile/src/features/auth/AuthContext.tsx`: Added `sessionEpochRef`,
+    `capabilityEpochRef`, `statusRef`, and `activeCapabilityRef`, incrementing
+    epochs on `restoreSession`, `login`, `logout`, `handleSessionExpired`, and
+    `setActiveCapability`. `refreshUser()` (and sibling async lifecycle methods)
+    checks session & capability epochs across every `await` before calling
+    `clearQueryCache()`, `safeSaveActiveCapability()`, or state/ref updates, blocking
+    stale overwrites on `A -> B`, same-account re-login `A -> logout -> A`, and
+    concurrent capability switches while keeping single-session refresh working.
+- **Verification (self-checks; prior `126/126` 4-suite pass belongs to the pre-P1-fix code):**
+  - **Before P1 fix (`authSessionRace.test.tsx`, real `AuthProvider` + `apiClient`):**
+    **5 failed, 1 passed, 6 total**, exit `1` (`p7022-p1-session-race-jest-before.log.txt`).
+  - **After P1 fix (10 auth + storage + cache + F06 suites):**
+    **172/172 passed, 0 skips**, exit `0` (`p7022-p1-auth-and-f06-jest-after.log.txt`),
+    `tsc --noEmit` exit `0` (`p7022-p1-typecheck.log.txt`),
+    `expo lint` exit `0` (`p7022-p1-lint.log.txt`),
+    `git diff --check` exit `0`.
+  - **Device P1 retest (account switch while `GET /users/me` / refresh in flight):**
+    **NOT RUN** (Metro `18081` exited on earlier system restart and was not reopened;
+    earlier Pixel_7 captures on `FoodAnalysisScreen.tsx` remain preserved).
+  - **Updated manifest & source SHA-256:** [p7022-p7023-verification.json](../08-ai/artifacts/f06-mobile-live-20261124/p7022-p7023-verification.json).
+
+## Antigravity QA continuation, P7-022 & P7-023 working-tree fixes — 2026-11-25 ICT
+
+Resumed QA on `feature/p2-dev-b-f06-mobile-client-20261124` from checkpoint
+`f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c` (backend dependency `17c485f`).
+**Uncommitted working-tree changes await independent Codex review** (no
+stage/commit/push, branch change or PR edit).
+
+### Findings & narrow fixes
+
+1. **P7-022 (reproduced live on Pixel_7 before edit):** Continuing Codex's
+   interrupted draft `c361a55c-f8a3-4807-b0c1-c4dc76d764c4` (network restored,
+   tapping `"Gửi lại xác nhận (thử lại an toàn)"`) failed with HTTP `401`
+   (`backend.log` 09:17:10.671) because the 15-minute access token expired while
+   `foodTextAnalysisApi.ts` passes `_isRetry: true` on mutations and the account
+   was `ACTIVE` with 0 revocations. `FoodAnalysisScreen.tsx` treated `401` like
+   `403/404` and called `clearAccess()`, wiping `confirmIntent` and `draftId`
+   (`pixel7/173`–`174`, `p7022-failure-evidence.json`).
+   - **Fix:** `FoodAnalysisScreen.tsx` now routes `401` through
+     `handleAuthFailure`, calling `refreshUser()` (`GET /users/me`) without
+     auto-resending the mutation (`foodTextAnalysisApi.ts` unchanged). Checks
+     returned `id === actor` and `capabilities?.hasStudentProfile !== false`.
+     When valid, all saved intents and draft remain intact with a manual retry
+     prompt; when capability/actor check fails or refresh fails `401/403`,
+     `clearAccess()` runs; network failures before token refresh keep saved
+     intents. `403/404` still clears immediately without calling `refreshUser()`.
+2. **P7-023 (partial-confirm receipt continuation, authoritative draft check & round history):**
+   After confirming a subset of items, `setReceipt(receiptResult)` hid `{draft && !receipt}`
+   and only rendered `"Quay lại nhật ký dinh dưỡng"`, giving no UI path to continue
+   confirming remaining items, nor checking authoritative draft sync or keeping
+   earlier round receipts.
+   - **Fix:** Receipt card gates `"Tiếp tục xác nhận món còn lại"` against synced
+     authoritative draft state (`draftSyncedToReceipt`, `draft.confirmationStatus !== 'CONFIRMED'`
+     and unconfirmed item count > 0), runs `handleContinueRemaining()` (`await draftQuery.refetch()`,
+     refusing to expose stale draft if refetch fails or `draftRevision < receipt.resultingDraftRevision`),
+     clears selection/preview/editor without auto-confirming, and preserves deduped
+     `receiptHistory` (`Lượt 1`, `Lượt 2`, ...) across confirm rounds.
+
+### Automated self-verification (not independent Codex review)
+
+Commands run from `apps/mobile`:
+
+```powershell
+npm test -- --runInBand src/__tests__/foodAnalysisScreen.test.tsx --testNamePattern="P7-022|P7-023"
+npx jest --runInBand src/__tests__/foodAnalysisScreen.test.tsx --testNamePattern="audit:"
+npx jest --runInBand src/__tests__/foodTextAnalysisApi.test.ts src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/apiClient.test.ts
+npx tsc --noEmit
+npx expo lint
+```
+
+- Before initial fix: **5 failed, 1 passed, 52 skipped, 58 total**, exit 1
+  (`p7022-p7023-jest-before.log.txt`).
+- Before audit hardening: **3 failed, 1 passed, 58 skipped, 62 total**, exit 1
+  (`p7022-p7023-audit-jest-before.log.txt`).
+- After latest edit: **126/126 across 4 suites, 0 skips**, exit 0
+  (`p7022-p7023-jest-after.log.txt`). `typecheck` exit 0, `lint` exit 0,
+  `git diff --check` exit 0 (LF/CRLF warnings only).
+- Manifest & updated source hashes: [P7-022/P7-023 verification](../08-ai/artifacts/f06-mobile-live-20261124/p7022-p7023-verification.json).
+
+### Live Pixel_7 device QA matrix (after fix & audit hardening)
+
+Environment: Pixel_7 `emulator-5580` (Android 16 / API 36, Expo Go 57.0.9),
+reloaded working-tree bundle, Spring `17c485f` (temporarily on `18083` behind
+a local QA fault proxy on `18080`, then restored directly on `18080`), FastAPI
+`20912` simulated fallback, disposable `f06-mobile-qa-20261124` / `f06qa`.
+
+| Scenario | Result | Evidence & boundary |
+|---|---|---|
+| Latest-bundle P7-022 (`confirm_401_once`) + P7-023 partial confirm + authoritative refetch (`ee072172...` + SQL Item 2 `3fd7f232...`) | PASS (with SQL Item 2 setup) | `256`–`263`, `retest-p7022-p7023-db.json`: `POST .../confirmations` 401 -> `GET /users/me` 200 -> Round 1 receipt `0f9b0b23...` (`Lượt 1`) -> `"Tiếp tục xác nhận món còn lại"` calls `GET /food-analyses/ee072172...` (`200`) & shows `Lịch sử biên lai` (`Lượt 1`) -> Round 2 receipt `7a7efd1e...` (`Lượt 2` distinct from `Lượt 1`), DB `CONFIRMED`, 2 FoodLogs on `meal_id` `30afc291...`, 0 duplicate receipts |
+| Initial-fix Goal 1 & P7-023 multi-item partial confirm (`3c2cce77...` + SQL Item 2 `f1b96708...`) | PASS (with SQL Item 2 setup) | `194`-`206`: Item 1 only logged (`3fa5e73c...`), `meal_id` `9fe67f4f...` |
+| Goal 2 offline Preview & exact retry (from Codex follow-up) | PASS | `167`-`169`, `followup-offline-preview-db.json` (0 snapshots/Logs before retry) |
+| Goal 3 Confirm response dropped after DB commit -> UI replay | PASS | `209`-`212`, `confirm-drop-after-commit-proxy.json` (`upstreamStatus: 201`, `committedReceiptCountBeforeDrop: 1` before socket drop) -> UI replay `200` `replayed=true`, same `receiptId` `18cac82f...` & Log `1324ba04...`, same `meal_id`, day `PARTIAL` (`216`: 560 kcal, protein 0, carb/fat unknown) |
+| Goal 4 account switch B -> logout -> login A while Generate held at proxy | PASS (with Back unmount + logout) | `235`-`247`; held request returned `401` after B logout, A's F06 clean with zero leakage |
+| Goal 4 account A `DISABLED` while Generate held at proxy | PASS (transport boundary before Spring) | `252`-`254`; `401` -> `refreshUser` `401` -> signed out (`"Phiên đăng nhập đã hết hạn..."`), 0 drafts; A restored `ACTIVE` afterward |
+| Goal 5 Background/Recents resume | PASS (memory retention) | `248`-`251`; `"BackgroundKeep"` retained |
+| Goal 5 Process death (`am kill`) | NOT RUN | `am kill` left PID `3260` alive (`PID_BEFORE=3260`, `PID_AFTER_AM_KILL=3260`) |
+| Goal 5 Screen reader (TalkBack) | NOT RUN | `enabled_accessibility_services=null`; semantic XML roles/labels verified in dumps only |
+| P7-020 heading overlaps status bar | DEFERRED_UI | Untouched per scope |
+
+Runtime retained for Codex review/verification: Spring PID `34136` directly on
+`18080`, Metro PID `22764` on `18081`, FastAPI PID `20912` on `18001`,
+disposable container `f06-mobile-qa-20261124` (unpurged), Pixel_7 `emulator-5580`
+logged into `Synthetic F06 B` (returned to Nutrition screen). Five pre-existing
+untracked Mobile scripts untouched. No claim of whole F06, P2-M5, model/catalog
+evaluation, or release completion.
+
 ## Reviewed P7-019/P7-021 checkpoint - 2026-11-25 ICT
 
 Antigravity independently reviewed both fixes and reported **FIXED**, with no new

@@ -76,7 +76,7 @@ function safeQuantity(value: number): boolean {
 function FoodAnalysisSession() {
   const router = useRouter();
   const params = useLocalSearchParams<{ day?: string; timezone?: string; mealType?: string }>();
-  const { user, activeCapability } = useAuth();
+  const { user, activeCapability, refreshUser } = useAuth();
   const actor = user?.id ?? '';
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const client = useQueryClient();
@@ -123,6 +123,7 @@ function FoodAnalysisSession() {
   // Confirmation state
   const [confirmIntent, setConfirmIntent] = useState<{ draftId: string; body: FoodAnalysisConfirmRequest } | null>(null);
   const [receipt, setReceipt] = useState<FoodAnalysisConfirmationReceipt | null>(null);
+  const [receiptHistory, setReceiptHistory] = useState<FoodAnalysisConfirmationReceipt[]>([]);
 
   // General feedback & lock
   const [message, setMessage] = useState('');
@@ -160,8 +161,38 @@ function FoodAnalysisSession() {
     setAccessDenied(true);
     setDraftId(null); setGenerationIntent(null); setCorrectionIntent(null);
     setPreviewIntent(null); setConfirmIntent(null); setEditingItem(null);
-    setPreview(null); setReceipt(null); setSelectedItemIds([]); setInputText('');
+    setPreview(null); setReceipt(null); setReceiptHistory([]); setSelectedItemIds([]); setInputText('');
     client.removeQueries({ queryKey: ['food-analysis', actor] });
+  };
+  const handleAuthFailure = async (
+    token: ActiveRequest,
+    error: ApiError,
+    deniedMessage: string
+  ) => {
+    if (error.status === 401 && typeof refreshUser === 'function') {
+      try {
+        const refreshedUser = await refreshUser();
+        if (!isCurrent(token)) return;
+        if (
+          refreshedUser &&
+          (refreshedUser.id !== actor || refreshedUser.capabilities?.hasStudentProfile === false)
+        ) {
+          clearAccess();
+          setMessage(deniedMessage);
+          return;
+        }
+        setMessage('Phiên truy cập vừa được làm mới. Vui lòng bấm thử lại thao tác vừa rồi với đúng mã lệnh đã lưu.');
+        return;
+      } catch (refreshError) {
+        if (!isCurrent(token)) return;
+        if (!(refreshError instanceof ApiError && [401, 403].includes(refreshError.status))) {
+          setMessage('Không thể làm mới phiên truy cập do lỗi kết nối. Bạn có thể bấm thử lại sau với đúng mã lệnh đã lưu.');
+          return;
+        }
+      }
+    }
+    clearAccess();
+    setMessage(error.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : deniedMessage);
   };
   const invalidatePreview = () => {
     reviewVersion.current += 1;
@@ -211,6 +242,22 @@ function FoodAnalysisSession() {
     if (authorityError && !denied.current) clearAccess();
   });
   const draft = !accessDenied && !authorityError && draftQuery.data?.studentId === actor ? draftQuery.data : null;
+  const draftSyncedToReceipt = Boolean(
+    receipt &&
+    draft &&
+    draft.draftId === receipt.draftId &&
+    draft.draftRevision >= receipt.resultingDraftRevision
+  );
+  const authoritativeRemainingCount = draftSyncedToReceipt && draft
+    ? draft.items.filter((item) => !item.confirmedFoodLogItemId).length
+    : receipt?.remainingDraftItemIds.length ?? 0;
+  const canContinueRemaining = Boolean(
+    receipt &&
+    (draftSyncedToReceipt
+      ? draft?.confirmationStatus !== 'CONFIRMED' && authoritativeRemainingCount > 0
+      : receipt.remainingDraftItemIds.length > 0)
+  );
+  const priorReceipts = receiptHistory.filter((entry) => entry.receiptId !== receipt?.receiptId);
   const savedEditingItem = editingItem ? draft?.items.find(i => i.itemId === editingItem.itemId) : null;
   const editorDirty = Boolean(editingItem && (!savedEditingItem
     || editingItem.itemRevision !== savedEditingItem.itemRevision
@@ -274,6 +321,7 @@ function FoodAnalysisSession() {
       const result = await foodTextAnalysisApi.generate(requestBody);
       if (!isCurrent(token)) return;
       setDraftId(result.draftId);
+      setReceiptHistory([]);
       client.setQueryData(foodAnalysisKeys.draft(currentActor, result.draftId), result);
       if (result.analysisStatus === 'READY') {
         setMessage('Đã hoàn tất phân tích mô tả bữa ăn. Vui lòng rà soát và định lượng từng món.');
@@ -289,10 +337,7 @@ function FoodAnalysisSession() {
       if (error instanceof FoodTextAnalysisTimeoutError) {
         setMessage('Chưa rõ kết quả phân tích do phản hồi quá lâu. Bạn có thể bấm "Khôi phục kết quả phân tích" bên dưới.');
       } else if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
-        clearAccess();
-        setMessage('Bạn không có quyền thực hiện phân tích dinh dưỡng.');
-        setDraftId(null);
-        setGenerationIntent(null);
+        await handleAuthFailure(token, error, 'Bạn không có quyền thực hiện phân tích dinh dưỡng.');
       } else if (error instanceof ApiError && error.status === 409) {
         setMessage('Lệnh đã bị trùng lặp hoặc xung đột. Vui lòng kiểm tra lại.');
       } else if (error instanceof ApiError && error.status === 400) {
@@ -315,6 +360,9 @@ function FoodAnalysisSession() {
     try {
       const recovered = await foodTextAnalysisApi.recoverByCommandKey(generationIntent.commandKey);
       if (!isCurrent(token)) return;
+      if (draftId && draftId !== recovered.draftId) {
+        setReceiptHistory([]);
+      }
       setDraftId(recovered.draftId);
       client.setQueryData(foodAnalysisKeys.draft(currentActor, recovered.draftId), recovered);
       setMessage(`Đã khôi phục bản nháp (Trạng thái: ${recovered.analysisStatus}).`);
@@ -323,10 +371,7 @@ function FoodAnalysisSession() {
       if (error instanceof ApiError && error.status === 404) {
         setMessage('Chưa tìm thấy bản nháp với mã lệnh này. Nếu vừa gửi, hệ thống có thể đang xử lý. Bạn có thể thử lại sau.');
       } else if (error instanceof ApiError && [401, 403].includes(error.status)) {
-        clearAccess();
-        setMessage('Bạn không còn quyền truy cập bản nháp này.');
-        setDraftId(null);
-        setGenerationIntent(null);
+        await handleAuthFailure(token, error, 'Bạn không còn quyền truy cập bản nháp này.');
       } else {
         setMessage('Chưa khôi phục được. Kiểm tra mạng và thử lại sau.');
       }
@@ -435,11 +480,7 @@ function FoodAnalysisSession() {
         setCorrectionIntent(null);
         await draftQuery.refetch();
       } else if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
-        clearAccess();
-        setMessage('Bạn không còn quyền sửa bản nháp này.');
-        setCorrectionIntent(null);
-        setDraftId(null);
-        setEditingItem(null);
+        await handleAuthFailure(token, error, 'Bạn không còn quyền sửa bản nháp này.');
       } else if (error instanceof ApiError && error.status === 400) {
         setMessage('Thông tin định lượng chưa hợp lệ.');
         setCorrectionIntent(null);
@@ -530,7 +571,7 @@ function FoodAnalysisSession() {
         setMessage('Bản nháp đã thay đổi so với bản xem trước. Đang tải lại dữ liệu...');
         await draftQuery.refetch();
       } else if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
-        clearAccess(); setMessage('Bạn không còn quyền xem bản nháp này.');
+        await handleAuthFailure(token, error, 'Bạn không còn quyền xem bản nháp này.');
       } else if (error instanceof ApiError && error.status === 400) {
         setPreviewIntent(null); setMessage('Lựa chọn xem trước chưa hợp lệ.');
       } else {
@@ -607,6 +648,11 @@ function FoodAnalysisSession() {
       const receiptResult = await foodTextAnalysisApi.confirm(currentDraftId, confirmBody);
       if (!isCurrent(token)) return;
       setReceipt(receiptResult);
+      setReceiptHistory((prev) =>
+        prev.some((existing) => existing.receiptId === receiptResult.receiptId)
+          ? prev
+          : [...prev, receiptResult]
+      );
       setConfirmIntent(null);
       setPreview(null);
       setSelectedItemIds([]);
@@ -631,12 +677,58 @@ function FoodAnalysisSession() {
         setConfirmIntent(null);
         await draftQuery.refetch();
       } else if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
-        clearAccess();
-        setMessage('Bạn không còn quyền xác nhận bản nháp này.');
-        setConfirmIntent(null);
-        setDraftId(null);
+        await handleAuthFailure(token, error, 'Bạn không còn quyền xác nhận bản nháp này.');
       } else {
         setMessage('Chưa rõ kết quả xác nhận. Bạn có thể bấm "Gửi lại xác nhận (thử lại an toàn)" với đúng mã lệnh đã lưu.');
+      }
+    } finally {
+      finishRequest(token);
+    }
+  };
+
+  const handleContinueRemaining = async () => {
+    if (!mounted.current || denied.current || submitting.current || !receipt) return;
+    const currentReceipt = receipt;
+    const token = beginRequest('continue-remaining');
+    setMessage('');
+    try {
+      const refetched = await draftQuery.refetch();
+      if (!isCurrent(token)) return;
+      if (refetched?.isError || refetched?.error) {
+        const refetchErr = refetched.error;
+        if (refetchErr instanceof ApiError && [401, 403, 404].includes(refetchErr.status)) {
+          await handleAuthFailure(token, refetchErr, 'Bạn không còn quyền truy cập bản nháp này.');
+          return;
+        }
+        setMessage('Chưa tải được trạng thái bản nháp mới nhất từ máy chủ. Vui lòng thử lại.');
+        return;
+      }
+      const latestDraft = refetched?.data ?? (draftQuery.data?.studentId === actor ? draftQuery.data : null);
+      if (
+        !latestDraft ||
+        latestDraft.studentId !== actor ||
+        latestDraft.draftId !== currentReceipt.draftId ||
+        latestDraft.draftRevision < currentReceipt.resultingDraftRevision
+      ) {
+        setMessage('Trạng thái bản nháp chưa đồng bộ với biên lai mới nhất. Vui lòng thử lại.');
+        return;
+      }
+      const remaining = latestDraft.items.filter((item) => !item.confirmedFoodLogItemId);
+      setSelectedItemIds([]);
+      invalidatePreview();
+      setPreviewIntent(null);
+      setEditingItem(null);
+      if (latestDraft.confirmationStatus === 'CONFIRMED' || remaining.length === 0) {
+        setMessage('Tất cả món trong bản nháp đã được xác nhận.');
+        return;
+      }
+      setReceipt(null);
+    } catch (error) {
+      if (!isCurrent(token)) return;
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        await handleAuthFailure(token, error, 'Bạn không còn quyền truy cập bản nháp này.');
+      } else {
+        setMessage('Chưa tải được trạng thái bản nháp mới nhất từ máy chủ. Vui lòng thử lại.');
       }
     } finally {
       finishRequest(token);
@@ -811,6 +903,15 @@ function FoodAnalysisSession() {
       {receipt ? (
         <WorkoutCard>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Biên lai xác nhận nhật ký</Text>
+          {(() => {
+            const activeRoundIndex = receiptHistory.findIndex((entry) => entry.receiptId === receipt.receiptId);
+            const roundNumber = activeRoundIndex >= 0 ? activeRoundIndex + 1 : 1;
+            return (
+              <Text style={[styles.body, { color: theme.textSecondary }]}>
+                {`Lượt ${roundNumber} · Mã biên lai: ${receipt.receiptId}`}
+              </Text>
+            );
+          })()}
           {receipt.replayed ? (
             <Text style={[styles.body, { color: theme.primary }]}>
               (Biên lai khôi phục từ lệnh đã xử lý thành công trước đó)
@@ -830,6 +931,33 @@ function FoodAnalysisSession() {
               </Text>
             </View>
           ))}
+          {priorReceipts.length > 0 ? (
+            <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border }}>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>
+                Các lượt đã xác nhận trước trong bản nháp này:
+              </Text>
+              {priorReceipts.map((prevReceipt, index) => (
+                <Text key={prevReceipt.receiptId} style={[styles.body, { color: theme.textSecondary, fontSize: 13 }]}>
+                  {`Lượt ${index + 1} · Mã biên lai: ${prevReceipt.receiptId} · Bản nháp #${prevReceipt.resultingDraftRevision} · ${prevReceipt.confirmedItems.length} món`}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {canContinueRemaining ? (
+            <>
+              <Text style={[styles.body, { color: theme.textSecondary, marginTop: 8 }]}>
+                {`Còn ${authoritativeRemainingCount} món chưa xác nhận vẫn đang được giữ ở bản nháp.`}
+              </Text>
+              <WorkoutButton
+                label={busy ? 'Đang tải bản nháp...' : 'Tiếp tục xác nhận món còn lại'}
+                secondary
+                disabled={busy}
+                onPress={() => {
+                  void handleContinueRemaining();
+                }}
+              />
+            </>
+          ) : null}
           <WorkoutButton
             label="Quay lại nhật ký dinh dưỡng"
             onPress={() => router.push('/nutrition' as never)}
@@ -883,6 +1011,18 @@ function FoodAnalysisSession() {
                 : 'Chưa ghi nhật ký'
             }`}
           </Text>
+          {priorReceipts.length > 0 ? (
+            <View style={{ marginVertical: 6, padding: 10, borderRadius: 8, backgroundColor: theme.surfaceSubtle }}>
+              <Text style={[styles.label, { color: theme.textPrimary }]}>
+                Lịch sử biên lai các lượt đã xác nhận:
+              </Text>
+              {priorReceipts.map((prevReceipt, index) => (
+                <Text key={prevReceipt.receiptId} style={[styles.body, { color: theme.textSecondary, fontSize: 13 }]}>
+                  {`Lượt ${index + 1} · Mã biên lai: ${prevReceipt.receiptId} · ${prevReceipt.confirmedItems.length} món · ${moment(prevReceipt.committedAt).format('HH:mm:ss')}`}
+                </Text>
+              ))}
+            </View>
+          ) : null}
 
           {draft.analysisStatus === 'PROCESSING' ? (
             <View style={{ marginVertical: 8 }}>

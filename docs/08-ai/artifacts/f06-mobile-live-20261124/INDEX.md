@@ -17,7 +17,7 @@ setup) are not publication artifacts.
 
 Original `.log` files are ignored and stay local. Byte-identical `.log.txt`
 exports below publish the reviewed logs without force-adding ignored files.
-Historical manifests retain their original local log names.
+Historical manifests retain their original local log names. New P7-022 log exports normalize trailing whitespace only for diff checks; unchanged raw originals are preserved locally outside Git at C:/Users/ADMIN/.codex/tmp/f06-p7022-original-logs-20261125. FAIL results and content are retained.
 
 ## Published checkpoint files
 
@@ -34,6 +34,34 @@ Historical manifests retain their original local log names.
 - `p7021-lint.log.txt`
 - `p7021-typecheck.log.txt`
 - `p7021-verification.json`
+- `p7022-p1-delete-reject-jest-after.log.txt`
+- `p7022-p1-delete-reject-jest-before.log.txt`
+- `p7022-p1-delete-reject-lint.log.txt`
+- `p7022-p1-delete-reject-typecheck.log.txt`
+- `p7022-p1-native-storage-jest-after.log.txt`
+- Local-only original `p7022-p1-native-storage-jest-before.log.txt` (fixture credential excerpts; not published).
+- `p7022-p1-native-storage-lint.log.txt`
+- `p7022-p1-native-storage-typecheck.log.txt`
+- `p7022-p1-auth-and-f06-jest-after.log.txt`
+- `p7022-p1-lint.log.txt`
+- Local-only original `p7022-p1-session-race-jest-before.log.txt` (fixture credential excerpts; not published).
+- `p7022-p1-typecheck.log.txt`
+- `p7022-p7023-audit-jest-before.log.txt`
+- `p7022-p7023-jest-after.log.txt`
+- `p7022-p7023-jest-before.log.txt`
+- `p7022-p7023-lint.log.txt`
+- `p7022-p7023-typecheck.log.txt`
+- `p7022-p7023-verification.json`
+- `pixel7/p7022-failure-evidence.json`
+- `pixel7/confirm-drop-after-commit-proxy.json`
+- `pixel7/retest-p7022-p7023-db.json`
+- `pixel7/followup-before-confirm-db.json`
+- `pixel7/followup-fixture.json`
+- `pixel7/followup-fixture-corrected.json`
+- `pixel7/followup-offline-preview-db.json`
+- `pixel7/followup-offline-confirm-db.json`
+- `pixel7/followup-after-partial-confirm-db.json`
+- Selected latest retest images: `pixel7/257-retest-p7022-401-banner.png`, `pixel7/259-retest-continue.png`, `pixel7/262b-round2-bottom.png`. The full 167–263 sequence stays local.
 - `pixel7/01-expo-open-error.png`
 - `pixel7/02-expo-error-log.png`
 - `pixel7/02-expo-error-log.xml`

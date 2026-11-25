@@ -1,0 +1,27 @@
+node.exe : PASS src/__tests__/authNativeStorageRace.test.tsx
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS src/__test...geRace.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+PASS src/__tests__/foodAnalysisScreen.test.tsx
+PASS src/__tests__/nutritionScreens.test.tsx
+PASS src/__tests__/authProviderCapabilities.test.tsx
+PASS src/__tests__/authSessionRace.test.tsx
+PASS src/__tests__/foodTextAnalysisApi.test.ts
+PASS src/__tests__/queryCacheLifecycle.test.tsx
+PASS src/__tests__/authFlow.test.ts
+PASS src/__tests__/apiClient.test.ts
+PASS src/__tests__/storage.test.ts
+PASS src/__tests__/sessionRestorationNavigation.test.tsx
+
+Test Suites: 11 passed, 11 total
+Tests:       179 passed, 179 total
+Snapshots:   0 total
+Time:        6.416 s, estimated 7 s
+Ran all test suites matching /src\\__tests__\\authNativeStorageRace.test.tsx|src\\__tests__\\authSessionRace.test.tsx|s
+rc\\__tests__\\authProviderCapabilities.test.tsx|src\\__tests__\\queryCacheLifecycle.test.tsx|src\\__tests__\\authFlow.
+test.ts|src\\__tests__\\sessionRestorationNavigation.test.tsx|src\\__tests__\\storage.test.ts|src\\__tests__\\foodTextA
+nalysisApi.test.ts|src\\__tests__\\foodAnalysisScreen.test.tsx|src\\__tests__\\nutritionScreens.test.tsx|src\\__tests__
+\\apiClient.test.ts/i.

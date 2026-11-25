@@ -1,0 +1,13 @@
+{
+  "observedAtUtc": "2026-11-25T02:37:49.923918+00:00",
+  "path": "/api/v1/nutrition/food-analyses/3c2cce77-fa63-4765-ac1b-064fe4c083a0/confirmations",
+  "upstreamStatus": 201,
+  "commandKey": "aae0e98f-70cd-4836-815d-c8f86a77a8b2",
+  "receiptId": "18cac82f-8646-473c-aaea-e278df529d8d",
+  "committedReceiptCountBeforeDrop": 1,
+  "foodLogItemIds": [
+    "1324ba04-a538-441f-9eba-f23605b2c9de"
+  ],
+  "draftId": "3c2cce77-fa63-4765-ac1b-064fe4c083a0",
+  "resultingDraftRevision": 5
+}

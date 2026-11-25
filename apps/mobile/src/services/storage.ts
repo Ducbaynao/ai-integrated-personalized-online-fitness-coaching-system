@@ -3,11 +3,40 @@ import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+const ACTIVE_CAPABILITY_KEY = 'active_mobile_capability';
 
 export interface StoredTokens {
   accessToken: string;
   refreshToken: string;
 }
+
+export interface StorageMutationOptions {
+  /** Checked inside the serialized queue right before performing storage writes/deletes. */
+  shouldApply?: () => boolean;
+}
+
+export class StaleStorageMutationError extends Error {
+  constructor(message = 'Stale session storage mutation aborted.') {
+    super(message);
+    this.name = 'StaleStorageMutationError';
+  }
+}
+
+function createSerialQueue() {
+  let tail: Promise<void> = Promise.resolve();
+  return function enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = tail.then(task, task);
+    // Keep the queue healthy if any operation fails so subsequent session operations never stall.
+    tail = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  };
+}
+
+const enqueueTokenOp = createSerialQueue();
+const enqueueCapabilityOp = createSerialQueue();
 
 /**
  * In-memory fallback for web preview.
@@ -24,89 +53,133 @@ export interface StoredTokens {
 const webMemoryStore = new Map<string, string>();
 
 export const tokenStorage = {
-  async saveTokens(accessToken: string, refreshToken: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      webMemoryStore.set(ACCESS_TOKEN_KEY, accessToken);
-      webMemoryStore.set(REFRESH_TOKEN_KEY, refreshToken);
-      return;
-    }
+  saveTokens(
+    accessToken: string,
+    refreshToken: string,
+    options?: StorageMutationOptions
+  ): Promise<void> {
+    return enqueueTokenOp(async () => {
+      if (options?.shouldApply && !options.shouldApply()) {
+        throw new StaleStorageMutationError();
+      }
 
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      if (Platform.OS === 'web') {
+        webMemoryStore.set(ACCESS_TOKEN_KEY, accessToken);
+        webMemoryStore.set(REFRESH_TOKEN_KEY, refreshToken);
+        return;
+      }
+
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+    });
   },
 
-  async getTokens(): Promise<StoredTokens | null> {
-    if (Platform.OS === 'web') {
-      const accessToken = webMemoryStore.get(ACCESS_TOKEN_KEY);
-      const refreshToken = webMemoryStore.get(REFRESH_TOKEN_KEY);
+  getTokens(): Promise<StoredTokens | null> {
+    return enqueueTokenOp(async () => {
+      if (Platform.OS === 'web') {
+        const accessToken = webMemoryStore.get(ACCESS_TOKEN_KEY);
+        const refreshToken = webMemoryStore.get(REFRESH_TOKEN_KEY);
+
+        if (!accessToken || !refreshToken) {
+          return null;
+        }
+
+        return { accessToken, refreshToken };
+      }
+
+      const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 
       if (!accessToken || !refreshToken) {
         return null;
       }
 
       return { accessToken, refreshToken };
-    }
-
-    const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-    const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-
-    if (!accessToken || !refreshToken) {
-      return null;
-    }
-
-    return { accessToken, refreshToken };
+    });
   },
 
-  async getAccessToken(): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      return webMemoryStore.get(ACCESS_TOKEN_KEY) ?? null;
-    }
-    return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  getAccessToken(): Promise<string | null> {
+    return enqueueTokenOp(async () => {
+      if (Platform.OS === 'web') {
+        return webMemoryStore.get(ACCESS_TOKEN_KEY) ?? null;
+      }
+      return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+    });
   },
 
-  async getRefreshToken(): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      return webMemoryStore.get(REFRESH_TOKEN_KEY) ?? null;
-    }
-    return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  getRefreshToken(): Promise<string | null> {
+    return enqueueTokenOp(async () => {
+      if (Platform.OS === 'web') {
+        return webMemoryStore.get(REFRESH_TOKEN_KEY) ?? null;
+      }
+      return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    });
   },
 
-  async clearTokens(): Promise<void> {
-    if (Platform.OS === 'web') {
-      webMemoryStore.clear();
-      return;
-    }
+  clearTokens(options?: StorageMutationOptions): Promise<void> {
+    return enqueueTokenOp(async () => {
+      if (options?.shouldApply && !options.shouldApply()) {
+        return;
+      }
 
-    await Promise.all([
-      SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-    ]);
+      if (Platform.OS === 'web') {
+        webMemoryStore.delete(ACCESS_TOKEN_KEY);
+        webMemoryStore.delete(REFRESH_TOKEN_KEY);
+        return;
+      }
+
+      const results = await Promise.allSettled([
+        SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+        SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+      ]);
+      const rejected = results.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected'
+      );
+      if (rejected) {
+        throw rejected.reason;
+      }
+    });
   },
 };
 
-const ACTIVE_CAPABILITY_KEY = 'active_mobile_capability';
-
 export const capabilityStorage = {
-  async saveActiveCapability(capability: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      webMemoryStore.set(ACTIVE_CAPABILITY_KEY, capability);
-      return;
-    }
-    await SecureStore.setItemAsync(ACTIVE_CAPABILITY_KEY, capability);
+  saveActiveCapability(
+    capability: string,
+    options?: StorageMutationOptions
+  ): Promise<void> {
+    return enqueueCapabilityOp(async () => {
+      if (options?.shouldApply && !options.shouldApply()) {
+        return;
+      }
+
+      if (Platform.OS === 'web') {
+        webMemoryStore.set(ACTIVE_CAPABILITY_KEY, capability);
+        return;
+      }
+      await SecureStore.setItemAsync(ACTIVE_CAPABILITY_KEY, capability);
+    });
   },
 
-  async getActiveCapability(): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      return webMemoryStore.get(ACTIVE_CAPABILITY_KEY) ?? null;
-    }
-    return SecureStore.getItemAsync(ACTIVE_CAPABILITY_KEY);
+  getActiveCapability(): Promise<string | null> {
+    return enqueueCapabilityOp(async () => {
+      if (Platform.OS === 'web') {
+        return webMemoryStore.get(ACTIVE_CAPABILITY_KEY) ?? null;
+      }
+      return SecureStore.getItemAsync(ACTIVE_CAPABILITY_KEY);
+    });
   },
 
-  async clearActiveCapability(): Promise<void> {
-    if (Platform.OS === 'web') {
-      webMemoryStore.delete(ACTIVE_CAPABILITY_KEY);
-      return;
-    }
-    await SecureStore.deleteItemAsync(ACTIVE_CAPABILITY_KEY);
+  clearActiveCapability(options?: StorageMutationOptions): Promise<void> {
+    return enqueueCapabilityOp(async () => {
+      if (options?.shouldApply && !options.shouldApply()) {
+        return;
+      }
+
+      if (Platform.OS === 'web') {
+        webMemoryStore.delete(ACTIVE_CAPABILITY_KEY);
+        return;
+      }
+      await SecureStore.deleteItemAsync(ACTIVE_CAPABILITY_KEY);
+    });
   },
 };

@@ -1,0 +1,66 @@
+node.exe : FAIL src/__tests__/authNativeStorageRace.test.tsx
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/__test...geRace.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  Native SecureStore serialization & session ordering (P1 storage race regression)
+    √ 1. Native token write A pending -> concurrent logout & login B waits for persistence, then B owns state &
+matched token pair (136 ms)
+    √ 2. Old session native deleteItemAsync pending -> new login B waits and is NOT deleted by old clear (5 ms)
+    √ 3. Stale native capability write & cleanup pending do NOT overwrite newer capability in SecureStore (5 ms)
+    √ 4. Storage error during saveTokens does NOT wedge the queue or block subsequent valid session login (4 ms)
+    √ 5. Concurrent access/refresh writes never produce mixed-session token pairs (1 ms)
+    × 6. clearTokens waits for sibling pending delete when auth_access_token rejects before releasing queue to save B
+(2 ms)
+    × 6. clearTokens waits for sibling pending delete when auth_refresh_token rejects before releasing queue to save B
+(1 ms)
+
+  ● Native SecureStore serialization & session ordering (P1 storage race regression) › 6. clearTokens waits for
+sibling pending delete when auth_access_token rejects before releasing queue to save B
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+    [0m [90m 474 |[39m
+     [90m 475 |[39m       [90m// Queue must NOT advance to save B (or settle clear A) while sibling delete A is
+still in flight.[39m
+    [31m[1m>[22m[39m[90m 476 |[39m       expect(clearSettled)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m     |[39m                            [31m[1m^[22m[39m
+     [90m 477 |[39m       expect(saveBStarted)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m 478 |[39m       expect(saveBSettled)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m 479 |[39m[0m
+
+      at toBe (src/__tests__/authNativeStorageRace.test.tsx:476:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Native SecureStore serialization & session ordering (P1 storage race regression) › 6. clearTokens waits for
+sibling pending delete when auth_refresh_token rejects before releasing queue to save B
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+    [0m [90m 474 |[39m
+     [90m 475 |[39m       [90m// Queue must NOT advance to save B (or settle clear A) while sibling delete A is
+still in flight.[39m
+    [31m[1m>[22m[39m[90m 476 |[39m       expect(clearSettled)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m     |[39m                            [31m[1m^[22m[39m
+     [90m 477 |[39m       expect(saveBStarted)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m 478 |[39m       expect(saveBSettled)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m 479 |[39m[0m
+
+      at toBe (src/__tests__/authNativeStorageRace.test.tsx:476:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 5 passed, 7 total
+Snapshots:   0 total
+Time:        1.827 s
+Ran all test suites matching /src\\__tests__\\authNativeStorageRace.test.tsx/i.

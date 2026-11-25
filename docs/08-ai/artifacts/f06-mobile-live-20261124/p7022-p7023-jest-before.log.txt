@@ -1,0 +1,283 @@
+
+> @fitness-coaching/mobile@1.0.0 test
+> jest --runInBand src/__tests__/foodAnalysisScreen.test.tsx --testNamePattern=P7-022|P7-023
+
+node.exe : FAIL src/__tests__/foodAnalysisScreen.test.tsx
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/__test...Screen.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  F06 FoodAnalysisScreen (Student Mobile UI)
+    × P7-022 401 expired access token on Confirm refreshes session without wiping saved intent or draft, allowing
+exact retry (544 ms)
+    × P7-022 401 expired access token on correct refreshes session and preserves exact saved intent for retry (38 ms)
+    × P7-022 401 expired access token on preview refreshes session and preserves exact saved intent for retry (17 ms)
+    × P7-022 401 when refreshUser fails with 401/403 revokes access; network refresh failure preserves intent (28 ms)
+    √ P7-022 403/404 on Confirm clears access immediately without calling refreshUser (29 ms)
+    × P7-023 partial confirm receipt lets student continue confirming remaining draft items (45 ms)
+    ○ skipped restricts access when activeCapability is not STUDENT
+    ○ skipped renders nutrient helper with unknown shown as "Chưa xác định", never 0
+    ○ skipped generates food analysis draft and transitions to READY detail
+    ○ skipped on Generate timeout, retains intent and allows recovery with the exact same commandKey
+    ○ skipped corrects an item selection and quantity, invalidating previous preview
+    ○ skipped native Correct press sends 1.25 with exact revisions/body and retries the saved intent after form edits
+    ○ skipped generates preview and executes atomic Confirm, with retry on timeout
+    ○ skipped initializes day, timezone, and localTime coherently when params.timezone differs from user.timezone
+    ○ skipped on Correct timeout, retains correction intent and retries with exact same commandKey and body
+    ○ skipped blocks Preview and displays warning when server draft contains unsafe integer revision or quantity
+exceeding safe bounds
+    ○ skipped isolates actor and discards pending responses when user logs out or switches account
+    ○ skipped cleans up query cache and displays error when access is denied (403/404)
+    ○ skipped blocks new Correct from unsafe draft revision 9007199254740992 through the save action
+    ○ skipped blocks new Correct from unsafe draft revision -1 through the save action
+    ○ skipped blocks new Correct from unsafe item revision 9007199254740992 through the save action
+    ○ skipped blocks new Correct from unsafe item revision -1 through the save action
+    ○ skipped checks draft again on new Confirm, not just on selecting/Preview
+    ○ skipped checks item again on new Confirm, not just on selecting/Preview
+    ○ skipped checks preview again on new Confirm, not just on selecting/Preview
+    ○ skipped checks previewDraft again on new Confirm, not just on selecting/Preview
+    ○ skipped checks selection again on new Confirm, not just on selecting/Preview
+    ○ skipped A → B → A never revives an old successful Generate or clears the new request lock
+    ○ skipped late rejection/finally from the old session cannot deny access or unlock a new request
+    ○ skipped Preview timeout retries its saved key/body even after form/selection changes; only an explicit new
+Preview gets a new intent
+    ○ skipped late Preview response/finally cannot overwrite or unlock a newer Preview intent
+    ○ skipped Correct network error retains the old intent while editing, blocking a fresh Save with a new key
+    ○ skipped unmount and capability loss discard old responses without restoring receipt/intents/cache
+    ○ skipped Correct rechecks the current server item revision after opening the edit form
+    ○ skipped new Confirm rejects the mismatched/invalid quantity in the actual Preview selection
+    ○ skipped new Confirm rejects the mismatched/invalid food in the actual Preview selection
+    ○ skipped new Confirm rejects the mismatched/invalid revisionMismatch in the actual Preview selection
+    ○ skipped new Confirm rejects the mismatched/invalid negativeRevision in the actual Preview selection
+    ○ skipped new Confirm rejects the mismatched/invalid zeroPreviewRevision in the actual Preview selection
+    ○ skipped a late old Preview rejection does not clear a new successful preview
+    ○ skipped Preview network failure exposes explicit retry with the same intent, without automatically resending
+    ○ skipped a late old Preview success cannot replace the already displayed new preview
+    ○ skipped Confirm timeout intent survives changed form, unsafe new server data and an attempted new Preview
+    ○ skipped old Confirm invalidation continuation cannot overwrite a new session message or lock
+    ○ skipped unmounted Generate cannot publish its result into the actor query cache
+    ○ skipped P7-021 dirty quantity cannot Confirm the old snapshot or create another Preview
+    ○ skipped P7-021 dirty food cannot bypass the new Confirm/Preview guard
+    ○ skipped P7-021 dirty revision cannot bypass the new Confirm/Preview guard
+    ○ skipped P7-021 dirty basis cannot bypass the new Confirm/Preview guard
+    ○ skipped P7-021 dirty portion cannot bypass the new Confirm/Preview guard
+    ○ skipped P7-021 Cancel does not resurrect the old preview; a fresh matching Preview permits Confirm
+    ○ skipped P7-021 revert does not resurrect the old preview; a fresh matching Preview permits Confirm
+    ○ skipped P7-021 successful Save requires a new Preview and Confirms the new saved quantity/revisions
+    ○ skipped P7-021 late Preview cannot authorize Confirm after the editor changed or Cancel
+    ○ skipped P7-021 saved Preview retry keeps its old key/body after dirty edits without authorizing Confirm
+    ○ skipped P7-021 dirty editor with Cancel=false preserves exact timed-out Confirm replay
+    ○ skipped P7-021 dirty editor with Cancel=true preserves exact timed-out Confirm replay
+    ○ skipped a detail authority error hides cached data and revokes pending callbacks in the same session
+
+  ● F06 FoodAnalysisScreen (Student Mobile UI) › P7-022 401 expired access token on Confirm refreshes session without
+wiping saved intent or draft, allowing exact retry
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 0
+
+    [0m [90m 1070 |[39m     [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Xác nhận ghi vào nhật ký'[39m))[33m;[39m
+     [90m 1071 |[39m
+    [31m[1m>[22m[39m[90m 1072 |[39m
+expect(refreshUser)[33m.[39mtoHaveBeenCalledTimes([35m1[39m)[33m;[39m
+     [90m      |[39m                         [31m[1m^[22m[39m
+     [90m 1073 |[39m     expect(removeQueries)[33m.[39mnot[33m.[39mtoHaveBeenCalled()[33m;[39m
+     [90m 1074 |[39m
+expect([33mJSON[39m[33m.[39mstringify(tree[33m.[39mtoJSON()))[33m.[39mnot[33m.[39mtoContain([32m'Không thể
+truy cập bản nháp'[39m)[33m;[39m
+     [90m 1075 |[39m
+expect([33mJSON[39m[33m.[39mstringify(tree[33m.[39mtoJSON()))[33m.[39mtoContain([32m'Gửi lại xác nhận (thử
+lại an toàn)'[39m)[33m;[39m[0m
+
+      at Object.toHaveBeenCalledTimes (src/__tests__/foodAnalysisScreen.test.tsx:1072:25)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● F06 FoodAnalysisScreen (Student Mobile UI) › P7-022 401 expired access token on correct refreshes session and
+preserves exact saved intent for retry
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 0
+
+    [0m [90m 1101 |[39m         input(tree[33m,[39m [32m'Số lượng'[39m[33m,[39m [32m'2'[39m)[33m;[39m
+     [90m 1102 |[39m         [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Lưu chỉnh sửa'[39m))[33m;[39m
+    [31m[1m>[22m[39m[90m 1103 |[39m
+expect(refreshUser)[33m.[39mtoHaveBeenCalledTimes([35m1[39m)[33m;[39m
+     [90m      |[39m                             [31m[1m^[22m[39m
+     [90m 1104 |[39m         expect(removeQueries)[33m.[39mnot[33m.[39mtoHaveBeenCalled()[33m;[39m
+     [90m 1105 |[39m         [36mconst[39m firstBody [33m=[39m (foodTextAnalysisApi[33m.[39mcorrectItem
+[36mas[39m jest[33m.[39m[33mMock[39m)[33m.[39mmock[33m.[39mcalls[[35m0[39m][[35m2[39m][33m;[39m
+     [90m 1106 |[39m         [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Thử lại lưu món'[39m))[33m;[39m[0m
+
+      at toHaveBeenCalledTimes (src/__tests__/foodAnalysisScreen.test.tsx:1103:29)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● F06 FoodAnalysisScreen (Student Mobile UI) › P7-022 401 expired access token on preview refreshes session and
+preserves exact saved intent for retry
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 0
+
+    [0m [90m 1113 |[39m         selectFirst(tree)[33m;[39m
+     [90m 1114 |[39m         [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Xem trước dinh dưỡng'[39m))[33m;[39m
+    [31m[1m>[22m[39m[90m 1115 |[39m
+expect(refreshUser)[33m.[39mtoHaveBeenCalledTimes([35m1[39m)[33m;[39m
+     [90m      |[39m                             [31m[1m^[22m[39m
+     [90m 1116 |[39m         expect(removeQueries)[33m.[39mnot[33m.[39mtoHaveBeenCalled()[33m;[39m
+     [90m 1117 |[39m         [36mconst[39m firstBody [33m=[39m (foodTextAnalysisApi[33m.[39mpreview
+[36mas[39m jest[33m.[39m[33mMock[39m)[33m.[39mmock[33m.[39mcalls[[35m0[39m][[35m1[39m][33m;[39m
+     [90m 1118 |[39m         [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Thử lại xem trước'[39m))[33m;[39m[0m
+
+      at toHaveBeenCalledTimes (src/__tests__/foodAnalysisScreen.test.tsx:1115:29)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● F06 FoodAnalysisScreen (Student Mobile UI) › P7-022 401 when refreshUser fails with 401/403 revokes access;
+network refresh failure preserves intent
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: {"queryKey": ["food-analysis", "student-1"]}
+
+    [0m [90m 1143 |[39m     [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Xác nhận ghi vào nhật ký'[39m))[33m;[39m
+     [90m 1144 |[39m
+    [31m[1m>[22m[39m[90m 1145 |[39m
+expect(removeQueries)[33m.[39mnot[33m.[39mtoHaveBeenCalled()[33m;[39m
+     [90m      |[39m                               [31m[1m^[22m[39m
+     [90m 1146 |[39m
+expect([33mJSON[39m[33m.[39mstringify(tree[33m.[39mtoJSON()))[33m.[39mtoContain([32m'Gửi lại xác nhận (thử
+lại an toàn)'[39m)[33m;[39m
+     [90m 1147 |[39m
+     [90m 1148 |[39m     [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Gửi lại xác nhận (thử lại an toàn)'[39m))[33m;[39m[0m
+
+      at Object.toHaveBeenCalled (src/__tests__/foodAnalysisScreen.test.tsx:1145:31)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● F06 FoodAnalysisScreen (Student Mobile UI) › P7-023 partial confirm receipt lets student continue confirming
+remaining draft items
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "Còn 1 món chưa xác nhận"
+    Received string:    "{\"type\":\"RCTScrollView\",\"props\":{\"testID\":\"food-analysis-screen\",\"style\":[{\"flex\
+":1},{\"backgroundColor\":\"#F8F9FC\"}],\"contentContainerStyle\":{\"padding\":16,\"paddingBottom\":32,\"gap\":16}},\"c
+hildren\":[{\"type\":\"View\",\"props\":{},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMS
+ans_700Bold\",\"fontSize\":28,\"lineHeight\":34},{\"color\":\"#151822\"}]},\"children\":[\"Ước tính dinh dưỡng từ văn
+bản (AI)\"]},{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_400Regular\",\"fontSize\":14,\"lineHeigh
+t\":20},{\"color\":\"#7B8496\"}]},\"children\":[\"Nhập mô tả bữa ăn tự nhiên. Hệ thống AI đưa ra gợi ý ước tính
+(ESTIMATE). Dữ liệu chỉ được ghi vào nhật ký khi bạn xác nhận.\"]},{\"type\":\"View\",\"props\":{\"style\":[{\"borderWi
+dth\":1,\"borderRadius\":16,\"padding\":16,\"gap\":8},{\"backgroundColor\":\"#FFFFFF\",\"borderColor\":\"#E1E5EC\"}]},\
+"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_600SemiBold\",\"fontSize\":18,\"lineHeig
+ht\":24},{\"color\":\"#151822\"}]},\"children\":[\"Ngữ cảnh bữa ăn\"]},{\"type\":\"View\",\"props\":{\"style\":{\"margi
+nBottom\":10}},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_600SemiBold\",\"fontSize
+\":14,\"lineHeight\":18},{\"color\":\"#151822\"}]},\"children\":[\"Ngày ghi
+(YYYY-MM-DD)\"]},{\"type\":\"TextInput\",\"props\":{\"accessibilityLabel\":\"Ngày ghi (YYYY-MM-DD)\",\"placeholderTextC
+olor\":\"#7B8496\",\"value\":\"2026-11-24\",\"keyboardType\":\"default\",\"style\":{\"borderWidth\":1,\"borderColor\":\
+"#E1E5EC\",\"color\":\"#151822\",\"minHeight\":48,\"padding\":10,\"borderRadius\":8}},\"children\":null}]},{\"type\":\"
+View\",\"props\":{\"style\":{\"marginBottom\":10}},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily
+\":\"DMSans_600SemiBold\",\"fontSize\":14,\"lineHeight\":18},{\"color\":\"#151822\"}]},\"children\":[\"Múi giờ
+IANA\"]},{\"type\":\"TextInput\",\"props\":{\"accessibilityLabel\":\"Múi giờ IANA\",\"placeholderTextColor\":\"#7B8496\
+",\"value\":\"Asia/Ho_Chi_Minh\",\"keyboardType\":\"default\",\"style\":{\"borderWidth\":1,\"borderColor\":\"#E1E5EC\",
+\"color\":\"#151822\",\"minHeight\":48,\"padding\":10,\"borderRadius\":8}},\"children\":null}]},{\"type\":\"View\",\"pr
+ops\":{\"style\":{\"marginBottom\":10}},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans
+_600SemiBold\",\"fontSize\":14,\"lineHeight\":18},{\"color\":\"#151822\"}]},\"children\":[\"Giờ ăn địa phương
+(HH:mm)\"]},{\"type\":\"TextInput\",\"props\":{\"accessibilityLabel\":\"Giờ ăn địa phương (HH:mm)\",\"placeholderTextCo
+lor\":\"#7B8496\",\"value\":\"19:00\",\"keyboardType\":\"default\",\"style\":{\"borderWidth\":1,\"borderColor\":\"#E1E5
+EC\",\"color\":\"#151822\",\"minHeight\":48,\"padding\":10,\"borderRadius\":8}},\"children\":null}]},{\"type\":\"Text\"
+,\"props\":{\"style\":[{\"fontFamily\":\"DMSans_600SemiBold\",\"fontSize\":14,\"lineHeight\":18},{\"color\":\"#151822\"
+,\"marginBottom\":6}]},\"children\":[\"Bữa ăn\"]},{\"type\":\"View\",\"props\":{\"style\":{\"flexDirection\":\"row\",\"
+flexWrap\":\"wrap\",\"gap\":8,\"marginBottom\":10}},\"children\":[{\"type\":\"View\",\"props\":{\"accessibilityRole\":\
+"radio\",\"accessibilityLabel\":\"Chọn Bữa sáng\",\"accessible\":true,\"accessibilityState\":{\"checked\":false},\"focu
+sable\":true,\"accessibilityValue\":{},\"style\":{\"paddingHorizontal\":12,\"paddingVertical\":8,\"borderRadius\":6,\"b
+orderWidth\":1,\"borderColor\":\"#E1E5EC\",\"backgroundColor\":\"transparent\"},\"collapsable\":false},\"children\":[{\
+"type\":\"Text\",\"props\":{\"style\":{\"color\":\"#151822\"}},\"children\":[\"Bữa
+sáng\"]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"radio\",\"accessibilityLabel\":\"Chọn Bữa trưa\",\"acc
+essible\":true,\"accessibilityState\":{\"checked\":true},\"focusable\":true,\"accessibilityValue\":{},\"style\":{\"padd
+ingHorizontal\":12,\"paddingVertical\":8,\"borderRadius\":6,\"borderWidth\":1,\"borderColor\":\"#5B2EEA\",\"backgroundC
+olor\":\"#F0F2F7\"},\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":{\"color\":\"#5B2EEA\"
+}},\"children\":[\"Bữa
+trưa\"]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"radio\",\"accessibilityLabel\":\"Chọn Bữa tối\",\"acce
+ssible\":true,\"accessibilityState\":{\"checked\":false},\"focusable\":true,\"accessibilityValue\":{},\"style\":{\"padd
+ingHorizontal\":12,\"paddingVertical\":8,\"borderRadius\":6,\"borderWidth\":1,\"borderColor\":\"#E1E5EC\",\"backgroundC
+olor\":\"transparent\"},\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":{\"color\":\"#1518
+22\"}},\"children\":[\"Bữa
+tối\"]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"radio\",\"accessibilityLabel\":\"Chọn Bữa phụ\",\"acces
+sible\":true,\"accessibilityState\":{\"checked\":false},\"focusable\":true,\"accessibilityValue\":{},\"style\":{\"paddi
+ngHorizontal\":12,\"paddingVertical\":8,\"borderRadius\":6,\"borderWidth\":1,\"borderColor\":\"#E1E5EC\",\"backgroundCo
+lor\":\"transparent\"},\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":{\"color\":\"#15182
+2\"}},\"children\":[\"Bữa
+phụ\"]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"radio\",\"accessibilityLabel\":\"Chọn Khác\",\"accessib
+le\":true,\"accessibilityState\":{\"checked\":false},\"focusable\":true,\"accessibilityValue\":{},\"style\":{\"paddingH
+orizontal\":12,\"paddingVertical\":8,\"borderRadius\":6,\"borderWidth\":1,\"borderColor\":\"#E1E5EC\",\"backgroundColor
+\":\"transparent\"},\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":{\"color\":\"#151822\"
+}},\"children\":[\"Khác\"]}]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"button\",\"accessibilityLabel\":\
+"Xác nhận ngữ cảnh\",\"accessible\":true,\"accessibilityState\":{\"busy\":false,\"disabled\":false},\"focusable\":true,
+\"accessibilityValue\":{},\"style\":[{\"minHeight\":44,\"minWidth\":44,\"paddingHorizontal\":16,\"borderRadius\":12,\"b
+orderWidth\":1,\"alignItems\":\"center\",\"justifyContent\":\"center\"},{\"backgroundColor\":\"#5B2EEA\",\"borderColor\
+":\"#5B2EEA\",\"opacity\":1}],\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFami
+ly\":\"DMSans_600SemiBold\",\"fontSize\":14,\"lineHeight\":18},{\"color\":\"#FFFFFF\"}]},\"children\":[\"Xác nhận ngữ c
+ảnh\"]}]}]},{\"type\":\"Text\",\"props\":{\"accessibilityRole\":\"alert\",\"style\":[{\"fontFamily\":\"DMSans_400Regula
+r\",\"fontSize\":14,\"lineHeight\":20},{\"color\":\"#151822\",\"marginVertical\":8}]},\"children\":[\"Đã xác nhận ghi
+vào nhật ký dinh dưỡng thành công.\"]},{\"type\":\"View\",\"props\":{\"style\":[{\"borderWidth\":1,\"borderRadius\":16,
+\"padding\":16,\"gap\":8},{\"backgroundColor\":\"#FFFFFF\",\"borderColor\":\"#E1E5EC\"}]},\"children\":[{\"type\":\"Tex
+t\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_600SemiBold\",\"fontSize\":18,\"lineHeight\":24},{\"color\":\"#15182
+2\"}]},\"children\":[\"Biên lai xác nhận nhật ký\"]},{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_
+400Regular\",\"fontSize\":14,\"lineHeight\":20},{\"color\":\"#7B8496\"}]},\"children\":[\"Thời gian ghi:
+\",\"2026-11-24 19:02:00\"]},{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_600SemiBold\",\"fontSize
+\":14,\"lineHeight\":18},{\"color\":\"#151822\",\"marginTop\":8}]},\"children\":[\"Các món đã ghi thành công:\"]},{\"ty
+pe\":\"View\",\"props\":{\"style\":{\"paddingVertical\":4}},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"f
+ontFamily\":\"DMSans_400Regular\",\"fontSize\":14,\"lineHeight\":20},{\"color\":\"#151822\"}]},\"children\":[\"•
+\",\"1\",\" \",\"Khẩu phần\"]},{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_400Regular\",\"fontSiz
+e\":14,\"lineHeight\":20},{\"color\":\"#7B8496\",\"fontSize\":13}]},\"children\":[\"Năng lượng: 450 kcal · Protein: 25
+g · Carb: 60 g · Chất béo: 12
+g\"]}]},{\"type\":\"View\",\"props\":{\"accessibilityRole\":\"button\",\"accessibilityLabel\":\"Quay lại nhật ký dinh d
+ưỡng\",\"accessible\":true,\"accessibilityState\":{\"busy\":false,\"disabled\":false},\"focusable\":true,\"accessibilit
+yValue\":{},\"style\":[{\"minHeight\":44,\"minWidth\":44,\"paddingHorizontal\":16,\"borderRadius\":12,\"borderWidth\":1
+,\"alignItems\":\"center\",\"justifyContent\":\"center\"},{\"backgroundColor\":\"#5B2EEA\",\"borderColor\":\"#5B2EEA\",
+\"opacity\":1}],\"collapsable\":false},\"children\":[{\"type\":\"Text\",\"props\":{\"style\":[{\"fontFamily\":\"DMSans_
+600SemiBold\",\"fontSize\":14,\"lineHeight\":18},{\"color\":\"#FFFFFF\"}]},\"children\":[\"Quay lại nhật ký dinh
+dưỡng\"]}]}]},{\"type\":\"View\",\"props\":{\"style\":{\"height\":40}},\"children\":null}]}]}"
+
+    [0m [90m 1233 |[39m     [36mawait[39m renderer[33m.[39mact([36masync[39m () [33m=>[39m
+press(tree[33m,[39m [32m'Xác nhận ghi vào nhật ký'[39m))[33m;[39m
+     [90m 1234 |[39m
+    [31m[1m>[22m[39m[90m 1235 |[39m
+expect([33mJSON[39m[33m.[39mstringify(tree[33m.[39mtoJSON()))[33m.[39mtoContain([32m'Còn 1 món chưa xác
+nhận'[39m)[33m;[39m
+     [90m      |[39m                                           [31m[1m^[22m[39m
+     [90m 1236 |[39m
+expect([33mJSON[39m[33m.[39mstringify(tree[33m.[39mtoJSON()))[33m.[39mtoContain([32m'Tiếp tục xác nhận món
+còn lại'[39m)[33m;[39m
+     [90m 1237 |[39m
+     [90m 1238 |[39m     renderer[33m.[39mact(() [33m=>[39m press(tree[33m,[39m [32m'Tiếp tục xác nhận món
+còn lại'[39m))[33m;[39m[0m
+
+      at Object.toContain (src/__tests__/foodAnalysisScreen.test.tsx:1235:43)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 52 skipped, 1 passed, 58 total
+Snapshots:   0 total
+Time:        3.216 s
+Ran all test suites matching /src\\__tests__\\foodAnalysisScreen.test.tsx/i with tests matching "P7-022|P7-023".
