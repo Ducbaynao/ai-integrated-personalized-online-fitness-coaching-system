@@ -1,0 +1,132 @@
+{
+  "observedAtUtc": "2026-11-25T18:14:30Z",
+  "baselineHead": "cdd33acc55b58907104053abad2c26056de24cbd",
+  "branch": "fix/p7-014-017-020-mobile-ux",
+  "issuesAddressed": [
+    "P7-017",
+    "P7-014",
+    "P7-020"
+  ],
+  "reviewStatus": {
+    "P7-014": "reviewed_by_codex_no_finding_untouched_in_p2_followup",
+    "P7-020": "reviewed_by_codex_no_finding_untouched_in_p2_followup",
+    "P7-017": "independent_codex_review_passed_including_parent_reconciliation"
+  },
+  "deferredContractOrData": {
+    "P7-008": "fitness.goal_types has 0 rows in V1..V63 and CreateGoalModal codes FITNESS_IMPROVEMENT/MAINTENANCE differ from FitnessGoalIntegrationTest IMPROVE_FITNESS/MAINTAIN; kept outside scope awaiting Flyway/catalog decision."
+  },
+  "deviceQaStatus": "DEFERRED_FOR_RAM",
+  "filesSha256": {
+    "apps/mobile/src/features/goal/CurrentGoalScreen.tsx": "1e8b5c6bbe7d69a0ab435dc7d62abfb9aa9b03b22c82c63dcc9087945a1fb0ab",
+    "apps/mobile/src/features/goal/components/CreateGoalModal.tsx": "b8c3c26dba621dcf0629cd07c258ae1919e9dc771681260aca7e1e72d13cfa09",
+    "apps/mobile/src/features/goal/components/CreateGoalVersionModal.tsx": "ae26894d5183a051191dd3ab57a530bb0894dac9d71ddd21543329c209892189",
+    "apps/mobile/src/features/goal/components/CreateGoalTransitionModal.tsx": "608c21a7e95ff64025857dd5a91437eb76a36eb3420a81e7b451150c9112e53a",
+    "apps/mobile/src/features/auth/HomeScreen.tsx": "ed43b20d423385084e3c823c5bea79add5a7f18a51d7c6714a5b4e659b661b01",
+    "apps/mobile/src/features/nutrition/FoodAnalysisScreen.tsx": "9f4c1a60d2111192dda7260973d7440c9f48d238e6f77e474e90390cff4c5c3a",
+    "apps/mobile/src/features/nutrition/NutritionScreen.tsx": "05c2f31a490137550e5332be69198effc6aa7f44b49e0fb57ba9c3e5fea009d0",
+    "apps/mobile/src/__tests__/goalModalP2Races.test.tsx": "32bd451d58f51df4d8afb6d8c8c19c04bbf6bdb9e1a806465d1be36f02445a16",
+    "apps/mobile/src/__tests__/CurrentGoalScreen.test.tsx": "8bb23e89ffd7d841b05e7469e0a7b26a92a4b53ba6a7cc6b94b878b5fb1f1adb",
+    "apps/mobile/src/__tests__/accessibilityAndTokens.test.tsx": "faefd21358cd88bf169a041f45b5662bd0487406b8dcd40b0ce7f08d89b5eb94"
+  },
+  "checks": {
+    "beforeFixInitialModalBanner": {
+      "command": "npx jest --runInBand --no-color src/__tests__/CurrentGoalScreen.test.tsx",
+      "exitCode": 1,
+      "failed": 3,
+      "passed": 32,
+      "total": 35,
+      "log": "p7017-goal-modal-error-before.log.txt"
+    },
+    "beforeFixP2Races": {
+      "command": "npx jest --runInBand --no-color --testTimeout=15000 src/__tests__/goalModalP2Races.test.tsx",
+      "exitCode": 1,
+      "failed": 10,
+      "passed": 4,
+      "total": 14,
+      "log": "p7017-p2-before.log.txt"
+    },
+    "beforeFixParentReconcile": {
+      "command": "npx jest --runInBand --no-color --testTimeout=15000 src/__tests__/goalModalP2Races.test.tsx",
+      "exitCode": 1,
+      "failed": 2,
+      "passed": 17,
+      "total": 19,
+      "log": "p7017-parent-reconcile-before.log.txt"
+    },
+    "afterFixFocusedMobileJest": {
+      "command": "npx jest --runInBand --no-color --testTimeout=15000 src/__tests__/goalModalP2Races.test.tsx src/__tests__/CurrentGoalScreen.test.tsx src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/accessibilityAndTokens.test.tsx src/__tests__/aiKnowledgeNavigation.test.tsx src/__tests__/coachingNavigation.test.tsx src/__tests__/exerciseNavigation.test.tsx src/__tests__/progressSummaryNavigation.test.tsx src/__tests__/studentWorkoutPlanNavigation.test.tsx",
+      "suitesPassed": 10,
+      "suitesTotal": 10,
+      "testsPassed": 140,
+      "testsTotal": 140,
+      "exitCode": 0,
+      "log": "p7014-017-020-jest-after.log.txt"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    "lint": {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    "gitDiffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "validateUxDocs": {
+      "command": "npm run validate:ux-docs",
+      "exitCode": 0
+    }
+  },
+  "reviewedPatchBaseline": "a289f274590e812316089a4b5515316f03bded53",
+  "reviewedSourceHashes": {
+    "apps/mobile/src/features/goal/CurrentGoalScreen.tsx": "1e8b5c6bbe7d69a0ab435dc7d62abfb9aa9b03b22c82c63dcc9087945a1fb0ab",
+    "apps/mobile/src/features/nutrition/NutritionScreen.tsx": "05c2f31a490137550e5332be69198effc6aa7f44b49e0fb57ba9c3e5fea009d0",
+    "apps/mobile/src/features/goal/components/CreateGoalModal.tsx": "b8c3c26dba621dcf0629cd07c258ae1919e9dc771681260aca7e1e72d13cfa09",
+    "apps/mobile/src/features/auth/HomeScreen.tsx": "ed43b20d423385084e3c823c5bea79add5a7f18a51d7c6714a5b4e659b661b01",
+    "apps/mobile/src/__tests__/CurrentGoalScreen.test.tsx": "8bb23e89ffd7d841b05e7469e0a7b26a92a4b53ba6a7cc6b94b878b5fb1f1adb",
+    "apps/mobile/src/features/nutrition/FoodAnalysisScreen.tsx": "69495aa352f39478277352fc5b3f6233c36d345d2218512dcba54d4bb8ba2918",
+    "apps/mobile/src/features/goal/components/CreateGoalVersionModal.tsx": "ae26894d5183a051191dd3ab57a530bb0894dac9d71ddd21543329c209892189",
+    "apps/mobile/src/features/goal/components/CreateGoalTransitionModal.tsx": "608c21a7e95ff64025857dd5a91437eb76a36eb3420a81e7b451150c9112e53a",
+    "apps/mobile/src/__tests__/goalModalP2Races.test.tsx": "32bd451d58f51df4d8afb6d8c8c19c04bbf6bdb9e1a806465d1be36f02445a16",
+    "apps/mobile/src/__tests__/accessibilityAndTokens.test.tsx": "faefd21358cd88bf169a041f45b5662bd0487406b8dcd40b0ce7f08d89b5eb94"
+  },
+  "mainIntegration": {
+    "mainBaseline": "cdd33acc55b58907104053abad2c26056de24cbd",
+    "checkout": "C:\\VScode\\CodePTIT\\Đồ Án Tốt Nghiệp\\p7-014-017-020-mobile-ux",
+    "method": "Exact-path git diff from a289f274 applied cleanly to origin/main; added reviewed goalModalP2Races test separately",
+    "conflicts": 0,
+    "logicChangesBeyondReviewedPatch": false,
+    "reviewedRawHashesMatching": 9,
+    "reviewedNormalizedContentMatching": 10,
+    "newlineOnlyDifference": "FoodAnalysisScreen.tsx: reviewed raw 69495aa352f39478277352fc5b3f6233c36d345d2218512dcba54d4bb8ba2918; integrated raw 9f4c1a60d2111192dda7260973d7440c9f48d238e6f77e474e90390cff4c5c3a; LF/CRLF only",
+    "jest": {
+      "failed": 0,
+      "passed": 142,
+      "exitCode": 0,
+      "skipped": 0,
+      "suites": 10,
+      "log": "p7014-main-patch-independent-jest.log.txt",
+      "testTimeoutMs": 15000
+    },
+    "testCountDifference": "Two pre-existing main tests in aiKnowledgeNavigation preserved; reviewed baseline run was 140, main+patch is 142",
+    "typecheckExit": 0,
+    "lintExit": 0,
+    "lintWarnings": 0,
+    "diffCheckExit": 0,
+    "uxDocsExit": 0,
+    "sourceProtection": "912 source files and source git status verified unchanged",
+    "device": "DEFERRED_FOR_RAM",
+    "outOfScope": [
+      "P7-008 goal_types catalog/seed",
+      "ACE content",
+      "Backend full suite local",
+      "runtime/DB/device operations"
+    ],
+    "evidenceExport": "Original FAIL files preserved in source; publication copies trim trailing whitespace/EOF blank lines and redact credential-shaped synthetic URI only",
+    "historicalEvidence": "checks section retains Antigravity self-check on reviewed baseline; mainIntegration is the new independent main+patch run"
+  }
+}

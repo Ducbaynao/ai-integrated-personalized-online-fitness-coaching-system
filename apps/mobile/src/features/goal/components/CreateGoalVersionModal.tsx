@@ -13,13 +13,18 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
-import { GOAL_TYPE_OPTIONS } from './CreateGoalModal';
+import {
+  GOAL_TYPE_OPTIONS,
+  resolveGoalModalErrorMessage,
+  useGoalModalSessionGuard,
+} from './CreateGoalModal';
 
 interface CreateGoalVersionModalProps {
   visible: boolean;
   currentTitle: string;
   isSubmitting: boolean;
   isDark: boolean;
+  sessionId?: number;
   onClose: () => void;
   onSubmit: (payload: {
     title?: string;
@@ -35,6 +40,7 @@ export function CreateGoalVersionModal({
   currentTitle,
   isSubmitting,
   isDark,
+  sessionId = 0,
   onClose,
   onSubmit,
 }: CreateGoalVersionModalProps) {
@@ -43,21 +49,45 @@ export function CreateGoalVersionModal({
   const [changeSummary, setChangeSummary] = useState('');
   const [selectedGoalType, setSelectedGoalType] = useState('FAT_LOSS');
   const [durationDays, setDurationDays] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
 
   const themeColors = getSemanticColors(isDark);
 
-  const handleClose = () => {
-    if (isSubmitting) return;
+  const resetFields = () => {
     setTitle(currentTitle);
     setChangeReason('');
     setChangeSummary('');
+    setSelectedGoalType('FAT_LOSS');
     setDurationDays('');
+  };
+
+  const {
+    validationError,
+    setValidationError,
+    isBusy,
+    beginRequest,
+    finishRequest,
+    clearLocalSubmitting,
+  } = useGoalModalSessionGuard({
+    visible,
+    isSubmitting,
+    sessionId,
+    onResetForm: resetFields,
+  });
+
+  const performClose = () => {
+    resetFields();
     setValidationError(null);
+    clearLocalSubmitting();
     onClose();
   };
 
+  const handleClose = () => {
+    if (isBusy) return;
+    performClose();
+  };
+
   const handleSubmit = async () => {
+    if (isBusy) return;
     const trimmedReason = changeReason.trim();
     if (!trimmedReason) {
       setValidationError('Vui lòng nêu lý do tạo phiên bản mục tiêu mới.');
@@ -78,7 +108,7 @@ export function CreateGoalVersionModal({
       parsedDuration = num;
     }
 
-    setValidationError(null);
+    const guard = beginRequest();
     try {
       await onSubmit({
         title: title.trim() || undefined,
@@ -87,9 +117,15 @@ export function CreateGoalVersionModal({
         durationDays: parsedDuration,
         goalTypeCode: selectedGoalType,
       });
-      handleClose();
-    } catch {
-      // Error handled by parent
+      if (guard.isCurrent()) {
+        performClose();
+      }
+    } catch (err) {
+      if (guard.isCurrent()) {
+        setValidationError(resolveGoalModalErrorMessage(err, 'Không thể điều chỉnh mục tiêu.'));
+      }
+    } finally {
+      finishRequest(guard);
     }
   };
 
@@ -154,7 +190,7 @@ export function CreateGoalVersionModal({
                 placeholder="Ví dụ: Điều chỉnh lịch, tiến triển nhanh hơn dự kiến"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={100}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -181,7 +217,7 @@ export function CreateGoalVersionModal({
                 multiline
                 numberOfLines={3}
                 maxLength={2000}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -206,7 +242,7 @@ export function CreateGoalVersionModal({
                 placeholder="Tiêu đề mục tiêu"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -222,7 +258,10 @@ export function CreateGoalVersionModal({
                     <Pressable
                       key={opt.code}
                       accessibilityRole="button"
-                      onPress={() => setSelectedGoalType(opt.code)}
+                      onPress={() => {
+                        setSelectedGoalType(opt.code);
+                        if (validationError) setValidationError(null);
+                      }}
                       style={[
                         styles.typeChip,
                         {
@@ -271,7 +310,7 @@ export function CreateGoalVersionModal({
                 placeholder="e.g. 60"
                 placeholderTextColor={themeColors.textSecondary}
                 keyboardType="numeric"
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -281,7 +320,7 @@ export function CreateGoalVersionModal({
                 testID="goal-version-cancel-button"
                 accessibilityRole="button"
                 accessibilityLabel="Hủy điều chỉnh mục tiêu"
-                disabled={isSubmitting}
+                disabled={isBusy}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
@@ -293,17 +332,17 @@ export function CreateGoalVersionModal({
                 testID="goal-version-submit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Lưu phiên bản đã điều chỉnh"
-                disabled={isSubmitting}
+                disabled={isBusy}
                 onPress={handleSubmit}
                 style={[
                   styles.button,
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isSubmitting ? 0.7 : 1,
+                    opacity: isBusy ? 0.7 : 1,
                   },
                 ]}>
-                {isSubmitting ? (
+                {isBusy ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <Text style={styles.primaryButtonText}>Lưu phiên bản mới</Text>

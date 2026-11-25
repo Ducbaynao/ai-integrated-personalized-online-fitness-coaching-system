@@ -13,12 +13,17 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
-import { GOAL_TYPE_OPTIONS } from './CreateGoalModal';
+import {
+  GOAL_TYPE_OPTIONS,
+  resolveGoalModalErrorMessage,
+  useGoalModalSessionGuard,
+} from './CreateGoalModal';
 
 interface CreateGoalTransitionModalProps {
   visible: boolean;
   isSubmitting: boolean;
   isDark: boolean;
+  sessionId?: number;
   onClose: () => void;
   onSubmit: (payload: {
     transitionReason: string;
@@ -33,6 +38,7 @@ export function CreateGoalTransitionModal({
   visible,
   isSubmitting,
   isDark,
+  sessionId = 0,
   onClose,
   onSubmit,
 }: CreateGoalTransitionModalProps) {
@@ -41,22 +47,45 @@ export function CreateGoalTransitionModal({
   const [selectedGoalType, setSelectedGoalType] = useState('MUSCLE_GAIN');
   const [durationDays, setDurationDays] = useState('90');
   const [notes, setNotes] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
 
   const themeColors = getSemanticColors(isDark);
 
-  const handleClose = () => {
-    if (isSubmitting) return;
+  const resetFields = () => {
     setTransitionReason('');
     setTitle('');
     setSelectedGoalType('MUSCLE_GAIN');
     setDurationDays('90');
     setNotes('');
+  };
+
+  const {
+    validationError,
+    setValidationError,
+    isBusy,
+    beginRequest,
+    finishRequest,
+    clearLocalSubmitting,
+  } = useGoalModalSessionGuard({
+    visible,
+    isSubmitting,
+    sessionId,
+    onResetForm: resetFields,
+  });
+
+  const performClose = () => {
+    resetFields();
     setValidationError(null);
+    clearLocalSubmitting();
     onClose();
   };
 
+  const handleClose = () => {
+    if (isBusy) return;
+    performClose();
+  };
+
   const handleSubmit = async () => {
+    if (isBusy) return;
     const trimmedReason = transitionReason.trim();
     if (!trimmedReason) {
       setValidationError('Vui lòng nêu lý do bắt đầu hành trình mục tiêu mới.');
@@ -87,7 +116,7 @@ export function CreateGoalTransitionModal({
       parsedDuration = num;
     }
 
-    setValidationError(null);
+    const guard = beginRequest();
     try {
       await onSubmit({
         transitionReason: trimmedReason,
@@ -96,9 +125,17 @@ export function CreateGoalTransitionModal({
         goalTypeCode: selectedGoalType,
         durationDays: parsedDuration,
       });
-      handleClose();
-    } catch {
-      // Error surfaced by parent
+      if (guard.isCurrent()) {
+        performClose();
+      }
+    } catch (err) {
+      if (guard.isCurrent()) {
+        setValidationError(
+          resolveGoalModalErrorMessage(err, 'Không thể chuyển sang hành trình mục tiêu mới.')
+        );
+      }
+    } finally {
+      finishRequest(guard);
     }
   };
 
@@ -163,7 +200,7 @@ export function CreateGoalTransitionModal({
                 placeholder="Ví dụ: Hoàn thành giai đoạn giảm mỡ, bắt đầu tăng cơ nạc"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={100}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -191,7 +228,7 @@ export function CreateGoalTransitionModal({
                 placeholder="Ví dụ: Giai đoạn tăng cơ 16 tuần"
                 placeholderTextColor={themeColors.textSecondary}
                 maxLength={200}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -207,7 +244,10 @@ export function CreateGoalTransitionModal({
                     <Pressable
                       key={opt.code}
                       accessibilityRole="button"
-                      onPress={() => setSelectedGoalType(opt.code)}
+                      onPress={() => {
+                        setSelectedGoalType(opt.code);
+                        if (validationError) setValidationError(null);
+                      }}
                       style={[
                         styles.typeChip,
                         {
@@ -256,7 +296,7 @@ export function CreateGoalTransitionModal({
                 placeholder="90"
                 placeholderTextColor={themeColors.textSecondary}
                 keyboardType="numeric"
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -283,7 +323,7 @@ export function CreateGoalTransitionModal({
                 multiline
                 numberOfLines={3}
                 maxLength={2000}
-                editable={!isSubmitting}
+                editable={!isBusy}
               />
             </View>
 
@@ -293,7 +333,7 @@ export function CreateGoalTransitionModal({
                 testID="goal-transition-cancel-button"
                 accessibilityRole="button"
                 accessibilityLabel="Hủy chuyển đổi"
-                disabled={isSubmitting}
+                disabled={isBusy}
                 onPress={handleClose}
                 style={[styles.button, styles.secondaryButton]}>
                 <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
@@ -305,17 +345,17 @@ export function CreateGoalTransitionModal({
                 testID="goal-transition-submit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Gửi chuyển đổi"
-                disabled={isSubmitting}
+                disabled={isBusy}
                 onPress={handleSubmit}
                 style={[
                   styles.button,
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isSubmitting ? 0.7 : 1,
+                    opacity: isBusy ? 0.7 : 1,
                   },
                 ]}>
-                {isSubmitting ? (
+                {isBusy ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <Text style={styles.primaryButtonText}>Bắt đầu hành trình mới</Text>

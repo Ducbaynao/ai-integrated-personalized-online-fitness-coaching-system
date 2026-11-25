@@ -186,6 +186,7 @@ describe('Accessibility Attributes on Auth Screens', () => {
     expect(logoutBtn.props.accessibilityRole).toBe('button');
     expect(logoutBtn.props.accessibilityLabel).toBe('Đăng xuất');
     expect(logoutBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });
+    expect(JSON.stringify(tree!.toJSON())).not.toContain('Tùy chọn');
   });
 
   it('ChoosePurposeScreen defines proper accessibility roles and labels', () => {

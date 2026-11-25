@@ -1968,5 +1968,114 @@ describe('CurrentGoalScreen', () => {
       // Conflict banner should be dismissed after reload
       expect(root.findAllByProps({ testID: 'goal-conflict-banner' }).length).toBe(0);
     });
+
+    it('P7-017: surfaces actionable inline error banner inside CreateGoalModal without closing or wiping form on 400 failure', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockRejectedValueOnce(
+        new ApiError(404, 'No goal found', {
+          errorCode: 'GOAL_NOT_FOUND',
+          message: 'No goal found',
+          timestamp: '2026-11-18T00:00:00Z',
+          requestId: 'req-empty',
+          fieldErrors: [],
+        })
+      );
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'create-first-goal-button' }).props.onPress();
+      });
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'create-goal-title-input' }).props.onChangeText('tăng cơ');
+        root.findByProps({ testID: 'create-goal-notes-input' }).props.onChangeText('tăng 2kg');
+      });
+
+      (fitnessGoalApi.createGoal as jest.Mock).mockRejectedValueOnce(
+        new ApiError(400, 'Goal type is invalid or does not exist', {
+          errorCode: 'VALIDATION_FAILED',
+          message: 'Goal type is invalid or does not exist',
+          timestamp: '2026-11-18T00:00:00Z',
+          requestId: 'req-400',
+          fieldErrors: [{ field: 'objectives[0].goalTypeId', code: 'NotFound', message: 'Goal type does not exist' }],
+        })
+      );
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'create-goal-submit-button' }).props.onPress();
+      });
+
+      const banner = root.findByProps({ testID: 'create-goal-error-banner' });
+      expect(banner).toBeDefined();
+      const bannerText = banner.find((node) => typeof node.props?.children === 'string');
+      expect(bannerText.props.children).toContain('Loại mục tiêu');
+      expect(root.findByProps({ testID: 'create-goal-modal' }).props.visible).toBe(true);
+      expect(root.findByProps({ testID: 'create-goal-title-input' }).props.value).toBe('tăng cơ');
+      expect(root.findByProps({ testID: 'create-goal-notes-input' }).props.value).toBe('tăng 2kg');
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'create-goal-title-input' }).props.onChangeText('tăng cơ mới');
+      });
+      expect(root.findAllByProps({ testID: 'create-goal-error-banner' }).length).toBe(0);
+    });
+
+    it('P7-017: surfaces inline error banner inside CreateGoalVersionModal and CreateGoalTransitionModal on rejection', async () => {
+      (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Cập nhật mục tiêu');
+      });
+      (fitnessGoalApi.createGoalVersion as jest.Mock).mockRejectedValueOnce(new Error('Network down'));
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      const versionBanner = root.findByProps({ testID: 'goal-version-error-banner' });
+      expect(versionBanner).toBeDefined();
+      expect(root.findByProps({ testID: 'create-goal-version-modal' }).props.visible).toBe(true);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-cancel-button' }).props.onPress();
+      });
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'transition-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-transition-title-input' }).props.onChangeText('Mục tiêu mới');
+        root.findByProps({ testID: 'goal-transition-reason-input' }).props.onChangeText('Hoàn thành chặng cũ');
+      });
+      (fitnessGoalApi.createGoalTransition as jest.Mock).mockRejectedValueOnce(
+        new ApiError(500, 'Server error', {
+          errorCode: 'INTERNAL_ERROR',
+          message: 'Server error',
+          timestamp: '2026-11-18T00:00:00Z',
+          requestId: 'req-500',
+          fieldErrors: [],
+        })
+      );
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-transition-submit-button' }).props.onPress();
+      });
+
+      const transitionBanner = root.findByProps({ testID: 'goal-transition-error-banner' });
+      expect(transitionBanner).toBeDefined();
+      expect(root.findByProps({ testID: 'create-goal-transition-modal' }).props.visible).toBe(true);
+    });
   });
 });

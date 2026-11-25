@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment-timezone';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -768,22 +769,29 @@ function FoodAnalysisSession() {
 
   if (activeCapability !== 'STUDENT') {
     return (
-      <WorkoutState
-        title="Chỉ dành cho học viên"
-        message="Vui lòng chuyển sang vai trò học viên để sử dụng tính năng ước tính dinh dưỡng."
-      />
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+        <WorkoutState
+          title="Chỉ dành cho học viên"
+          message="Vui lòng chuyển sang vai trò học viên để sử dụng tính năng ước tính dinh dưỡng."
+        />
+      </SafeAreaView>
     );
   }
 
   if (!actor || accessDenied || authorityError) {
-    return <WorkoutState title="Không thể truy cập bản nháp" message={message || 'Bạn không còn quyền truy cập dữ liệu dinh dưỡng này.'} />;
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+        <WorkoutState title="Không thể truy cập bản nháp" message={message || 'Bạn không còn quyền truy cập dữ liệu dinh dưỡng này.'} />
+      </SafeAreaView>
+    );
   }
 
   return (
-    <ScrollView
-      testID="food-analysis-screen"
-      style={[styles.screen, { backgroundColor: theme.canvas }]}
-      contentContainerStyle={styles.content}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+      <ScrollView
+        testID="food-analysis-screen"
+        style={styles.screen}
+        contentContainerStyle={styles.content}>
       <Text style={[styles.title, { color: theme.textPrimary }]}>Ước tính dinh dưỡng từ văn bản (AI)</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>
         Nhập mô tả bữa ăn tự nhiên. Hệ thống AI đưa ra gợi ý ước tính (ESTIMATE). Dữ liệu chỉ được ghi vào nhật ký khi bạn xác nhận.
@@ -1286,6 +1294,7 @@ function FoodAnalysisSession() {
       ) : null}
 
       <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
