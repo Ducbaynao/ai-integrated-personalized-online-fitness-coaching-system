@@ -109,8 +109,107 @@
     }
   ],
   "runtimeNotRun": {
-    "deviceEmulator": "NOT RUN (native DocumentPicker/live upload not run; adb devices empty; Metro 18081 DOWN; Spring 18080 DOWN; PostgreSQL container f06-mobile-qa-20261124 untouched)",
-    "httpDbLiveQa": "NOT RUN (runtime untouched)"
+    "deviceEmulator": "NOT RUN (Metro 18081 crashed with V8 ReportExternalAllocationLimitReached and Pixel_7 QEMU failed to attach adb due to Windows host pagefile limit alongside CVAT containers)",
+    "documentUploadCleanFixture": "NOT RUN (ClamAV/S3 unset in dev QA profile; live HTTP probes for PDF/PNG/JPEG returned 503 SCANNER_UNAVAILABLE without bypass)"
   },
-  "eofWhitespaceTrimNote": "Trimmed 1 trailing blank EOF line in V63__trainer_verify_permission.sql and TrainerHomeScreen.test.tsx so git diff --cached --check exits 0; TrainerHomeScreen.test.tsx re-run 6/6 PASS."
+  "postCheckpointQa": {
+    "commit": "f1113fbbbdbd198ca4b602f1b4b6d084ac2f9775",
+    "prNumber": 172,
+    "pr172Ci": {
+      "passed": [
+        "Client Admin Web",
+        "Client Mobile",
+        "AI Service",
+        "Contracts & Docs Validation",
+        "Database Migrations Check"
+      ],
+      "failed": [
+        {
+          "name": "Backend",
+          "runId": 45639754550,
+          "jobId": 139294802558,
+          "summary": "Tests run: 2128, Failures: 3, Errors: 0, Skipped: 5",
+          "failures": [
+            "AuthSessionIntegrationTest.loginAndRefreshExposeEffectivePermissionsThroughCurrentUserProjection:1295",
+            "ContentManagementIntegrationTest.revokingContentAdminRoleImmediatelyDeniesApiAndRemovesEffectivePermissions:840",
+            "CurrentUserIntegrationTest.revokedAdminPermissionDisappearsAndAdminApiRemainsDenied:343"
+          ],
+          "cause": "Existing assertions expect the pre-V63 10-permission ADMIN list without TRAINER_VERIFY."
+        }
+      ]
+    },
+    "liveHttpDbQa": "PASS (p7018-live-http-db-qa.json; V63 63:true, ADMIN:TRAINER_VERIFY, non-admin 403, status=ALL, reject/hide reviewNotes, resubmit, approve, /users/me canCoach=true, !acceptingStudents hidden, acceptingStudents=true visible by displayName, publicSlug excluded)",
+    "backendCiTestFix": {
+      "ciBeforeLog": "p7018-pr172-backend-ci-before.log.txt",
+      "local3SuitesBefore": "FAIL (53 run, 3 fail, 0 errors, 0 skipped, exit 1; p7018-backend-3suites-before.log.txt)",
+      "local3SuitesAfter": "PASS (53 run, 0 failures, 0 errors, 0 skipped, exit 0: AuthSessionIntegrationTest 26, ContentManagementIntegrationTest 5, CurrentUserIntegrationTest 22; p7018-backend-3suites-after.log.txt)",
+      "localFullBackend": "NOT RUN (Windows host FreeVirtualMemory ~1.73 GB alongside active cvat_* containers and missing services/ai-service/.venv; targeted PASS does not substitute for full suite)"
+    }
+  },
+  "eofWhitespaceTrimNote": "Trimmed 1 trailing blank EOF line in V63__trainer_verify_permission.sql and TrainerHomeScreen.test.tsx so git diff --cached --check exits 0; TrainerHomeScreen.test.tsx re-run 6/6 PASS.",
+  "independentBackendCiReview": {
+    "scope": "PR #172 Backend CI test alignment",
+    "reviewer": "Codex independent review",
+    "reviewedHead": "f1113fbbbdbd198ca4b602f1b4b6d084ac2f9775",
+    "findings": "None in the three-test scope; exact permission equality and revoked-role denial remain intact.",
+    "java": "Microsoft OpenJDK 21.0.8",
+    "maven": "3.9.16",
+    "command": ".\\mvnw.cmd -B test -Dtest=AuthSessionIntegrationTest,ContentManagementIntegrationTest,CurrentUserIntegrationTest",
+    "exitCode": 0,
+    "tests": 53,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "tests": 26,
+        "name": "AuthSessionIntegrationTest"
+      },
+      {
+        "tests": 5,
+        "name": "ContentManagementIntegrationTest"
+      },
+      {
+        "tests": 22,
+        "name": "CurrentUserIntegrationTest"
+      }
+    ],
+    "surefireXmlVerified": true,
+    "testInfrastructure": "Testcontainers disposable PostgreSQL; Flyway V63",
+    "historicalEvidence": [
+      {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "result": "FAIL",
+        "tests": 53,
+        "source": "p7018-backend-3suites-before.log.txt (local only)"
+      },
+      {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "result": "PASS",
+        "tests": 53,
+        "source": "p7018-backend-3suites-after.log.txt (Antigravity, local only)"
+      },
+      {
+        "errors": 0,
+        "failures": 3,
+        "skipped": 5,
+        "result": "FAIL",
+        "runId": "45639754550",
+        "tests": 2128,
+        "source": "p7018-pr172-backend-ci-before.log.txt (local only)"
+      }
+    ],
+    "publicationNote": "Raw logs retained locally, excluded from Git because they contain credential-shaped test output. This summary preserves original FAIL results without publishing secrets.",
+    "liveQaEvidence": "p7018-live-http-db-qa.json",
+    "limits": [
+      "Local full Backend NOT RUN; new CI required",
+      "Live HTTP/DB journey is historical Antigravity evidence, not repeated by this reviewer",
+      "PDF/PNG/JPEG probes returned 503 SCANNER_UNAVAILABLE; clean upload NOT RUN",
+      "Native picker/device QA NOT RUN"
+    ]
+  }
 }

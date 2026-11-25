@@ -253,7 +253,7 @@ class CurrentUserIntegrationTest {
                 .andExpect(jsonPath("$.permissions", is(List.of(
                         "AUDIT_VIEW", "AUDIT_VIEW_TEST", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE",
                         "MODERATION_MANAGE", "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE",
-                        "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
+                        "TRAINER_VERIFY", "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
                 ))));
     }
 
@@ -285,6 +285,7 @@ class CurrentUserIntegrationTest {
             grantPermission("ADMIN", "AUDIT_VIEW");
             grantPermission("ADMIN", "PRIVILEGED_ACCESS_MANAGE");
             grantPermission("ADMIN", "DATA_CORRECTION_EXECUTE");
+            grantPermission("ADMIN", "TRAINER_VERIFY");
         }
     }
 
@@ -342,8 +343,8 @@ class CurrentUserIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.permissions", is(List.of(
                         "AUDIT_VIEW", "CATALOG_MANAGE", "DATA_CORRECTION_EXECUTE", "MODERATION_MANAGE",
-                        "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "USER_DISABLE",
-                        "USER_ROLE_MANAGE", "USER_SUSPEND"
+                        "PRIVILEGED_ACCESS_MANAGE", "SESSION_REVOKE", "SUPPORT_MANAGE", "TRAINER_VERIFY",
+                        "USER_DISABLE", "USER_ROLE_MANAGE", "USER_SUSPEND"
                 ))));
 
         revokeRole(userId, "ADMIN");
