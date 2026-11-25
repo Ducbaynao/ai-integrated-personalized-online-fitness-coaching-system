@@ -192,6 +192,77 @@ class AiWorkoutRescheduleRealFastApiIntegrationTest {
 
     private record TestFixture(UUID studentId, UUID planId, UUID versionId, UUID sessionId) {}
 
+    @Autowired private com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService appointments;
+
+    @Test
+    void bilateralAppointmentRefresh_throughRealFastApi_preservesSnapshotAndAppliesNewProposal() throws Exception {
+        var f = createFixture(false);
+        jdbc.update("INSERT INTO fitness.user_roles(user_id,role_id,assigned_by,assigned_at) SELECT ?,id,?,clock_timestamp() FROM fitness.roles WHERE code='STUDENT' ON CONFLICT DO NOTHING",
+                f.studentId(), f.studentId());
+        UUID trainer = UUID.randomUUID();
+        setupCoachingPeriod(f.studentId(), trainer, "HUMAN_COACH");
+        UUID period = jdbc.queryForObject("SELECT id FROM fitness.coaching_periods WHERE student_id=?", UUID.class, f.studentId());
+        Instant start = LocalDate.now(ZoneOffset.ofHours(7)).plusDays(3).atTime(9, 0).toInstant(ZoneOffset.ofHours(7));
+        UUID occurrence = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.planned_workouts
+                (id,student_id,workout_plan_session_id,coaching_period_id,planned_start_at,planned_end_at,
+                 original_planned_start_at,created_by,schedule_local_start,schedule_local_end,
+                 schedule_timezone,schedule_start_utc_offset,schedule_end_utc_offset)
+                VALUES (?,?,?,?,?,?,?,?,?,?,'Asia/Ho_Chi_Minh','+07:00','+07:00')
+                """, occurrence, f.studentId(), f.sessionId(), period, Timestamp.from(start), Timestamp.from(start.plusSeconds(2700)),
+                Timestamp.from(start), f.studentId(), LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)).toString(),
+                LocalDateTime.ofInstant(start.plusSeconds(2700), ZoneOffset.ofHours(7)).toString());
+        UUID appointment = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.appointments
+                (id,student_id,trainer_id,coaching_period_id,planned_workout_id,start_at,end_at,display_timezone,
+                 local_start,local_end,start_utc_offset,end_utc_offset,guarded_v2,status,created_by)
+                VALUES (?,?,?,?,?,?,?,'Asia/Ho_Chi_Minh',?,?,'+07:00','+07:00',true,'CONFIRMED',?)
+                """, appointment, f.studentId(), trainer, period, occurrence, Timestamp.from(start), Timestamp.from(start.plusSeconds(3600)),
+                LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)), LocalDateTime.ofInstant(start.plusSeconds(3600), ZoneOffset.ofHours(7)), f.studentId());
+        String studentToken = generateToken(f.studentId(), "STUDENT");
+        String trainerToken = generateToken(trainer, "TRAINER");
+        var before = mockMvc.perform(post("/api/v1/ai/workout-reschedules")
+                .header("Authorization", "Bearer " + studentToken).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new WorkoutRescheduleApiRequest(
+                        f.studentId(), occurrence, 0L, "before-bilateral", "Review", null))))
+                .andExpect(status().isOk()).andReturn();
+        UUID oldRecommendation = UUID.fromString(objectMapper.readTree(before.getResponse().getContentAsString()).path("recommendationId").asText());
+        String oldSnapshot = recommendationRepository.findById(oldRecommendation).orElseThrow().sourceSnapshot();
+
+        LocalDateTime moved = LocalDateTime.ofInstant(start.plus(2, java.time.temporal.ChronoUnit.DAYS), ZoneOffset.ofHours(7)).withHour(14);
+        var change = appointments.requestReschedule(new com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService.RescheduleCommand(
+                f.studentId(), appointment, 0L,
+                new com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService.LocalInterval(moved, moved.plusHours(3), "Asia/Ho_Chi_Minh", "+07:00", "+07:00"),
+                "Bilateral change", UUID.randomUUID()));
+        appointments.decideReschedule(new com.fitnesscoaching.platform.modules.schedule.application.service.AppointmentService.RescheduleDecisionCommand(
+                trainer, change.request().requestId(), "ACCEPT", 0L, 0L, UUID.randomUUID()));
+        mockMvc.perform(post("/api/v1/ai/workout-reschedules/" + oldRecommendation + "/accept")
+                .header("Authorization", "Bearer " + trainerToken).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new AcceptRescheduleApiRequest("stale-bilateral", "Reviewed", 1, 0L, 0L, appointment))))
+                .andExpect(status().isConflict());
+
+        var refreshed = mockMvc.perform(post("/api/v1/ai/workout-reschedules")
+                .header("Authorization", "Bearer " + studentToken).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new WorkoutRescheduleApiRequest(
+                        f.studentId(), occurrence, 0L, "after-bilateral", "Review new confirmed Appointment", null))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.structuredPayload.reschedule.destination.localStart", is(moved.toString() + ":00")))
+                .andReturn();
+        UUID newRecommendation = UUID.fromString(objectMapper.readTree(refreshed.getResponse().getContentAsString()).path("recommendationId").asText());
+        var applied = mockMvc.perform(post("/api/v1/ai/workout-reschedules/" + newRecommendation + "/accept")
+                .header("Authorization", "Bearer " + trainerToken).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new AcceptRescheduleApiRequest("apply-bilateral", "Reviewed new proposal", 1, 0L, 1L, appointment))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status", is("APPLIED"))).andReturn();
+        UUID successor = UUID.fromString(objectMapper.readTree(applied.getResponse().getContentAsString()).path("resultingEntityId").asText());
+        assertThat(newRecommendation).isNotEqualTo(oldRecommendation);
+        assertThat(recommendationRepository.findById(oldRecommendation).orElseThrow().sourceSnapshot()).isEqualTo(oldSnapshot);
+        assertThat(jdbc.queryForObject("SELECT planned_workout_id FROM fitness.appointments WHERE id=?", UUID.class, appointment)).isEqualTo(successor);
+        assertThat(jdbc.queryForObject("SELECT planned_end_at-planned_start_at=interval '45 minutes' FROM fitness.planned_workouts WHERE id=?", Boolean.class, successor)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.workout_session_logs WHERE planned_workout_id IN (?,?)", Integer.class, occurrence, successor)).isZero();
+    }
+
     private String generateToken(UUID userId, String role) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()

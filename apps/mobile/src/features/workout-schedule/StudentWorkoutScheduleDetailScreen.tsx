@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,8 @@ import { ApiError } from '@/types/auth';
 import type { CancelPlannedWorkoutRequest, ReschedulePlannedWorkoutRequest, WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from '@/features/workout-plan/components/AiWorkoutAdjustmentModal';
+import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWorkoutRescheduleModal';
+import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -52,6 +54,13 @@ export function StudentWorkoutScheduleDetailScreen({
   const submitting = useRef(false);
   const [isAdjustmentModalVisible, setIsAdjustmentModalVisible] = useState(Boolean(initialRecommendationId));
   const [activeRecommendationId, setActiveRecommendationId] = useState<string | undefined>(initialRecommendationId);
+  const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
+  const [lastAppliedSuccessorId, setLastAppliedSuccessorId] = useState<string | null>(null);
+
+  const handleOpenRescheduleModal = useCallback(() => {
+    setLastAppliedSuccessorId(null);
+    setIsRescheduleModalVisible(true);
+  }, []);
 
   const planId = item?.planSummary?.planId ?? '';
   const planVersionId = item?.planSummary?.planVersionId ?? '';
@@ -98,9 +107,14 @@ export function StudentWorkoutScheduleDetailScreen({
   useEffect(() => {
     if (!permissionLost && query.error instanceof ApiError && [403, 404].includes(query.error.status)) {
       client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+      client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
       queueMicrotask(() => setPermissionLost(true));
     }
   }, [client, permissionLost, query.error, studentId]);
+
+  useEffect(() => {
+    if (!allowed && studentId) client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
+  }, [allowed, client, studentId]);
 
   const resetCommand = () => { setRetryCommand(null); setPreview(false); setError(''); };
   const editDestination = (patch: Partial<WorkoutScheduleChangeDestination>) => {
@@ -111,6 +125,7 @@ export function StudentWorkoutScheduleDetailScreen({
     setPermissionLost(true);
     setRetryCommand(null);
     client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+    client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
   };
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
@@ -201,6 +216,7 @@ export function StudentWorkoutScheduleDetailScreen({
       {needsReview ? <WorkoutState testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} /> : null}
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
         {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
+        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={handleOpenRescheduleModal} /> : null}
         {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination(EMPTY_DESTINATION); resetCommand(); }} /> : null}
         {item.availableActions.includes('CANCEL') ? <WorkoutButton testID="schedule-cancel" label="Hủy buổi này" danger onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} /> : null}
       </View> : null}
@@ -288,6 +304,27 @@ export function StudentWorkoutScheduleDetailScreen({
           await query.refetch();
         }}
       />
+      {isRescheduleModalVisible ? <AiWorkoutRescheduleModal
+        visible={true}
+        actorId={studentId}
+        capability="STUDENT"
+        studentId={studentId}
+        occurrence={item}
+        authorized={allowed && !permissionLost}
+        onClose={async () => {
+          setIsRescheduleModalVisible(false);
+          await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+          if (lastAppliedSuccessorId) {
+            const nextId = lastAppliedSuccessorId;
+            setLastAppliedSuccessorId(null);
+            AccessibilityInfo.announceForAccessibility('Đã đổi lịch. Đang mở buổi tập mới.');
+            router.replace(`/workouts/schedule/${nextId}` as never);
+          } else {
+            await query.refetch();
+          }
+        }}
+        onApplied={(result) => setLastAppliedSuccessorId(result.resultingEntityId || null)}
+      /> : null}
     </> : null}
   </ScrollView>;
 }

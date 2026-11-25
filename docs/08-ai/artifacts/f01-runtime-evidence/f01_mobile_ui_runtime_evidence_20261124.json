@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-11-24T16:34:04.337071+00:00",
+  "verificationType": "Real Interactive Mobile UI on Expo Web -> Spring Boot Backend -> PostgreSQL",
+  "environment": {
+    "webUrl": "http://localhost:8081",
+    "backendUrl": "http://localhost:8080/api/v1",
+    "database": "PostgreSQL 18.6 (digital-fitness-postgres:5433)",
+    "aiServiceMode": "simulated",
+    "aiEmbeddingProvider": "simulated",
+    "note": "AI Service operates in deterministic simulated provider mode; real LLM external generation evaluated under separate A-49 gate."
+  },
+  "scenarios": [
+    {
+      "scenario": "Student General Knowledge Query",
+      "actor": "STUDENT",
+      "contextMode": "GENERAL",
+      "screenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\01_student_general_knowledge.png",
+      "answerPreview": "Theo Phạm vi và cách sử dụng WHO 2020 (WHO-PA-SB-2020-VI-01 phiên bản 1.1.0): Nội dung WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần su",
+      "hasCitations": true,
+      "asOf": "Thời điểm dữ liệu: 2026-11-24T16:33:34Z",
+      "invariantPassed": true,
+      "status": "PASS"
+    },
+    {
+      "scenario": "Student Personalized Knowledge Query",
+      "actor": "STUDENT",
+      "contextMode": "PERSONAL",
+      "screenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\02_student_personalized_knowledge.png",
+      "answerPreview": "Theo Hành vi ít vận động ở tuổi 18–64 (WHO-PA-SB-2020-VI-06 phiên bản 1.1.0): Giới hạn WHO 2020 không chốt số giờ ngồi tối đa/ngày, cũng không chốt tầ",
+      "invariantPassed": true,
+      "status": "PASS"
+    },
+    {
+      "scenario": "Trainer Student Picker & Personalized Inquiry",
+      "actor": "TRAINER",
+      "contextMode": "PERSONAL",
+      "selectedStudentId": "5c6f49c6-f4f6-4941-b217-2574b3830395",
+      "screenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\03_trainer_personalized_student.png",
+      "answerPreview": "Theo Vận động và tăng cường cơ ở tuổi 18–64 (WHO-PA-SB-2020-VI-05 phiên bản 1.1.0): Giới hạn và cách đọc Hai khoảng aerobic là lựa chọn thay thế hoặc ",
+      "invariantPassed": true,
+      "status": "PASS"
+    },
+    {
+      "scenario": "Trainer Access F01 from Relationship Detail",
+      "actor": "TRAINER",
+      "relationshipId": "95501599-414d-4d0d-b663-296978c402a5",
+      "screenshots": [
+        "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\04_relationship_detail_f01_button.png",
+        "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\05_trainer_locked_student_from_relationship.png"
+      ],
+      "studentLocked": true,
+      "status": "PASS"
+    },
+    {
+      "scenario": "Anti-Stale Cancellation",
+      "actor": "TRAINER",
+      "screenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\06_anti_stale_cancellation.png",
+      "staleLeaked": false,
+      "status": "PASS"
+    },
+    {
+      "scenario": "Readback by runId (Authorized Ownership & Unauthorized Ownership Rejection)",
+      "actor": "TRAINER",
+      "authorizedScreenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\07_readback_authorized_success.png",
+      "unauthorizedScreenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\08_readback_unauthorized_forbidden.png",
+      "note": "Rejection verified for cross-owner run (student-owned run accessed by trainer). Coaching relationship revocation after personalized run creation is verified at backend integration test level (AiRunF01PersistenceIntegrationTest test #9).",
+      "status": "PASS"
+    },
+    {
+      "scenario": "Client-side Question Length Validation",
+      "actor": "TRAINER",
+      "screenshot": "docs\\08-ai\\artifacts\\f01-runtime-evidence\\screenshots\\09_client_validation_min_length.png",
+      "submitDisabled": true,
+      "status": "PASS"
+    }
+  ],
+  "overallStatus": "PASS"
+}

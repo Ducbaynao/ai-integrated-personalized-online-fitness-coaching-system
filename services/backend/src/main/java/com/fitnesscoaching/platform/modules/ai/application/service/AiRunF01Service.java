@@ -241,7 +241,8 @@ public class AiRunF01Service implements AiRunF01UseCase {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    // Trainer readback checks use Coaching authority's FOR SHARE boundary, requiring a read-write transaction in PostgreSQL.
+    @Transactional
     public AiRun getF01Run(UUID actorId, UUID runId) {
         if (actorId == null) {
             throw new AiRunAccessDeniedException("Authenticated actor ID is required");
