@@ -411,7 +411,7 @@ export function AiWorkoutProposalModal({
       <View style={[styles.container, { backgroundColor: theme.canvas }]}>
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>
-            Đề xuất giáo án 1 tuần (AI)
+            Đề xuất giáo án 1 tuần bằng AI
           </Text>
           <TouchableOpacity
             testID="close-ai-proposal-modal-button"
@@ -602,8 +602,8 @@ export function AiWorkoutProposalModal({
                   { id: 'DUMBBELL', label: 'Tạ đơn' },
                   { id: 'BARBELL', label: 'Thanh đòn' },
                   { id: 'RESISTANCE_BAND', label: 'Dây kháng lực' },
-                  { id: 'CABLE', label: 'Máy cáp (Cable)' },
-                  { id: 'MACHINE', label: 'Máy tạ (Machine)' },
+                  { id: 'CABLE', label: 'Máy cáp' },
+                  { id: 'MACHINE', label: 'Máy tạ' },
                 ].map((item) => {
                   const isSelected = selectedEquipment.includes(item.id);
                   return (
@@ -780,7 +780,7 @@ export function AiWorkoutProposalModal({
 
               <WorkoutButton
                 testID="generate-ai-proposal-button"
-                label={isGenerating ? 'Đang phân tích và tạo giáo án...' : 'Tạo đề xuất giáo án (AI)'}
+                label={isGenerating ? 'Đang phân tích và tạo giáo án...' : 'Tạo đề xuất giáo án bằng AI'}
                 busy={isGenerating}
                 disabled={isGenerating}
                 onPress={handleGenerate}

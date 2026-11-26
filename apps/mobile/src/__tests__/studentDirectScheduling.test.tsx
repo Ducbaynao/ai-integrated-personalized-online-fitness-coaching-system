@@ -160,7 +160,9 @@ describe('Student direct scheduling', () => {
     const tree = render();
     await fill(tree);
     await press(tree, 'confirm-batch');
-    expect(JSON.stringify(tree.toJSON())).toContain('Upper body (giờ bắt đầu): Giờ không hợp lệ');
+    // P7-016: item errors are mapped by `code`; the server message is not shown even when it is Vietnamese.
+    expect(JSON.stringify(tree.toJSON())).toContain('Upper body (giờ bắt đầu): Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại.');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Giờ không hợp lệ');
     expect(tree.root.findAllByProps({ testID: 'confirm-batch' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
     (workoutScheduleApi.confirmBatch as jest.Mock).mockRejectedValueOnce(new ApiError(403, 'denied'));

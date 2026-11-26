@@ -390,6 +390,25 @@ describe('ProgressDashboardScreen', () => {
       expect(textOf(unknown)).not.toContain('FUTURE_STATE');
     });
 
+    it('P7-016: shows photo takenAt as a labelled UTC instant, never raw ISO or a guessed local time', async () => {
+      const photos = [
+        { ...samplePhotos[0], id: 'p-utc', takenAt: '2026-11-01T23:30:00Z' },
+        { ...samplePhotos[0], id: 'p-date-only', takenAt: '2026-11-01' },
+        { ...samplePhotos[0], id: 'p-missing', takenAt: '' },
+      ];
+      const tree = await renderWith(sampleSummaryCurrentGoal, photos);
+      const takenAt = (id: string) => {
+        const node = tree.root.findByProps({ testID: `photo-taken-at-${id}` });
+        const c = node.props.children;
+        return Array.isArray(c) ? c.join('') : String(c);
+      };
+      expect(takenAt('p-utc')).toMatch(/23:30.*· UTC$/);
+      expect(takenAt('p-utc')).not.toContain('06:30'); // not shifted to Asia/Ho_Chi_Minh
+      expect(takenAt('p-utc')).not.toContain('T23:30:00Z');
+      expect(takenAt('p-date-only')).toBe('Chưa rõ thời điểm chụp');
+      expect(takenAt('p-missing')).toBe('Chưa rõ thời điểm chụp');
+    });
+
     it('does not render a raw error message on load failure', async () => {
       (progressDashboardApi.getSummary as jest.Mock).mockRejectedValueOnce(new Error('500 Internal Error at ProgressEngineService'));
       (measurementApi.listProgressPhotos as jest.Mock).mockResolvedValue({ content: [], totalElements: 0 });

@@ -152,8 +152,11 @@ export function trendLabel(direction?: string | null): { label: string; symbol: 
 
 export const CONTINUITY_SECTION_TITLE = 'Tình trạng lịch sử tập luyện';
 
-/** Same wording as the existing CONTINUITY_STATE_LABELS in aiProgressSummaryApi.ts (timezone-patch owned). */
-const CONTINUITY_LABELS: Record<string, string> = {
+/**
+ * Single source for continuity-state labels; aiProgressSummaryApi.ts re-exports it as
+ * CONTINUITY_STATE_LABELS. Prefer continuityStateLabel() for display (it has a neutral fallback).
+ */
+export const CONTINUITY_LABELS: Readonly<Record<string, string>> = {
   CONFIRMED_NEW: 'Học viên mới bắt đầu',
   PROLONGED_INACTIVITY: 'Gián đoạn tập luyện dài hạn',
   RECENT_ACTIVITY_OBSERVED: 'Có hoạt động tập luyện gần đây',

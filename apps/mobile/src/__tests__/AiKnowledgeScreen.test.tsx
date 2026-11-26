@@ -448,6 +448,9 @@ describe('AiKnowledgeScreen', () => {
     expect(cardText).toContain('Loại yêu cầu khác');
     expect(cardText).toContain('run-history-1111');
     expect(cardText).not.toMatch(/SUCCEEDED|F01_KNOWLEDGE_QUERY|Run ID/);
+    // P7-016: completedAt is an Instant without timezone context → labelled UTC, not raw ISO.
+    expect(cardText).toMatch(/Thời gian hoàn tất: .*10:05.*· UTC/);
+    expect(cardText).not.toContain('2026-10-22T10:05:00Z');
   });
 
   it('Readback / History: handles 403 AI_FORBIDDEN when permissions are revoked', async () => {

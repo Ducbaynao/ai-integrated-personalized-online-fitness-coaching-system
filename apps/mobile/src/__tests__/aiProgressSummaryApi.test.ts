@@ -216,7 +216,8 @@ describe('aiProgressSummaryApi', () => {
       expect(METRIC_LABELS['F_WEIGHT']).toBe('Cân nặng (kg)');
       expect(CONTINUITY_STATE_LABELS['PROLONGED_INACTIVITY']).toContain('Gián đoạn');
       expect(TREND_DIRECTION_LABELS['STABLE'].symbol).toBe('→');
-      expect(TREND_DIRECTION_LABELS['INCREASED'].symbol).toBe('↑');
+      // P7-016: derived from trendLabel() so every Progress screen uses the same symbol.
+      expect(TREND_DIRECTION_LABELS['INCREASED'].symbol).toBe('▲');
     });
   });
 });
