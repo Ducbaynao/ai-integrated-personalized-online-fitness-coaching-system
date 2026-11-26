@@ -3,7 +3,7 @@ import type { WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 
 export function validateScheduleDestination(destination: WorkoutScheduleChangeDestination): string | null {
-  if (!destination.timezone) return 'Hãy chọn và xác nhận múi giờ IANA cho lịch mới.';
+  if (!destination.timezone) return 'Hãy xác nhận khung giờ cho lịch mới.';
   const starts = validProposalOffsets(destination.timezone, destination.localStart);
   const ends = validProposalOffsets(destination.timezone, destination.localEnd);
   if (!starts.length || !ends.length) return 'Giờ địa phương không tồn tại trong múi giờ đã chọn hoặc sai định dạng YYYY-MM-DDTHH:mm.';

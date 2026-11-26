@@ -3,6 +3,7 @@ import { ScrollView, Text, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { useWorkoutScheduleProposals } from './workoutScheduleProposalQueries';
 import { proposalErrorMessage, proposalStatusLabels, formatProposalLocal } from './proposalPresentation';
@@ -28,7 +29,7 @@ export function StudentScheduleProposalsScreen() {
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Đề xuất từ {proposal.trainerDisplayName?.trim() || 'huấn luyện viên'}</Text>
       <Text style={[styles.label, { color: theme.textPrimary }]}>{proposalStatusLabels[proposal.status]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {proposal.sourcePlanName?.trim() || 'Chưa có tên kế hoạch'} · Phiên bản {proposal.sourcePlanVersionNumber}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>{proposal.items.length} buổi được đề xuất · {proposal.timezone}</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>{proposal.items.length} buổi được đề xuất · {formatTimezoneDisplay(proposal.timezone)}</Text>
       {proposal.items[0] ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đầu: {formatProposalLocal(proposal.items[0].localStart, proposal.items[0].startUtcOffset, proposal.timezone)}</Text> : null}
       <WorkoutButton testID={`open-proposal-${proposal.proposalId}`} label="Xem chi tiết đề xuất" onPress={() => router.push(`/workout-schedule-proposals/${proposal.proposalId}` as never)} />
     </WorkoutCard>)}

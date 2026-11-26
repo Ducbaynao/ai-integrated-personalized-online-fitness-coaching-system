@@ -32,7 +32,7 @@ async function renderRequest() {
   renderer.act(() => {
     tree = renderer.create(<QueryClientProvider client={client}><AppointmentRequestScreen requestId="request-1" /></QueryClientProvider>);
   });
-  await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh'));
+  await waitForScreen(() => expect(JSON.stringify(tree.toJSON())).toContain('Giờ Việt Nam'));
 }
 async function waitForScreen(assertion: () => void) {
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -67,7 +67,7 @@ afterEach(() => { if (tree) renderer.act(() => tree.unmount()); client?.clear();
 
 it('shows a nullable-safe request and sends the actual optimistic version only after confirmation', async () => {
   await renderRequest();
-  expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh');
+  expect(JSON.stringify(tree.toJSON())).toContain('Giờ Việt Nam');
   await press('Chấp nhận');
   expect(appointmentApi.decide).not.toHaveBeenCalled();
   await press('Xác nhận quyết định');

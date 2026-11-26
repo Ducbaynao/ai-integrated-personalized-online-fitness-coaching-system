@@ -64,44 +64,53 @@ export type NutritionChangeBody = { kind: 'NEW_GOAL' | 'CHANGE_TARGET'; goalId: 
   timezone: string; effectiveFrom: string; targets: NutritionTargetSpec[]; reason: string | null;
   confirmed: boolean; commandKey: string };
 
+/**
+ * Optional per-dispatch liveness guard forwarded to the shared request runner's existing
+ * `shouldContinue` check (before token read, before fetch and before a 401 retry). Omitted by default,
+ * so other callers keep their request options unchanged. It is not part of the request payload.
+ */
+export type MutationGuard = { shouldContinue?: () => boolean };
+const write = (method: 'POST' | 'PUT', body: unknown, guard?: MutationGuard) =>
+  (guard?.shouldContinue ? { method, body, shouldContinue: guard.shouldContinue } : { method, body });
+
 export const nutritionApi = {
   catalogFoods: () => request<CatalogFood[]>('/nutrition/catalog/foods'),
   catalogFood: (id: string) => request<CatalogFood>(`/nutrition/catalog/foods/${id}`),
-  addCatalogItem: (day: string, body: CatalogItemBody) => request<NutritionDay>(`/nutrition/days/${day}/catalog-items`, { method: 'POST', body }),
+  addCatalogItem: (day: string, body: CatalogItemBody, guard?: MutationGuard) => request<NutritionDay>(`/nutrition/days/${day}/catalog-items`, write('POST', body, guard)),
   foods: () => request<PrivateFood[]>('/nutrition/private-foods'),
-  createFood: (body: FoodBody) => request<PrivateFood>('/nutrition/private-foods', { method: 'POST', body }),
-  updateFood: (id: string, body: FoodBody) => request<PrivateFood>(`/nutrition/private-foods/${id}`, { method: 'PUT', body }),
+  createFood: (body: FoodBody, guard?: MutationGuard) => request<PrivateFood>('/nutrition/private-foods', write('POST', body, guard)),
+  updateFood: (id: string, body: FoodBody, guard?: MutationGuard) => request<PrivateFood>(`/nutrition/private-foods/${id}`, write('PUT', body, guard)),
   day: (day: string, timezone: string) => request<NutritionDay>(`/nutrition/days/${day}?timezone=${encodeURIComponent(timezone)}`),
   trainerDay: (studentId: string, day: string, timezone: string) =>
     request<NutritionDay>(`/students/${studentId}/nutrition/days/${day}?timezone=${encodeURIComponent(timezone)}`),
-  addItem: (day: string, body: ItemBody) => request<NutritionDay>(`/nutrition/days/${day}/items`, { method: 'POST', body }),
-  correct: (itemId: string, body: CorrectionBody) => request<NutritionDay>(`/nutrition/items/${itemId}/correct`, { method: 'POST', body }),
+  addItem: (day: string, body: ItemBody, guard?: MutationGuard) => request<NutritionDay>(`/nutrition/days/${day}/items`, write('POST', body, guard)),
+  correct: (itemId: string, body: CorrectionBody, guard?: MutationGuard) => request<NutritionDay>(`/nutrition/items/${itemId}/correct`, write('POST', body, guard)),
   corrections: (itemId: string) => request<{ id: string; fromVersion: number; toVersion: number; correctedAt: string }[]>(`/nutrition/items/${itemId}/corrections`),
-  confirm: (day: string, body: ConfirmBody) => request<NutritionDay>(`/nutrition/days/${day}/confirm`, { method: 'POST', body }),
+  confirm: (day: string, body: ConfirmBody, guard?: MutationGuard) => request<NutritionDay>(`/nutrition/days/${day}/confirm`, write('POST', body, guard)),
   goalTypes: () => request<NutritionGoalType[]>('/nutrition/strategy/goal-types'),
   targetNutrients: () => request<NutritionTargetNutrient[]>('/nutrition/strategy/target-nutrients'),
   strategy: () => request<NutritionStrategyState>('/nutrition/strategy/me'),
   trainerStrategy: (studentId: string) => request<NutritionStrategyState>(`/students/${studentId}/nutrition/strategy`),
-  changeStrategy: (body: NutritionChangeBody) => request<NutritionStrategyGoal>('/nutrition/strategy/goals', { method: 'POST', body }),
-  transitionGoal: (goalId: string, body: { action: 'PAUSE' | 'RESUME' | 'END'; expectedGoalVersion: number; reason: string; commandKey: string }) =>
-    request<NutritionStrategyGoal>(`/nutrition/strategy/goals/${goalId}/transitions`, { method: 'POST', body }),
+  changeStrategy: (body: NutritionChangeBody, guard?: MutationGuard) => request<NutritionStrategyGoal>('/nutrition/strategy/goals', write('POST', body, guard)),
+  transitionGoal: (goalId: string, body: { action: 'PAUSE' | 'RESUME' | 'END'; expectedGoalVersion: number; reason: string; commandKey: string }, guard?: MutationGuard) =>
+    request<NutritionStrategyGoal>(`/nutrition/strategy/goals/${goalId}/transitions`, write('POST', body, guard)),
   targetDay: (day: string, timezone: string) => request<NutritionTargetDay>(`/nutrition/strategy/days/${day}?timezone=${encodeURIComponent(timezone)}`),
   frozenCorrections: (day: string) => request<FrozenTargetCorrection[]>(`/nutrition/strategy/days/${day}/frozen-target-corrections`),
   trainerFrozenCorrections: (studentId: string, day: string) => request<FrozenTargetCorrection[]>(
     `/students/${studentId}/nutrition/strategy/days/${day}/frozen-target-corrections`),
   correctFrozenTarget: (day: string, body: { timezone: string; nutrientId: number; targetAmount: number;
-    expectedVersion: number; reason: string; commandKey: string }) => request<NutritionTargetDay>(
-      `/nutrition/strategy/days/${day}/frozen-target-corrections`, { method: 'POST', body }),
-  chooseDayType: (day: string, body: { timezone: string; dayType: 'REST_DAY' | 'DEFAULT'; commandKey: string }) =>
-    request<NutritionTargetDay>(`/nutrition/strategy/days/${day}/day-type`, { method: 'POST', body }),
+    expectedVersion: number; reason: string; commandKey: string }, guard?: MutationGuard) => request<NutritionTargetDay>(
+      `/nutrition/strategy/days/${day}/frozen-target-corrections`, write('POST', body, guard)),
+  chooseDayType: (day: string, body: { timezone: string; dayType: 'REST_DAY' | 'DEFAULT'; commandKey: string }, guard?: MutationGuard) =>
+    request<NutritionTargetDay>(`/nutrition/strategy/days/${day}/day-type`, write('POST', body, guard)),
   overrideTarget: (day: string, body: { timezone: string; goalVersionId: string; nutrientId: number; unitId: number;
-    targetAmount: number; reason: string; expectedOverrideVersion: number | null; commandKey: string }) =>
-    request<NutritionTargetDay>(`/nutrition/strategy/days/${day}/overrides`, { method: 'POST', body }),
+    targetAmount: number; reason: string; expectedOverrideVersion: number | null; commandKey: string }, guard?: MutationGuard) =>
+    request<NutritionTargetDay>(`/nutrition/strategy/days/${day}/overrides`, write('POST', body, guard)),
   strategyProposals: () => request<NutritionStrategyProposal[]>('/nutrition/strategy/proposals/me'),
   trainerStrategyProposals: (studentId: string) => request<NutritionStrategyProposal[]>(`/students/${studentId}/nutrition/strategy/proposals`),
   strategyProposal: (id: string) => request<NutritionStrategyProposal>(`/nutrition/strategy/proposals/${id}`),
-  proposeStrategy: (studentId: string, body: NutritionChangeBody) => request<NutritionStrategyProposal>(
-    `/students/${studentId}/nutrition/strategy/proposals`, { method: 'POST', body }),
-  decideStrategy: (id: string, body: { decision: 'ACCEPT' | 'REJECT'; expectedProposalVersion: number; commandKey: string }) =>
-    request<NutritionStrategyProposal>(`/nutrition/strategy/proposals/${id}/decisions`, { method: 'POST', body }),
+  proposeStrategy: (studentId: string, body: NutritionChangeBody, guard?: MutationGuard) => request<NutritionStrategyProposal>(
+    `/students/${studentId}/nutrition/strategy/proposals`, write('POST', body, guard)),
+  decideStrategy: (id: string, body: { decision: 'ACCEPT' | 'REJECT'; expectedProposalVersion: number; commandKey: string }, guard?: MutationGuard) =>
+    request<NutritionStrategyProposal>(`/nutrition/strategy/proposals/${id}/decisions`, write('POST', body, guard)),
 };

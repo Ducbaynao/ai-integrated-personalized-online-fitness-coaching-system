@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutRecurrenceApi } from '@/services/workoutRecurrenceApi';
 import { ApiError } from '@/types/auth';
@@ -118,7 +119,7 @@ function RecurrenceDetail({ seriesId, actorId, allowed, canWithdraw, trainerStud
       {series && !query.isError ? <>
         <WorkoutCard>
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{recurrenceStatus[series.status]}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Thứ Hai bắt đầu: {series.mondayAnchorDate} · {series.timezone}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Thứ Hai bắt đầu: {series.mondayAnchorDate} · {formatTimezoneDisplay(series.timezone)}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Lặp block {series.planWeeks} tuần không giới hạn; chỉ các buổi đã chọn được tạo. Nguồn phiên bản {series.sourcePlanVersionNumber}.</Text>
           {series.items.map(item => <Text key={item.planSessionId} style={[styles.body, { color: theme.textPrimary }]}>
             Tuần {item.weekNumber}, ngày {item.dayNumber}, thứ tự {item.sequenceNumber}: {item.firstLocalStart} → {item.firstLocalEnd}
@@ -147,7 +148,7 @@ function RecurrenceDetail({ seriesId, actorId, allowed, canWithdraw, trainerStud
         {!periods.isPending && !periods.isError && !periods.data?.pages.some(page => page.items.length) ? <WorkoutState title="Chưa có kỳ được xử lý" message="Job hằng ngày chỉ xét giờ bắt đầu trong 30 ngày tới." /> : null}
         {periods.data?.pages.flatMap(page => page.items).map(period => <WorkoutCard key={period.periodId} testID={`series-period-${period.periodId}`}>
           <Text style={[styles.label, { color: theme.textPrimary }]}>Chặn {period.blockIteration + 1} · {outcomeLabels[period.outcome]}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>{period.localStart} → {period.localEnd} · {period.timezone}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>{period.localStart} → {period.localEnd} · {formatTimezoneDisplay(period.timezone)}</Text>
           {period.startUtcOffset ? <Text style={[styles.body, { color: theme.textSecondary }]}>UTC {period.startUtcOffset} → {period.endUtcOffset}</Text> : null}
           {period.occurrenceId && !relationshipId ? <WorkoutButton label="Xem buổi đã tạo" secondary onPress={() => router.push(`/workouts/schedule/${period.occurrenceId}` as never)} /> : null}
           {!relationshipId && ['DST_GAP', 'DST_AMBIGUOUS'].includes(period.outcome) ? <WorkoutButton

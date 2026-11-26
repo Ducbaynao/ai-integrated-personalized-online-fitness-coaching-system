@@ -7,6 +7,7 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleChangeProposalApi } from '@/services/workoutScheduleChangeProposalApi';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { workoutScheduleQueryKeys } from '@/features/workout-schedule/workoutScheduleQueries';
 import { ApiError } from '@/types/auth';
 import type { PlannedWorkoutChangeResult } from '@/types/workoutSchedule';
@@ -124,7 +125,7 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Lịch hiện tại khi đề xuất</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu: {formatChangeTime(proposal.oldPlannedStartAt, proposal.oldTimezone)}</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Kết thúc: {proposal.oldPlannedEndAt ? formatChangeTime(proposal.oldPlannedEndAt, proposal.oldTimezone) : 'Chưa xác định trong bản ghi cũ'}</Text>
-        {proposal.oldLocalStart && proposal.oldStartUtcOffset ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương đã lưu: {proposal.oldLocalStart.replace('T', ' ')} UTC{proposal.oldStartUtcOffset} · {proposal.oldTimezone || 'Múi giờ chưa xác định'}</Text> : null}
+        {proposal.oldLocalStart && proposal.oldStartUtcOffset ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương đã lưu: {proposal.oldLocalStart.replace('T', ' ')} UTC{proposal.oldStartUtcOffset} · {formatTimezoneDisplay(proposal.oldTimezone, 'Múi giờ chưa xác định')}</Text> : null}
         <WorkoutButton testID="student-change-open-occurrence" label="Xem buổi tập gốc" secondary onPress={() => router.push(`/workouts/schedule/${proposal.occurrenceId}` as never)} />
         {proposal.appointmentId ? <>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi tập này liên kết với một lịch hẹn. Máy chủ sẽ kiểm tra lại đúng lịch hẹn và phiên bản đã ghi nhận khi bạn chấp nhận.</Text>
@@ -136,7 +137,7 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
         {proposal.changeType === 'RESCHEDULE' && proposal.destination ? <>
           <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu mới: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset}</Text>
           <Text style={[styles.body, { color: theme.textPrimary }]}>Kết thúc mới: {proposal.destination.localEnd.replace('T', ' ')} UTC{proposal.destination.endUtcOffset}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Múi giờ IANA: {proposal.destination.timezone}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Khung giờ áp dụng: {formatTimezoneDisplay(proposal.destination.timezone)}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Nếu chấp nhận, máy chủ sẽ kiểm tra lại lịch và tạo occurrence thay thế. Buổi cũ sẽ còn trong lịch sử.</Text>
         </> : proposal.changeType === 'CANCEL' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Huấn luyện viên đề xuất hủy buổi này. Nếu chấp nhận, buổi gốc chuyển sang Đã hủy; không tạo buổi thay thế.</Text>
           : <Text style={[styles.body, { color: theme.warningText }]}>Thiếu thời gian đề xuất. Hãy tải lại trước khi quyết định.</Text>}
@@ -155,7 +156,7 @@ export function StudentChangeProposalDetailScreen({ proposalId }: { proposalId: 
       {confirmation && proposal.status === 'PENDING' && !needsReview ? <WorkoutCard testID="student-change-confirmation">
         <Text accessibilityRole="alert" style={[styles.h2, { color: theme.textPrimary }]}>{confirmation === 'ACCEPT' ? 'Xác nhận chấp nhận thay đổi buổi tập?' : 'Xác nhận từ chối đề xuất?'}</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Buổi hiện tại: {formatChangeTime(proposal.oldPlannedStartAt, proposal.oldTimezone)}</Text>
-        {confirmation === 'ACCEPT' && proposal.changeType === 'RESCHEDULE' && proposal.destination ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ mới: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset} → {proposal.destination.localEnd.replace('T', ' ')} UTC{proposal.destination.endUtcOffset} · {proposal.destination.timezone}</Text> : null}
+        {confirmation === 'ACCEPT' && proposal.changeType === 'RESCHEDULE' && proposal.destination ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ mới: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset} → {proposal.destination.localEnd.replace('T', ' ')} UTC{proposal.destination.endUtcOffset} · {formatTimezoneDisplay(proposal.destination.timezone)}</Text> : null}
         {confirmation === 'ACCEPT' && proposal.changeType === 'CANCEL' ? <>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Bạn sẽ hủy buổi gốc. Nếu giờ bắt đầu đã qua theo máy chủ, lý do của bạn là bắt buộc; lý do của huấn luyện viên không thay thế lý do này.</Text>
           {proposal.appointmentId ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Lịch hẹn liên kết vẫn được xác nhận sau khi hủy buổi tập. Muốn hủy lịch hẹn, bạn phải thực hiện riêng trong phần Lịch hẹn.</Text> : null}

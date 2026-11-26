@@ -196,10 +196,13 @@ describe('Trainer change proposal screens', () => {
     expect(blocked.tree.root.findByProps({ testID: 'select-change-reschedule' }).props.disabled).toBe(true);
     renderer.act(() => blocked.tree.unmount());
     setup();
+    (useTrainerWorkoutScheduleDetail as jest.Mock).mockReturnValue({
+      data: { ...occurrence, timezone: 'America/New_York', startUtcOffset: '-05:00', endUtcOffset: '-05:00' },
+      isPending: false, isError: false, isFetching: false, refetch: jest.fn(),
+    });
     const { tree } = render(<TrainerCreateChangeProposalScreen relationshipId="relationship-1" occurrenceId="occurrence-1" />);
     renderer.act(() => tree.root.findByProps({ testID: 'select-change-reschedule' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ testID: 'change-timezone-search' }).props.onChangeText('America/New_York'));
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'America/New_York' }).props.onPress());
+    expect(JSON.stringify(tree.root.findByProps({ testID: 'change-timezone-display' }).props.children)).toContain('Giờ Miền Đông Hoa Kỳ (New York)');
     pickDate(tree.root, 'change-local-start-date-trigger', '2027-03-14');
     renderer.act(() => tree.root.findByProps({ testID: 'change-local-start-time' }).props.onChangeText('02:30'));
     expect(JSON.stringify(tree.toJSON())).toContain('Giờ không tồn tại');
@@ -216,7 +219,7 @@ describe('Trainer change proposal screens', () => {
       .mockResolvedValue({ proposal: { ...proposal, changeType: 'RESCHEDULE' }, replayed: false } as never);
     const { tree } = render(<TrainerCreateChangeProposalScreen relationshipId="relationship-1" occurrenceId="occurrence-1" />);
     renderer.act(() => tree.root.findByProps({ testID: 'select-change-reschedule' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Dùng múi giờ occurrence: Asia/Ho_Chi_Minh' }).props.onPress());
+    expect(JSON.stringify(tree.root.findByProps({ testID: 'change-timezone-display' }).props.children)).toContain('Giờ Việt Nam');
     pickDate(tree.root, 'change-local-start-date-trigger', '2026-10-21');
     renderer.act(() => tree.root.findByProps({ testID: 'change-local-start-time' }).props.onChangeText('18:00'));
     pickDate(tree.root, 'change-local-end-date-trigger', '2026-10-21');
@@ -226,7 +229,7 @@ describe('Trainer change proposal screens', () => {
     renderer.act(() => offsets[0].props.onPress());
     renderer.act(() => offsets[1].props.onPress());
     renderer.act(() => tree.root.findByProps({ testID: 'review-change-proposal' }).props.onPress());
-    expect(JSON.stringify(tree.toJSON())).toContain('Asia/Ho_Chi_Minh');
+    expect(JSON.stringify(tree.toJSON())).toContain('Giờ Việt Nam');
     await renderer.act(async () => { tree.root.findByProps({ testID: 'confirm-create-change-proposal' }).props.onPress(); await Promise.resolve(); });
     expect(create).toHaveBeenCalledWith('student-1', {
       occurrenceId: 'occurrence-1', expectedOccurrenceVersion: 7, changeType: 'RESCHEDULE',

@@ -62,7 +62,7 @@ describe('Student Planned Workout calendar', () => {
     expect(tree.root.findAllByProps({ testID: 'schedule-start-occurrence-1' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ testID: 'schedule-skip-occurrence-1' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
-    expect(formatScheduleTime(occurrence.plannedStartAt, 'Etc/UTC', student.timezone)).toContain('Etc/UTC');
+    expect(formatScheduleTime(occurrence.plannedStartAt, 'Etc/UTC', student.timezone)).toContain('Giờ chuẩn quốc tế (UTC)');
   });
 
   it('opens the real occurrence detail even for terminal history', () => {

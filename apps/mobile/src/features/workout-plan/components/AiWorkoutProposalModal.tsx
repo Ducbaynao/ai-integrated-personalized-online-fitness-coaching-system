@@ -27,6 +27,7 @@ import {
 } from '@/types/aiWorkoutProposal';
 import { WorkoutButton, WorkoutCard } from './WorkoutUi';
 import { DateInputField } from '@/components/ui/DateInputField';
+import { resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 
 interface ModalProposalState extends WorkoutProposalResponse {
   revision?: number;
@@ -182,13 +183,7 @@ export function AiWorkoutProposalModal({
       equipList.push('BODYWEIGHT');
     }
 
-    const localTimezone = (() => {
-      try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        return undefined;
-      }
-    })();
+    const localTimezone = resolveNewRecordDefaultTimezone();
 
     const prefs: WorkoutProposalPreferences = {
       preferredDaysPerWeek: daysPerWeek,

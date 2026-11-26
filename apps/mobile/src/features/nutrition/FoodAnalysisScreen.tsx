@@ -9,7 +9,9 @@ import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { DateInputField } from '@/components/ui/DateInputField';
+import { MealTypeSelector } from '@/components/ui/MealTypeSelector';
 import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
+import { formatTimezoneDisplay, resolveExistingRecordTimezone, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { nutritionApi } from './nutritionApi';
@@ -46,14 +48,6 @@ export function formatNutrientSummary(nutrients: FoodAnalysisNutrients): string 
   ].join(' · ');
 }
 
-const mealTypeLabels: Record<FoodAnalysisMealType, string> = {
-  BREAKFAST: 'Bữa sáng',
-  LUNCH: 'Bữa trưa',
-  DINNER: 'Bữa tối',
-  SNACK: 'Bữa phụ',
-  OTHER: 'Khác',
-};
-
 const basisLabels: Record<FoodAnalysisQuantityBasis, string> = {
   GRAM: 'Gam (g)',
   SERVING: 'Khẩu phần',
@@ -84,11 +78,14 @@ function FoodAnalysisSession() {
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const client = useQueryClient();
 
-  // Coherent Context Initialization: day, timezone and localTime all derive from the exact same instant in effectiveTz
-  const effectiveTz = params.timezone || user?.timezone || 'Asia/Ho_Chi_Minh';
-  const initialNow = moment.utc().tz(moment.tz.zone(effectiveTz) ? effectiveTz : 'Asia/Ho_Chi_Minh');
+  // Coherent Context Initialization: preserve explicit day timezone when launched from an existing day;
+  // otherwise default brand-new estimation intents to Vietnam time.
+  const effectiveTz = params.timezone
+    ? resolveExistingRecordTimezone(params.timezone)
+    : resolveNewRecordDefaultTimezone();
+  const initialNow = moment.utc().tz(effectiveTz);
   const [day, setDay] = useState(() => params.day || initialNow.format('YYYY-MM-DD'));
-  const [timezone, setTimezone] = useState(() => effectiveTz);
+  const [timezone] = useState(() => effectiveTz);
   const [localTime, setLocalTime] = useState(() => initialNow.format('HH:mm'));
   const [chosenOffset, setChosenOffset] = useState('');
   const [mealType, setMealType] = useState<FoodAnalysisMealType>(() => {
@@ -219,6 +216,12 @@ function FoodAnalysisSession() {
     moment.tz.zone(timezone) &&
     confirmedContext
   );
+  // Live committed context for NEW commands. A handler retained from an earlier render (older day,
+  // invalidated preview or unconfirmed context) is inert; saved-intent retries keep their own context.
+  const liveContextRef = useRef({ day, validContext, preview });
+  React.useLayoutEffect(() => {
+    liveContextRef.current = { day, validContext, preview };
+  });
 
   // Queries
   const draftQuery = useQuery({
@@ -283,6 +286,7 @@ function FoodAnalysisSession() {
   // Generate action
   const handleGenerate = async () => {
     if (!mounted.current || denied.current || submitting.current) return;
+    if (liveContextRef.current.day !== day || (validContext && !liveContextRef.current.validContext)) return;
     if (confirmIntent || correctionIntent) {
       setMessage('Lệnh trước chưa rõ kết quả. Hãy thử lại đúng lệnh đã lưu trước khi tạo phân tích mới.');
       return;
@@ -520,6 +524,7 @@ function FoodAnalysisSession() {
   // is an unknown outcome, so retry uses the saved intent, never current form.
   const handlePreview = async (retryIntent?: NonNullable<typeof previewIntent>) => {
     if (!mounted.current || denied.current || submitting.current || !draft) return;
+    if (!retryIntent && liveContextRef.current.day !== day) return;
     if (confirmIntent || correctionIntent) {
       setMessage('Lệnh sửa/xác nhận trước chưa rõ kết quả. Hãy thử lại đúng lệnh đã lưu trước.'); return;
     }
@@ -530,6 +535,10 @@ function FoodAnalysisSession() {
     } else {
       if (selectedItemIds.length === 0) {
         setMessage('Vui lòng chọn ít nhất một món đã định lượng để xem trước dinh dưỡng.'); return;
+      }
+      if (!retryIntent && draft && day !== draft.day) {
+        setMessage('Ngày bữa ăn đã thay đổi so với bản nháp. Hãy xác nhận lại ngữ cảnh và tạo phân tích phù hợp.');
+        return;
       }
       const consumedAt = resolveConsumedAt();
       if (!consumedAt) { setMessage('Giờ ăn địa phương chưa hợp lệ.'); return; }
@@ -586,6 +595,7 @@ function FoodAnalysisSession() {
   // Confirm action
   const handleConfirm = async (retryIntent?: { draftId: string; body: FoodAnalysisConfirmRequest }) => {
     if (!mounted.current || denied.current || submitting.current) return;
+    if (!retryIntent && (liveContextRef.current.day !== day || liveContextRef.current.preview !== preview)) return;
     if (!retryIntent && (confirmIntent || correctionIntent)) {
       setMessage('Lệnh trước chưa rõ kết quả. Hãy thử lại đúng intent đã lưu trước.'); return;
     }
@@ -623,6 +633,10 @@ function FoodAnalysisSession() {
               || item.quantityBasis !== s.quantityBasis || item.portionId !== s.portionId;
           })) {
         setMessage('Lựa chọn hoặc bản nháp không còn khớp bản xem trước. Hãy xem trước lại; không thể tạo xác nhận mới.'); return;
+      }
+      if (!retryIntent && draft && day !== draft.day) {
+        setMessage('Ngày bữa ăn đã thay đổi so với bản nháp. Hãy xác nhận lại ngữ cảnh và tạo phân tích phù hợp.');
+        return;
       }
       const consumedAt = resolveConsumedAt();
       if (!consumedAt) {
@@ -810,15 +824,16 @@ function FoodAnalysisSession() {
           onChange={(v) => {
             setDay(v);
             setConfirmedContext(false);
+            setChosenOffset('');
+            invalidatePreview();
           }}
           initialBrowseDate={day || getTodayDateOnly(timezone)}
           sessionKey={`${actor}:${activeCapability ?? ''}`}
           accessibilityLabel="Ngày ghi"
         />
-        {inputField('Múi giờ IANA', timezone, (v) => {
-          setTimezone(v);
-          setConfirmedContext(false);
-        })}
+        <Text testID="food-analysis-timezone-display" style={[styles.body, { color: theme.textSecondary, marginBottom: 10 }]}>
+          Khung giờ áp dụng: {formatTimezoneDisplay(timezone)}
+        </Text>
         {inputField('Giờ ăn địa phương (HH:mm)', localTime, (v) => {
           setLocalTime(v);
           setChosenOffset('');
@@ -843,28 +858,14 @@ function FoodAnalysisSession() {
         ) : null}
 
         {/* Meal Type selection */}
-        <Text style={[styles.label, { color: theme.textPrimary, marginBottom: 6 }]}>Bữa ăn</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-          {(['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'OTHER'] as FoodAnalysisMealType[]).map((type) => (
-            <Pressable
-              key={type}
-              accessibilityRole="radio"
-              accessibilityLabel={`Chọn ${mealTypeLabels[type]}`}
-              accessibilityState={{ checked: mealType === type }}
-              onPress={() => { invalidatePreview(); setMealType(type); }}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 6,
-                borderWidth: 1,
-                borderColor: mealType === type ? theme.primary : theme.border,
-                backgroundColor: mealType === type ? theme.surfaceSubtle : 'transparent',
-              }}>
-              <Text style={{ color: mealType === type ? theme.primary : theme.textPrimary }}>
-                {mealTypeLabels[type]}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={{ marginBottom: 10 }}>
+          <MealTypeSelector
+            value={mealType}
+            onChange={(type) => { invalidatePreview(); setMealType(type); }}
+            disabled={busy}
+            testID="food-analysis-meal-selector"
+            testIDPrefix="food-analysis-meal"
+          />
         </View>
 
         <WorkoutButton

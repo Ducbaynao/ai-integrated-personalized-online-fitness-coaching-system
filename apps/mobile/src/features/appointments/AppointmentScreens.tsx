@@ -10,10 +10,12 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { createCommandKey } from '@/services/coachingApi';
 import { appointmentApi, AppointmentInterval } from '@/services/appointmentApi';
-import { validProposalOffsets, proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
+import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { formatVietnameseDateDisplay, isoTimestampToDateOnly, localDateRangeBoundaryIso, replaceDateInIsoTimestamp } from '@/features/shared/dateInputUtils';
+import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
+import { formatTimezoneDisplay, resolveExistingRecordTimezone, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 
 const root = (actor: string, role: string) => ['appointments', actor, role];
@@ -27,7 +29,7 @@ const label = (status: string) => ({ PENDING: 'Chờ quyết định', ACCEPTED:
 const localText = (interval: { localStart: string | null; localEnd: string | null; timezone: string;
   startUtcOffset: string | null; endUtcOffset: string | null } | null) => interval
   && interval.localStart && interval.localEnd && interval.startUtcOffset && interval.endUtcOffset
-  ? `${interval.localStart} ${interval.startUtcOffset} → ${interval.localEnd} ${interval.endUtcOffset} · ${interval.timezone}`
+  ? `${interval.localStart} ${interval.startUtcOffset} → ${interval.localEnd} ${interval.endUtcOffset} · ${formatTimezoneDisplay(interval.timezone)}`
   : 'Lịch cũ thiếu dữ liệu thời gian; không thể xác nhận yêu cầu mới.';
 
 function useGuidanceNow() {
@@ -168,8 +170,11 @@ export function AppointmentCreateScreen({ studentId, appointmentId }: { studentI
   const guidanceNow = useGuidanceNow();
   const source = useQuery({ queryKey: [...root(actor, role), 'detail', appointmentId], enabled: !!actor && !!appointmentId,
     gcTime: 0, queryFn: () => appointmentApi.detail(appointmentId!) });
-  const [search, setSearch] = useState('');
-  const [timezone, setTimezone] = useState('');
+  const [manualTimezone, setManualTimezone] = useState<string | null>(null);
+  const [tzExpanded, setTzExpanded] = useState(false);
+  const timezone = manualTimezone ?? (appointmentId
+    ? resolveExistingRecordTimezone(source.data?.timezone)
+    : resolveNewRecordDefaultTimezone());
   const [localStart, setLocalStart] = useState('');
   const [localEnd, setLocalEnd] = useState('');
   const [startUtcOffset, setStartUtcOffset] = useState('');
@@ -179,7 +184,6 @@ export function AppointmentCreateScreen({ studentId, appointmentId }: { studentI
   const [stale, setStale] = useState(false);
   const starts = useMemo(() => validProposalOffsets(timezone, localStart), [timezone, localStart]);
   const ends = useMemo(() => validProposalOffsets(timezone, localEnd), [timezone, localEnd]);
-  const zones = useMemo(() => search.trim().length < 2 ? [] : proposalTimezones(search), [search]);
   const start = starts.find(item => item.offset === startUtcOffset);
   const end = ends.find(item => item.offset === endUtcOffset);
   const valid = !!start && !!end && end.instant > start.instant && guidanceNow > 0 && start.instant > guidanceNow;
@@ -205,10 +209,22 @@ export function AppointmentCreateScreen({ studentId, appointmentId }: { studentI
     {appointmentId && source.isPending ? <CoachingState busy title="Đang tải lịch hẹn hiện tại" message="Vui lòng chờ." /> : null}
     {appointmentId && source.isError ? <CoachingState title="Không thể tải lịch hiện tại" message={message(source.error)} onRetry={() => source.refetch()} /> : null}
     {source.data ? <CoachingCard><Text style={[styles.body, { color: theme.textPrimary }]}>Lịch hiện tại: {localText(source.data)}</Text></CoachingCard> : null}
-    <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn rõ múi giờ IANA và UTC offset. Không lấy múi giờ thiết bị; người còn lại sẽ xác nhận toàn bộ yêu cầu.</Text>
-    <TextInput accessibilityLabel="Tìm múi giờ IANA" value={search} onChangeText={setSearch} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-    {zones.map(zone => <CoachingButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); setStartUtcOffset(''); setEndUtcOffset(''); reset(); }} />)}
-    <Text style={[styles.label, { color: theme.textPrimary }]}>Múi giờ: {timezone || 'Chưa chọn'}</Text>
+    <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn ngày giờ và xác nhận UTC offset phù hợp; người còn lại sẽ xác nhận toàn bộ yêu cầu.</Text>
+    <TimezoneContextPicker
+      testIDPrefix="appointment-timezone"
+      label="Khung giờ áp dụng"
+      value={timezone}
+      expanded={tzExpanded}
+      onToggleExpanded={() => setTzExpanded(v => !v)}
+      extraTimezones={[source.data?.timezone, user?.timezone]}
+      onChange={nextZone => {
+        setManualTimezone(nextZone);
+        setStartUtcOffset('');
+        setEndUtcOffset('');
+        reset();
+        setTzExpanded(false);
+      }}
+    />
     <LocalDateTimeInputField
       label="Bắt đầu"
       value={localStart}

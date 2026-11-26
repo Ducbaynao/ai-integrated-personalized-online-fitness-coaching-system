@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 import type { WorkoutScheduleChangeProposalStatus } from '@/types/workoutScheduleChangeProposal';
 import { changeProposalErrorMessage, changeTypeLabels, formatChangeTime, studentChangeProposalStatusLabels } from './changeProposalPresentation';
@@ -59,7 +60,7 @@ export function StudentChangeProposalsScreen() {
       <Text style={[styles.label, { color: theme.textPrimary }]}>{changeTypeLabels[proposal.changeType]} · {studentChangeProposalStatusLabels[proposal.status]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Từ: {proposal.trainerDisplayName?.trim() || 'Huấn luyện viên chưa có tên hiển thị'}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hiện tại: {formatChangeTime(proposal.oldPlannedStartAt, proposal.oldTimezone)}</Text>
-      {proposal.destination ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ đề xuất: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset} · {proposal.destination.timezone}</Text> : null}
+      {proposal.destination ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ đề xuất: {proposal.destination.localStart.replace('T', ' ')} UTC{proposal.destination.startUtcOffset} · {formatTimezoneDisplay(proposal.destination.timezone)}</Text> : null}
       <WorkoutButton testID={`student-open-change-proposal-${proposal.proposalId}`} label="Xem chi tiết đề xuất"
         onPress={() => router.push(`/workout-change-proposals/${proposal.proposalId}` as never)} />
     </WorkoutCard>) : null}

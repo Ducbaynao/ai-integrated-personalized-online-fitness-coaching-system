@@ -1,4 +1,5 @@
 import type { PlannedWorkoutStatus } from '@/types/workoutSchedule';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 
 const DAY = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 30;
@@ -17,7 +18,7 @@ export function formatScheduleTime(instant: string, timezone: string | null, pro
   const preferred = timezone || profileTimezone || 'UTC';
   try {
     const value = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: preferred }).format(new Date(instant));
-    return `${value} · ${preferred}${timezone ? '' : profileTimezone ? ' (múi giờ hồ sơ)' : ' (không có múi giờ hồ sơ)'}`;
+    return `${value} · ${formatTimezoneDisplay(preferred, 'Chưa có múi giờ', instant)}${timezone ? '' : profileTimezone ? ' (múi giờ hồ sơ)' : ' (không có múi giờ hồ sơ)'}`;
   } catch {
     const value = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(instant));
     return `${value} · UTC (không xác định được múi giờ)`;

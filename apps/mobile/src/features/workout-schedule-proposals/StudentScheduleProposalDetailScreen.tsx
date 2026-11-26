@@ -8,6 +8,7 @@ import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalAp
 import { workoutScheduleQueryKeys } from '@/features/workout-schedule/workoutScheduleQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 import type { DecideWorkoutScheduleProposalRequest, WorkoutScheduleDecision } from '@/types/workoutScheduleProposal';
 import { formatProposalInstant, formatProposalLocal, proposalErrorMessage, proposalStatusLabels } from './proposalPresentation';
@@ -98,7 +99,7 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
         <Text style={[styles.body, { color: theme.textSecondary }]}>Huấn luyện viên đề xuất: {proposal.trainerDisplayName?.trim() || 'Chưa có tên huấn luyện viên'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch nguồn: {proposal.sourcePlanName?.trim() || 'Chưa có tên kế hoạch'}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản nguồn: {proposal.sourcePlanVersionNumber}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Tuần bắt đầu: {proposal.weekAnchorDate} · Múi giờ: {proposal.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Tuần bắt đầu: {proposal.weekAnchorDate} · Khung giờ: {formatTimezoneDisplay(proposal.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất lúc: {formatProposalInstant(proposal.proposedAt, user?.timezone || 'UTC')}</Text>
         {proposal.decidedAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đã quyết định lúc: {formatProposalInstant(proposal.decidedAt, user?.timezone || 'UTC')}</Text> : null}
         {proposal.decisionNote ? <Text style={[styles.body, { color: theme.textSecondary }]}>Ghi chú quyết định: {proposal.decisionNote}</Text> : null}
@@ -125,7 +126,7 @@ export function StudentScheduleProposalDetailScreen({ proposalId }: { proposalId
       {confirmation && proposal.status === 'PENDING' ? <WorkoutCard testID="proposal-confirmation">
         <Text accessibilityRole="alert" style={[styles.h2, { color: theme.textPrimary }]}>{confirmation === 'ACCEPT' ? 'Xác nhận chấp nhận toàn bộ lịch?' : 'Xác nhận từ chối toàn bộ đề xuất?'}</Text>
         {confirmation === 'ACCEPT' ? <>
-          <Text style={[styles.body, { color: theme.textPrimary }]}>Múi giờ huấn luyện viên đã chọn cho đề xuất: {proposal.timezone}. Đây không phải múi giờ hồ sơ của bạn.</Text>
+          <Text style={[styles.body, { color: theme.textPrimary }]}>Khung giờ huấn luyện viên đã chọn cho đề xuất: {formatTimezoneDisplay(proposal.timezone)}. Đây không phải khung giờ mặc định tự áp từ hồ sơ của bạn.</Text>
           {proposal.items.map((item) => <Text key={item.clientItemId} style={[styles.body, { color: theme.textPrimary }]}>{item.sourceSessionName?.trim() || `Buổi ${item.sequenceNumber}`}: {formatProposalLocal(item.localStart, item.startUtcOffset, proposal.timezone)} → {formatProposalLocal(item.localEnd, item.endUtcOffset, proposal.timezone)}{item.appointmentId ? ' · Yêu cầu lịch hẹn đã chọn còn được xác nhận' : ''}</Text>)}
         </> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{confirmation === 'ACCEPT'
