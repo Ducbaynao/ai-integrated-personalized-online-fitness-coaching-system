@@ -44,4 +44,4 @@ If a request conflicts with these rules, explain the conflict and request a prod
 
 ## Visual direction
 
-Follow `../../../docs/06-ui-ux/references/superfit-reference.md`: DM Sans, purple brand, light canvas, rounded cards, generous spacing, and clear metric cards. Do not copy template branding, images, wording, navigation, or simplified goal model.
+Follow `../../../docs/06-ui-ux/references/superfit-reference.md`: Be Vietnam Pro (replaces the reference DM Sans, which lacks Vietnamese glyphs), purple brand, light canvas, rounded cards, generous spacing, and clear metric cards. Do not copy template branding, images, wording, navigation, or simplified goal model.

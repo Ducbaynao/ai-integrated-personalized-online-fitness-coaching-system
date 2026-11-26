@@ -1,8 +1,15 @@
+/**
+ * App font families. Each value is the name a font file is registered under in
+ * `appFontAssets` (see `src/design-system/fonts.ts`), one file per weight.
+ *
+ * Be Vietnam Pro replaces DM Sans (P7-012): DM Sans ships only latin/latin-ext and
+ * has no glyphs for ơ, ư or the Latin Extended Additional tone-mark letters.
+ */
 export const fontFamily = {
-  regular: 'DMSans_400Regular',
-  medium: 'DMSans_500Medium',
-  semiBold: 'DMSans_600SemiBold',
-  bold: 'DMSans_700Bold',
+  regular: 'BeVietnamPro_400Regular',
+  medium: 'BeVietnamPro_500Medium',
+  semiBold: 'BeVietnamPro_600SemiBold',
+  bold: 'BeVietnamPro_700Bold',
 } as const;
 
 export const typography = {

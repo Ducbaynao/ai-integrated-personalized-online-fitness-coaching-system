@@ -27,7 +27,9 @@ Không dùng đỏ cho AI recommendation. Đỏ chỉ dành cho error, dangerous
 
 ## Typography
 
-Font chính: **DM Sans**. Fallback: `system-ui`, `sans-serif`.
+Font chính: **Be Vietnam Pro** (Google Fonts, SIL OFL 1.1, qua `@expo-google-fonts/be-vietnam-pro`). Mỗi weight dùng một file riêng: 400 Regular, 500 Medium, 600 SemiBold, 700 Bold; token code ở `apps/mobile/src/design-system/tokens/typography.ts`. Fallback: `system-ui`, `sans-serif`.
+
+P7-012: Be Vietnam Pro thay DM Sans vì DM Sans chỉ có subset `latin`/`latin-ext`, thiếu `ơ`, `ư` và các chữ có dấu thanh thuộc Latin Extended Additional (ví dụ `ạ ả ế ộ ự`), nên các ký tự đó bị thay bằng glyph của font hệ thống. Xem [handoff P7-012](../07-development/p7-012-vietnamese-fonts-handoff.md).
 
 | Style | Size/Line | Weight | Dùng cho |
 |---|---|---|---|
