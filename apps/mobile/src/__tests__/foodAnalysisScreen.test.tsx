@@ -451,10 +451,12 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
     });
 
     const dayInput = tree.root.findByProps({ testID: 'food-analysis-day-input-trigger' });
-    const tzInput = tree.root.findByProps({ accessibilityLabel: 'Múi giờ IANA' });
+    const tzDisplay = tree.root.findByProps({ testID: 'food-analysis-timezone-display' });
     const timeInput = tree.root.findByProps({ accessibilityLabel: 'Giờ ăn địa phương (HH:mm)' });
 
-    expect(tzInput.props.value).toBe('America/New_York');
+    expect(JSON.stringify(tzDisplay.props.children)).toContain('Giờ Miền Đông Hoa Kỳ (New York)');
+    expect(JSON.stringify(tzDisplay.props.children)).not.toContain('America/New_York');
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Múi giờ IANA' })).toHaveLength(0);
     expect(dayInput.props.accessibilityValue.text).toBe('23/11/2026'); // Formatted in America/New_York, NOT local device/user timezone
     expect(timeInput.props.value).toBe('21:30'); // Formatted in America/New_York (21:30), NOT Asia/Ho_Chi_Minh (09:30)
 
@@ -1452,6 +1454,39 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
     expect(jsonAfterRound2).toContain('receipt-round-2');
     expect(jsonAfterRound2).toContain('Lượt 1');
     expect(jsonAfterRound2).toContain('Lượt 2');
+    renderer.act(() => tree.unmount());
+  });
+  it('R3 retained new Preview/Confirm handlers are inert after the meal day changes; saved Confirm retry stays exact', async () => {
+    (foodTextAnalysisApi.preview as jest.Mock).mockResolvedValue(mockPreview);
+    (foodTextAnalysisApi.confirm as jest.Mock).mockRejectedValueOnce(new FoodTextAnalysisTimeoutError());
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<FoodAnalysisScreen />); });
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn món Phở bò' }).props.onPress());
+    await renderer.act(async () => { press(tree, 'Xem trước dinh dưỡng'); });
+    expect(foodTextAnalysisApi.preview).toHaveBeenCalledTimes(1);
+    const findAction = (label: string) => tree.root.findAll((node) => node.props.accessibilityRole === 'button'
+      && node.props.accessibilityLabel === label && typeof node.props.onPress === 'function')[0];
+    const retainedPreview = findAction('Xem trước dinh dưỡng').props.onPress;
+    const retainedConfirm = findAction('Xác nhận ghi vào nhật ký').props.onPress;
+
+    const dayField = tree.root.findAll((node) => node.props.testID === 'food-analysis-day-input'
+      && typeof node.props.onChange === 'function')[0];
+    renderer.act(() => dayField.props.onChange('2026-11-25'));
+    await renderer.act(async () => { retainedConfirm(); });
+    await renderer.act(async () => { retainedPreview(); });
+    expect(foodTextAnalysisApi.confirm).not.toHaveBeenCalled();
+    expect(foodTextAnalysisApi.preview).toHaveBeenCalledTimes(1);
+    renderer.act(() => tree.unmount());
+
+    // A saved intent (unknown outcome) still replays its own key/body exactly.
+    renderer.act(() => { tree = renderer.create(<FoodAnalysisScreen />); });
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn món Phở bò' }).props.onPress());
+    await renderer.act(async () => { press(tree, 'Xem trước dinh dưỡng'); });
+    await renderer.act(async () => { press(tree, 'Xác nhận ghi vào nhật ký'); });
+    (foodTextAnalysisApi.confirm as jest.Mock).mockResolvedValueOnce(mockReceipt);
+    await renderer.act(async () => { press(tree, 'Gửi lại xác nhận (thử lại an toàn)'); });
+    expect(foodTextAnalysisApi.confirm).toHaveBeenCalledTimes(2);
+    expect((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[1]).toEqual((foodTextAnalysisApi.confirm as jest.Mock).mock.calls[0]);
     renderer.act(() => tree.unmount());
   });
 });

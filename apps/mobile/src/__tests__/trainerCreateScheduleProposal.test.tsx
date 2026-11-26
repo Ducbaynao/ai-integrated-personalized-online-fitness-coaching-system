@@ -65,8 +65,7 @@ async function fillValid(tree: renderer.ReactTestRenderer) {
   const monday = moment.utc().add(7, 'days').startOf('isoWeek').format('YYYY-MM-DD');
   const localStart = `${monday}T18:30`;
   const localEnd = `${monday}T19:30`;
-  input(tree, 'timezone-search', 'Ho_Chi_Minh');
-  await renderer.act(async () => { tree.root.findByProps({ accessibilityLabel: 'Asia/Ho_Chi_Minh' }).props.onPress(); });
+  expect(JSON.stringify(tree.root.findByProps({ testID: 'proposal-timezone-display' }).props.children)).toContain('Giờ Việt Nam');
   pickDate(tree, 'week-anchor-trigger', monday);
   await press(tree, 'select-session-session-1');
   pickDate(tree, 'start-session-1-date-trigger', monday);

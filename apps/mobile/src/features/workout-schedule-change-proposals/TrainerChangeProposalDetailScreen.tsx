@@ -6,6 +6,7 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleChangeProposalApi } from '@/services/workoutScheduleChangeProposalApi';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 import type { WithdrawWorkoutScheduleChangeProposalRequest } from '@/types/workoutScheduleChangeProposal';
 import { changeProposalErrorMessage, changeProposalStatusLabels, changeTypeLabels, formatChangeTime } from './changeProposalPresentation';
@@ -91,7 +92,7 @@ export function TrainerChangeProposalDetailScreen({ relationshipId, proposalId }
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Giờ mới được đề xuất</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu: {proposal.destination.localStart} UTC{proposal.destination.startUtcOffset}</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Kết thúc: {proposal.destination.localEnd} UTC{proposal.destination.endUtcOffset}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Múi giờ IANA: {proposal.destination.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Khung giờ áp dụng: {formatTimezoneDisplay(proposal.destination.timezone)}</Text>
       </WorkoutCard> : null}
       {proposal.status === 'PENDING' ? <WorkoutCard>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất chưa đổi occurrence. Chỉ Học viên có thể chấp nhận hoặc từ chối.</Text>

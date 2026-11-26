@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
+import { ScrollView, Text, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { useCurrentWorkoutPlan, useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
-import { proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
 import { suggestedSessionDate } from '@/features/workout-schedule/directBatchValidation';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
+import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
+import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutRecurrenceApi } from '@/services/workoutRecurrenceApi';
 import { ApiError } from '@/types/auth';
@@ -68,8 +69,8 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
   const published = sourceReady && version?.id === versionId && version.current
     && !!version.lockedAt && version.effectiveUntil === null;
   const [anchor, setAnchor] = useState('');
-  const [timezoneSearch, setTimezoneSearch] = useState('');
-  const [timezone, setTimezone] = useState('');
+  const [timezone, setTimezone] = useState(() => resolveNewRecordDefaultTimezone());
+  const [tzExpanded, setTzExpanded] = useState(false);
   const [entries, setEntries] = useState<RecurrenceEntry[]>([]);
   const [review, setReview] = useState(false);
   const [pending, setPending] = useState<RecurrenceCreate | null>(null);
@@ -77,7 +78,6 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
   const [concealed, setConcealed] = useState(false);
   const submitting = useRef(false);
   const preview = useMemo(() => recurrencePreview(anchor, timezone, entries), [anchor, timezone, entries]);
-  const zones = useMemo(() => proposalTimezones(timezoneSearch), [timezoneSearch]);
   const denied = versionQuery.error instanceof ApiError && [403, 404].includes(versionQuery.error.status);
   useEffect(() => {
     if (!denied || !studentId) return;
@@ -152,10 +152,14 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
           sessionKey={`${planId}:${versionId}:${relationshipId ?? ''}`}
           accessibilityLabel="Thứ Hai bắt đầu series"
         />
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Tìm múi giờ IANA</Text>
-        <TextInput testID="series-timezone-search" accessibilityLabel="Tìm múi giờ IANA" value={timezoneSearch} onChangeText={setTimezoneSearch} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-        <Text style={[styles.body, { color: theme.textPrimary }]}>Múi giờ đã chọn: {timezone || 'Chưa chọn'}</Text>
-        <View style={styles.row}>{zones.slice(0, 12).map(zone => <WorkoutButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); reset(); }} />)}</View>
+        <TimezoneContextPicker
+          testIDPrefix="series-timezone"
+          label="Khung giờ áp dụng"
+          value={timezone}
+          expanded={tzExpanded}
+          onToggleExpanded={() => setTzExpanded(v => !v)}
+          onChange={nextZone => { setTimezone(nextZone); setTzExpanded(false); reset(); }}
+        />
       </WorkoutCard>
       {sessions.map(session => <WorkoutCard key={session.id} testID={`series-session-${session.id}`}>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{session.name} · Tuần {session.weekNumber}, ngày {session.dayNumber}, thứ tự {session.sequenceNumber}</Text>
@@ -192,7 +196,7 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
       {preview.error ? <WorkoutState title="Cần kiểm tra biểu mẫu" message={preview.error} /> : null}
       {!review ? <WorkoutButton testID="series-preview" label="Xem trước toàn series" disabled={!!preview.error} onPress={() => setReview(true)} /> : <WorkoutCard testID="series-preview-card">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận toàn series</Text>
-        <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu {anchor} · {timezone} · {entries.length} buổi được chọn. {relationshipId ? 'Chỉ tạo đề xuất đang chờ; Học viên quyết định sau.' : 'Chỉ các kỳ hợp lệ trong cửa sổ 30 ngày mới được tạo.'}</Text>
+        <Text style={[styles.body, { color: theme.textPrimary }]}>Bắt đầu {anchor} · {formatTimezoneDisplay(timezone)} · {entries.length} buổi được chọn. {relationshipId ? 'Chỉ tạo đề xuất đang chờ; Học viên quyết định sau.' : 'Chỉ các kỳ hợp lệ trong cửa sổ 30 ngày mới được tạo.'}</Text>
         {entries.map(entry => <Text key={entry.session.id} style={[styles.body, { color: theme.textSecondary }]}>{entry.session.name}: {entry.firstLocalStart} → {entry.firstLocalEnd}</Text>)}
         {preview.warnings.map(warning => <Text key={warning} style={[styles.body, { color: theme.warningText }]}>{warning}</Text>)}
         <View style={styles.row}><WorkoutButton label="Sửa lại" secondary onPress={() => { setReview(false); setPending(null); }} />

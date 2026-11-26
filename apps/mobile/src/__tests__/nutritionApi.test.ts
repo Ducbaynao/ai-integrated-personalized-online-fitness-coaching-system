@@ -25,6 +25,17 @@ describe('B07 basic nutrition contract', () => {
     expect(request).toHaveBeenNthCalledWith(2, '/nutrition/days/2026-10-13/items', { method: 'POST', body: item });
   });
 
+  it('forwards an optional live-scope guard to the request runner only when a caller supplies it', async () => {
+    const item = { timezone: 'Asia/Ho_Chi_Minh', consumedAt: '2026-10-13T12:00:00Z', mealType: 'OTHER' as const,
+      description: 'Phở', privateFoodId: null, servings: null, commandKey: 'item-command' };
+    const shouldContinue = jest.fn(() => true);
+    await nutritionApi.addItem('2026-10-13', item, { shouldContinue });
+    expect(request).toHaveBeenLastCalledWith('/nutrition/days/2026-10-13/items', { method: 'POST', body: item, shouldContinue });
+    await nutritionApi.addItem('2026-10-13', item);
+    expect(request).toHaveBeenLastCalledWith('/nutrition/days/2026-10-13/items', { method: 'POST', body: item });
+    expect(shouldContinue).not.toHaveBeenCalled();
+  });
+
   it('sends an explicit zero and expected version when reconciling a draft food', async () => {
     const update = { name: 'Món riêng', servingLabel: 'chén', energyKcal: null, proteinG: 0,
       carbohydrateG: null, fatG: null, expectedVersion: 2, commandKey: 'reconcile-command' };

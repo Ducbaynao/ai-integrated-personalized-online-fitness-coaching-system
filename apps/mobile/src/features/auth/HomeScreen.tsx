@@ -16,6 +16,7 @@ import { colors, getSemanticColors, semanticColors } from '@/design-system/token
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
+import { DEFAULT_APP_TIMEZONE, formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 
 const ACCOUNT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Đang hoạt động',
@@ -106,12 +107,14 @@ export function HomeScreen() {
             </Text>
           </View>
 
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Múi giờ</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.timezone ?? 'Asia/Ho_Chi_Minh'}
-            </Text>
-          </View>
+          {user?.timezone && user.timezone !== DEFAULT_APP_TIMEZONE ? (
+            <View style={styles.row}>
+              <Text style={[styles.label, { color: subtextColor }]}>Múi giờ tài khoản</Text>
+              <Text style={[styles.value, { color: textColor }]}>
+                {formatTimezoneDisplay(user.timezone)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Capabilities Card */}

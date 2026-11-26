@@ -20,7 +20,7 @@ export function suggestedSessionDate(anchor: string, session: WorkoutSession): s
 
 export function validateDirectBatch(anchor: string, timezone: string, entries: DirectBatchEntry[], now?: number): string | null {
   if (!timezone || !isMonday(anchor) || entries.length === 0)
-    return 'Chọn múi giờ IANA, ngày thứ Hai đầu tuần và ít nhất một buổi tập.';
+    return 'Chọn khung giờ, ngày thứ Hai đầu tuần và ít nhất một buổi tập.';
   const sessions = new Set<string>();
   const intervals: { from: number; until: number }[] = [];
   for (const entry of entries) {

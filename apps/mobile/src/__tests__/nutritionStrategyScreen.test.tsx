@@ -74,7 +74,6 @@ describe('B07 nutrition strategy Mobile', () => {
     renderer.act(() => { tree = renderer.create(<NutritionStrategyScreen />); });
     type(tree, 'Tên mục tiêu', 'Cân bằng');
     chooseRadio(tree, 'Cân bằng');
-    type(tree, 'Múi giờ IANA của lịch chỉ tiêu', 'Asia/Ho_Chi_Minh');
     pickDate(tree, 'strategy-effective-from-input-trigger', '2026-10-17');
     type(tree, 'Energy · Ngày mặc định (kcal)', '1800');
     renderer.act(() => press(tree, 'Xem trước toàn bộ mục tiêu'));
@@ -82,9 +81,9 @@ describe('B07 nutrition strategy Mobile', () => {
     await renderer.act(async () => { press(tree, 'Xác nhận và áp dụng'); });
     expect(nutritionApi.changeStrategy).toHaveBeenCalledWith(expect.objectContaining({ confirmed: true,
       goalTypeId: 12, timezone: 'Asia/Ho_Chi_Minh', commandKey: 'stable-key',
-      targets: [{ nutrientId: 41, unitId: 93, dayType: 'DEFAULT', targetAmount: 1800 }] }));
+      targets: [{ nutrientId: 41, unitId: 93, dayType: 'DEFAULT', targetAmount: 1800 }] }), expect.objectContaining({ shouldContinue: expect.any(Function) }));
     await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
-    expect((nutritionApi.changeStrategy as jest.Mock).mock.calls[1]).toEqual((nutritionApi.changeStrategy as jest.Mock).mock.calls[0]);
+    expect((nutritionApi.changeStrategy as jest.Mock).mock.calls[1].slice(0, -1)).toEqual((nutritionApi.changeStrategy as jest.Mock).mock.calls[0].slice(0, -1));
     renderer.act(() => tree.unmount());
   }, 15000);
 
@@ -108,7 +107,7 @@ describe('B07 nutrition strategy Mobile', () => {
     await renderer.act(async () => { press(tree, 'Xác nhận quyết định'); });
     expect(nutritionApi.decideStrategy).toHaveBeenCalledWith('proposal-id', {
       decision: 'ACCEPT', expectedProposalVersion: 2, commandKey: 'stable-key',
-    });
+    }, expect.objectContaining({ shouldContinue: expect.any(Function) }));
     expect(tree.root.findAll((node) => node.props.label === 'Thử lại cùng lệnh')).toHaveLength(0);
     expect(refresh).toHaveBeenCalled();
     renderer.act(() => tree.unmount());
@@ -141,10 +140,10 @@ describe('B07 nutrition strategy Mobile', () => {
     await renderer.act(async () => { press(tree, 'Xác nhận điều chỉnh'); });
     expect(nutritionApi.correctFrozenTarget).toHaveBeenCalledWith('2026-10-16',
       expect.objectContaining({ nutrientId: 41, targetAmount: 1700, expectedVersion: 1,
-        reason: 'Đánh giá lại', commandKey: 'stable-key' }));
+        reason: 'Đánh giá lại', commandKey: 'stable-key' }), expect.objectContaining({ shouldContinue: expect.any(Function) }));
     await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
-    expect((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[1])
-      .toEqual((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[0]);
+    expect((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[1].slice(0, -1))
+      .toEqual((nutritionApi.correctFrozenTarget as jest.Mock).mock.calls[0].slice(0, -1));
     renderer.act(() => tree.unmount());
   });
 });

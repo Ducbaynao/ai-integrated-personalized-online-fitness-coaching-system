@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import moment from 'moment-timezone';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
@@ -11,6 +11,8 @@ import { attentionReviewApi, AttentionPage, AttentionSignal, CompleteReviewBody,
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
+import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 
 type Pending =
   | { kind: 'timezone'; timezone: string; key: string }
@@ -36,7 +38,7 @@ function message(error: unknown) {
   return 'Không thể tải hoặc lưu dữ liệu. Vui lòng thử lại.';
 }
 function localDate(value: string, zone: string) {
-  return `${moment.tz(value, zone).format('DD/MM/YYYY HH:mm')} · ${zone}`;
+  return `${moment.tz(value, zone).format('DD/MM/YYYY HH:mm')} · ${formatTimezoneDisplay(zone, 'Chưa có múi giờ', value)}`;
 }
 
 export function AttentionReviewScreen({ relationshipId }: { relationshipId?: string }) {
@@ -55,8 +57,6 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const cache = useQueryClient();
   const router = useRouter();
   const theme = getSemanticColors(useColorScheme() === 'dark');
-  const [zoneSearch, setZoneSearch] = useState('');
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
   const [evidenceText, setEvidenceText] = useState('');
   const [missingText, setMissingText] = useState('');
@@ -64,12 +64,20 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
   const [deniedReturnScope, setDeniedReturnScope] = useState<string | null>(null);
   const scopeId = scope.join(':');
+  const [trackedScopeId, setTrackedScopeId] = useState(scopeId);
+  const [selectedReviewZone, setSelectedReviewZone] = useState(() => resolveNewRecordDefaultTimezone());
+  const [pickerExpanded, setPickerExpanded] = useState(false);
   const returnBlocked = trainer && deniedReturnScope === scopeId;
   const [pending, setPending] = useState<Pending | null>(null);
-  const zones = useMemo(() => zoneSearch.trim().length < 2 ? [] : moment.tz.names()
-    .filter(name => name.toLocaleLowerCase().includes(zoneSearch.trim().toLocaleLowerCase())).slice(0, 15), [zoneSearch]);
+  if (trackedScopeId !== scopeId) {
+    setTrackedScopeId(scopeId);
+    setSelectedReviewZone(resolveNewRecordDefaultTimezone());
+    setPickerExpanded(false);
+    setPending(null);
+  }
   const timezone = useQuery({ queryKey: [...scope, 'timezone'], enabled: ready && !trainer,
     gcTime: 0, queryFn: attentionReviewApi.timezone });
+  const targetReviewZone = selectedReviewZone;
   const reviews = useInfiniteQuery({ queryKey: [...scope, 'reviews'], enabled: ready,
     gcTime: 0, initialPageParam: 0,
     queryFn: ({ pageParam }) => attentionReviewApi.reviews(pageParam, trainer ? studentId : undefined),
@@ -150,19 +158,22 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
         {timezone.isPending ? <CoachingState busy title="Đang tải múi giờ" message="Vui lòng chờ." /> : null}
         {timezone.isError ? <CoachingState title="Không thể tải múi giờ" message={message(timezone.error)} onRetry={() => timezone.refetch()} /> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{timezone.data
-          ? `Đã xác nhận: ${timezone.data.timezone}`
+          ? `Đã xác nhận: ${formatTimezoneDisplay(timezone.data.timezone)}`
           : 'Chưa xác nhận. Múi giờ tài khoản hoặc thiết bị không được dùng ngầm cho chu kỳ đánh giá.'}</Text>
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Tìm IANA timezone để xác nhận</Text>
-        <TextInput testID="review-timezone-search" accessibilityLabel="Tìm IANA timezone" value={zoneSearch}
-          onChangeText={text => { setZoneSearch(text); setSelectedZone(null); }}
-          style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-        {zones.map(zone => <Pressable key={zone} accessibilityRole="button" accessibilityLabel={`Chọn ${zone}`}
-          onPress={() => setSelectedZone(zone)} style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text style={[styles.body, { color: selectedZone === zone ? theme.primary : theme.textPrimary }]}>{zone}</Text>
-        </Pressable>)}
-        {selectedZone ? <Text style={[styles.body, { color: theme.textPrimary }]}>Sẽ xác nhận: {selectedZone}</Text> : null}
-        <CoachingButton label="Xác nhận múi giờ" disabled={!selectedZone || mutation.isPending}
-          onPress={() => selectedZone && run({ kind: 'timezone', timezone: selectedZone, key: createCommandKey() })} />
+        <Text testID="review-timezone-target" style={[styles.body, { color: theme.textPrimary }]}>
+          Khung giờ xác nhận: {formatTimezoneDisplay(targetReviewZone)}
+        </Text>
+        <TimezoneContextPicker
+          testIDPrefix="review-timezone"
+          label="Khung giờ muốn xác nhận"
+          value={targetReviewZone}
+          expanded={pickerExpanded}
+          onToggleExpanded={() => setPickerExpanded(v => !v)}
+          extraTimezones={[timezone.data?.timezone, user?.timezone]}
+          onChange={zone => { setSelectedReviewZone(zone); setPickerExpanded(false); }}
+        />
+        <CoachingButton label="Xác nhận múi giờ" disabled={mutation.isPending}
+          onPress={() => run({ kind: 'timezone', timezone: targetReviewZone, key: createCommandKey() })} />
       </CoachingCard> : null}
       {canView ? <>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Chu kỳ đánh giá</Text>
@@ -172,7 +183,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           ? <CoachingState title="Chưa có nhiệm vụ đánh giá" message="Nhiệm vụ cần kỳ huấn luyện con người và múi giờ đã được học viên xác nhận." /> : null}
         {reviewRows.map(task => <CoachingCard key={task.id} testID={`review-${task.id}`}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{labelStatus[task.status]}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Chu kỳ {task.cycleStartDate} · hạn {task.dueDate} · {task.timezone}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Chu kỳ {task.cycleStartDate} · hạn {task.dueDate} · {formatTimezoneDisplay(task.timezone)}</Text>
           {task.summary ? <Text style={[styles.body, { color: theme.textPrimary }]}>Tóm tắt: {task.summary}</Text> : null}
           {task.evidenceRefs.length ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bằng chứng buổi tập: {task.evidenceRefs.length} mục</Text> : null}
           {task.missingData.length ? <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu thiếu/không xác định: {task.missingData.join('; ')}</Text> : null}
@@ -215,7 +226,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Trở lại sau 100 ngày</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>{returnStatus.data.status === 'UNKNOWN'
             ? returnStatus.data.reason === 'TIMEZONE_UNCONFIRMED'
-              ? 'Chưa xác định: Học viên chưa xác nhận IANA timezone.'
+              ? 'Chưa xác định: Học viên chưa xác nhận múi giờ đánh giá.'
               : returnStatus.data.reason === 'COMPLETION_TIME_MISSING'
                 ? 'Chưa xác định: một buổi tập hoàn tất thiếu thời gian kết thúc.'
                 : 'Chưa xác định: chưa đủ hai buổi tập thực sự hoàn tất.'
@@ -223,7 +234,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
               ? 'Có hai buổi tập hoàn tất cách nhau ít nhất 100 ngày lịch. Xem tín hiệu và bằng chứng bên dưới.'
               : 'Đã đủ dữ liệu, chưa có hai buổi tập hoàn tất cách nhau 100 ngày lịch.'}</Text>
           {returnStatus.data.timezone ? <Text style={[styles.body, { color: theme.textSecondary }]}>
-            Múi giờ đã xác nhận: {returnStatus.data.timezone}
+            Múi giờ đã xác nhận: {formatTimezoneDisplay(returnStatus.data.timezone)}
           </Text> : null}
         </CoachingCard> : null}
         {signals.isPending ? <CoachingState busy title="Đang tải tín hiệu" message="Vui lòng chờ." /> : null}
@@ -239,7 +250,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           {signal.reviewTaskId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: nhiệm vụ đánh giá</Text> : null}
           {signal.returnEvidence ? <Text style={[styles.body, { color: theme.textSecondary }]}>
             Hai buổi tập đã hoàn tất: {signal.returnEvidence.previousLocalDate} → {signal.returnEvidence.currentLocalDate}
-            {' · '}{signal.returnEvidence.calendarDays} ngày lịch · {signal.returnEvidence.timezone}.
+            {' · '}{signal.returnEvidence.calendarDays} ngày lịch · {formatTimezoneDisplay(signal.returnEvidence.timezone)}.
             Đây là tín hiệu để xem lại, không tự đổi kế hoạch tập.
           </Text> : null}
           <CoachingButton label="Xem lịch sử xử lý" secondary onPress={() => setSelectedSignal(signal.id)} />

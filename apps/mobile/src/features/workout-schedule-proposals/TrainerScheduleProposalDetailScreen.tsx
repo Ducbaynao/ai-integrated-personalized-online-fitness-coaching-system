@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
@@ -86,7 +87,7 @@ export function TrainerScheduleProposalDetailScreen({ relationshipId, proposalId
       <WorkoutCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{proposal.sourcePlanName?.trim() || 'Chưa có tên kế hoạch'}</Text>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{trainerProposalStatusLabels[proposal.status]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {proposal.sourcePlanVersionNumber} · {proposal.items.length} buổi · {proposal.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {proposal.sourcePlanVersionNumber} · {proposal.items.length} buổi · {formatTimezoneDisplay(proposal.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Đề xuất lúc: {formatProposalInstant(proposal.proposedAt, user?.timezone || 'UTC')}</Text>
       </WorkoutCard>
       {proposal.items.map((item) => <WorkoutCard key={item.clientItemId}>

@@ -38,11 +38,9 @@ describe('B08 push settings screen', () => {
     expect(pushApi.set).not.toHaveBeenCalled();
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Bật thông báo đẩy Tin nhắn' }).props.onPress());
     expect(pushApi.set).not.toHaveBeenCalled();
-    renderer.act(() => {
-      tree.root.findByProps({ accessibilityLabel: 'Tìm múi giờ IANA' }).props.onChangeText('Ho_Chi_Minh');
-    });
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Asia/Ho_Chi_Minh' }).props.onPress());
-    expect(tree.root.findByProps({ accessibilityLabel: 'Asia/Ho_Chi_Minh' })).toBeDefined();
+    renderer.act(() => tree.root.findByProps({ testID: 'push-confirm-timezone-button' }).props.onPress());
+    expect(JSON.stringify(tree.toJSON())).toContain('Đã xác nhận Giờ Việt Nam');
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Tìm múi giờ IANA' })).toHaveLength(0);
     expect(pushApi.set).not.toHaveBeenCalled();
     await cache.cancelQueries();
     renderer.act(() => tree.unmount());

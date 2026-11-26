@@ -74,9 +74,9 @@ describe('B07 nutrition screens', () => {
     expect(nutritionApi.addItem).toHaveBeenCalledWith('2026-10-13', expect.objectContaining({
       timezone: 'Asia/Ho_Chi_Minh', privateFoodId: 'food-1', servings: 1.25, commandKey: 'same-key',
       consumedAt: '2026-10-13T12:00:00.000Z',
-    }));
+    }), expect.objectContaining({ shouldContinue: expect.any(Function) }));
     await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
-    expect((nutritionApi.addItem as jest.Mock).mock.calls[1]).toEqual((nutritionApi.addItem as jest.Mock).mock.calls[0]);
+    expect((nutritionApi.addItem as jest.Mock).mock.calls[1].slice(0, -1)).toEqual((nutritionApi.addItem as jest.Mock).mock.calls[0].slice(0, -1));
     renderer.act(() => tree.unmount());
   });
 
@@ -98,7 +98,7 @@ describe('B07 nutrition screens', () => {
     await renderer.act(async () => { press(tree, 'Lưu dinh dưỡng món nháp'); });
     expect(nutritionApi.updateFood).toHaveBeenCalledWith('draft-1', expect.objectContaining({
       expectedVersion: 2, energyKcal: null, proteinG: 0, commandKey: 'same-key',
-    }));
+    }), expect.objectContaining({ shouldContinue: expect.any(Function) }));
     renderer.act(() => tree.unmount());
   });
 
@@ -111,7 +111,7 @@ describe('B07 nutrition screens', () => {
     await renderer.act(async () => { press(tree, 'Xác nhận'); });
     expect(nutritionApi.confirm).toHaveBeenCalledWith('2026-10-13', {
       timezone: 'Asia/Ho_Chi_Minh', expectedDayVersion: 0, noIntakeConfirmed: true, commandKey: 'same-key',
-    });
+    }, expect.objectContaining({ shouldContinue: expect.any(Function) }));
     renderer.act(() => tree.unmount());
   });
 
@@ -158,10 +158,10 @@ describe('B07 nutrition screens', () => {
     expect(nutritionApi.addCatalogItem).toHaveBeenCalledWith('2026-10-13',
       expect.objectContaining({ catalogFoodId: 'catalog-food', expectedRevisionId: 'revision-id',
         portionId: 'portion-id', quantityBasis: 'SERVING', quantity: 1.25,
-        commandKey: 'same-key' }));
+        commandKey: 'same-key' }), expect.objectContaining({ shouldContinue: expect.any(Function) }));
     await renderer.act(async () => { press(tree, 'Thử lại cùng lệnh'); });
-    expect((nutritionApi.addCatalogItem as jest.Mock).mock.calls[1])
-      .toEqual((nutritionApi.addCatalogItem as jest.Mock).mock.calls[0]);
+    expect((nutritionApi.addCatalogItem as jest.Mock).mock.calls[1].slice(0, -1))
+      .toEqual((nutritionApi.addCatalogItem as jest.Mock).mock.calls[0].slice(0, -1));
     renderer.act(() => tree.unmount());
   });
 
@@ -172,7 +172,7 @@ describe('B07 nutrition screens', () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<TrainerNutritionScreen studentId="student-1" />); });
     pickDate(tree, 'trainer-nutrition-day-input-trigger', '2026-10-13');
-    input(tree, 'Múi giờ của ngày log', 'Asia/Ho_Chi_Minh');
+    expect(JSON.stringify(tree.toJSON())).toContain('Giờ Việt Nam');
     renderer.act(() => press(tree, 'Xem ngày'));
     expect(JSON.stringify(tree.toJSON())).not.toContain('Oats');
     expect(JSON.stringify(tree.toJSON())).not.toContain('Ghi món');

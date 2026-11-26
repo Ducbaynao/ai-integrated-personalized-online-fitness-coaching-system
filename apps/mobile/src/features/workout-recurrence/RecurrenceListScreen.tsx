@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/coachingQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 import type { RecurrenceSeries, RecurrenceStatus } from '@/types/workoutRecurrence';
 import { recurrenceKeys, useStudentSeries, useTrainerSeries } from './workoutRecurrenceQueries';
@@ -75,7 +76,7 @@ function RecurrenceList({ allowed, title, items, pending, error, hasNext, loadin
       {!pending && !error && visible.length === 0 ? <WorkoutState testID="recurrence-empty" title="Chưa có series" message="Khi có lịch lặp hoặc đề xuất, dữ liệu sẽ xuất hiện ở đây." /> : null}
       {!error && visible.map(item => <WorkoutCard key={item.seriesId} testID={`recurrence-${item.seriesId}`}>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{recurrenceStatus[item.status]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu {item.mondayAnchorDate} · {item.timezone}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu {item.mondayAnchorDate} · {formatTimezoneDisplay(item.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>{item.items.length} buổi được chọn · block {item.planWeeks} tuần · phiên bản nguồn {item.sourcePlanVersionNumber}</Text>
         <WorkoutButton label="Xem series và từng kỳ" onPress={() => open(item)} />
       </WorkoutCard>)}
