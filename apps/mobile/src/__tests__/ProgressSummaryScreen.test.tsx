@@ -96,14 +96,25 @@ describe('ProgressSummaryScreen', () => {
     const preset14 = tree.root.findByProps({ testID: 'preset-14-days' });
     expect(preset14).toBeDefined();
 
-    const fromDateInput = tree.root.findByProps({ testID: 'from-date-input' });
-    const toDateInput = tree.root.findByProps({ testID: 'to-date-input' });
-    expect(fromDateInput.props.value).toBeDefined();
-    expect(toDateInput.props.value).toBeDefined();
+    const fromDateInput = tree.root.findByProps({ testID: 'from-date-input-trigger' });
+    const toDateInput = tree.root.findByProps({ testID: 'to-date-input-trigger' });
+    expect(fromDateInput.props.accessibilityValue.text).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+    expect(toDateInput.props.accessibilityValue.text).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
 
     const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
     expect(generateBtn.props.accessibilityState.disabled).toBe(false);
   });
+
+  const pickDate = (root: renderer.ReactTestInstance, testID: string, isoDate: string) => {
+    const [yStr, mStr] = isoDate.split('-');
+    renderer.act(() => { root.findByProps({ testID }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress(); });
+    renderer.act(() => { root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress(); });
+  };
 
   it('validates date range and disables submit when fromDate is after toDate', async () => {
     let tree!: renderer.ReactTestRenderer;
@@ -111,13 +122,8 @@ describe('ProgressSummaryScreen', () => {
       tree = renderer.create(<ProgressSummaryScreen />);
     });
 
-    const fromDateInput = tree.root.findByProps({ testID: 'from-date-input' });
-    const toDateInput = tree.root.findByProps({ testID: 'to-date-input' });
-
-    await renderer.act(async () => {
-      fromDateInput.props.onChangeText('2026-11-10');
-      toDateInput.props.onChangeText('2026-11-01');
-    });
+    pickDate(tree.root, 'from-date-input-trigger', '2026-11-10');
+    pickDate(tree.root, 'to-date-input-trigger', '2026-11-01');
 
     const errorText = tree.root.findByProps({ testID: 'validation-error-text' });
     expect(errorText.props.children).toBe('Ngày bắt đầu không được sau ngày kết thúc.');
@@ -126,23 +132,23 @@ describe('ProgressSummaryScreen', () => {
     expect(generateBtn.props.accessibilityState.disabled).toBe(true);
   });
 
-  it('validates non-existent calendar dates strictly (e.g. Feb 30)', async () => {
+  it('prevents non-existent calendar dates (e.g. Feb 29/30 in non-leap 2026) and supports leap year 2024-02-29', async () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => {
       tree = renderer.create(<ProgressSummaryScreen />);
     });
 
-    const fromDateInput = tree.root.findByProps({ testID: 'from-date-input' });
+    renderer.act(() => { tree.root.findByProps({ testID: 'from-date-input-trigger' }).props.onPress(); });
+    renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress(); });
+    renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-year-2026' }).props.onPress(); });
+    renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress(); });
+    renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-month-2' }).props.onPress(); });
+    expect(tree.root.findAllByProps({ testID: 'date-picker-day-2026-02-29' }).length).toBe(0);
+    expect(tree.root.findAllByProps({ testID: 'date-picker-day-2026-02-30' }).length).toBe(0);
+    renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-cancel-button' }).props.onPress(); });
 
-    await renderer.act(async () => {
-      fromDateInput.props.onChangeText('2026-02-30');
-    });
-
-    const errorText = tree.root.findByProps({ testID: 'validation-error-text' });
-    expect(errorText.props.children).toContain('Ngày bắt đầu không hợp lệ');
-
-    const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });
-    expect(generateBtn.props.accessibilityState.disabled).toBe(true);
+    pickDate(tree.root, 'from-date-input-trigger', '2024-02-29');
+    expect(tree.root.findByProps({ testID: 'from-date-input-trigger' }).props.accessibilityValue.text).toBe('29/02/2024');
   });
 
   it('submits request and renders successful progress summary with all sections', async () => {
@@ -752,10 +758,7 @@ describe('ProgressSummaryScreen', () => {
     await settle();
 
     // Form was populated from readback: modify fromDate input
-    const fromInput = tree.root.findByProps({ testID: 'from-date-input' });
-    renderer.act(() => {
-      fromInput.props.onChangeText('2026-10-10');
-    });
+    pickDate(tree.root, 'from-date-input-trigger', '2026-10-10');
 
     // 1. Tapping "Làm mới ngay" strictly refreshes the saved summary scope (2026-10-01 to 2026-10-31)
     const refreshBtn = tree.root.findByProps({ testID: 'refresh-summary-button' });
@@ -776,9 +779,7 @@ describe('ProgressSummaryScreen', () => {
     );
 
     // Now change form again
-    renderer.act(() => {
-      fromInput.props.onChangeText('2026-10-15');
-    });
+    pickDate(tree.root, 'from-date-input-trigger', '2026-10-15');
 
     // 2. Tapping form submit "Cập nhật lại tóm tắt" uses the user-modified form scope (2026-10-15)
     const generateBtn = tree.root.findByProps({ testID: 'generate-summary-button' });

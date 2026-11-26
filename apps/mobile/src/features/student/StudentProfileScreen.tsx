@@ -23,6 +23,8 @@ import {
   UpdateStudentProfileRequest,
 } from '@/types/student';
 import { validateStudentProfileForm } from './studentValidation';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -426,30 +428,38 @@ export function StudentProfileScreen() {
             )}
 
             {/* Date of Birth Input */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: textColor }]}>Ngày sinh</Text>
-              <Text style={[styles.helperText, { color: subtextColor }]}>Định dạng: YYYY-MM-DD</Text>
-              <TextInput
-                testID="edit-dob-input"
-                accessibilityLabel="Ngày sinh"
-                style={[
-                  styles.input,
-                  {
-                    color: textColor,
-                    borderColor: fieldErrors.dateOfBirth ? themeColors.dangerText : borderColor,
-                  },
-                ]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={subtextColor}
-                value={editDob}
-                onChangeText={setEditDob}
-                maxLength={10}
-                editable={!isSubmitting}
-              />
-              {fieldErrors.dateOfBirth && (
-                <Text style={styles.fieldError}>{fieldErrors.dateOfBirth}</Text>
-              )}
-            </View>
+            {(() => {
+              const todayDate = getTodayDateOnly();
+              return (
+                <View style={styles.inputGroup}>
+                  <DateInputField
+                    testID="edit-dob-input"
+                    clearTestID="edit-dob-clear-button"
+                    label="Ngày sinh"
+                    helperText="Chạm để chọn ngày sinh hoặc xóa để bỏ trống"
+                    placeholder="Chọn ngày sinh"
+                    accessibilityLabel="Ngày sinh"
+                    value={editDob}
+                    onChange={(nextDate) => {
+                      setEditDob(nextDate);
+                      if (fieldErrors.dateOfBirth) {
+                        setFieldErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.dateOfBirth;
+                          return copy;
+                        });
+                      }
+                    }}
+                    allowClear
+                    maxDate={todayDate}
+                    initialBrowseDate="1995-06-15"
+                    disabled={isSubmitting}
+                    error={fieldErrors.dateOfBirth}
+                    sessionKey={`${profile?.userId ?? ''}:${isEditing ? 'edit' : 'view'}`}
+                  />
+                </View>
+              );
+            })()}
 
             {/* Gender Input */}
             <View style={styles.inputGroup}>

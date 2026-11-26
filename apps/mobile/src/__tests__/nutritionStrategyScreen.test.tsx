@@ -36,6 +36,16 @@ function press(tree: renderer.ReactTestRenderer, label: string) {
 function type(tree: renderer.ReactTestRenderer, label: string, value: string) {
   renderer.act(() => tree.root.findByProps({ accessibilityLabel: label }).props.onChangeText(value));
 }
+function pickDate(tree: renderer.ReactTestRenderer, testID: string, isoDate: string) {
+  const [yStr, mStr] = isoDate.split('-');
+  renderer.act(() => tree.root.findByProps({ testID }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress());
+}
 function chooseRadio(tree: renderer.ReactTestRenderer, text: string) {
   const control = tree.root.findAll((node) => node.props.accessibilityRole === 'radio'
     && node.props.accessibilityLabel === `Chọn loại mục tiêu ${text}`)[0];
@@ -65,7 +75,7 @@ describe('B07 nutrition strategy Mobile', () => {
     type(tree, 'Tên mục tiêu', 'Cân bằng');
     chooseRadio(tree, 'Cân bằng');
     type(tree, 'Múi giờ IANA của lịch chỉ tiêu', 'Asia/Ho_Chi_Minh');
-    type(tree, 'Có hiệu lực từ ngày (YYYY-MM-DD)', '2026-10-17');
+    pickDate(tree, 'strategy-effective-from-input-trigger', '2026-10-17');
     type(tree, 'Energy · Ngày mặc định (kcal)', '1800');
     renderer.act(() => press(tree, 'Xem trước toàn bộ mục tiêu'));
     (nutritionApi.changeStrategy as jest.Mock).mockRejectedValueOnce(new Error('network unknown'));
@@ -120,7 +130,7 @@ describe('B07 nutrition strategy Mobile', () => {
       .mockResolvedValueOnce(frozenDay);
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<NutritionStrategyScreen />); });
-    type(tree, 'Ngày (YYYY-MM-DD)', '2026-10-16');
+    pickDate(tree, 'strategy-student-day-input-trigger', '2026-10-16');
     renderer.act(() => press(tree, 'Xem ngày theo múi giờ đã chọn'));
     expect(JSON.stringify(tree.toJSON())).toContain('gốc');
     expect(JSON.stringify(tree.toJSON())).toContain('2000');

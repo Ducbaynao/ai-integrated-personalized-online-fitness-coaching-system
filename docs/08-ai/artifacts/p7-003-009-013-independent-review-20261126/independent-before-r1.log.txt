@@ -1,0 +1,34 @@
+PASS strict leap/grid/calendar round trip
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS empty browse/cancel never injects date; month/year edge
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS local date-time preserves time/date and partial empty state
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+old confirm actual onChange: ["2026-11-23"] openPickers= 0
+FAIL old confirm must not change a reopened picker session: 1 == 0
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+unmount actual onChange: ["2026-11-23"]
+FAIL confirm after unmount must not invoke onChange: 1 == 0
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS disabled transition blocks pending callback
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+AI real caller date: new draft= 2026-12-01 after old callback= 2026-11-27
+FAIL real AI Workout caller close/reopen ignores old picker callback: '2026-11-27' == '2026-12-01'
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+valid DOB=1919-06-15; first grid cell= date-picker-day-1920-06-01
+FAIL valid pre-1920 DOB can still be selected/edited: The expression evaluated to a falsy value:
+
+  assert(t.root.findAllByProps({testID:'date-picker-day-1919-06-16'}).length>0)
+
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Appointment from before= 2026-10-27T12:34:56.000Z after unchanged-date confirm= 2026-10-26T17:00:00.000Z
+FAIL Appointment confirm unchanged displayed date preserves timestamp range: '2026-10-26T17:00:00.000Z' == '2026-10-27T12:34:56.000Z'
+exclusive until actual= 2026-11-26T16:59:59.999Z expected= 2026-11-26T17:00:00.000Z last-ms included= false
+FAIL exclusive until includes final instant of selected day: '2026-11-26T16:59:59.999Z' == '2026-11-26T17:00:00.000Z'
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+source calculated day width at 360= 38.48 minWidth= undefined hitSlop= undefined
+FAIL calendar touch-width meets 44 at 360 viewport (source layout): The expression evaluated to a falsy value:
+
+  assert((style.minWidth||width)>=layout.minimumTouchTarget)
+
+Independent result: 4 PASS, 7 FAIL

@@ -9,6 +9,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { nutritionApi, type CatalogItemBody, type CorrectionBody, type FoodBody, type ItemBody, type NutritionDay, type NutritionItem, type PrivateFood } from './nutritionApi';
 
@@ -196,7 +198,16 @@ export function NutritionScreen() {
     <WorkoutButton testID="entry-food-text-analysis" label="Ước tính từ mô tả bữa ăn (AI)" secondary onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: { day, timezone, mealType } } as never)} />
     <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu bạn tự khai báo. Chưa biết không có nghĩa là 0.</Text>
     <WorkoutCard>
-      {input('Ngày ghi (YYYY-MM-DD)', day, (value) => { setDay(value); setConfirmedContext(false); })}
+      <DateInputField
+        testID="nutrition-day-input"
+        label="Ngày ghi"
+        placeholder="Chọn ngày ghi"
+        value={day}
+        onChange={(value) => { setDay(value); setConfirmedContext(false); }}
+        initialBrowseDate={getTodayDateOnly(timezone || user?.timezone)}
+        sessionKey={actor}
+        accessibilityLabel="Ngày ghi"
+      />
       {input('Múi giờ IANA', timezone, (value) => { setTimezone(value); setConfirmedContext(false); })}
       <WorkoutButton label={confirmedContext ? 'Đã xác nhận ngày và múi giờ' : 'Xác nhận ngày và múi giờ'}
         disabled={!day || !moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}

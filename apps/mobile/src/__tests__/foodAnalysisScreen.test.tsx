@@ -450,12 +450,12 @@ describe('F06 FoodAnalysisScreen (Student Mobile UI)', () => {
       tree = renderer.create(<FoodAnalysisScreen />);
     });
 
-    const dayInput = tree.root.findByProps({ accessibilityLabel: 'Ngày ghi (YYYY-MM-DD)' });
+    const dayInput = tree.root.findByProps({ testID: 'food-analysis-day-input-trigger' });
     const tzInput = tree.root.findByProps({ accessibilityLabel: 'Múi giờ IANA' });
     const timeInput = tree.root.findByProps({ accessibilityLabel: 'Giờ ăn địa phương (HH:mm)' });
 
     expect(tzInput.props.value).toBe('America/New_York');
-    expect(dayInput.props.value).toBe('2026-11-23'); // Formatted in America/New_York, NOT local device/user timezone
+    expect(dayInput.props.accessibilityValue.text).toBe('23/11/2026'); // Formatted in America/New_York, NOT local device/user timezone
     expect(timeInput.props.value).toBe('21:30'); // Formatted in America/New_York (21:30), NOT Asia/Ho_Chi_Minh (09:30)
 
     renderer.act(() => tree.unmount());

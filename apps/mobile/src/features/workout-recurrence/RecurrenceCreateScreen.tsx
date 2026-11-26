@@ -9,6 +9,8 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
 import { suggestedSessionDate } from '@/features/workout-schedule/directBatchValidation';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutRecurrenceApi } from '@/services/workoutRecurrenceApi';
 import { ApiError } from '@/types/auth';
@@ -140,8 +142,16 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
       <WorkoutCard>
         <Text style={[styles.body, { color: theme.textPrimary }]}>Phiên bản nguồn {version.versionNumber}. Series lặp toàn bộ block {Math.max(0, ...sessions.map(s => s.weekNumber))} tuần, kể cả tuần không chọn buổi; chỉ tạo buổi đã chọn. Tiếp tục đến khi Học viên dừng hoặc nguồn bị tạm dừng.</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Job chỉ xét kỳ bắt đầu trong 30 ngày tới. DST thiếu/nhập nhằng và xung đột sẽ được ghi lại để xem, không tự đoán offset hay lịch hẹn huấn luyện.</Text>
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Thứ Hai bắt đầu series (YYYY-MM-DD)</Text>
-        <TextInput testID="series-anchor" accessibilityLabel="Thứ Hai bắt đầu series" value={anchor} onChangeText={value => { setAnchor(value); reset(); }} placeholder="2026-11-02" style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+        <DateInputField
+          testID="series-anchor"
+          label="Thứ Hai bắt đầu series"
+          placeholder="Chọn Thứ Hai bắt đầu"
+          value={anchor}
+          mondayOnly
+          onChange={value => { setAnchor(value); reset(); }}
+          sessionKey={`${planId}:${versionId}:${relationshipId ?? ''}`}
+          accessibilityLabel="Thứ Hai bắt đầu series"
+        />
         <Text style={[styles.label, { color: theme.textPrimary }]}>Tìm múi giờ IANA</Text>
         <TextInput testID="series-timezone-search" accessibilityLabel="Tìm múi giờ IANA" value={timezoneSearch} onChangeText={setTimezoneSearch} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
         <Text style={[styles.body, { color: theme.textPrimary }]}>Múi giờ đã chọn: {timezone || 'Chưa chọn'}</Text>
@@ -154,13 +164,29 @@ function RecurrenceCreateForm({ studentId, planId, versionId, aggregateVersion, 
           : <WorkoutButton label={entries.some(entry => entry.session.id === session.id) ? 'Bỏ chọn buổi' : 'Chọn buổi'}
               secondary onPress={() => select(session)} />}
         {entries.filter(entry => entry.session.id === session.id).map(entry => <View key={session.id}>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày dự kiến theo tọa độ: {suggestedSessionDate(anchor, session) || 'Chọn thứ Hai hợp lệ'}. Nhập giờ địa phương đầy đủ; không suy kết thúc từ mẫu.</Text>
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Bắt đầu (YYYY-MM-DDTHH:mm)</Text>
-          <TextInput testID={`series-start-${session.id}`} accessibilityLabel={`Giờ bắt đầu ${session.name}`} value={entry.firstLocalStart}
-            onChangeText={value => update(session.id, 'firstLocalStart', value)} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Kết thúc (YYYY-MM-DDTHH:mm)</Text>
-          <TextInput testID={`series-end-${session.id}`} accessibilityLabel={`Giờ kết thúc ${session.name}`} value={entry.firstLocalEnd}
-            onChangeText={value => update(session.id, 'firstLocalEnd', value)} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày dự kiến theo tọa độ: {suggestedSessionDate(anchor, session) || 'Chọn thứ Hai hợp lệ'}. Chọn ngày và giờ địa phương (HH:mm); không suy kết thúc từ mẫu.</Text>
+          <LocalDateTimeInputField
+            label="Bắt đầu"
+            value={entry.firstLocalStart}
+            onChange={value => update(session.id, 'firstLocalStart', value)}
+            dateTestID={`series-start-${session.id}-date`}
+            timeTestID={`series-start-${session.id}-time`}
+            dateAccessibilityLabel={`Ngày bắt đầu ${session.name}`}
+            timeAccessibilityLabel={`Giờ bắt đầu ${session.name}`}
+            initialBrowseDate={suggestedSessionDate(anchor, session) || anchor || undefined}
+            sessionKey={`${planId}:${versionId}:${relationshipId ?? ''}`}
+          />
+          <LocalDateTimeInputField
+            label="Kết thúc"
+            value={entry.firstLocalEnd}
+            onChange={value => update(session.id, 'firstLocalEnd', value)}
+            dateTestID={`series-end-${session.id}-date`}
+            timeTestID={`series-end-${session.id}-time`}
+            dateAccessibilityLabel={`Ngày kết thúc ${session.name}`}
+            timeAccessibilityLabel={`Giờ kết thúc ${session.name}`}
+            initialBrowseDate={suggestedSessionDate(anchor, session) || anchor || undefined}
+            sessionKey={`${planId}:${versionId}:${relationshipId ?? ''}`}
+          />
         </View>)}
       </WorkoutCard>)}
       {preview.error ? <WorkoutState title="Cần kiểm tra biểu mẫu" message={preview.error} /> : null}

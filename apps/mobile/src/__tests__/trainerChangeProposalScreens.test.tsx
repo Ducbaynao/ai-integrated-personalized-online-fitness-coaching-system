@@ -177,6 +177,17 @@ describe('Trainer change proposal screens', () => {
     renderer.act(() => tree.unmount()); create.mockRestore();
   });
 
+  const pickDate = (root: renderer.ReactTestInstance, testID: string, isoDate: string) => {
+    const [yStr, mStr] = isoDate.split('-');
+    renderer.act(() => root.findByProps({ testID }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress());
+  };
+
   it('blocks COACH_REQUIRED RESCHEDULE and DST gap/ambiguous offset without guessing', () => {
     (useTrainerWorkoutScheduleDetail as jest.Mock).mockReturnValue({ data: { ...occurrence,
       sessionSummary: { ...occurrence.sessionSummary, supervisionRequirement: 'COACH_REQUIRED' } },
@@ -189,9 +200,11 @@ describe('Trainer change proposal screens', () => {
     renderer.act(() => tree.root.findByProps({ testID: 'select-change-reschedule' }).props.onPress());
     renderer.act(() => tree.root.findByProps({ testID: 'change-timezone-search' }).props.onChangeText('America/New_York'));
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'America/New_York' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start' }).props.onChangeText('2027-03-14T02:30'));
+    pickDate(tree.root, 'change-local-start-date-trigger', '2027-03-14');
+    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start-time' }).props.onChangeText('02:30'));
     expect(JSON.stringify(tree.toJSON())).toContain('Giờ không tồn tại');
-    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start' }).props.onChangeText('2026-11-01T01:30'));
+    pickDate(tree.root, 'change-local-start-date-trigger', '2026-11-01');
+    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start-time' }).props.onChangeText('01:30'));
     expect(JSON.stringify(tree.toJSON())).toContain('Giờ lặp');
     renderer.act(() => tree.root.findByProps({ testID: 'review-change-proposal' }).props.onPress());
     expect(tree.root.findAllByProps({ testID: 'change-proposal-preview' })).toHaveLength(0);
@@ -204,8 +217,10 @@ describe('Trainer change proposal screens', () => {
     const { tree } = render(<TrainerCreateChangeProposalScreen relationshipId="relationship-1" occurrenceId="occurrence-1" />);
     renderer.act(() => tree.root.findByProps({ testID: 'select-change-reschedule' }).props.onPress());
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Dùng múi giờ occurrence: Asia/Ho_Chi_Minh' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start' }).props.onChangeText('2026-10-21T18:00'));
-    renderer.act(() => tree.root.findByProps({ testID: 'change-local-end' }).props.onChangeText('2026-10-21T19:00'));
+    pickDate(tree.root, 'change-local-start-date-trigger', '2026-10-21');
+    renderer.act(() => tree.root.findByProps({ testID: 'change-local-start-time' }).props.onChangeText('18:00'));
+    pickDate(tree.root, 'change-local-end-date-trigger', '2026-10-21');
+    renderer.act(() => tree.root.findByProps({ testID: 'change-local-end-time' }).props.onChangeText('19:00'));
     const offsets = tree.root.findAllByProps({ accessibilityLabel: 'UTC+07:00' })
       .filter((node) => typeof node.props.onPress === 'function');
     renderer.act(() => offsets[0].props.onPress());

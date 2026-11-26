@@ -32,6 +32,17 @@ function input(tree: renderer.ReactTestRenderer, label: string, value: string) {
   const element = tree.root.findByProps({ accessibilityLabel: label });
   renderer.act(() => element.props.onChangeText(value));
 }
+function pickDate(tree: renderer.ReactTestRenderer, testID: string, isoDate: string) {
+  const [yStr, mStr] = isoDate.split('-');
+  const trigger = tree.root.findByProps({ testID });
+  renderer.act(() => trigger.props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress());
+  renderer.act(() => tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress());
+}
 
 describe('B07 nutrition screens', () => {
   beforeEach(() => {
@@ -53,7 +64,7 @@ describe('B07 nutrition screens', () => {
   it('requires explicit day/timezone, sends a serving payload, then retries the same ambiguous network command', async () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<NutritionScreen />); });
-    input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
+    pickDate(tree, 'nutrition-day-input-trigger', '2026-10-13');
     renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
     const choice = tree.root.findByProps({ accessibilityLabel: 'Chọn Oats, nguồn tự khai báo' });
     renderer.act(() => choice.props.onPress());
@@ -94,7 +105,7 @@ describe('B07 nutrition screens', () => {
   it('confirms an empty day as explicit no-intake, not an inferred zero', async () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<NutritionScreen />); });
-    input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
+    pickDate(tree, 'nutrition-day-input-trigger', '2026-10-13');
     renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
     renderer.act(() => press(tree, 'Xác nhận hoàn tất ngày'));
     await renderer.act(async () => { press(tree, 'Xác nhận'); });
@@ -110,7 +121,7 @@ describe('B07 nutrition screens', () => {
     expect(nutrientText(0, null)).toBe('0');
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<NutritionScreen />); });
-    input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
+    pickDate(tree, 'nutrition-day-input-trigger', '2026-10-13');
     renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
     input(tree, 'Mô tả món', 'Món tự nấu');
     (nutritionApi.addItem as jest.Mock).mockRejectedValueOnce(new ApiError(409, 'stale'));
@@ -136,7 +147,7 @@ describe('B07 nutrition screens', () => {
       .mockResolvedValueOnce(day);
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<NutritionScreen />); });
-    input(tree, 'Ngày ghi (YYYY-MM-DD)', '2026-10-13');
+    pickDate(tree, 'nutrition-day-input-trigger', '2026-10-13');
     renderer.act(() => press(tree, 'Xác nhận ngày và múi giờ'));
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn Foundation oats, USDA FDC 12345' }).props.onPress());
     expect(tree.root.findByProps({ accessibilityLabel: 'Đơn vị mililít' }).props.disabled).toBe(true);
@@ -160,7 +171,7 @@ describe('B07 nutrition screens', () => {
       isError: true, error: new ApiError(404, 'concealed'), refetch: jest.fn() });
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<TrainerNutritionScreen studentId="student-1" />); });
-    input(tree, 'Ngày xem', '2026-10-13');
+    pickDate(tree, 'trainer-nutrition-day-input-trigger', '2026-10-13');
     input(tree, 'Múi giờ của ngày log', 'Asia/Ho_Chi_Minh');
     renderer.act(() => press(tree, 'Xem ngày'));
     expect(JSON.stringify(tree.toJSON())).not.toContain('Oats');

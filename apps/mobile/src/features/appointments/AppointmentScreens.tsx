@@ -11,6 +11,9 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { createCommandKey } from '@/services/coachingApi';
 import { appointmentApi, AppointmentInterval } from '@/services/appointmentApi';
 import { validProposalOffsets, proposalTimezones } from '@/features/workout-schedule-proposals/proposalTime';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
+import { formatVietnameseDateDisplay, isoTimestampToDateOnly, localDateRangeBoundaryIso, replaceDateInIsoTimestamp } from '@/features/shared/dateInputUtils';
 import { ApiError } from '@/types/auth';
 
 const root = (actor: string, role: string) => ['appointments', actor, role];
@@ -45,16 +48,60 @@ export function AppointmentHomeScreen({ studentId }: { studentId?: string }) {
   const router = useRouter();
   const cache = useQueryClient();
   const theme = getSemanticColors(useColorScheme() === 'dark');
-  const [from, setFrom] = useState('');
-  const [until, setUntil] = useState('');
+  type RangeBoundState = { iso: string; inclusiveDate: string | null };
+  const [fromBound, setFromBound] = useState<RangeBoundState>({ iso: '', inclusiveDate: null });
+  const [untilBound, setUntilBound] = useState<RangeBoundState>({ iso: '', inclusiveDate: null });
+  const [fromError, setFromError] = useState<string | undefined>(undefined);
+  const [untilError, setUntilError] = useState<string | undefined>(undefined);
+  const from = fromBound.iso;
+  const until = untilBound.iso;
   useEffect(() => {
     const initial = setTimeout(() => {
       const now = Date.now();
-      setFrom(new Date(now - 30 * 86_400_000).toISOString());
-      setUntil(new Date(now + 60 * 86_400_000).toISOString());
+      setFromBound((prev) =>
+        prev.iso ? prev : { iso: new Date(now - 30 * 86_400_000).toISOString(), inclusiveDate: null }
+      );
+      setUntilBound((prev) =>
+        prev.iso ? prev : { iso: new Date(now + 60 * 86_400_000).toISOString(), inclusiveDate: null }
+      );
     }, 0);
     return () => clearTimeout(initial);
   }, []);
+
+  const applyDateFilterChange = (
+    boundary: 'start' | 'end',
+    nextDate: string,
+    current: RangeBoundState,
+    setBound: React.Dispatch<React.SetStateAction<RangeBoundState>>,
+    setError: React.Dispatch<React.SetStateAction<string | undefined>>
+  ) => {
+    const tz = user?.timezone;
+    if (!current.iso || current.inclusiveDate !== null) {
+      if (current.inclusiveDate === nextDate && current.iso) {
+        setError(undefined);
+        return;
+      }
+      const nextIso = localDateRangeBoundaryIso(nextDate, boundary, tz);
+      if (nextIso) {
+        setBound({ iso: nextIso, inclusiveDate: boundary === 'end' ? nextDate : null });
+        setError(undefined);
+      }
+      return;
+    }
+
+    const nextIso = replaceDateInIsoTimestamp(current.iso, nextDate, tz);
+    if (!nextIso) {
+      setError(
+        `Không thể chuyển sang ngày ${formatVietnameseDateDisplay(nextDate)} vì giờ lọc hiện tại không tồn tại trong ngày chuyển đổi giờ mùa hè (DST). Bộ lọc trước đó vẫn được giữ nguyên; vui lòng chọn ngày khác.`
+      );
+      return;
+    }
+
+    setError(undefined);
+    if (nextIso !== current.iso) {
+      setBound({ iso: nextIso, inclusiveDate: null });
+    }
+  };
   const requests = useInfiniteQuery({ queryKey: [...root(actor, role), 'requests'], enabled: !!actor,
     gcTime: 0, initialPageParam: 0, queryFn: ({ pageParam }) => appointmentApi.requests(pageParam),
     getNextPageParam: page => (page.page + 1) * page.size < page.totalItems ? page.page + 1 : undefined });
@@ -81,8 +128,24 @@ export function AppointmentHomeScreen({ studentId }: { studentId?: string }) {
     </CoachingCard>)}
     {requests.hasNextPage && !denied ? <CoachingButton label="Tải thêm yêu cầu" secondary busy={requests.isFetchingNextPage} onPress={() => requests.fetchNextPage()} /> : null}
     <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Lịch đã xác nhận và lịch sử</Text>
-    <TextInput accessibilityLabel="Từ thời điểm ISO có múi giờ" value={from} onChangeText={setFrom} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-    <TextInput accessibilityLabel="Đến thời điểm ISO có múi giờ" value={until} onChangeText={setUntil} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+    <DateInputField
+      testID="appointments-from-date"
+      label="Từ ngày"
+      accessibilityLabel="Từ ngày"
+      value={fromBound.inclusiveDate ?? isoTimestampToDateOnly(from, user?.timezone)}
+      onChange={(nextDate) => applyDateFilterChange('start', nextDate, fromBound, setFromBound, setFromError)}
+      error={fromError}
+      sessionKey={`${actor}:${role}:home-from`}
+    />
+    <DateInputField
+      testID="appointments-to-date"
+      label="Đến ngày"
+      accessibilityLabel="Đến ngày"
+      value={untilBound.inclusiveDate ?? isoTimestampToDateOnly(until, user?.timezone)}
+      onChange={(nextDate) => applyDateFilterChange('end', nextDate, untilBound, setUntilBound, setUntilError)}
+      error={untilError}
+      sessionKey={`${actor}:${role}:home-until`}
+    />
     {appointments.isPending ? <CoachingState busy title="Đang tải lịch hẹn" message="Vui lòng chờ." /> : null}
     {appointments.isError ? <CoachingState title="Không thể tải lịch hẹn" message={message(appointments.error)} onRetry={() => appointments.refetch()} /> : null}
     {!appointments.isPending && !appointments.isError && !appointmentRows.length ? <CoachingState title="Không có lịch trong khoảng đã chọn" message="Bạn có thể đổi khoảng thời gian để xem lại." /> : null}
@@ -146,9 +209,27 @@ export function AppointmentCreateScreen({ studentId, appointmentId }: { studentI
     <TextInput accessibilityLabel="Tìm múi giờ IANA" value={search} onChangeText={setSearch} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
     {zones.map(zone => <CoachingButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); setStartUtcOffset(''); setEndUtcOffset(''); reset(); }} />)}
     <Text style={[styles.label, { color: theme.textPrimary }]}>Múi giờ: {timezone || 'Chưa chọn'}</Text>
-    <TextInput accessibilityLabel="Bắt đầu YYYY-MM-DDTHH:mm" placeholder="2026-10-25T09:00" value={localStart} onChangeText={value => { setLocalStart(value); setStartUtcOffset(''); reset(); }} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+    <LocalDateTimeInputField
+      label="Bắt đầu"
+      value={localStart}
+      onChange={value => { setLocalStart(value); setStartUtcOffset(''); reset(); }}
+      dateTestID="appointment-start-date"
+      timeTestID="appointment-start-time"
+      dateAccessibilityLabel="Ngày bắt đầu"
+      timeAccessibilityLabel="Giờ bắt đầu (HH:mm)"
+      sessionKey={`${actor}:${role}:${appointmentId ?? studentId}`}
+    />
     {starts.map(choice => <CoachingButton key={choice.offset} label={`Bắt đầu UTC ${choice.offset}`} secondary={choice.offset !== startUtcOffset} onPress={() => { setStartUtcOffset(choice.offset); reset(); }} />)}
-    <TextInput accessibilityLabel="Kết thúc YYYY-MM-DDTHH:mm" placeholder="2026-10-25T10:00" value={localEnd} onChangeText={value => { setLocalEnd(value); setEndUtcOffset(''); reset(); }} style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
+    <LocalDateTimeInputField
+      label="Kết thúc"
+      value={localEnd}
+      onChange={value => { setLocalEnd(value); setEndUtcOffset(''); reset(); }}
+      dateTestID="appointment-end-date"
+      timeTestID="appointment-end-time"
+      dateAccessibilityLabel="Ngày kết thúc"
+      timeAccessibilityLabel="Giờ kết thúc (HH:mm)"
+      sessionKey={`${actor}:${role}:${appointmentId ?? studentId}`}
+    />
     {ends.map(choice => <CoachingButton key={choice.offset} label={`Kết thúc UTC ${choice.offset}`} secondary={choice.offset !== endUtcOffset} onPress={() => { setEndUtcOffset(choice.offset); reset(); }} />)}
     {!valid ? <CoachingState title="Chưa thể gửi" message="Chọn giờ hợp lệ trong tương lai và UTC offset cho từng mốc. Giờ không tồn tại do DST không được chọn." /> : null}
     {!preview ? <CoachingButton label="Xem trước yêu cầu" disabled={!valid} onPress={() => setPreview(true)} /> : <CoachingCard>

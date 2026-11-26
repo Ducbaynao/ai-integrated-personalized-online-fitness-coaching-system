@@ -6,6 +6,7 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleChangeProposalApi } from '@/services/workoutScheduleChangeProposalApi';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { spacing } from '@/design-system/tokens/spacing';
 import { ApiError } from '@/types/auth';
 import type { WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
@@ -143,11 +144,17 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
             const offset = part === 'Start' ? destination.startUtcOffset : destination.endUtcOffset;
             const choices = validProposalOffsets(destination.timezone, local);
             return <View key={part} style={{ gap: spacing.xs }}>
-              <Text style={[styles.label, { color: theme.textPrimary }]}>{part === 'Start' ? 'Bắt đầu mới' : 'Kết thúc mới'}</Text>
-              <TextInput testID={`change-local-${part.toLowerCase()}`} accessibilityLabel={`${part === 'Start' ? 'Bắt đầu' : 'Kết thúc'} địa phương`}
-                placeholder="YYYY-MM-DDTHH:mm" value={local} onChangeText={(value) => editDestination(part === 'Start'
+              <LocalDateTimeInputField
+                label={part === 'Start' ? 'Bắt đầu mới' : 'Kết thúc mới'}
+                value={local}
+                onChange={(value) => editDestination(part === 'Start'
                   ? { localStart: value, startUtcOffset: '' } : { localEnd: value, endUtcOffset: '' })}
-                style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+                dateTestID={`change-local-${part.toLowerCase()}-date`}
+                timeTestID={`change-local-${part.toLowerCase()}-time`}
+                dateAccessibilityLabel={`Ngày ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương`}
+                timeAccessibilityLabel={`Giờ ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương (HH:mm)`}
+                sessionKey={`${relationshipId}:${occurrenceId}:${changeType ?? ''}`}
+              />
               {local && !choices.length ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Giờ không tồn tại trong múi giờ này hoặc sai định dạng.</Text> : null}
               {choices.length > 1 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ lặp khi đổi DST. Chọn một UTC offset rõ ràng.</Text> : null}
               <View style={styles.row}>{choices.map((choice) => <WorkoutButton key={choice.offset} label={`UTC${choice.offset}`} secondary={offset !== choice.offset}

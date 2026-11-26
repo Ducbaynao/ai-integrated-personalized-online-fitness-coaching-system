@@ -18,6 +18,8 @@ import { studentProfileApi } from '@/services/studentProfileApi';
 import { ApiError } from '@/types/auth';
 import { Gender, TrainingExperienceLevel } from '@/types/student';
 import { validateStudentProfileForm } from './studentValidation';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
@@ -203,34 +205,39 @@ export function StudentOnboardingScreen() {
           )}
 
           {/* 1. Date of Birth */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: textColor }]}>Ngày sinh</Text>
-            <Text style={[styles.helperText, { color: subtextColor }]}>
-              Định dạng: YYYY-MM-DD (ví dụ: 1995-06-15)
-            </Text>
-            <TextInput
-              testID="dob-input"
-              accessibilityLabel="Ngày sinh"
-              accessibilityHint="Nhập ngày sinh của bạn theo định dạng YYYY-MM-DD"
-              aria-invalid={!!fieldErrors.dateOfBirth}
-              style={[
-                styles.input,
-                {
-                  color: textColor,
-                  borderColor: fieldErrors.dateOfBirth ? themeColors.dangerText : borderColor,
-                },
-              ]}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={subtextColor}
-              value={dateOfBirth}
-              onChangeText={setDateOfBirth}
-              maxLength={10}
-              editable={!isSubmitting}
-            />
-            {fieldErrors.dateOfBirth && (
-              <Text style={styles.fieldError}>{fieldErrors.dateOfBirth}</Text>
-            )}
-          </View>
+          {(() => {
+            const todayDate = getTodayDateOnly(user?.timezone);
+            return (
+              <View style={styles.inputGroup}>
+                <DateInputField
+                  testID="dob-input"
+                  clearTestID="dob-clear-button"
+                  label="Ngày sinh"
+                  helperText="Chạm để chọn ngày sinh theo lịch (tùy chọn)"
+                  placeholder="Chọn ngày sinh"
+                  accessibilityLabel="Ngày sinh"
+                  accessibilityHint="Mở lịch để chọn ngày sinh của bạn"
+                  value={dateOfBirth}
+                  onChange={(nextDate) => {
+                    setDateOfBirth(nextDate);
+                    if (fieldErrors.dateOfBirth) {
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.dateOfBirth;
+                        return copy;
+                      });
+                    }
+                  }}
+                  allowClear
+                  maxDate={todayDate}
+                  initialBrowseDate="1995-06-15"
+                  disabled={isSubmitting}
+                  error={fieldErrors.dateOfBirth}
+                  sessionKey={user?.id ?? 'onboarding'}
+                />
+              </View>
+            );
+          })()}
 
           {/* 2. Gender */}
           <View style={styles.inputGroup}>
