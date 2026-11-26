@@ -22,7 +22,7 @@
 - **EXISTING IMPLEMENTATION:** Retryable restoration errors retain credentials and present a Vietnamese retry state; terminal `401`/`403` restoration errors clear credentials and present a Vietnamese sign-in notice.
 - **EXISTING IMPLEMENTATION:** Unit tests cover API calls, refresh behavior, authentication flow, secure storage, restoration retry, accessibility, and token usage.
 - **EXISTING IMPLEMENTATION:** The public starter Explore route and unused starter tab components have been removed. The authenticated home routes use backend capabilities to present Student/Trainer shells and preserve the rule that the client does not grant coaching authority.
-- **EXISTING IMPLEMENTATION:** Registration, verification, sign-in, session states, capability switching, and the B01 Student/Trainer shell use Vietnamese copy. DM Sans is loaded through the Expo font integration before the application shell renders.
+- **EXISTING IMPLEMENTATION:** Registration, verification, sign-in, session states, capability switching, and the B01 Student/Trainer shell use Vietnamese copy. The app font (Be Vietnam Pro since P7-012; previously DM Sans) is loaded through the Expo font integration before the application shell renders.
 - **VERIFIED IMPLEMENTATION:** On 2026-09-26, the B01 flow passed on the `Pixel_7` Android emulator with Expo Go 57.0.9 and the real Spring Boot/PostgreSQL/Redis/Mailpit stack. Registration, email verification, login, native process restart, access-token refresh, revoked-session handling, retry after a temporary backend outage, logout, protected routing, and Student/Trainer capability switching were exercised through the Mobile UI.
 
 ## 4. Feature dependencies
@@ -54,7 +54,7 @@
 - **VERIFIED IMPLEMENTATION:** Environment-based API configuration reaches the host backend from Android without a machine-specific value in source. Single-flight refresh, bootstrap/session restoration, logout cleanup, terminal session expiry, and retryable network restoration are implemented and covered by tests; the native paths also passed the emulator verification described below.
 - **EXISTING IMPLEMENTATION:** Starter routes are replaced by a capability-aware B01 shell. The five-destination Student and Trainer navigation structures remain incremental deliverables of B02-B08 as those destinations become executable.
 - **VERIFIED IMPLEMENTATION:** Vietnamese production copy, field validation, duplicate-submit prevention, offline messaging, expired-session handling, accessible controls, and keyboard-safe scrolling are present on B01 screens and passed the Pixel 7 smoke test.
-- **VERIFIED IMPLEMENTATION:** DM Sans loads before the application shell renders; the session gate retains safe system typography while fonts initialize.
+- **VERIFIED IMPLEMENTATION:** DM Sans loads before the application shell renders; the session gate retains safe system typography while fonts initialize. (Historical B01 evidence. P7-012 replaced DM Sans with Be Vietnam Pro; Android/web runtime re-verification is pending.)
 
 ## 9. Admin Web scope
 
@@ -65,7 +65,7 @@
 
 - **CONFIRMED REQUIREMENT:** Cover SH-01 Welcome/Sign In, SH-02 Register, session bootstrap, session-expired handling, and the authenticated shell from [screen inventory](../../06-ui-ux/screen-inventory.md).
 - **VERIFIED REFERENCE:** Figma MCP inspection covered the supplied SuperFit file at root node `86:2234`, including Light Sign In `2885:580`, Light Sign Up `2886:694`, Dark Sign In `2896:11024`, and Dark Sign Up `2896:11055`.
-- **VERIFIED IMPLEMENTATION:** B01 uses the same broad visual direction as the reference for DM Sans, purple primary actions, rounded inputs, and rounded cards. The Android render has correct safe-area spacing, focus behavior, readable state messages, and no remaining Expo starter screen inside the application.
+- **VERIFIED IMPLEMENTATION:** B01 uses the same broad visual direction as the reference for DM Sans (replaced by Be Vietnam Pro in P7-012), purple primary actions, rounded inputs, and rounded cards. The Android render has correct safe-area spacing, focus behavior, readable state messages, and no remaining Expo starter screen inside the application.
 - **DESIGN DECISION:** The SuperFit authentication frames use a workout image, bottom-sheet composition, English copy, and social-login controls. B01 follows the repository's Vietnamese product copy, documented screen states, and supported authentication contract, so copying that full template would be a product-wide redesign rather than a B01 bug fix.
 - **DESIGN GAP:** The supplied reference does not contain confirmed matching frames for Verify Email, Session Gate, or the capability-aware Student/Trainer shell. No Code Connect mapping was available, so the shared UI/UX documentation and executable behavior remain authoritative for those surfaces.
 
@@ -74,7 +74,7 @@
 1. **EXISTING IMPLEMENTATION:** Authentication, refresh/replay, storage, restoration, route, error-mapping, and accessibility tests cover the final automated B01 behavior.
 2. **EXISTING IMPLEMENTATION:** Environment-based API configuration, single-flight refresh, native secure storage, retryable bootstrap, and logout cleanup are implemented without replacing the working `fetch`/Context foundation.
 3. **EXISTING IMPLEMENTATION:** Starter routes were removed and the authenticated shell is capability-aware.
-4. **EXISTING IMPLEMENTATION:** Vietnamese copy, shared states, duplicate-submit protection, accessibility attributes, design tokens, and DM Sans loading are applied to the B01 screens.
+4. **EXISTING IMPLEMENTATION:** Vietnamese copy, shared states, duplicate-submit protection, accessibility attributes, design tokens, and app font loading (Be Vietnam Pro since P7-012) are applied to the B01 screens.
 5. **VERIFIED IMPLEMENTATION:** Registration, Mailpit verification, login, refresh, native process restart, forced revocation, logout, retry after a backend outage, protected routing, and both capability shells passed against Spring Boot M1 on the `Pixel_7` Android emulator.
 
 ## 12. Acceptance criteria
@@ -108,7 +108,7 @@
 - **CONFIRMED REQUIREMENT:** The common account and backend-provided capabilities determine navigation; the client does not grant roles or coaching authority.
 - **PROPOSED SOLUTION:** Retain the working `fetch`/Context foundation during B01 completion.
 - **CONFIRMED REQUIREMENT:** Vietnamese is the Phase 1 production copy for the B01 authentication and shell surfaces.
-- **EXISTING IMPLEMENTATION:** The documented DM Sans family is supplied by `@expo-google-fonts/dm-sans` and loaded during application bootstrap.
+- **EXISTING IMPLEMENTATION:** The app font family Be Vietnam Pro is supplied by `@expo-google-fonts/be-vietnam-pro` and loaded during application bootstrap. P7-012 replaced `@expo-google-fonts/dm-sans`, which has no Vietnamese subset.
 - **CONFIRMED DECISION:** B01 retains one capability-aware home shell and introduces the five documented Student/Trainer destinations incrementally with B02-B08, avoiding placeholder destinations with no executable feature behavior.
 - **UNRESOLVED DECISION:** The team must reconcile the target architecture's Axios/TanStack Query/Zustand/React Hook Form statement with incremental dependency adoption before later features create competing patterns.
 

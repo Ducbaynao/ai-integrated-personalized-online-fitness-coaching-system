@@ -2,18 +2,13 @@ import { useEffect } from 'react';
 import { Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
-import {
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_600SemiBold,
-  DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { SessionGateScreen } from '@/features/auth/SessionGateScreen';
 import { queryClient } from '@/services/queryClient';
 import { PushReceiptListener } from '@/features/chat/PushReceiptListener';
+import { appFontAssets } from '@/design-system/fonts';
 import { parseCoachingQrUri } from '@/features/coaching/coachingQrCodec';
 import { setPendingCoachingQrIntent } from '@/features/coaching/pendingQrIntent';
 
@@ -77,12 +72,8 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
-    DMSans_700Bold,
-  });
+  // A load error must not block the app: text then falls back to the system font.
+  const [fontsLoaded, fontError] = useFonts(appFontAssets);
 
   return (
     <QueryClientProvider client={queryClient}>

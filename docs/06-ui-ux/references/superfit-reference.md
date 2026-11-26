@@ -37,7 +37,7 @@ Các mục trên phải được ghi `NOT FOUND IN INSPECTED NODES`, không đư
 
 ## Có thể kế thừa
 
-- DM Sans.
+- Tinh thần sans-serif hình học của DM Sans. Sản phẩm dùng Be Vietnam Pro vì DM Sans không đủ glyph tiếng Việt (P7-012).
 - Nền trắng/xám rất nhạt và tím làm màu thương hiệu.
 - Card bo tròn 16–24 px.
 - Metric cards có màu pastel theo nhóm dữ liệu.

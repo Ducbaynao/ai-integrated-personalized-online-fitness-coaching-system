@@ -13,7 +13,7 @@
 ## Visual consistency
 
 - [ ] Shared tokens and components are used.
-- [ ] DM Sans, purple brand and semantic status colors match the specification.
+- [ ] Be Vietnam Pro (through typography tokens), purple brand and semantic status colors match the specification; Vietnamese text shows no fallback glyphs.
 - [ ] Spacing follows the 2/4/8/12/16/24/32 scale.
 - [ ] Mobile screen padding is consistent.
 - [ ] Admin Web uses appropriate information density rather than mobile cards everywhere.

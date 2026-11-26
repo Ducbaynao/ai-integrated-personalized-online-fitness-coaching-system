@@ -51,5 +51,5 @@ Thông tin nhạy cảm như Progress Photo, chat, nutrition và body metric ch�
 
 ## 10. Phong cách tham khảo SuperFit
 
-Giữ DM Sans, nền sáng, tím chủ đạo, card bo tròn, khoảng trắng rộng và metric card màu nhẹ. Giảm ảnh trang trí ở màn hình nghiệp vụ dày dữ liệu; ưu tiên hierarchy và readability.
+Dùng Be Vietnam Pro (thay DM Sans của SuperFit vì DM Sans không đủ glyph tiếng Việt — P7-012), nền sáng, tím chủ đạo, card bo tròn, khoảng trắng rộng và metric card màu nhẹ. Giảm ảnh trang trí ở màn hình nghiệp vụ dày dữ liệu; ưu tiên hierarchy và readability.
 
