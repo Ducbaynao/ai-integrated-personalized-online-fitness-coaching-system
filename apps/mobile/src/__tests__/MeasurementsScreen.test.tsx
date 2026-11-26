@@ -105,6 +105,42 @@ describe('MeasurementsScreen', () => {
     expect(item2).toBeDefined();
   });
 
+  it('P7-016: labels units by metric — bare BMI, "điểm" for other SCORE, neutral COUNT', async () => {
+    const base = sampleMeasurements[0];
+    const rows: Measurement[] = [
+      { ...base, id: 'bmi', metricCode: 'BMI', metricDisplayName: 'Body Mass Index', numericValue: 24.5, unitCode: 'SCORE', unitSymbol: 'score' },
+      { ...base, id: 'vf', metricCode: 'VISCERAL_FAT', metricDisplayName: 'Visceral Fat', numericValue: 9, unitCode: 'SCORE', unitSymbol: 'score' },
+      { ...base, id: 'hr', metricCode: 'RESTING_HEART_RATE', metricDisplayName: 'Resting Heart Rate', numericValue: 62, unitCode: 'COUNT', unitSymbol: 'count' },
+      { ...base, id: 'cx', metricCode: 'CUSTOM_STEPS', metricDisplayName: 'Bước chân', numericValue: 7, unitCode: 'COUNT', unitSymbol: 'count' },
+    ];
+    (measurementApi.getMetricDefinitions as jest.Mock).mockResolvedValueOnce(sampleMetrics);
+    (measurementApi.getMeasurements as jest.Mock).mockResolvedValueOnce({ content: rows, totalElements: rows.length });
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(<MeasurementsScreen studentId="student-1" />);
+    });
+    await settle();
+
+    const flat = (c: any): string =>
+      Array.isArray(c) ? c.map(flat).join('') : typeof c === 'string' || typeof c === 'number' ? String(c) : '';
+    const itemTexts = (id: string) =>
+      tree.root
+        .findByProps({ testID: `measurement-item-${id}` })
+        .findAll((n) => typeof n.type === 'string')
+        .map((n) => flat(n.props.children));
+
+    expect(itemTexts('bmi')).toContain('24.5');
+    expect(itemTexts('bmi').join(' ')).not.toMatch(/điểm|score/);
+    expect(itemTexts('vf')).toContain('9 điểm');
+    expect(itemTexts('hr')).toContain('62');
+    expect(itemTexts('hr').join(' ')).not.toMatch(/nhịp|phút|lần|count/);
+    expect(itemTexts('cx')).toContain('7');
+    expect(itemTexts('cx').join(' ')).not.toMatch(/lần|count/);
+    // custom metric name is kept as provided
+    expect(itemTexts('cx')).toContain('Bước chân');
+  });
+
   it('renders empty state when measurement content is empty', async () => {
     (measurementApi.getMetricDefinitions as jest.Mock).mockResolvedValueOnce(sampleMetrics);
     (measurementApi.getMeasurements as jest.Mock).mockResolvedValueOnce({

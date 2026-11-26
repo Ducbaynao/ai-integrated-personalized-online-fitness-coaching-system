@@ -5,6 +5,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { GoalTarget } from '@/types/goal';
+import { metricLabel, unitTypeLabel, withUnit } from '@/localization/progressLabels';
 
 interface GoalTargetsTabProps {
   targets: GoalTarget[];
@@ -35,9 +36,11 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
     );
   }
 
+  const unitContext = (target: GoalTarget) => ({ metricCode: target.metricCode, symbol: target.unitSymbol });
+
   const formatTargetValue = (target: GoalTarget): string => {
     if (target.targetValue !== null && target.targetValue !== undefined) {
-      return `${target.targetValue} ${target.unitSymbol}`;
+      return withUnit(target.targetValue, target.unitCode, unitContext(target));
     }
     if (
       target.targetMinValue !== null &&
@@ -45,20 +48,20 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
       target.targetMaxValue !== null &&
       target.targetMaxValue !== undefined
     ) {
-      return `${target.targetMinValue} – ${target.targetMaxValue} ${target.unitSymbol}`;
+      return withUnit(`${target.targetMinValue} – ${target.targetMaxValue}`, target.unitCode, unitContext(target));
     }
     if (target.targetMinValue !== null && target.targetMinValue !== undefined) {
-      return `≥ ${target.targetMinValue} ${target.unitSymbol}`;
+      return withUnit(`≥ ${target.targetMinValue}`, target.unitCode, unitContext(target));
     }
     if (target.targetMaxValue !== null && target.targetMaxValue !== undefined) {
-      return `≤ ${target.targetMaxValue} ${target.unitSymbol}`;
+      return withUnit(`≤ ${target.targetMaxValue}`, target.unitCode, unitContext(target));
     }
     return 'Chưa rõ';
   };
 
   const formatStartValue = (target: GoalTarget): string => {
     if (target.startValue !== null && target.startValue !== undefined) {
-      return `${target.startValue} ${target.unitSymbol}`;
+      return withUnit(target.startValue, target.unitCode, unitContext(target));
     }
     return 'Chưa ghi nhận';
   };
@@ -78,17 +81,20 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
           ]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.metricName, { color: themeColors.textPrimary }]}>
-              {target.metricDisplayName}
+              {metricLabel(target.metricCode, target.metricDisplayName)}
             </Text>
-            <View
-              style={[
-                styles.unitBadge,
-                { backgroundColor: themeColors.surfaceSubtle },
-              ]}>
-              <Text style={[styles.unitText, { color: themeColors.textSecondary }]}>
-                {target.unitCode} ({target.unitSymbol})
-              </Text>
-            </View>
+            {unitTypeLabel(target.unitCode, unitContext(target)) ? (
+              <View
+                testID={`target-unit-${target.id}`}
+                style={[
+                  styles.unitBadge,
+                  { backgroundColor: themeColors.surfaceSubtle },
+                ]}>
+                <Text style={[styles.unitText, { color: themeColors.textSecondary }]}>
+                  {unitTypeLabel(target.unitCode, unitContext(target))}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.grid}>

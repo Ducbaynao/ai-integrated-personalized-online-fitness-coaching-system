@@ -1,5 +1,5 @@
 import { request } from '@/services/apiClient';
-import { localizedServerMessage } from '@/localization/displayLabels';
+import { localizeFieldErrorsByCode } from '@/localization/fieldErrorMessages';
 import { createCommandKey } from '@/services/coachingApi';
 import {
   WorkoutAdjustmentApiRequest,
@@ -18,15 +18,35 @@ import { ApiError } from '@/types/auth';
 
 export function getWorkoutAdjustmentFieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ApiError && error.errorResponse?.fieldErrors) {
-    const map: Record<string, string> = {};
-    for (const fe of error.errorResponse.fieldErrors) {
-      if (fe.field && fe.message) {
-        map[fe.field] = localizedServerMessage(fe.message, 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
-      }
-    }
-    return map;
+    return localizeFieldErrorsByCode(error.errorResponse.fieldErrors);
   }
   return {};
+}
+
+/**
+ * Backend diagnostic text from ErrorResponse.message. apiClient replaces ApiError.message with a
+ * generic Vietnamese sentence, so the diagnostic only lives here. Used for classification only and
+ * never displayed; a non-string value (object/null/number) is ignored, not coerced to text.
+ */
+function backendDiagnostic(error: ApiError): string {
+  const value: unknown = error.errorResponse?.message;
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * Snapshot diagnostics verified in AiWorkoutAdjustmentService (409 AI_RUN_LIFECYCLE_CONFLICT):
+ * - SHARED: "Shared snapshot data is missing or corrupted." / "Shared snapshot payload is corrupted."
+ *   (data saved when the trainer shared the draft)
+ * - SOURCE: "Missing <field> in source snapshot." / "Source snapshot is malformed…: <detail>"
+ *   (source data recorded when the proposal was created)
+ * Anything else, including other text containing "snapshot", is not classified.
+ */
+function classifySnapshotDiagnostic(diagnostic: string): 'SHARED' | 'SOURCE' | null {
+  if (/^shared snapshot (data is missing or corrupted|payload is corrupted)\b/.test(diagnostic)) return 'SHARED';
+  if (/^missing [a-z_]+ in source snapshot\b/.test(diagnostic) || /^source snapshot is malformed\b/.test(diagnostic)) {
+    return 'SOURCE';
+  }
+  return null;
 }
 
 export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
@@ -46,6 +66,13 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       return 'Biến thể bài tập thay thế hiện không khả dụng trong danh mục bài tập.';
     }
     if (code === 'AI_RUN_LIFECYCLE_CONFLICT') {
+      const snapshotIssue = error.status === 409 ? classifySnapshotDiagnostic(backendDiagnostic(error)) : null;
+      if (snapshotIssue === 'SHARED') {
+        return 'Dữ liệu của bản nháp đã chia sẻ (được lưu tại thời điểm chia sẻ) bị thiếu hoặc hỏng. Vui lòng liên hệ Huấn luyện viên để chia sẻ lại.';
+      }
+      if (snapshotIssue === 'SOURCE') {
+        return 'Dữ liệu nguồn được lưu khi tạo đề xuất bị thiếu hoặc không hợp lệ. Vui lòng tạo đề xuất mới.';
+      }
       if (msg.includes('expired')) {
         return 'Đề xuất điều chỉnh đã hết hạn. Vui lòng tạo đề xuất mới.';
       }
@@ -57,9 +84,6 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       }
       if (msg.includes('Revision conflict')) {
         return 'Bản thảo đã bị chỉnh sửa ở một phiên khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.';
-      }
-      if (msg.includes('snapshot') || msg.includes('missing or corrupted')) {
-        return 'Bản nháp chia sẻ bị thiếu hoặc hỏng dữ liệu snapshot. Vui lòng liên hệ Huấn luyện viên để chia sẻ lại.';
       }
       if (msg.includes('already been decided') || msg.includes('already been applied')) {
         return 'Đề xuất điều chỉnh này đã được quyết định trước đó.';

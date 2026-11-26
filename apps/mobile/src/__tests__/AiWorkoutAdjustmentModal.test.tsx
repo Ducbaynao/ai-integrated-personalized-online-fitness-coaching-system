@@ -703,6 +703,54 @@ describe('AiWorkoutAdjustmentModal', () => {
     expect(aiWorkoutAdjustmentApi.accept).toHaveBeenCalledTimes(1);
   });
 
+  it('P7-016: shows only the fixed source-snapshot copy on accept, never the raw Backend diagnostic', async () => {
+    (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockSubstitutionProposal);
+    const sensitive =
+      'Source snapshot is malformed and cannot be verified: JsonParseException at /var/app/secret.json token=sk-live-123';
+    // Shape produced by apiClient.parseResponse: ApiError.message is the generic sentence, the diagnostic stays in errorResponse.
+    const snapshotError = new ApiError(409, 'Dữ liệu đã thay đổi. Vui lòng tải lại và thử lại.', {
+      errorCode: 'AI_RUN_LIFECYCLE_CONFLICT',
+      message: sensitive,
+      timestamp: '2026-11-27T00:00:00Z',
+      requestId: 'req-s',
+      fieldErrors: [],
+    });
+    (aiWorkoutAdjustmentApi.accept as jest.Mock).mockRejectedValueOnce(snapshotError);
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutAdjustmentModal
+          visible={true}
+          studentId="stu-1"
+          occurrenceContext={mockOccurrenceContext}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
+    });
+    await flushPromises();
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'adjustment-accept-button' }).props.onPress();
+    });
+    await flushPromises();
+
+    const flat = (c: any): string =>
+      Array.isArray(c) ? c.map(flat).join('') : typeof c === 'string' || typeof c === 'number' ? String(c) : '';
+    const errorText = tree.root
+      .findByProps({ testID: 'adjustment-error-message' })
+      .findAllByType(Text)
+      .map((n) => flat(n.props.children))
+      .join(' ');
+    expect(errorText).toContain('Dữ liệu nguồn được lưu khi tạo đề xuất bị thiếu hoặc không hợp lệ. Vui lòng tạo đề xuất mới.');
+    const allText = tree.root.findAllByType(Text).map((n) => flat(n.props.children)).join(' ');
+    expect(allText).not.toMatch(/JsonParseException|secret\.json|sk-live|Source snapshot/);
+    expect(() => tree.root.findByProps({ testID: 'adjustment-applied-card' })).toThrow();
+    expect(aiWorkoutAdjustmentApi.accept).toHaveBeenCalledTimes(1);
+  });
+
   it('generates proposal with TEMPLATE_OR_FUTURE_OCCURRENCES scope', async () => {
     const templateProposal: WorkoutAdjustmentApiResponse = {
       ...mockSubstitutionProposal,

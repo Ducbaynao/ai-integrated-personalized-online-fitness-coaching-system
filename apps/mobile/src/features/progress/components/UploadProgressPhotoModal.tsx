@@ -15,6 +15,7 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
+import { PHOTO_VIEW_OPTIONS } from '@/localization/progressLabels';
 import { PhotoViewType, UploadProgressPhotoParams } from '@/types/measurement';
 
 interface UploadProgressPhotoModalProps {
@@ -41,13 +42,7 @@ export function UploadProgressPhotoModal({
 
   const themeColors = getSemanticColors(isDark);
 
-  const viewTypeOptions: { type: PhotoViewType; label: string }[] = [
-    { type: 'FRONT', label: 'Chính diện (Front)' },
-    { type: 'BACK', label: 'Phía sau (Back)' },
-    { type: 'SIDE_LEFT', label: 'Nghiêng trái' },
-    { type: 'SIDE_RIGHT', label: 'Nghiêng phải' },
-    { type: 'OTHER', label: 'Khác' },
-  ];
+  const viewTypeOptions: { type: PhotoViewType; label: string }[] = PHOTO_VIEW_OPTIONS;
 
   const handlePickPhoto = async () => {
     if (isPicking || isSubmitting) return;

@@ -22,6 +22,7 @@ import { apiErrorMessage, goalProposalStatusLabels } from '@/localization/displa
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { ApiError } from '@/services/apiClient';
 import { GoalScreenSkeleton } from '@/features/goal/components/GoalScreenSkeleton';
+import { metricLabel, withUnit } from '@/localization/progressLabels';
 
 interface GoalProposalDetailScreenProps {
   proposalId: string;
@@ -582,7 +583,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                   },
                 ]}>
                 <Text style={[styles.itemTitle, { color: themeColors.textPrimary }]}>
-                  {tgt.metricDisplayName || tgt.metricCode}
+                  {metricLabel(tgt.metricCode, tgt.metricDisplayName)}
                 </Text>
                 <View style={styles.targetGrid}>
                   <View style={styles.targetGridItem}>
@@ -591,7 +592,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                     </Text>
                     <Text style={[styles.metaVal, { color: themeColors.textPrimary }]}>
                       {tgt.startValue !== null && tgt.startValue !== undefined
-                        ? `${tgt.startValue} ${tgt.unitSymbol}`
+                        ? withUnit(tgt.startValue, tgt.unitCode, { metricCode: tgt.metricCode, symbol: tgt.unitSymbol })
                         : '—'}
                     </Text>
                   </View>
@@ -605,9 +606,9 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                         { color: themeColors.primary, fontWeight: '700' },
                       ]}>
                       {tgt.targetValue !== null && tgt.targetValue !== undefined
-                        ? `${tgt.targetValue} ${tgt.unitSymbol}`
+                        ? withUnit(tgt.targetValue, tgt.unitCode, { metricCode: tgt.metricCode, symbol: tgt.unitSymbol })
                         : tgt.targetMinValue !== null && tgt.targetMaxValue !== null
-                        ? `${tgt.targetMinValue} - ${tgt.targetMaxValue} ${tgt.unitSymbol}`
+                        ? withUnit(`${tgt.targetMinValue} - ${tgt.targetMaxValue}`, tgt.unitCode, { metricCode: tgt.metricCode, symbol: tgt.unitSymbol })
                         : '—'}
                     </Text>
                   </View>

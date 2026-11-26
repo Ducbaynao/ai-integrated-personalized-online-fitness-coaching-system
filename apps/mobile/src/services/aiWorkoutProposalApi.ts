@@ -1,5 +1,5 @@
 import { request } from '@/services/apiClient';
-import { localizedServerMessage } from '@/localization/displayLabels';
+import { localizeFieldErrorsByCode } from '@/localization/fieldErrorMessages';
 import { createCommandKey } from '@/services/coachingApi';
 import {
   WorkoutProposalResponse,
@@ -14,13 +14,7 @@ import { ApiError } from '@/types/auth';
 
 export function getWorkoutProposalFieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ApiError && error.errorResponse?.fieldErrors) {
-    const map: Record<string, string> = {};
-    for (const fe of error.errorResponse.fieldErrors) {
-      if (fe.field && fe.message) {
-        map[fe.field] = localizedServerMessage(fe.message, 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
-      }
-    }
-    return map;
+    return localizeFieldErrorsByCode(error.errorResponse.fieldErrors);
   }
   return {};
 }

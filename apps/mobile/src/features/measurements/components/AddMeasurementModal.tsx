@@ -14,6 +14,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { MetricDefinition, RecordMeasurementRequest } from '@/types/measurement';
+import { metricLabel, unitTypeLabel, valueFieldLabel } from '@/localization/progressLabels';
 
 interface AddMeasurementModalProps {
   visible: boolean;
@@ -124,7 +125,7 @@ export function AddMeasurementModal({
                         styles.chipText,
                         { color: isSelected ? '#FFFFFF' : themeColors.textPrimary },
                       ]}>
-                      {m.displayName}
+                      {metricLabel(m.code, m.displayName)}
                     </Text>
                   </Pressable>
                 );
@@ -134,7 +135,15 @@ export function AddMeasurementModal({
             {activeMetric?.valueType === 'NUMERIC' ? (
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: themeColors.textSecondary }]}>
-                  Giá trị ({unitCode || activeMetric.defaultUnitCode || 'đơn vị'}):
+                  {valueFieldLabel(
+                    'Giá trị',
+                    unitCode || activeMetric.defaultUnitCode
+                      ? unitTypeLabel(unitCode || activeMetric.defaultUnitCode, {
+                          metricCode: activeMetric.code,
+                          symbol: unitCode ? undefined : activeMetric.defaultUnitSymbol,
+                        })
+                      : 'đơn vị'
+                  )}
                 </Text>
                 <TextInput
                   testID="input-numeric-value"

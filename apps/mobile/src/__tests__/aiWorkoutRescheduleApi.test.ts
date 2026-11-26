@@ -357,7 +357,8 @@ describe('aiWorkoutRescheduleApi', () => {
       };
       const apiErr = new ApiError(400, 'Invalid', errResp);
       const errors = getWorkoutRescheduleFieldErrors(apiErr);
-      expect(errors.reason).toBe('Lý do quá dài');
+      // P7-016: unknown codes use the generic copy; the (even Vietnamese) server message is not echoed.
+      expect(errors.reason).toBe('Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
       expect(errors.preferredTimeOfDay).toBe('Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
     });
   });
