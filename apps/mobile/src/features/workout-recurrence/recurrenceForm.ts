@@ -7,7 +7,7 @@ export interface RecurrenceEntry { session: WorkoutSession; firstLocalStart: str
 
 export function recurrencePreview(anchor: string, timezone: string, entries: RecurrenceEntry[]): { error: string | null; warnings: string[] } {
   if (!isMonday(anchor) || !moment.tz.zone(timezone) || !entries.length) {
-    return { error: 'Chọn thứ Hai bắt đầu, múi giờ IANA và ít nhất một buổi.', warnings: [] };
+    return { error: 'Chọn thứ Hai bắt đầu, khung giờ và ít nhất một buổi.', warnings: [] };
   }
   const warnings: string[] = [];
   const ids = new Set<string>();

@@ -61,8 +61,7 @@ function pickDate(tree: renderer.ReactTestRenderer, testID: string, isoDate: str
   renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress(); });
 }
 async function fill(tree: renderer.ReactTestRenderer, count = 1, monday = moment.utc().add(7, 'days').startOf('isoWeek').format('YYYY-MM-DD'), review = true) {
-  input(tree, 'timezone-search', 'Ho_Chi_Minh');
-  await renderer.act(async () => { tree.root.findByProps({ accessibilityLabel: 'Asia/Ho_Chi_Minh' }).props.onPress(); });
+  expect(JSON.stringify(tree.root.findByProps({ testID: 'batch-timezone-display' }).props.children)).toContain('Giờ Việt Nam');
   pickDate(tree, 'week-anchor-trigger', monday);
   for (let n = 1; n <= count; n++) {
     const id = `session-${n}`;

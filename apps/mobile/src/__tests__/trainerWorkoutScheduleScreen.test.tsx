@@ -79,7 +79,7 @@ describe('Trainer read-only Planned Workout calendar', () => {
     expect(output.indexOf('occurrence-legacy')).toBeLessThan(output.indexOf('occurrence-new'));
     expect(output).toContain('Chưa có tên kế hoạch trong bản ghi cũ');
     expect(output).toContain('múi giờ của bản ghi cũ chưa xác định');
-    expect(output).toContain('Asia/Ho_Chi_Minh');
+    expect(output).toContain('Giờ Việt Nam');
     expect(output).toContain('UTC+07:00');
     expect(output).toContain('Upper body');
     expect(output).not.toContain('Bắt đầu tập');

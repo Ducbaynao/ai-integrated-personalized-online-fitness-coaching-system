@@ -103,5 +103,18 @@ Hiển thị target, action, impact, required reason, permission, step-up requir
 ## DateInputField, DatePickerModal & LocalDateTimeInputField
 
 - `DateInputField` + `DatePickerModal` là thành phần chọn ngày chuẩn cross-platform (Android & Web) thay thế nhập chuỗi `YYYY-MM-DD`: hiển thị ngày tiếng Việt `DD/MM/YYYY`, giữ payload nội bộ `YYYY-MM-DD` không convert qua UTC, không tự điền ngày mặc định khi field đang rỗng, hỗ trợ chọn năm xa/tháng/ngày không áp trần giả trước 1920, xử lý minh bạch ngày không tồn tại khi đổi tháng/năm (không clamp âm thầm), hủy không đổi giá trị, nút xóa cho field tùy chọn, giới hạn `minDate`/`maxDate`/`mondayOnly`, layout responsive theo `useWindowDimensions` bảo đảm chạm tối thiểu `44 × 44` ngay cả ở màn hình `360px` không tràn ngang, `SafeAreaView` và cô lập callback theo operation ID bất biến từng lần mở + unmount/disabled/`sessionKey`.
-- `LocalDateTimeInputField` ghép `DateInputField` cho phần ngày với ô giờ `HH:mm` riêng cho các màn lịch hẹn/lịch tập địa phương để giữ nguyên chọn IANA timezone và phân giải DST UTC offset tường minh.
+- `LocalDateTimeInputField` ghép `DateInputField` cho phần ngày với ô giờ `HH:mm` riêng cho các màn lịch hẹn/lịch tập địa phương, mặc định `Asia/Ho_Chi_Minh` (`Giờ Việt Nam`) cho bản ghi mới khi phù hợp và giữ nguyên múi giờ phi Việt Nam/lịch sử cùng phân giải DST UTC offset tường minh.
+
+## MealTypeSelector
+
+- Bộ chọn bữa ăn dùng chung cho Nhật ký dinh dưỡng (`NutritionScreen`) và Phân tích bữa ăn từ mô tả (`FoodAnalysisScreen`), giữ nguyên 5 giá trị enum nghiệp vụ (`BREAKFAST`, `LUNCH`, `DINNER`, `SNACK`, `OTHER`) và nhãn tiếng Việt tương ứng (`Bữa sáng`, `Bữa trưa`, `Bữa tối`, `Bữa phụ`, `Khác`).
+- Không tự suy đoán hay tự chuyển bữa ăn theo giờ đồng hồ thiết bị.
+- Bảo đảm `accessibilityRole="radiogroup"` / `"radio"`, trạng thái `checked`/`selected`/`disabled`, vùng chạm tối thiểu `44 × 44` (`flexWrap: 'wrap'`, `flexShrink: 1` không cắt chữ khi nhãn dài ở chiều rộng `360px`), và dấu hiệu chọn kép (nền nhấn mạnh, viền `2px` và dấu `✓`) không phụ thuộc duy nhất vào màu sắc hoặc ký tự tròn nhỏ.
+
+## Friendly Timezone Defaults & `TimezoneContextPicker` (`timezoneUtils`)
+
+- Giao diện Mobile thường không hiển thị ô tìm/nhập hay chuỗi mã IANA thô: mọi tạo mới thực sự (`resolveNewRecordDefaultTimezone`) mặc định `Asia/Ho_Chi_Minh` (`Giờ Việt Nam`) bất kể múi giờ tài khoản hay thiết bị.
+- Dữ liệu hiện có (`resolveExistingRecordTimezone`, chiến lược/version mục tiêu, lịch hẹn, occurrence, đề xuất, setting đã lưu) được giữ nguyên mã IANA và DST/offset trong dữ liệu/payload, nhưng hiển thị trên UI bằng nhãn tiếng Việt thân thiện phân biệt rõ từng vùng qua `formatTimezoneDisplay` (không gom thành nhãn mơ hồ); bản ghi thiếu múi giờ lịch sử vẫn giữ trạng thái chưa có múi giờ, không gán nhầm sang Việt Nam.
+- `TimezoneContextPicker` dùng radio semantics (`44 × 44`, không nhập mã IANA) để chọn hoặc khôi phục ngữ cảnh thân thiện (bao gồm tình huống `409 NUTRITION_TIMEZONE_CONFLICT`) mà không tự động thử hàng loạt múi giờ hoặc bỏ qua xác nhận bắt buộc (xác nhận ngày/ngữ cảnh dinh dưỡng, xác nhận múi giờ đánh giá 100 ngày, opt-in thông báo đẩy theo từng danh mục/phiên, xem trước lịch và chọn UTC offset khi DST nhập nhằng).
+- Tập lựa chọn của `TimezoneContextPicker` chỉ gồm giao của danh mục `ZoneId.getAvailableZoneIds()` mà Backend kiểm membership (sinh và đối chiếu bằng `apps/mobile/scripts/generate-backend-timezone-catalog.cjs [--check]` với JDK khớp runtime Backend) và các vùng `moment-timezone` hiển thị được; giữ alias hợp lệ như `Asia/Saigon`. Mã đã lưu nằm ngoài tập này vẫn hiển thị nhãn thân thiện và không bị đổi/canonicalize, nhưng không được đưa ra làm lựa chọn mới.
 

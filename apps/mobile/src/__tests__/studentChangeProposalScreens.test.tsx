@@ -100,7 +100,8 @@ describe('Student change proposal screens', () => {
     const json = JSON.stringify(tree.toJSON());
     expect(json).toContain('Chưa có tên kế hoạch');
     expect(json).toContain('Chưa xác định trong bản ghi cũ');
-    expect(json).toContain('America/New_York');
+    expect(json).toContain('Giờ Miền Đông Hoa Kỳ (New York)');
+    expect(json).not.toContain('America/New_York');
     renderer.act(() => tree.root.findByProps({ testID: 'student-change-accept' }).props.onPress());
     expect(tree.root.findByProps({ testID: 'student-change-confirmation' })).toBeTruthy();
     await renderer.act(async () => { tree.root.findByProps({ testID: 'student-change-confirm-decision' }).props.onPress(); await Promise.resolve(); });

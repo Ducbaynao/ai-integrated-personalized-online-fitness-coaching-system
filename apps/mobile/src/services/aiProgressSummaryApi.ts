@@ -1,5 +1,6 @@
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
+import { resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import {
   F04ProgressSummaryApiRequest,
   F04ProgressSummaryResponse,
@@ -8,14 +9,8 @@ import {
 export const F04_DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
 export function getUserTimezone(preferredTimezone?: string): string {
-  if (preferredTimezone) return preferredTimezone;
-  try {
-    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (resolved) return resolved;
-  } catch {
-    // fallback if Intl is not available
-  }
-  return F04_DEFAULT_TIMEZONE;
+  void preferredTimezone;
+  return resolveNewRecordDefaultTimezone();
 }
 
 export const METRIC_OPTIONS: { code: string; label: string }[] = [

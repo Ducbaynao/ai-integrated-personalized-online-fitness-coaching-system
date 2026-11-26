@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
+import { AccessibilityInfo, ScrollView, Text, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -8,6 +8,8 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
+import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
+import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
 import { appointmentApi } from '@/services/appointmentApi';
@@ -15,7 +17,7 @@ import { ApiError } from '@/types/auth';
 import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displayLabels';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { ConfirmWorkoutScheduleBatchRequest } from '@/types/workoutScheduleBatch';
-import { isMonday, proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
+import { isMonday, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { workoutScheduleQueryKeys } from './workoutScheduleQueries';
 import { DirectBatchEntry, suggestedSessionDate, validateDirectBatch } from './directBatchValidation';
 
@@ -45,8 +47,8 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
     && currentVersion?.id === plan.currentVersionId && Boolean(currentVersion?.lockedAt)
     && currentVersion?.effectiveUntil === null && version?.id === currentVersion.id
     && version.current && Boolean(version.lockedAt) && version.effectiveUntil === null;
-  const [timezoneSearch, setTimezoneSearch] = useState('');
-  const [timezone, setTimezone] = useState('');
+  const [timezone, setTimezone] = useState(() => resolveNewRecordDefaultTimezone());
+  const [tzExpanded, setTzExpanded] = useState(false);
   const [anchor, setAnchor] = useState('');
   const [entries, setEntries] = useState<DirectBatchEntry[]>([]);
   const [preview, setPreview] = useState(false);
@@ -73,7 +75,6 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
   });
   const appointmentCandidates = appointmentQuery.data?.pages.flatMap(page => page.items)
     .filter(item => item.status === 'CONFIRMED' && !item.plannedWorkoutId && !!item.coachingPeriodId) ?? [];
-  const zones = useMemo(() => proposalTimezones(timezoneSearch), [timezoneSearch]);
   const validation = useMemo(() => validateDirectBatch(anchor, timezone, entries), [anchor, timezone, entries]);
 
   useEffect(() => {
@@ -168,11 +169,20 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
     {sourceReady && plan ? <>
       <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{plan.name}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {version?.versionNumber} · {sessions.length} buổi. Lịch chỉ được tạo sau khi bạn xác nhận toàn bộ đợt.</Text></WorkoutCard>
-      <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Múi giờ của đợt lịch</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn rõ múi giờ IANA; không dùng ngầm múi giờ thiết bị hay hồ sơ.</Text>
-        <TextInput testID="timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Đã chọn: {timezone || 'Chưa chọn'}</Text>
-        {zones.map((zone) => <WorkoutButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); resetReview(); }} />)}
+      <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Khung giờ của đợt lịch</Text>
+        <TimezoneContextPicker
+          testIDPrefix="batch-timezone"
+          label="Khung giờ áp dụng"
+          value={timezone}
+          expanded={tzExpanded}
+          onToggleExpanded={() => setTzExpanded((v) => !v)}
+          onChange={(nextZone) => {
+            setTimezone(nextZone);
+            setEntries((current) => current.map((entry) => ({ ...entry, startOffset: '', endOffset: '' })));
+            setTzExpanded(false);
+            resetReview();
+          }}
+        />
       </WorkoutCard>
       <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Tuần bắt đầu</Text>
         <DateInputField
@@ -232,7 +242,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
               {!appointmentQuery.isPending && !appointmentQuery.isError && !appointmentCandidates.length
                 ? <WorkoutState title="Chưa có lịch hẹn phù hợp" message="Tạo yêu cầu lịch hẹn và chờ bên còn lại xác nhận trước khi lên lịch buổi này." /> : null}
               {appointmentCandidates.map(candidate => <WorkoutButton key={candidate.appointmentId} testID={`appointment-${candidate.appointmentId}`}
-                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${candidate.timezone}`}
+                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${formatTimezoneDisplay(candidate.timezone)}`}
                 secondary={selected.appointmentId !== candidate.appointmentId}
                 onPress={() => updateEntry(session.id, { appointmentId: candidate.appointmentId })} />)}
               {appointmentQuery.hasNextPage ? <WorkoutButton label="Tải thêm lịch hẹn" secondary
@@ -245,7 +255,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
       {validation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>{validation}</Text> : null}
       {preview && !validation ? <WorkoutCard testID="batch-preview">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận cả đợt lịch</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.name} · Phiên bản {version?.versionNumber} · {timezone} · Tuần bắt đầu {anchor}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.name} · Phiên bản {version?.versionNumber} · {formatTimezoneDisplay(timezone)} · Tuần bắt đầu {anchor}</Text>
         {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Đã chọn lịch hẹn xác nhận' : ''}</Text>)}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Máy chủ sẽ kiểm tra quyền, phiên bản và xung đột. Hoặc toàn bộ buổi được tạo, hoặc không buổi nào được tạo.</Text>
         <WorkoutButton testID="confirm-batch" label="Xác nhận tạo toàn bộ lịch" busy={mutation.isPending} disabled={mutation.isPending || stale} onPress={confirm} />

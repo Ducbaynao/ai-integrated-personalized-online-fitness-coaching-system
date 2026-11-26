@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
+import { AccessibilityInfo, ScrollView, Text, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentApi } from '@/services/appointmentApi';
@@ -10,6 +10,8 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
+import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
+import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
 import { ApiError } from '@/types/auth';
@@ -17,7 +19,7 @@ import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displ
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { CreateWorkoutScheduleProposalRequest } from '@/types/workoutScheduleProposal';
 import { proposalErrorMessage } from './proposalPresentation';
-import { isInSessionWeek, isMonday, proposalTimezones, validProposalOffsets } from './proposalTime';
+import { isInSessionWeek, isMonday, validProposalOffsets } from './proposalTime';
 import { workoutScheduleProposalQueryKeys } from './workoutScheduleProposalQueries';
 
 type Entry = { session: WorkoutSession; localStart: string; localEnd: string; startOffset: string; endOffset: string; appointmentId?: string };
@@ -45,8 +47,8 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
   const sessions = versionQuery.data?.sessions ?? [];
   const sourceReady = plan?.status === 'ACTIVE' && plan.currentVersionLockedAt && version?.id === versionId
     && version.current && version.lockedAt && version.effectiveUntil === null;
-  const [timezoneSearch, setTimezoneSearch] = useState('');
-  const [timezone, setTimezone] = useState('');
+  const [timezone, setTimezone] = useState(() => resolveNewRecordDefaultTimezone());
+  const [tzExpanded, setTzExpanded] = useState(false);
   const [anchor, setAnchor] = useState('');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [preview, setPreview] = useState(false);
@@ -60,7 +62,6 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
   });
   const appointmentFrom = includeEarlierAppointments ? new Date(0).toISOString() : appointmentWindow.from;
   const submitting = useRef(false);
-  const zones = useMemo(() => proposalTimezones(timezoneSearch), [timezoneSearch]);
   const appointmentQuery = useInfiniteQuery({
     queryKey: ['appointments', trainerId, studentId, 'proposal-candidates', appointmentFrom, appointmentWindow.until],
     enabled: allowed && !concealed && !!appointmentWindow && entries.some(entry => entry.session.supervisionRequirement === 'COACH_REQUIRED'),
@@ -99,7 +100,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
   };
 
   const validation = useMemo(() => {
-    if (!sourceReady || !timezone || !isMonday(anchor) || entries.length === 0) return 'Chọn kế hoạch đang hiệu lực, múi giờ IANA, thứ Hai đầu tuần và ít nhất một buổi.';
+    if (!sourceReady || !timezone || !isMonday(anchor) || entries.length === 0) return 'Chọn kế hoạch đang hiệu lực, thứ Hai đầu tuần và ít nhất một buổi.';
     const intervals: { from: number; until: number }[] = [];
     for (const entry of entries) {
       const { session } = entry;
@@ -190,11 +191,21 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
     </WorkoutCard> : null}
     {sourceReady ? <>
       <WorkoutCard>
-        <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Múi giờ của đề xuất</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Huấn luyện viên phải chọn rõ múi giờ IANA. Đây không phải múi giờ hồ sơ học viên hay thiết bị.</Text>
-        <TextInput testID="timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
-        <Text style={[styles.label, { color: theme.textPrimary }]}>Đã chọn: {timezone || 'Chưa chọn'}</Text>
-        {zones.map((zone) => <WorkoutButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); resetReview(); }} />)}
+        <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Khung giờ của đề xuất</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên sẽ xem rõ khung giờ này trước khi quyết định toàn bộ đề xuất.</Text>
+        <TimezoneContextPicker
+          testIDPrefix="proposal-timezone"
+          label="Khung giờ áp dụng"
+          value={timezone}
+          expanded={tzExpanded}
+          onToggleExpanded={() => setTzExpanded((v) => !v)}
+          onChange={(nextZone) => {
+            setTimezone(nextZone);
+            setEntries((current) => current.map((entry) => ({ ...entry, startOffset: '', endOffset: '', appointmentId: undefined })));
+            setTzExpanded(false);
+            resetReview();
+          }}
+        />
       </WorkoutCard>
       <WorkoutCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Tuần bắt đầu</Text>
@@ -259,7 +270,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
                 label="Tìm cả lịch hẹn bắt đầu trước hôm qua" secondary
                 onPress={() => setIncludeEarlierAppointments(true)} /> : null}
               {matchingAppointments.map(candidate => <WorkoutButton key={candidate.appointmentId} testID={`proposal-appointment-${candidate.appointmentId}`}
-                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${candidate.timezone}`}
+                label={`${candidate.localStart ?? candidate.startAt} – ${candidate.localEnd ?? candidate.endAt} · ${formatTimezoneDisplay(candidate.timezone)}`}
                 secondary={selected.appointmentId !== candidate.appointmentId}
                 onPress={() => updateEntry(session.id, { appointmentId: candidate.appointmentId })} />)}
               {appointmentQuery.hasNextPage ? <WorkoutButton label="Tải thêm lịch hẹn" secondary
@@ -272,7 +283,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       {validation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>{validation}</Text> : null}
       {preview && !validation ? <WorkoutCard testID="proposal-preview">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận tạo đề xuất</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {plan?.name} · Phiên bản {version?.versionNumber} · Múi giờ huấn luyện viên chọn: {timezone} · Tuần bắt đầu: {anchor}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {plan?.name} · Phiên bản {version?.versionNumber} · Khung giờ đề xuất: {formatTimezoneDisplay(timezone)} · Tuần bắt đầu: {anchor}</Text>
         {entries.map((entry) => <Text key={entry.session.id} style={[styles.body, { color: theme.textPrimary }]}>{entry.session.name}: {entry.localStart} UTC{entry.startOffset} → {entry.localEnd} UTC{entry.endOffset}{entry.appointmentId ? ' · Có lịch hẹn đã xác nhận được chọn' : ''}</Text>)}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Học viên sẽ xem múi giờ, thời gian từng buổi rồi chấp nhận hoặc từ chối toàn bộ. Không buổi nào được tạo khi chỉ gửi đề xuất.</Text>
         <WorkoutButton testID="confirm-create-proposal" label="Gửi đề xuất cho học viên" busy={mutation.isPending} disabled={mutation.isPending || stale} onPress={create} />

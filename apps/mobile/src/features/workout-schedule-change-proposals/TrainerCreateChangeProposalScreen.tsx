@@ -8,13 +8,14 @@ import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } fro
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { spacing } from '@/design-system/tokens/spacing';
+import { formatTimezoneDisplay, resolveExistingRecordTimezone } from '@/features/shared/timezoneUtils';
 import { ApiError } from '@/types/auth';
 import type { WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
 import type { CreateWorkoutScheduleChangeProposalRequest, WorkoutScheduleChangeType } from '@/types/workoutScheduleChangeProposal';
 import { useTrainerWorkoutScheduleDetail, workoutScheduleQueryKeys } from '@/features/workout-schedule/workoutScheduleQueries';
 import { formatTrainerScheduleTime, plannedWorkoutStatusLabels } from '@/features/workout-schedule/scheduleDisplay';
 import { validateScheduleDestination } from '@/features/workout-schedule/scheduleChange';
-import { proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
+import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { changeProposalErrorMessage, changeTypeLabels } from './changeProposalPresentation';
 import { workoutScheduleChangeProposalQueryKeys } from './workoutScheduleChangeProposalQueries';
 import { useTrainerChangeProposalAuthority } from './useTrainerChangeProposalAuthority';
@@ -34,7 +35,6 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
   const denied = query.error instanceof ApiError && [403, 404].includes(query.error.status);
   const [changeType, setChangeType] = useState<WorkoutScheduleChangeType | null>(null);
   const [destination, setDestination] = useState<WorkoutScheduleChangeDestination>(EMPTY_DESTINATION);
-  const [timezoneSearch, setTimezoneSearch] = useState('');
   const [reason, setReason] = useState('');
   const [preview, setPreview] = useState(false);
   const [pending, setPending] = useState<Command | null>(null);
@@ -121,7 +121,11 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
       {!canSelect ? <WorkoutState testID="create-change-ineligible" title="Không thể đề xuất từ buổi này" message="Cần occurrence SCHEDULED và quyền Đóng góp hiện hành." /> : <>
         <View style={styles.row}>
           <WorkoutButton testID="select-change-reschedule" label="Đề xuất đổi lịch" secondary={changeType !== 'RESCHEDULE'} disabled={!rescheduleSourceReady}
-            onPress={() => { setChangeType('RESCHEDULE'); resetReview(); }} />
+            onPress={() => {
+              setChangeType('RESCHEDULE');
+              setDestination({ ...EMPTY_DESTINATION, timezone: resolveExistingRecordTimezone(item.timezone) });
+              resetReview();
+            }} />
           <WorkoutButton testID="select-change-cancel" label="Đề xuất hủy" secondary={changeType !== 'CANCEL'} onPress={() => { setChangeType('CANCEL'); resetReview(); }} />
         </View>
         {!rescheduleSourceReady ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>
@@ -131,14 +135,9 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         </Text> : null}
         {changeType === 'RESCHEDULE' && rescheduleSourceReady ? <WorkoutCard testID="create-change-reschedule-form">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Giờ thay thế</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn tường minh IANA timezone, giờ bắt đầu/kết thúc địa phương và UTC offset. Không suy thời lượng từ kế hoạch.</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn giờ bắt đầu/kết thúc địa phương và xác nhận UTC offset phù hợp. Không suy thời lượng từ kế hoạch.</Text>
           {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi đề xuất phải nằm trọn trong cùng một lịch hẹn đã xác nhận. Lịch hẹn không tự đổi; hệ thống sẽ kiểm lại mã và phiên bản khi học viên chấp nhận.</Text> : null}
-          {item.timezone ? <WorkoutButton label={`Dùng múi giờ occurrence: ${item.timezone}`} secondary onPress={() => editDestination({ timezone: item.timezone ?? '', startUtcOffset: '', endUtcOffset: '' })} /> : null}
-          <TextInput testID="change-timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch}
-            style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Múi giờ đã chọn: {destination.timezone || 'Chưa chọn'}</Text>
-          {proposalTimezones(timezoneSearch).map((zone) => <WorkoutButton key={zone} label={zone} secondary={zone !== destination.timezone}
-            onPress={() => editDestination({ timezone: zone, startUtcOffset: '', endUtcOffset: '' })} />)}
+          <Text testID="change-timezone-display" style={[styles.label, { color: theme.textPrimary }]}>Khung giờ áp dụng: {formatTimezoneDisplay(destination.timezone)}</Text>
           {(['Start', 'End'] as const).map((part) => {
             const local = part === 'Start' ? destination.localStart : destination.localEnd;
             const offset = part === 'Start' ? destination.startUtcOffset : destination.endUtcOffset;
@@ -172,7 +171,7 @@ export function TrainerCreateChangeProposalScreen({ relationshipId, occurrenceId
         {preview && changeType ? <WorkoutCard testID="change-proposal-preview">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận gửi {changeTypeLabels[changeType].toLowerCase()}</Text>
           <Text style={[styles.body, { color: theme.textPrimary }]}>Buổi hiện tại: {item.sessionSummary?.name?.trim() || 'Buổi tập theo lịch'} · {formatTrainerScheduleTime(item.plannedStartAt, item.timezone)}</Text>
-          {changeType === 'RESCHEDULE' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ đề xuất: {destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {destination.timezone}</Text> : null}
+          {changeType === 'RESCHEDULE' ? <Text style={[styles.body, { color: theme.textPrimary }]}>Giờ đề xuất: {destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {formatTimezoneDisplay(destination.timezone)}</Text> : null}
           {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn hiện có là một lifecycle riêng. Đề xuất hủy buổi tập không hủy lịch hẹn; đề xuất đổi lịch không tự dời lịch hẹn.</Text> : null}
           {reason.trim() ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {reason.trim()}</Text> : null}
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ một buổi tập. Học viên sẽ chấp nhận hoặc từ chối; gửi đề xuất đang chờ không đổi buổi tập hay giữ chỗ trên lịch.</Text>

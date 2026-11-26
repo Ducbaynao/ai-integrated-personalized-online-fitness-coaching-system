@@ -11,13 +11,14 @@ import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWor
 import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import type { PlannedWorkoutOccurrence } from '@/types/workoutSchedule';
 import { calendarWindow, formatTrainerScheduleTime, plannedWorkoutStatusLabels } from './scheduleDisplay';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 import { useTrainerWorkoutSchedule, workoutScheduleQueryKeys } from './workoutScheduleQueries';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 function localIntent(value: string | null, offset: string | null, timezone: string | null) {
   if (!value) return 'Không có giờ địa phương trong bản ghi cũ';
-  return `${value.replace('T', ' ')} · ${offset ? `UTC${offset}` : 'chưa có UTC offset'} · ${timezone || 'chưa có múi giờ gốc'}`;
+  return `${value.replace('T', ' ')} · ${offset ? `UTC${offset}` : 'chưa có UTC offset'} · ${formatTimezoneDisplay(timezone, 'chưa có múi giờ gốc')}`;
 }
 
 function TrainerOccurrenceCard({ item, relationshipId, canContribute, canManage, onAiReschedule }: { item: PlannedWorkoutOccurrence; relationshipId: string; canContribute: boolean; canManage: boolean; onAiReschedule: (item: PlannedWorkoutOccurrence) => void }) {

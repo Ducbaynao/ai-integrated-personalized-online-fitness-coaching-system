@@ -1,5 +1,6 @@
 import { ApiError } from '@/types/auth';
 import type { WorkoutScheduleProposalStatus } from '@/types/workoutScheduleProposal';
+import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 
 export const proposalStatusLabels: Record<WorkoutScheduleProposalStatus, string> = {
   PENDING: 'Đang chờ bạn quyết định',
@@ -15,12 +16,12 @@ export const trainerProposalStatusLabels: Record<WorkoutScheduleProposalStatus, 
 };
 
 export function formatProposalLocal(value: string, offset: string, timezone: string): string {
-  return `${value.replace('T', ' ')} (UTC${offset}) · ${timezone}`;
+  return `${value.replace('T', ' ')} (UTC${offset}) · ${formatTimezoneDisplay(timezone)}`;
 }
 
 export function formatProposalInstant(value: string, timezone: string): string {
   try {
-    return `${new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(value))} · ${timezone}`;
+    return `${new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(value))} · ${formatTimezoneDisplay(timezone, 'Chưa có múi giờ', value)}`;
   } catch {
     return `${new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(value))} · UTC`;
   }

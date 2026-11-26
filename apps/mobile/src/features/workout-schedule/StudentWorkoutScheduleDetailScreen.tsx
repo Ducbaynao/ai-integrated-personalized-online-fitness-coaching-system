@@ -15,7 +15,8 @@ import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/f
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { spacing } from '@/design-system/tokens/spacing';
-import { proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
+import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
+import { formatTimezoneDisplay, resolveExistingRecordTimezone } from '@/features/shared/timezoneUtils';
 import { workoutScheduleQueryKeys, useWorkoutScheduleDetail } from './workoutScheduleQueries';
 import { formatScheduleTime, plannedWorkoutStatusLabels } from './scheduleDisplay';
 import { scheduleChangeErrorMessage, validateScheduleDestination } from './scheduleChange';
@@ -46,7 +47,6 @@ export function StudentWorkoutScheduleDetailScreen({
   const item = query.data;
   const [mode, setMode] = useState<'VIEW' | 'RESCHEDULE' | 'CANCEL'>('VIEW');
   const [destination, setDestination] = useState<WorkoutScheduleChangeDestination>(EMPTY_DESTINATION);
-  const [timezoneSearch, setTimezoneSearch] = useState('');
   const [reason, setReason] = useState('');
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
@@ -204,7 +204,7 @@ export function StudentWorkoutScheduleDetailScreen({
         <Text style={[styles.body, { color: theme.textSecondary }]}>Bắt đầu: {formatScheduleTime(item.plannedStartAt, item.timezone, user?.timezone)}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc: {item.plannedEndAt ? formatScheduleTime(item.plannedEndAt, item.timezone, user?.timezone) : 'Chưa rõ trong bản ghi cũ'}</Text>
         {item.localStart && item.localEnd && item.timezone && item.startUtcOffset && item.endUtcOffset
-          ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương: {item.localStart} UTC{item.startUtcOffset} → {item.localEnd} UTC{item.endUtcOffset} · {item.timezone}</Text>
+          ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương: {item.localStart} UTC{item.startUtcOffset} → {item.localEnd} UTC{item.endUtcOffset} · {formatTimezoneDisplay(item.timezone)}</Text>
           : <Text style={[styles.body, { color: theme.textSecondary }]}>Bản ghi cũ chưa có đủ giờ địa phương, múi giờ hoặc UTC offset.</Text>}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Mốc đầu chuỗi: {formatScheduleTime(item.originalPlannedStartAt, item.timezone, user?.timezone)}</Text>
         {item.rescheduledFromOccurrenceId ? <WorkoutButton testID="schedule-predecessor" label="Xem buổi tập trước khi đổi lịch" secondary onPress={() => router.push(`/workouts/schedule/${item.rescheduledFromOccurrenceId}` as never)} /> : null}
@@ -218,17 +218,14 @@ export function StudentWorkoutScheduleDetailScreen({
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
         {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
         {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={handleOpenRescheduleModal} /> : null}
-        {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination(EMPTY_DESTINATION); resetCommand(); }} /> : null}
+        {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination({ ...EMPTY_DESTINATION, timezone: resolveExistingRecordTimezone(item.timezone) }); resetCommand(); }} /> : null}
         {item.availableActions.includes('CANCEL') ? <WorkoutButton testID="schedule-cancel" label="Hủy buổi này" danger onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} /> : null}
       </View> : null}
       {mode === 'RESCHEDULE' && item.availableActions.includes('RESCHEDULE') && !needsReview ? <>
         <WorkoutCard testID="schedule-reschedule-form">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Chọn giờ mới</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn rõ múi giờ IANA, ngày giờ địa phương và UTC offset. Không suy giờ kết thúc từ kế hoạch.</Text>
-          {item.timezone ? <WorkoutButton label={`Dùng múi giờ hiện tại: ${item.timezone}`} secondary onPress={() => editDestination({ timezone: item.timezone ?? '', startUtcOffset: '', endUtcOffset: '' })} /> : null}
-          <TextInput testID="schedule-timezone-search" accessibilityLabel="Tìm múi giờ IANA" placeholder="Tìm, ví dụ Asia/Ho_Chi_Minh" value={timezoneSearch} onChangeText={setTimezoneSearch} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
-          <Text style={[styles.label, { color: theme.textPrimary }]}>Múi giờ đã chọn: {destination.timezone || 'Chưa chọn'}</Text>
-          {proposalTimezones(timezoneSearch).map((zone) => <WorkoutButton key={zone} label={zone} secondary={zone !== destination.timezone} onPress={() => editDestination({ timezone: zone, startUtcOffset: '', endUtcOffset: '' })} />)}
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn ngày giờ địa phương và xác nhận UTC offset phù hợp. Không suy giờ kết thúc từ kế hoạch.</Text>
+          <Text testID="schedule-timezone-display" style={[styles.label, { color: theme.textPrimary }]}>Khung giờ áp dụng: {formatTimezoneDisplay(destination.timezone)}</Text>
           {(['Start', 'End'] as const).map((part) => {
             const local = part === 'Start' ? destination.localStart : destination.localEnd;
             const offset = part === 'Start' ? destination.startUtcOffset : destination.endUtcOffset;
@@ -258,7 +255,7 @@ export function StudentWorkoutScheduleDetailScreen({
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận đổi một buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi cũ được giữ trong lịch sử; buổi mới sẽ có ID riêng, giữ nguyên nguồn kế hoạch và nội dung tập.</Text>
           {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn không tự dời. Buổi mới phải nằm trọn trong lịch hẹn đã xác nhận hiện tại; liên kết đang hoạt động sẽ chuyển sang buổi mới. Nếu cần giờ ngoài lịch hẹn, hãy hoàn tất yêu cầu đổi lịch hẹn trước rồi xem và xác nhận lại buổi tập.</Text> : null}
-          <Text style={[styles.body, { color: theme.textPrimary }]}>{destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {destination.timezone}</Text>
+          <Text style={[styles.body, { color: theme.textPrimary }]}>{destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {formatTimezoneDisplay(destination.timezone)}</Text>
           <WorkoutButton testID="schedule-confirm-reschedule" label="Xác nhận đổi lịch" busy={mutation.isPending} disabled={mutation.isPending} onPress={submit} />
         </WorkoutCard> : null}
       </> : null}

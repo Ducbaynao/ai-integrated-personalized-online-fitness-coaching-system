@@ -98,7 +98,7 @@ describe('Student direct schedule change', () => {
     (workoutScheduleApi.reschedule as jest.Mock).mockResolvedValue({ changeType: 'RESCHEDULE', replacementOccurrenceId: 'new-1' });
     const { tree, invalidate } = render();
     renderer.act(() => tree.root.findByProps({ testID: 'schedule-reschedule' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Dùng múi giờ hiện tại: Asia/Ho_Chi_Minh' }).props.onPress());
+    expect(JSON.stringify(tree.root.findByProps({ testID: 'schedule-timezone-display' }).props.children)).toContain('Giờ Việt Nam');
     pickDate(tree.root, 'schedule-local-start-date-trigger', '2026-10-21');
     renderer.act(() => tree.root.findByProps({ testID: 'schedule-local-start-time' }).props.onChangeText('18:00'));
     pickDate(tree.root, 'schedule-local-end-date-trigger', '2026-10-21');
