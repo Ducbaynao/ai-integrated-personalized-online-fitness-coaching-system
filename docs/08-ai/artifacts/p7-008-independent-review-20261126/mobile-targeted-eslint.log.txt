@@ -1,0 +1,9 @@
+
+C:\VScode\CodePTIT\Đồ Án Tốt Nghiệp\p7-008-review-r3\apps\mobile\src\__tests__\CurrentGoalScreen.test.tsx
+  2126:44  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2169:44  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2227:44  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2277:44  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2328:44  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+✖ 5 problems (0 errors, 5 warnings)

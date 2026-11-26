@@ -2078,4 +2078,300 @@ describe('CurrentGoalScreen', () => {
       expect(root.findByProps({ testID: 'create-goal-transition-modal' }).props.visible).toBe(true);
     });
   });
+
+  describe('P7-008 parent identity guard across pending refresh', () => {
+    const createDeferred = <T,>() => {
+      let resolve!: (value: T) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    const goalA: FitnessGoal = {
+      ...activeGoal,
+      id: 'goal-A',
+      title: 'Title goal-A',
+    };
+
+    const goalB: FitnessGoal = {
+      ...activeGoal,
+      id: 'goal-B',
+      title: 'Title goal-B',
+      currentVersion: activeGoal.currentVersion
+        ? {
+            ...activeGoal.currentVersion,
+            id: 'version-B-1',
+            title: 'Title goal-B',
+          }
+        : null,
+    };
+
+    it('Case A (Version): blocks submit and never calls createGoalVersion for goal-B with draft-A when pending refresh returns goal-B with same PRIMARY', async () => {
+      const refreshDeferred = createDeferred<FitnessGoal>();
+      (fitnessGoalApi.getCurrentGoal as jest.Mock)
+        .mockResolvedValueOnce(goalA)
+        .mockImplementationOnce(() => refreshDeferred.promise);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      // Trigger pull-to-refresh (GET pending)
+      await renderer.act(async () => {
+        const scrollView = root.findByType(require('react-native').ScrollView);
+        scrollView.props.refreshControl.props.onRefresh();
+      });
+
+      // Open version editor while Goal A is displayed and enter draft-A
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Unsaved draft for A');
+      });
+
+      // Pending refresh resolves with Goal B (same PRIMARY: MUSCLE_GAIN)
+      await renderer.act(async () => {
+        refreshDeferred.resolve(goalB);
+        await Promise.resolve();
+      });
+
+      // Stale editor A must show mismatch notice, disable submit, and never call createGoalVersion
+      expect(root.findByProps({ testID: 'goal-version-error-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'goal-version-submit-button' }).props.disabled).toBe(true);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+      expect(fitnessGoalApi.createGoalVersion).not.toHaveBeenCalled();
+    });
+
+    it('Case B (Version): closing stale editor A and opening new editor for B submits createGoalVersion for goal-B with draft-B', async () => {
+      const refreshDeferred = createDeferred<FitnessGoal>();
+      (fitnessGoalApi.getCurrentGoal as jest.Mock)
+        .mockResolvedValueOnce(goalA)
+        .mockImplementationOnce(() => refreshDeferred.promise)
+        .mockResolvedValueOnce(goalB);
+      (fitnessGoalApi.createGoalVersion as jest.Mock).mockResolvedValueOnce(goalB);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        const scrollView = root.findByType(require('react-native').ScrollView);
+        scrollView.props.refreshControl.props.onRefresh();
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Unsaved draft for A');
+      });
+      await renderer.act(async () => {
+        refreshDeferred.resolve(goalB);
+        await Promise.resolve();
+      });
+
+      // Close stale editor A
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-cancel-button' }).props.onPress();
+      });
+
+      // Open fresh editor for B
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      expect(root.findAllByProps({ testID: 'goal-version-error-banner' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'goal-version-submit-button' }).props.disabled).toBe(false);
+
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Valid draft for B');
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledTimes(1);
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledWith(
+        'goal-B',
+        expect.objectContaining({
+          changeReason: 'Valid draft for B',
+          objectives: [{ goalTypeCode: 'MUSCLE_GAIN', priority: 'PRIMARY' }],
+        })
+      );
+    });
+
+    it('Case C (Version): pending refresh returning same goal-A preserves draft and submits to goal-A', async () => {
+      const refreshDeferred = createDeferred<FitnessGoal>();
+      (fitnessGoalApi.getCurrentGoal as jest.Mock)
+        .mockResolvedValueOnce(goalA)
+        .mockImplementationOnce(() => refreshDeferred.promise)
+        .mockResolvedValueOnce(goalA);
+      (fitnessGoalApi.createGoalVersion as jest.Mock).mockResolvedValueOnce(goalA);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        const scrollView = root.findByType(require('react-native').ScrollView);
+        scrollView.props.refreshControl.props.onRefresh();
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Preserved draft for A');
+      });
+
+      await renderer.act(async () => {
+        refreshDeferred.resolve({ ...goalA, updatedAt: '2026-09-02T10:00:00Z' });
+        await Promise.resolve();
+      });
+
+      expect(root.findAllByProps({ testID: 'goal-version-error-banner' }).length).toBe(0);
+      expect(root.findByProps({ testID: 'goal-version-reason-input' }).props.value).toBe('Preserved draft for A');
+      expect(root.findByProps({ testID: 'goal-version-submit-button' }).props.disabled).toBe(false);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledTimes(1);
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledWith(
+        'goal-A',
+        expect.objectContaining({
+          changeReason: 'Preserved draft for A',
+          objectives: [{ goalTypeCode: 'MUSCLE_GAIN', priority: 'PRIMARY' }],
+        })
+      );
+    });
+
+    it('Case D (Version): transient failure on same goal-A followed by retry preserves editor/draft and submits to goal-A', async () => {
+      const sameGoalRefresh = createDeferred<FitnessGoal>();
+      (fitnessGoalApi.getCurrentGoal as jest.Mock)
+        .mockResolvedValueOnce(goalA)
+        .mockImplementationOnce(() => sameGoalRefresh.promise)
+        .mockResolvedValueOnce(goalA);
+      (fitnessGoalApi.createGoalVersion as jest.Mock)
+        .mockRejectedValueOnce(new Error('Transient network failure'))
+        .mockResolvedValueOnce(goalA);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        const scrollView = root.findByType(require('react-native').ScrollView);
+        scrollView.props.refreshControl.props.onRefresh();
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'adjust-goal-version-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText('Draft across retry');
+      });
+
+      // Same goal-A refresh arrives
+      await renderer.act(async () => {
+        sameGoalRefresh.resolve(goalA);
+        await Promise.resolve();
+      });
+
+      // First submit fails transiently -> modal and draft must stay intact
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+
+      expect(root.findByProps({ testID: 'create-goal-version-modal' }).props.visible).toBe(true);
+      expect(root.findByProps({ testID: 'goal-version-error-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'goal-version-reason-input' }).props.value).toBe('Draft across retry');
+
+      // Retry submit -> succeeds against goal-A with preserved draft
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-version-submit-button' }).props.onPress();
+      });
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenCalledTimes(2);
+      expect(fitnessGoalApi.createGoalVersion).toHaveBeenLastCalledWith(
+        'goal-A',
+        expect.objectContaining({ changeReason: 'Draft across retry' })
+      );
+    });
+
+    it('Case E (Transition): blocks submit when pending refresh switches goal-A to goal-B and submits only after reopening for goal-B', async () => {
+      const refreshDeferred = createDeferred<FitnessGoal>();
+      (fitnessGoalApi.getCurrentGoal as jest.Mock)
+        .mockResolvedValueOnce(goalA)
+        .mockImplementationOnce(() => refreshDeferred.promise)
+        .mockResolvedValueOnce(goalB);
+      (fitnessGoalApi.createGoalTransition as jest.Mock).mockResolvedValueOnce(goalB);
+
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => {
+        tree = renderer.create(<CurrentGoalScreen />);
+      });
+      const root = tree.root;
+
+      await renderer.act(async () => {
+        const scrollView = root.findByType(require('react-native').ScrollView);
+        scrollView.props.refreshControl.props.onRefresh();
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'transition-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-transition-title-input' }).props.onChangeText('Transition draft A');
+        root.findByProps({ testID: 'goal-transition-reason-input' }).props.onChangeText('Reason A');
+      });
+
+      await renderer.act(async () => {
+        refreshDeferred.resolve(goalB);
+        await Promise.resolve();
+      });
+
+      expect(root.findByProps({ testID: 'goal-transition-error-banner' })).toBeDefined();
+      expect(root.findByProps({ testID: 'goal-transition-submit-button' }).props.disabled).toBe(true);
+
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-transition-submit-button' }).props.onPress();
+      });
+      expect(fitnessGoalApi.createGoalTransition).not.toHaveBeenCalled();
+
+      // Close stale editor and reopen for B
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-transition-cancel-button' }).props.onPress();
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'transition-goal-button' }).props.onPress();
+      });
+      renderer.act(() => {
+        root.findByProps({ testID: 'goal-transition-title-input' }).props.onChangeText('Transition draft B');
+        root.findByProps({ testID: 'goal-transition-reason-input' }).props.onChangeText('Reason B');
+      });
+      await renderer.act(async () => {
+        root.findByProps({ testID: 'goal-transition-submit-button' }).props.onPress();
+      });
+
+      expect(fitnessGoalApi.createGoalTransition).toHaveBeenCalledTimes(1);
+      expect(fitnessGoalApi.createGoalTransition).toHaveBeenCalledWith(
+        'goal-B',
+        expect.objectContaining({
+          title: 'Transition draft B',
+          transitionReason: 'Reason B',
+        })
+      );
+    });
+  });
 });

@@ -14,14 +14,7 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
-
-export const GOAL_TYPE_OPTIONS = [
-  { code: 'FAT_LOSS', label: 'Giảm mỡ' },
-  { code: 'MUSCLE_GAIN', label: 'Tăng cơ' },
-  { code: 'STRENGTH', label: 'Tăng sức mạnh' },
-  { code: 'FITNESS_IMPROVEMENT', label: 'Cải thiện thể lực' },
-  { code: 'MAINTENANCE', label: 'Duy trì thể lực' },
-];
+import { GOAL_TYPE_OPTIONS } from '@/features/goal/goalTypeOptions';
 
 /** Map goal mutation rejections into safe, actionable Vietnamese inline feedback for modal forms. */
 export function resolveGoalModalErrorMessage(error: unknown, fallback: string): string {

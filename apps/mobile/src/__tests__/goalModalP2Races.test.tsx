@@ -179,7 +179,7 @@ describe('P7-017 P2 regression: stale modal submit generation isolation across a
       submitTestId: 'goal-version-submit-button',
       primaryInputTestId: 'goal-version-reason-input',
       renderModal: ({ visible, isSubmitting, onClose, onSubmit }) => (
-        <CreateGoalVersionModal visible={visible} currentTitle="Base Goal" isSubmitting={isSubmitting} isDark={false} onClose={onClose} onSubmit={onSubmit} />
+        <CreateGoalVersionModal visible={visible} currentTitle="Base Goal" currentGoalTypeCode="FAT_LOSS" isSubmitting={isSubmitting} isDark={false} onClose={onClose} onSubmit={onSubmit} />
       ),
       fillValid: (root, label) => {
         root.findByProps({ testID: 'goal-version-reason-input' }).props.onChangeText(label);

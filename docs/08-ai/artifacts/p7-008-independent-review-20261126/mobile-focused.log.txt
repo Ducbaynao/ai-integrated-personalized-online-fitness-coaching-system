@@ -1,0 +1,16 @@
+
+> @fitness-coaching/mobile@1.0.0 test
+> jest --runInBand --testTimeout=30000 src/__tests__/goalTypeOptions.test.tsx src/__tests__/CurrentGoalScreen.test.tsx src/__tests__/TrainerStudentGoalScreen.test.tsx src/__tests__/fitnessGoalApi.test.ts src/__tests__/GoalProposalDetailScreen.test.tsx src/__tests__/goalModalP2Races.test.tsx
+
+PASS src/__tests__/CurrentGoalScreen.test.tsx (15.773 s)
+PASS src/__tests__/goalModalP2Races.test.tsx
+PASS src/__tests__/GoalProposalDetailScreen.test.tsx
+PASS src/__tests__/fitnessGoalApi.test.ts
+PASS src/__tests__/goalTypeOptions.test.tsx
+PASS src/__tests__/TrainerStudentGoalScreen.test.tsx
+
+Test Suites: 6 passed, 6 total
+Tests:       111 passed, 111 total
+Snapshots:   0 total
+Time:        29.036 s
+Ran all test suites matching /src\\__tests__\\goalTypeOptions.test.tsx|src\\__tests__\\CurrentGoalScreen.test.tsx|src\\__tests__\\TrainerStudentGoalScreen.test.tsx|src\\__tests__\\fitnessGoalApi.test.ts|src\\__tests__\\GoalProposalDetailScreen.test.tsx|src\\__tests__\\goalModalP2Races.test.tsx/i.

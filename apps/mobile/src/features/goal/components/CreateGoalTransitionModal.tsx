@@ -13,14 +13,15 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
+import { GOAL_TYPE_OPTIONS } from '@/features/goal/goalTypeOptions';
 import {
-  GOAL_TYPE_OPTIONS,
   resolveGoalModalErrorMessage,
   useGoalModalSessionGuard,
 } from './CreateGoalModal';
 
 interface CreateGoalTransitionModalProps {
   visible: boolean;
+  targetMismatchError?: string | null;
   isSubmitting: boolean;
   isDark: boolean;
   sessionId?: number;
@@ -36,6 +37,7 @@ interface CreateGoalTransitionModalProps {
 
 export function CreateGoalTransitionModal({
   visible,
+  targetMismatchError,
   isSubmitting,
   isDark,
   sessionId = 0,
@@ -86,6 +88,10 @@ export function CreateGoalTransitionModal({
 
   const handleSubmit = async () => {
     if (isBusy) return;
+    if (targetMismatchError) {
+      setValidationError(targetMismatchError);
+      return;
+    }
     const trimmedReason = transitionReason.trim();
     if (!trimmedReason) {
       setValidationError('Vui lòng nêu lý do bắt đầu hành trình mục tiêu mới.');
@@ -163,7 +169,7 @@ export function CreateGoalTransitionModal({
               Kết thúc mục tiêu hiện tại và bắt đầu mục tiêu mới từ ngày đầu tiên. Toàn bộ lịch sử tiến độ vẫn được giữ nguyên.
             </Text>
 
-            {validationError && (
+            {(targetMismatchError || validationError) && (
               <View
                 testID="goal-transition-error-banner"
                 style={[
@@ -171,7 +177,7 @@ export function CreateGoalTransitionModal({
                   { backgroundColor: themeColors.dangerSurface, borderColor: themeColors.dangerText },
                 ]}>
                 <Text style={[styles.errorText, { color: themeColors.dangerText }]}>
-                  {validationError}
+                  {targetMismatchError || validationError}
                 </Text>
               </View>
             )}
@@ -345,14 +351,14 @@ export function CreateGoalTransitionModal({
                 testID="goal-transition-submit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Gửi chuyển đổi"
-                disabled={isBusy}
+                disabled={isBusy || Boolean(targetMismatchError)}
                 onPress={handleSubmit}
                 style={[
                   styles.button,
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isBusy ? 0.7 : 1,
+                    opacity: isBusy || Boolean(targetMismatchError) ? 0.5 : 1,
                   },
                 ]}>
                 {isBusy ? (
