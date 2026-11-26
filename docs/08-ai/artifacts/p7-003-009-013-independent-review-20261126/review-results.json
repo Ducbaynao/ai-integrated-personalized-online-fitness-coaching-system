@@ -1,0 +1,207 @@
+{
+  "mainBaseline": "7fbedab6f6aff83a21f351e063d6948d62cd4e71",
+  "branch": "codex/fix-p7-003-009-013-date-inputs",
+  "sourceHandoffSha256": "40EC8CE7002F679652FFDD5A22B1E0D4F99BC4034070E01CF0D952F9EAD1D161",
+  "integration": "Exact reviewed delta applies cleanly to current main; no product logic edits by reviewer",
+  "findings": {
+    "callbackLifecycle": "FIXED; unchanged reviewed hash",
+    "appointmentDst": "FIXED; helper and actual screen source with mocked auth/query/transport boundaries",
+    "layout360": "FIXED at source/component level; unchanged reviewed hash",
+    "emptyUntil": "FIXED under controlled initialization timer",
+    "dob": "FIXED; unchanged reviewed hash"
+  },
+  "independentRegression": {
+    "passed": 23,
+    "timing": "Explicit controlled callbacks and timers; no sleep as race evidence",
+    "exitCode": 0,
+    "failed": 0
+  },
+  "mobileJest": {
+    "options": "--runInBand --testTimeout=30000",
+    "suites": 15,
+    "exitCode": 0,
+    "passed": 197,
+    "nodeOptions": "--max-old-space-size=1280",
+    "failed": 0
+  },
+  "typecheckExit": 0,
+  "fullLint": {
+    "lines": [
+      2126,
+      2169,
+      2227,
+      2277,
+      2328
+    ],
+    "file": "apps/mobile/src/__tests__/CurrentGoalScreen.test.tsx",
+    "exitCode": 0,
+    "rule": "@typescript-eslint/no-require-imports",
+    "errors": 0,
+    "warnings": 5
+  },
+  "uxDocs": {
+    "requiredFiles": 18,
+    "exitCode": 0
+  },
+  "diffCheckExit": 0,
+  "sourceInventory": [
+    {
+      "file": "apps/mobile/src/features/shared/dateInputUtils.ts",
+      "expected": "1C6E3BB4B3C494868A5BAADC4F915F9ADC15FF24E56DE4FBF48E5D65E8A78355",
+      "hash": "1C6E3BB4B3C494868A5BAADC4F915F9ADC15FF24E56DE4FBF48E5D65E8A78355"
+    },
+    {
+      "file": "apps/mobile/src/components/ui/DatePickerModal.tsx",
+      "expected": "5AD6D91456FF16C577D14BDBA509B26A5F3A32D0CBB383B68D4F27FD8AA30E1D",
+      "hash": "5AD6D91456FF16C577D14BDBA509B26A5F3A32D0CBB383B68D4F27FD8AA30E1D"
+    },
+    {
+      "file": "apps/mobile/src/components/ui/DateInputField.tsx",
+      "expected": "C3F027040DA569294A32B3E457FEA105023A53040A946BC06D7DD292F06EF0E6",
+      "hash": "C3F027040DA569294A32B3E457FEA105023A53040A946BC06D7DD292F06EF0E6"
+    },
+    {
+      "file": "apps/mobile/src/components/ui/LocalDateTimeInputField.tsx",
+      "expected": "B4F74AC6AD1F1DC23990C30AE4915CD8BE939F10FE2B12DE90E19D2796A068B5",
+      "hash": "B4F74AC6AD1F1DC23990C30AE4915CD8BE939F10FE2B12DE90E19D2796A068B5"
+    },
+    {
+      "file": "apps/mobile/src/features/student/StudentOnboardingScreen.tsx",
+      "expected": "19D08B30788C37220AD1DFA6233528B52A793F71FCAA7F5205EC7373C54D606E",
+      "hash": "19D08B30788C37220AD1DFA6233528B52A793F71FCAA7F5205EC7373C54D606E"
+    },
+    {
+      "file": "apps/mobile/src/features/student/StudentProfileScreen.tsx",
+      "expected": "461B99AEF5EF44994800651E2EF60F17B70BAD31E77E68634B1C9DD07C2F4A17",
+      "hash": "461B99AEF5EF44994800651E2EF60F17B70BAD31E77E68634B1C9DD07C2F4A17"
+    },
+    {
+      "file": "apps/mobile/src/features/nutrition/NutritionScreen.tsx",
+      "expected": "3AE7DD597492DB52175B9F44690ADAD5F9B3C4D98204AB7508ED3F5DB6304FD0",
+      "hash": "3AE7DD597492DB52175B9F44690ADAD5F9B3C4D98204AB7508ED3F5DB6304FD0"
+    },
+    {
+      "file": "apps/mobile/src/features/nutrition/FoodAnalysisScreen.tsx",
+      "expected": "7DD8470D6EFDC9123D3A4DE566870A4C04C1612FE905D955FBAD7247EA7374A5",
+      "hash": "7DD8470D6EFDC9123D3A4DE566870A4C04C1612FE905D955FBAD7247EA7374A5"
+    },
+    {
+      "file": "apps/mobile/src/features/nutrition/NutritionStrategyScreen.tsx",
+      "expected": "7CA239596D6A4E90B3FA0C3ACA3824A52B8255B766626240F5D77099E17C6267",
+      "hash": "7CA239596D6A4E90B3FA0C3ACA3824A52B8255B766626240F5D77099E17C6267"
+    },
+    {
+      "file": "apps/mobile/src/features/nutrition/TrainerNutritionScreen.tsx",
+      "expected": "A695B8535285583A0E3A58653A4B379DEF704D13ABFB763728C46FABAF0FCEBB",
+      "hash": "A695B8535285583A0E3A58653A4B379DEF704D13ABFB763728C46FABAF0FCEBB"
+    },
+    {
+      "file": "apps/mobile/src/features/progress-summary/ProgressSummaryScreen.tsx",
+      "expected": "521BF84DDA6D64055ADFA07600BB55E54E1E6D78AA678FC308CE505A43190A87",
+      "hash": "521BF84DDA6D64055ADFA07600BB55E54E1E6D78AA678FC308CE505A43190A87"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-plan/components/AiWorkoutProposalModal.tsx",
+      "expected": "89F59981D373D403D27E962AD9EDF0BA5D0405EF5FE4E50D5D48E15C13CB6C5A",
+      "hash": "89F59981D373D403D27E962AD9EDF0BA5D0405EF5FE4E50D5D48E15C13CB6C5A"
+    },
+    {
+      "file": "apps/mobile/src/features/appointments/AppointmentScreens.tsx",
+      "expected": "090B2AE72DC40E8ADEAA3E2B4F4F202742E518899063657FE9462814FF318893",
+      "hash": "090B2AE72DC40E8ADEAA3E2B4F4F202742E518899063657FE9462814FF318893"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-recurrence/RecurrenceCreateScreen.tsx",
+      "expected": "9F8F1583D4A661BBE746C2CD9B239196A7161909883E7901F06052A9AA304CEF",
+      "hash": "9F8F1583D4A661BBE746C2CD9B239196A7161909883E7901F06052A9AA304CEF"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-schedule/StudentConfirmBatchScreen.tsx",
+      "expected": "35C6C24987391D30F7325BAB69D589741FCD25740E229645F33A406FA7B51B90",
+      "hash": "35C6C24987391D30F7325BAB69D589741FCD25740E229645F33A406FA7B51B90"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-schedule/StudentWorkoutScheduleDetailScreen.tsx",
+      "expected": "F90BD5E4970010A507D6FF283DE0688AEFBD742841F35FA75CEB374A9695D3CA",
+      "hash": "F90BD5E4970010A507D6FF283DE0688AEFBD742841F35FA75CEB374A9695D3CA"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-schedule-change-proposals/TrainerCreateChangeProposalScreen.tsx",
+      "expected": "FC199CFD62E766B228158D2E208306DDFEC2664831E2375BE0E4365C9AE77DBC",
+      "hash": "FC199CFD62E766B228158D2E208306DDFEC2664831E2375BE0E4365C9AE77DBC"
+    },
+    {
+      "file": "apps/mobile/src/features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx",
+      "expected": "CEBF06EC75970CCFA459577957957CC6318F4F9195AEA89D8DC02E22CCB85602",
+      "hash": "CEBF06EC75970CCFA459577957957CC6318F4F9195AEA89D8DC02E22CCB85602"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/dateInputs.test.tsx",
+      "expected": "542A09111C3380C7E460AE731D549055C2EF8C8C06DD93F8EB1EB78B3CA07248",
+      "hash": "542A09111C3380C7E460AE731D549055C2EF8C8C06DD93F8EB1EB78B3CA07248"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/studentOnboardingFlow.test.tsx",
+      "expected": "80EA6650961ECB395614966A1911BBF46531FDBFC26A805FE44948646D70DCBC",
+      "hash": "80EA6650961ECB395614966A1911BBF46531FDBFC26A805FE44948646D70DCBC"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/studentProfileScreen.test.tsx",
+      "expected": "B10C3F44F03886B5918E5926F8C4113AACB585550FCE78352FFACA688DCB54B2",
+      "hash": "B10C3F44F03886B5918E5926F8C4113AACB585550FCE78352FFACA688DCB54B2"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/nutritionScreens.test.tsx",
+      "expected": "9DDA731C739B37238A23C34A7EF99EB66EECD3D4EA01F152A10C25E6CCA3B26F",
+      "hash": "9DDA731C739B37238A23C34A7EF99EB66EECD3D4EA01F152A10C25E6CCA3B26F"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/nutritionStrategyScreen.test.tsx",
+      "expected": "D7F597DA1BFEF43DB08B31F40DDF65578AED9C943FA144FF771342120DB9FB99",
+      "hash": "D7F597DA1BFEF43DB08B31F40DDF65578AED9C943FA144FF771342120DB9FB99"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/foodAnalysisScreen.test.tsx",
+      "expected": "F5BCEBFF0E0FD04809D1FE7FCEDAE0C461D94297D3FEDDFB31E90932862DE722",
+      "hash": "F5BCEBFF0E0FD04809D1FE7FCEDAE0C461D94297D3FEDDFB31E90932862DE722"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/ProgressSummaryScreen.test.tsx",
+      "expected": "ABFB7FFB44D824DF192649909858A07AD4BB66A8CC32F27335C19474C6B2D24C",
+      "hash": "ABFB7FFB44D824DF192649909858A07AD4BB66A8CC32F27335C19474C6B2D24C"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/AiWorkoutProposalModal.test.tsx",
+      "expected": "91B965F5C2373856AB6C805A81CF8E3EB150E63543C70A4B231675FCFB83C98B",
+      "hash": "91B965F5C2373856AB6C805A81CF8E3EB150E63543C70A4B231675FCFB83C98B"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/studentDirectScheduling.test.tsx",
+      "expected": "5E3920A63EC37340785AC93625140A186DB82E8D90AEC9DE280FDA3161D540B2",
+      "hash": "5E3920A63EC37340785AC93625140A186DB82E8D90AEC9DE280FDA3161D540B2"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/trainerCreateScheduleProposal.test.tsx",
+      "expected": "4D626D66506FAD18F76914AE664E3EE0F88923E19284F2F11BA5093E48F9C19F",
+      "hash": "4D626D66506FAD18F76914AE664E3EE0F88923E19284F2F11BA5093E48F9C19F"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/workoutScheduleChange.test.tsx",
+      "expected": "C736C5D22E9213EE37C9D6015298A92DFD03564C73EF404EC9EC690BC5D98BE3",
+      "hash": "C736C5D22E9213EE37C9D6015298A92DFD03564C73EF404EC9EC690BC5D98BE3"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/trainerChangeProposalScreens.test.tsx",
+      "expected": "E18A6C39EBD5C3C07C350C052CE4C2614D389EF6B2BE454509610976ACACD665",
+      "hash": "E18A6C39EBD5C3C07C350C052CE4C2614D389EF6B2BE454509610976ACACD665"
+    },
+    {
+      "file": "apps/mobile/src/__tests__/appointmentScreens.test.tsx",
+      "expected": "26C872EB7720A27B992632619D0650C9944D0558346EDFE30F5EDC440E1C939C",
+      "hash": "26C872EB7720A27B992632619D0650C9944D0558346EDFE30F5EDC440E1C939C"
+    }
+  ],
+  "deviceWebVisualKeyboard": "NOT RUN / DEFERRED_FOR_RAM",
+  "backendLocal": "NOT RUN; client-only patch",
+  "ci": "Pending new PR workflow; local evidence does not establish CI PASS"
+}

@@ -85,12 +85,24 @@ describe('Student direct schedule change', () => {
   });
 
   it('sends real version and explicit destination, then navigates to server replacement', async () => {
+    const pickDate = (root: renderer.ReactTestInstance, testID: string, isoDate: string) => {
+      const [yStr, mStr] = isoDate.split('-');
+      renderer.act(() => root.findByProps({ testID }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress());
+      renderer.act(() => root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress());
+    };
     (workoutScheduleApi.reschedule as jest.Mock).mockResolvedValue({ changeType: 'RESCHEDULE', replacementOccurrenceId: 'new-1' });
     const { tree, invalidate } = render();
     renderer.act(() => tree.root.findByProps({ testID: 'schedule-reschedule' }).props.onPress());
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Dùng múi giờ hiện tại: Asia/Ho_Chi_Minh' }).props.onPress());
-    renderer.act(() => tree.root.findByProps({ testID: 'schedule-local-start' }).props.onChangeText('2026-10-21T18:00'));
-    renderer.act(() => tree.root.findByProps({ testID: 'schedule-local-end' }).props.onChangeText('2026-10-21T19:00'));
+    pickDate(tree.root, 'schedule-local-start-date-trigger', '2026-10-21');
+    renderer.act(() => tree.root.findByProps({ testID: 'schedule-local-start-time' }).props.onChangeText('18:00'));
+    pickDate(tree.root, 'schedule-local-end-date-trigger', '2026-10-21');
+    renderer.act(() => tree.root.findByProps({ testID: 'schedule-local-end-time' }).props.onChangeText('19:00'));
     const offsetButtons = tree.root.findAllByProps({ accessibilityLabel: 'UTC+07:00' }).filter((node) => typeof node.props.onPress === 'function');
     renderer.act(() => offsetButtons[0].props.onPress());
     renderer.act(() => offsetButtons[1].props.onPress());

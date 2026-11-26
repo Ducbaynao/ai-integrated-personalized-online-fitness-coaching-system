@@ -7,14 +7,14 @@ import { useRelationships } from '@/features/coaching/coachingQueries';
 import { appointmentApi, Appointment, AppointmentRequest } from '@/services/appointmentApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
-import { AppointmentDetailScreen, AppointmentRequestScreen } from '@/features/appointments/AppointmentScreens';
+import { AppointmentDetailScreen, AppointmentHomeScreen, AppointmentRequestScreen } from '@/features/appointments/AppointmentScreens';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), push: mockPush, replace: jest.fn() }) }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('@/features/coaching/coachingQueries', () => ({ useRelationships: jest.fn() }));
 jest.mock('@/services/coachingApi', () => ({ createCommandKey: jest.fn() }));
-jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { requestDetail: jest.fn(), detail: jest.fn(), decide: jest.fn(), decideReschedule: jest.fn(), cancel: jest.fn() } }));
+jest.mock('@/services/appointmentApi', () => ({ appointmentApi: { requests: jest.fn(), appointments: jest.fn(), requestDetail: jest.fn(), detail: jest.fn(), decide: jest.fn(), decideReschedule: jest.fn(), cancel: jest.fn() } }));
 
 const request: AppointmentRequest = {
   requestId: 'request-1', kind: 'CREATE', studentId: 'student-1', trainerId: 'trainer-1',
@@ -208,5 +208,238 @@ describe('AppointmentDetailScreen linked workout navigation', () => {
       linkButton.props.onPress();
     });
     expect(mockPush).toHaveBeenCalledWith('/coaching');
+  });
+});
+
+describe('AppointmentHomeScreen P2-3 date range filter semantics', () => {
+  it('preserves existing instant on unchanged date confirm and preserves time-of-day in timezone on date change', async () => {
+    const fixedNow = Date.parse('2026-11-26T05:15:30.123Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(fixedNow);
+    try {
+      (useAuth as jest.Mock).mockReturnValue({
+        user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+        activeCapability: 'STUDENT',
+      });
+      (appointmentApi.requests as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+      (appointmentApi.appointments as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+
+      client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      renderer.act(() => {
+        tree = renderer.create(
+          <QueryClientProvider client={client}>
+            <AppointmentHomeScreen />
+          </QueryClientProvider>
+        );
+      });
+
+      const expectedInitialFrom = new Date(fixedNow - 30 * 86_400_000).toISOString();
+      const expectedInitialUntil = new Date(fixedNow + 60 * 86_400_000).toISOString();
+      await waitForScreen(() => {
+        expect(appointmentApi.appointments).toHaveBeenCalledWith(expectedInitialFrom, expectedInitialUntil, 0);
+      });
+
+      const callsAfterInit = (appointmentApi.appointments as jest.Mock).mock.calls.length;
+
+      // Confirm unchanged "Đến ngày" -> must keep exact initial ISO instant (no drift to .999Z or 00:00:00Z)
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await renderer.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      expect((appointmentApi.appointments as jest.Mock).mock.calls.length).toBe(callsAfterInit);
+
+      // Confirm unchanged "Từ ngày" -> must keep exact initial ISO instant
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-from-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await renderer.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      expect((appointmentApi.appointments as jest.Mock).mock.calls.length).toBe(callsAfterInit);
+
+      // Change "Đến ngày" from 2027-01-25 to 2027-01-26 -> preserves 12:15:30.123 in Asia/Ho_Chi_Minh (+07:00)
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-day-2027-01-26' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await waitForScreen(() => {
+        expect(appointmentApi.appointments).toHaveBeenLastCalledWith(
+          expectedInitialFrom,
+          '2027-01-26T05:15:30.123Z',
+          0
+        );
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('rejects nonexistent DST gap local time on date change, retains previous filter & shows alert, then recovers on valid day', async () => {
+    const targetFromMs = Date.parse('2026-03-07T07:30:45.123Z'); // 02:30:45.123 EST in America/New_York
+    const fixedNow = targetFromMs + 30 * 86_400_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(fixedNow);
+    try {
+      (useAuth as jest.Mock).mockReturnValue({
+        user: { id: 'student-1', timezone: 'America/New_York' },
+        activeCapability: 'STUDENT',
+      });
+      (appointmentApi.requests as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+      (appointmentApi.appointments as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+
+      client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      renderer.act(() => {
+        tree = renderer.create(
+          <QueryClientProvider client={client}>
+            <AppointmentHomeScreen />
+          </QueryClientProvider>
+        );
+      });
+
+      const expectedInitialFrom = new Date(fixedNow - 30 * 86_400_000).toISOString();
+      const expectedInitialUntil = new Date(fixedNow + 60 * 86_400_000).toISOString();
+      await waitForScreen(() => {
+        expect(appointmentApi.appointments).toHaveBeenCalledWith(expectedInitialFrom, expectedInitialUntil, 0);
+      });
+
+      const callsAfterInit = (appointmentApi.appointments as jest.Mock).mock.calls.length;
+
+      // Attempt to change "Từ ngày" to 2026-03-08 (DST spring-forward day where 02:30:45.123 does not exist)
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-from-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-day-2026-03-08' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await renderer.act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+      // Must NOT query with normalized timestamp (03:30) or fallback to start of day, must keep 07/03/2026 and show alert
+      expect((appointmentApi.appointments as jest.Mock).mock.calls.length).toBe(callsAfterInit);
+      expect(tree.root.findByProps({ testID: 'appointments-from-date-trigger' }).props.accessibilityValue.text).toBe('07/03/2026');
+      const alerts = tree.root.findAllByProps({ accessibilityRole: 'alert' });
+      expect(alerts.some((n) => JSON.stringify(n.props.children).includes('DST'))).toBe(true);
+
+      // Selecting valid day 2026-03-09 clears the error and queries with preserved 02:30:45.123 (-04:00 -> 06:30:45.123Z)
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-from-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-day-2026-03-09' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await waitForScreen(() => {
+        expect(appointmentApi.appointments).toHaveBeenLastCalledWith(
+          '2026-03-09T06:30:45.123Z',
+          expectedInitialUntil,
+          0
+        );
+      });
+      expect(tree.root.findByProps({ testID: 'appointments-from-date-trigger' }).props.accessibilityValue.text).toBe('09/03/2026');
+      expect(
+        tree.root.findAllByProps({ accessibilityRole: 'alert' }).some((n) => JSON.stringify(n.props.children).includes('DST'))
+      ).toBe(false);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('keeps selected display date 15/11/2026 while sending exclusive until 2026-11-15T17:00:00.000Z when until starts empty', async () => {
+    jest.useFakeTimers();
+    const fixedNow = Date.parse('2026-11-26T05:15:30.123Z');
+    jest.setSystemTime(fixedNow);
+    try {
+      (useAuth as jest.Mock).mockReturnValue({
+        user: { id: 'student-1', timezone: 'Asia/Ho_Chi_Minh' },
+        activeCapability: 'STUDENT',
+      });
+      (appointmentApi.requests as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+      (appointmentApi.appointments as jest.Mock).mockResolvedValue({ page: 0, size: 20, totalItems: 0, items: [] });
+
+      client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      renderer.act(() => {
+        tree = renderer.create(
+          <QueryClientProvider client={client}>
+            <AppointmentHomeScreen />
+          </QueryClientProvider>
+        );
+      });
+
+      // Before initial setTimeout(..., 0) fires, both filters are empty ("Chưa chọn")
+      expect(tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.accessibilityValue.text).toBe('Chưa chọn');
+
+      // Select 2026-11-15 while until is still empty
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-day-2026-11-15' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+
+      // Displayed date must remain 15/11/2026 (NOT drift to 16/11/2026 from exclusive boundary)
+      expect(tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.accessibilityValue.text).toBe('15/11/2026');
+
+      // Reopen picker and cancel -> keeps 15/11/2026
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.onPress();
+      });
+      expect(
+        tree.root.findByProps({ testID: 'date-picker-day-2026-11-15' }).props.accessibilityState.selected
+      ).toBe(true);
+      expect(JSON.stringify(tree.toJSON())).toContain('15/11/2026');
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-cancel-button' }).props.onPress();
+      });
+      expect(tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.accessibilityValue.text).toBe('15/11/2026');
+
+      // Now run initial mount timer: from initializes, until retains explicit 2026-11-15T17:00:00.000Z exclusive bound
+      await renderer.act(async () => {
+        jest.runOnlyPendingTimers();
+        await Promise.resolve();
+      });
+      const expectedInitialFrom = new Date(fixedNow - 30 * 86_400_000).toISOString();
+      expect(appointmentApi.appointments).toHaveBeenLastCalledWith(
+        expectedInitialFrom,
+        '2026-11-15T17:00:00.000Z',
+        0
+      );
+      expect(tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.accessibilityValue.text).toBe('15/11/2026');
+
+      // Reopen and pick 2026-11-18 -> keeps inclusive 18/11/2026 display while sending exclusive 2026-11-18T17:00:00.000Z
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-day-2026-11-18' }).props.onPress();
+      });
+      renderer.act(() => {
+        tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+      });
+      await renderer.act(async () => {
+        await Promise.resolve();
+      });
+      expect(tree.root.findByProps({ testID: 'appointments-to-date-trigger' }).props.accessibilityValue.text).toBe('18/11/2026');
+      expect(appointmentApi.appointments).toHaveBeenLastCalledWith(
+        expectedInitialFrom,
+        '2026-11-18T17:00:00.000Z',
+        0
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

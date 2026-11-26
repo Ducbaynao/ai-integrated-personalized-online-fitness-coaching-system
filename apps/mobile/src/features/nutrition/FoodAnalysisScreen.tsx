@@ -8,6 +8,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { nutritionApi } from './nutritionApi';
@@ -800,10 +802,19 @@ function FoodAnalysisSession() {
       {/* Context Card */}
       <WorkoutCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Ngữ cảnh bữa ăn</Text>
-        {inputField('Ngày ghi (YYYY-MM-DD)', day, (v) => {
-          setDay(v);
-          setConfirmedContext(false);
-        })}
+        <DateInputField
+          testID="food-analysis-day-input"
+          label="Ngày ghi"
+          placeholder="Chọn ngày ghi"
+          value={day}
+          onChange={(v) => {
+            setDay(v);
+            setConfirmedContext(false);
+          }}
+          initialBrowseDate={day || getTodayDateOnly(timezone)}
+          sessionKey={`${actor}:${activeCapability ?? ''}`}
+          accessibilityLabel="Ngày ghi"
+        />
         {inputField('Múi giờ IANA', timezone, (v) => {
           setTimezone(v);
           setConfirmedContext(false);

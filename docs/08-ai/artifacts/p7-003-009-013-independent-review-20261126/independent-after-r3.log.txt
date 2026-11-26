@@ -1,0 +1,47 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker confirm after reopen
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker confirm after session
+PASS stale picker confirm after disabled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker confirm after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker clear after reopen
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker clear after session
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker clear after disabled
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker clear after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker cancel after reopen
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker cancel after session
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS stale picker cancel after disabled
+PASS stale picker cancel after unmount
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS current clear works
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS current cancel works
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS DOB month edit retains 1919
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS DOB month edit retains 1800
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS 31 January to February requires explicit valid day
+PASS same-day timestamp string/precision untouched
+PASS normal date change retains local time across DST
+gap actual= null local= Invalid date
+PASS DST gap must not silently normalize wall time
+PASS whole-day exclusive boundary spans DST day
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+real caller DST from before= 2026-03-07T07:30:45.123Z after= 2026-03-07T07:30:45.123Z
+PASS real Appointment caller must not query normalized DST gap
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+empty until selected= 2026-11-15 display= 2026-11-15 query until= 2026-11-15T17:00:00.000Z
+until reopen/edit/initializer retained= 2026-11-16 2026-11-16T17:00:00.000Z
+PASS empty until whole-day selection must retain displayed date
+Independent expanded: 23 PASS, 0 FAIL

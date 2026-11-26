@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useColorScheme,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { useRouter } from 'expo-router';
 import moment from 'moment-timezone';
 import { useAuth } from '@/features/auth/AuthContext';
 import { colors, getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
@@ -537,52 +537,34 @@ export function ProgressSummaryScreen({
             {/* Date Inputs */}
             <View style={styles.dateInputsRow}>
               <View style={styles.dateInputCol}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Từ ngày</Text>
-                <TextInput
+                <DateInputField
                   testID="from-date-input"
-                  accessibilityLabel="Từ ngày định dạng YYYY-MM-DD"
+                  label="Từ ngày"
+                  accessibilityLabel="Từ ngày"
+                  placeholder="Chọn từ ngày"
                   value={fromDate}
-                  onChangeText={(text) => {
+                  onChange={(text) => {
                     setPreset('CUSTOM');
                     setFromDate(text);
                   }}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme.textSecondary}
-                  maxLength={10}
-                  editable={!isSubmitting}
-                  style={[
-                    styles.dateInput,
-                    {
-                      color: theme.textPrimary,
-                      backgroundColor: theme.surfaceSubtle,
-                      borderColor: theme.border,
-                    },
-                  ]}
+                  disabled={isSubmitting}
+                  sessionKey={targetStudentId ?? 'self'}
                 />
               </View>
 
               <View style={styles.dateInputCol}>
-                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Đến ngày</Text>
-                <TextInput
+                <DateInputField
                   testID="to-date-input"
-                  accessibilityLabel="Đến ngày định dạng YYYY-MM-DD"
+                  label="Đến ngày"
+                  accessibilityLabel="Đến ngày"
+                  placeholder="Chọn đến ngày"
                   value={toDate}
-                  onChangeText={(text) => {
+                  onChange={(text) => {
                     setPreset('CUSTOM');
                     setToDate(text);
                   }}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme.textSecondary}
-                  maxLength={10}
-                  editable={!isSubmitting}
-                  style={[
-                    styles.dateInput,
-                    {
-                      color: theme.textPrimary,
-                      backgroundColor: theme.surfaceSubtle,
-                      borderColor: theme.border,
-                    },
-                  ]}
+                  disabled={isSubmitting}
+                  sessionKey={targetStudentId ?? 'self'}
                 />
               </View>
             </View>

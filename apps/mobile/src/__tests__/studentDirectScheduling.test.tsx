@@ -50,16 +50,28 @@ async function press(tree: renderer.ReactTestRenderer, testID: string) {
 function input(tree: renderer.ReactTestRenderer, testID: string, value: string) {
   renderer.act(() => { tree.root.findByProps({ testID }).props.onChangeText(value); });
 }
+function pickDate(tree: renderer.ReactTestRenderer, testID: string, isoDate: string) {
+  const [yStr, mStr] = isoDate.split('-');
+  renderer.act(() => { tree.root.findByProps({ testID }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress(); });
+  renderer.act(() => { tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress(); });
+}
 async function fill(tree: renderer.ReactTestRenderer, count = 1, monday = moment.utc().add(7, 'days').startOf('isoWeek').format('YYYY-MM-DD'), review = true) {
   input(tree, 'timezone-search', 'Ho_Chi_Minh');
   await renderer.act(async () => { tree.root.findByProps({ accessibilityLabel: 'Asia/Ho_Chi_Minh' }).props.onPress(); });
-  input(tree, 'week-anchor', monday);
+  pickDate(tree, 'week-anchor-trigger', monday);
   for (let n = 1; n <= count; n++) {
     const id = `session-${n}`;
     await press(tree, `select-session-${id}`);
-    input(tree, `start-${id}`, `${monday}T${n === 1 ? '18:00' : '20:00'}`);
+    pickDate(tree, `start-${id}-date-trigger`, monday);
+    input(tree, `start-${id}-time`, n === 1 ? '18:00' : '20:00');
     await renderer.act(async () => { tree.root.findAllByProps({ accessibilityLabel: 'UTC+07:00' }).filter((node) => typeof node.props.onPress === 'function').at(-1)!.props.onPress(); });
-    input(tree, `end-${id}`, `${monday}T${n === 1 ? '19:00' : '21:00'}`);
+    pickDate(tree, `end-${id}-date-trigger`, monday);
+    input(tree, `end-${id}-time`, n === 1 ? '19:00' : '21:00');
     await renderer.act(async () => { tree.root.findAllByProps({ accessibilityLabel: 'UTC+07:00' }).filter((node) => typeof node.props.onPress === 'function').at(-1)!.props.onPress(); });
   }
   if (review) await press(tree, 'review-batch');

@@ -6,6 +6,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
 import { appointmentApi } from '@/services/appointmentApi';
@@ -173,8 +175,17 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
         {zones.map((zone) => <WorkoutButton key={zone} label={zone} secondary={zone !== timezone} onPress={() => { setTimezone(zone); resetReview(); }} />)}
       </WorkoutCard>
       <WorkoutCard><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Tuần bắt đầu</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn thứ Hai dạng YYYY-MM-DD. Mỗi buổi được đặt trong tuần tương ứng của kế hoạch.</Text>
-        <TextInput testID="week-anchor" accessibilityLabel="Ngày thứ Hai bắt đầu đợt lịch" placeholder="YYYY-MM-DD" value={anchor} onChangeText={(value) => { setAnchor(value); resetReview(); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+        <DateInputField
+          testID="week-anchor"
+          label="Ngày thứ Hai bắt đầu đợt lịch"
+          helperText="Mỗi buổi được đặt trong tuần tương ứng của kế hoạch."
+          placeholder="Chọn Thứ Hai bắt đầu"
+          value={anchor}
+          mondayOnly
+          onChange={(value) => { setAnchor(value); resetReview(); }}
+          sessionKey={planId}
+          accessibilityLabel="Ngày thứ Hai bắt đầu đợt lịch"
+        />
         <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ bắt đầu của từng buổi phải ở tương lai và không quá 90 ngày tính từ lúc máy chủ xác nhận. Kiểm tra trên thiết bị chỉ để hướng dẫn trước khi gửi.</Text>
         {anchor && !isMonday(anchor) ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Ngày đầu tuần phải là thứ Hai hợp lệ.</Text> : null}
       </WorkoutCard>
@@ -190,16 +201,23 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
           {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Thiếu thông tin giám sát hợp lệ; không thể chọn.</Text> : null}
           <WorkoutButton testID={`select-session-${session.id}`} label={selected ? 'Bỏ buổi này' : 'Chọn buổi này'} secondary={!selected} disabled={!eligible} onPress={() => selectSession(session)} />
           {selected ? <>
-            <Text style={[styles.body, { color: theme.textSecondary }]}>Nhập rõ ngày giờ địa phương YYYY-MM-DDTHH:mm. Giờ kết thúc không suy từ thời lượng dự kiến.</Text>
+            <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn ngày theo lịch và nhập giờ địa phương (HH:mm). Giờ kết thúc không suy từ thời lượng dự kiến.</Text>
             {(['Start', 'End'] as const).map((part) => {
               const local = part === 'Start' ? selected.localStart : selected.localEnd;
               const chosen = part === 'Start' ? selected.startOffset : selected.endOffset;
               const options = validProposalOffsets(timezone, local);
               return <View key={part}>
-                <Text style={[styles.label, { color: theme.textPrimary }]}>{part === 'Start' ? 'Bắt đầu' : 'Kết thúc'}</Text>
-                <TextInput testID={`${part.toLowerCase()}-${session.id}`} accessibilityLabel={`${part === 'Start' ? 'Bắt đầu' : 'Kết thúc'} địa phương của ${session.name}`} placeholder="YYYY-MM-DDTHH:mm" value={local}
-                  onChangeText={(value) => updateEntry(session.id, part === 'Start' ? { localStart: value, startOffset: '' } : { localEnd: value, endOffset: '' })}
-                  style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+                <LocalDateTimeInputField
+                  label={part === 'Start' ? 'Bắt đầu' : 'Kết thúc'}
+                  value={local}
+                  onChange={(value) => updateEntry(session.id, part === 'Start' ? { localStart: value, startOffset: '' } : { localEnd: value, endOffset: '' })}
+                  dateTestID={`${part.toLowerCase()}-${session.id}-date`}
+                  timeTestID={`${part.toLowerCase()}-${session.id}-time`}
+                  dateAccessibilityLabel={`Ngày ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} của ${session.name}`}
+                  timeAccessibilityLabel={`Giờ ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương của ${session.name} (HH:mm)`}
+                  initialBrowseDate={suggestedSessionDate(anchor, session) || anchor || undefined}
+                  sessionKey={planId}
+                />
                 {local && options.length === 0 ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Giờ không tồn tại trong múi giờ này hoặc sai định dạng.</Text> : null}
                 {options.length > 1 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ bị lặp khi đổi DST: chọn rõ một UTC offset.</Text> : null}
                 <View style={styles.row}>{options.map((option) => <WorkoutButton key={option.offset} label={`UTC${option.offset}`} secondary={chosen !== option.offset}

@@ -189,7 +189,7 @@ describe('StudentProfileScreen', () => {
 
     // Clear date of birth
     renderer.act(() => {
-      root.findByProps({ testID: 'edit-dob-input' }).props.onChangeText('');
+      root.findByProps({ testID: 'edit-dob-clear-button' }).props.onPress();
     });
 
     // Save changes
@@ -276,5 +276,46 @@ describe('StudentProfileScreen', () => {
     });
 
     expect(root.findByProps({ testID: 'view-days' }).props.children).toBe('5 ngày');
+  });
+
+  it('P2-2: edits pre-1920 DOB (1919-06-15 -> month 7 -> 1919-07-15) without clamping year to 1920', async () => {
+    (studentProfileApi.getMyStudentProfile as jest.Mock).mockResolvedValueOnce({
+      ...sampleProfile,
+      dateOfBirth: '1919-06-15',
+    });
+    (studentProfileApi.updateMyStudentProfile as jest.Mock).mockResolvedValueOnce({
+      ...sampleProfile,
+      dateOfBirth: '1919-07-15',
+    });
+
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => {
+      tree = renderer.create(<StudentProfileScreen />);
+    });
+    const root = tree.root;
+
+    renderer.act(() => {
+      root.findByProps({ testID: 'edit-button' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'edit-dob-input-trigger' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'date-picker-month-7' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+    });
+
+    expect(root.findByProps({ testID: 'edit-dob-input-trigger' }).props.accessibilityValue.text).toBe('15/07/1919');
+    await renderer.act(async () => {
+      root.findByProps({ testID: 'save-button' }).props.onPress();
+    });
+    expect(studentProfileApi.updateMyStudentProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ dateOfBirth: '1919-07-15' })
+    );
   });
 });
