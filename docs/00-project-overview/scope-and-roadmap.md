@@ -33,9 +33,13 @@ Phase 1 implementations may simplify workflows, but the schema must not reduce v
 
 The [Phase 2 release scope](phase-2-release-scope.md) expands this roadmap into F01–F11 and explicit release limits. The [data/authority matrix](../08-ai/phase-2-feature-data-authority-matrix.md) and [implementation plan](../07-development/phase-2-implementation-plan.md) define the approved implementation baseline (version 1.0, project-owner approval on 2026-10-04). D01–D07 are recorded in the release scope; technical prerequisites and release evidence remain to be completed. In particular, deferring AI-generated Fitness Goal and strategic Nutrition Target proposals is an approved release limit, not removal of the target-product proposal/Student-approval rules.
 
+### Phase 2 extension approved 2026-11-25 — F12 Coaching QR
+
+Dev A owns `P2-A-QR`: real per-account/per-capability QR → camera or image decode → minimal profile → coaching request/invitation → counterparty acceptance. This replaces name/email discovery UI, reuses B03 authority/history, and adds no friendship or marketplace. See [the approved F12 plan](../07-development/features/phase-2-dev-a-coaching-qr.md) and D08 in the release scope. Implementation is PLANNED; QR01–QR10 are required before P2-M6. Advanced commercial discovery/profile capabilities remain Phase 3.
+
 ## Phase 3 Product and commercial expansion
 
-- Trainer discovery and profiles;
+- advanced Trainer discovery, commercial profiles and marketplace browsing beyond Phase 2 F12 QR introduction;
 - Coaching Packages;
 - subscriptions, payments, and invoices;
 - Trainer reviews and ratings;

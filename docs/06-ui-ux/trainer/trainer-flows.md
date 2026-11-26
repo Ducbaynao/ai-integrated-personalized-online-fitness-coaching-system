@@ -19,6 +19,8 @@
 
 ## 2. Daily management by exception
 
+**F12 Phase 2 — PLANNED, D08 ngày 25/11/2026:** Từ TR-01/TR-02/“Tìm học viên”, eligible Trainer mở SH-07 quét camera hoặc chọn ảnh QR STUDENT thật. SH-09 resolve backend và hiển thị hồ sơ tối thiểu trước khi PT gửi lời mời B03; Student nhận và chấp nhận/từ chối ở Coaching hub. SH-08 hiển thị/lưu QR TRAINER cho chiều Student tìm PT. Thay UI nhập email, không tạo Student directory hoặc kết bạn. Account hai capability chọn tư cách rõ ràng; QR không mở health-data scope. [Kế hoạch F12 Dev A](../../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 1. Trainer mở Overview.
 2. Review Today's Sessions, Students Need Review và Attention Queue.
 3. Filter signal theo severity/type/status.

@@ -1,5 +1,9 @@
 # Navigation Architecture
 
+## F12 Coaching QR — Phase 2 design approved 25/11/2026 (PLANNED)
+
+ST-17 “Tìm PT” và TR-01/TR-02 “Tìm học viên” mở shared `/(app)/coaching/qr` (SH-07), camera/ảnh → backend resolve → `/(app)/coaching/qr-profile` (SH-09) → explicit B03 request/invitation. `/(app)/coaching/my-qr` (SH-08) hiển thị/lưu QR backend thật theo tư cách. Đây là route dự kiến. Giữ tương thích entry `/coaching/trainers` và `/coaching/invite` khi thay UI tên/email. Link QR ngoài app đi qua auth/context/resolve, không tự gửi/accept hoặc mở health-data scope; logout/đổi account xóa preview. [Kế hoạch F12 Dev A](../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 ## B06 Appointment / B08 lifecycle notice candidate (20/10/2026)
 
 From the Coaching relationship detail, Student and Trainer can open `/(app)/appointments` for Appointment list and bilateral requests. `/(app)/appointments/new` asks for an explicit IANA timezone, local start/end and valid UTC offsets; a pending request does not reserve or create a confirmed Appointment. The counterparty opens `/(app)/appointments/requests/[requestId]`, reviews the interval and accepts or rejects with the real request version. A confirmed Appointment opens `/(app)/appointments/[appointmentId]` for detail, reasoned cancellation or a bilateral reschedule request at `/reschedule`. These are local, unmerged screens and remain subject to backend/A01 review. A legacy Appointment without local intent is displayed with nullable fields; Mobile does not invent an offset.

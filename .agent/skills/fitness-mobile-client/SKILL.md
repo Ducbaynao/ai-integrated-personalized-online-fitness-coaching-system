@@ -5,6 +5,10 @@ description: Design or implement the React Native Expo application for Students 
 
 # Fitness Mobile Client
 
+## F12 Coaching QR routing
+
+For Student/PT QR discovery load the [approved Dev A Phase 2 plan](../../../docs/07-development/features/phase-2-dev-a-coaching-qr.md) (D08, 2026-11-25). Real per-capability QR generation, camera/image decode and authenticated backend resolution are required; no decorative/mock QR or fabricated profile. SH-07/08/09 replace name/email selection and reuse B03 invitation/decision commands. QR01–QR10 require real camera/device and saved-image round trips; emulator-only or mocked scanner tests cannot close camera acceptance. Implementation is PLANNED at the documentation checkpoint.
+
 Read `digital-fitness-core` and the domain skill for the feature.
 
 Use React Native, TypeScript, Expo, Expo Router, TanStack Query, Axios, Zustand, and React Hook Form. Treat server data as authoritative server state; keep local/global state focused on UI/session concerns.

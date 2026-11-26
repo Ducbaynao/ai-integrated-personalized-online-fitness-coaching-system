@@ -2,6 +2,12 @@
 
 The following scenarios are release gates for the target domain design. Phase-specific releases select the relevant subset but must not violate later boundaries.
 
+## Phase 2 F12 — Real Coaching QR (D08, approved 2026-11-25)
+
+Student and Trainer generate their own backend-issued QR, scan camera or decode a saved image, review the real counterparty's minimal profile, and explicitly send a B03 coaching request/invitation. Only the counterparty accepts/rejects; no friendship or automatic acceptance. QR does not grant private-data scope, bypass eligibility or rewrite Coaching Period/fitness history.
+
+Both directions must pass real account/backend camera and saved-image round trips, including invalid/self/rotated QR, account/capability loss after preview, pending/duplicate/concurrent requests, rollback, offline and permission-denied states. Fixtures or mocked scanner callbacks alone do not satisfy acceptance. See [QR01–QR10, Dev A plan](../07-development/features/phase-2-dev-a-coaching-qr.md); implementation and tests remain PLANNED until evidence is recorded.
+
 ## Identity and authority
 
 1. A Student becomes a Trainer on the same User Account, creates a Trainer Profile, passes verification, and retains all Student history.

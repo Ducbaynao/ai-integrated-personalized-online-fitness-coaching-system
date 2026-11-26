@@ -11,6 +11,16 @@
 | SH-05 | Trainer Application | Profile, certificates, verification lifecycle |
 | SH-06 | Role Switcher | Chỉ khi capability hợp lệ |
 
+### Shared Coaching QR — F12 / Phase 2 (approved scope 25/11/2026, PLANNED)
+
+| ID | Màn hình | Route dự kiến / ghi chú |
+|---|---|---|
+| SH-07 | Quét QR huấn luyện | `/(app)/coaching/qr`; camera/ảnh, resolve backend; entry ST-17/TR-01/TR-02 |
+| SH-08 | Mã QR của tôi | `/(app)/coaching/my-qr`; QR thật theo tư cách, lưu ảnh/tạo lại mã |
+| SH-09 | Hồ sơ từ QR | `/(app)/coaching/qr-profile`; minimal profile và lời mời B03, không tự accept |
+
+Các route này chưa triển khai. [F12 Dev A và QR01–QR10](../07-development/features/phase-2-dev-a-coaching-qr.md) thay UI tìm tên/email, giữ relationship/history/sharing; không friendship.
+
 ## Student Mobile
 
 | ID | Màn hình | Core capability |

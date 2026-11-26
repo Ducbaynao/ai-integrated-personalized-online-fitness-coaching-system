@@ -101,6 +101,8 @@ Các section: Recommendation, Why, Data used, Missing/uncertain data, Expected i
 
 Hiển thị current mode, Trainer nếu có, current Coaching Period, relationship status, shared data scope và coaching history. End coaching/switch trainer là flow xác nhận có impact summary.
 
+**F12 Phase 2 (PLANNED, D08):** ST-17 có “Tìm PT” → SH-07 quét camera/chọn ảnh → SH-09 hồ sơ backend và gửi yêu cầu; “Mã QR của tôi” → SH-08 với tư cách STUDENT. Thay màn tìm tên, giữ incoming/outgoing/history; không friendship hoặc tự cấp sharing. [Đặc tả QR thật](../../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 ## ST-18 Reschedule Request
 
 Current appointment, proposed slot, timezone, conflict result, recurrence scope và supervision requirement. Accept/decline; khi accept phải revalidate.

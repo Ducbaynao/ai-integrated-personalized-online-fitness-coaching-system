@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { authApi, registerSessionExpiredHandler } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
-import { clearQueryCache } from '@/services/queryClient';
+import { clearQueryCache, queryClient } from '@/services/queryClient';
 import { pushApi } from '@/services/pushApi';
+import { clearPendingCoachingQrIntent } from '@/features/coaching/pendingQrIntent';
 import {
   ApiError,
   CurrentUserResponse,
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSessionExpired = useCallback(() => {
     clearQueryCache();
+    clearPendingCoachingQrIntent();
     safeClearActiveCapability().catch(() => {});
     userRef.current = null;
     setUser(null);
@@ -194,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authApi.logout();
     } finally {
       clearQueryCache();
+      clearPendingCoachingQrIntent();
       await safeClearActiveCapability();
       userRef.current = null;
       setUser(null);
@@ -227,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(currentUser);
+      queryClient.removeQueries({ queryKey: ['coaching', 'qr'] });
       setActiveCapabilityState(resolved);
       return currentUser;
     },
@@ -246,6 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await safeSaveActiveCapability(resolved);
       }
 
+      queryClient.removeQueries({ queryKey: ['coaching', 'qr'] });
       setActiveCapabilityState(resolved);
     },
     []

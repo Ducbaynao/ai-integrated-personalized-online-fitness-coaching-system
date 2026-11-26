@@ -77,6 +77,14 @@ public class JdbcCoachingStore implements CoachingStore {
                 """, Boolean.class, studentId, trainerId));
     }
 
+    @Override public Optional<Relationship> currentPairRelationship(UUID studentId, UUID trainerId) {
+        return first(jdbc.query("""
+                SELECT * FROM fitness.coaching_relationships
+                WHERE student_id = ? AND trainer_id = ? AND status IN ('PENDING', 'ACTIVE', 'PAUSED')
+                LIMIT 1
+                """, RELATIONSHIP, studentId, trainerId));
+    }
+
     @Override public List<Relationship> pending(UUID actorId, boolean incoming, boolean studentCapability,
                                                  boolean trainerCapability, int limit, int offset) {
         String sql = incoming ? """

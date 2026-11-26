@@ -2,6 +2,10 @@
 
 Spring Boot exposes versioned REST APIs and WebSocket channels. Clients use DTO contracts; persistence entities are never external response models.
 
+## Phase 2 F12 Coaching QR — approved design, not implemented
+
+D08 (2026-11-25) assigns Dev A the Coaching-owned QR issue/read/rotate and authenticated minimal-profile resolver contracts. Existing `/api/v1/coaching/relationships/requests`, `/invitations` and `/{relationshipId}/{accept|reject|cancel}` remain the mutation boundary with command keys/version checks and current authority. QR is a public discovery identifier, never a credential or sharing grant. New paths, DTOs, concealment/rate limits and any forward Flyway migration must be reviewed and added to executable OpenAPI together with implementation. See [F12 Coaching QR contract design (A-QR-01, PLANNED)](coaching-qr-contract.md) and [F12 plan and tests](../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 ## Resource conventions
 
 - Prefix public REST endpoints with `/api/v1`.

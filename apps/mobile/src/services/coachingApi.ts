@@ -1,6 +1,9 @@
 import { request } from '@/services/apiClient';
 import {
   CoachingOutcome,
+  CoachingQrIdentity,
+  CoachingQrProfilePreview,
+  CoachingQrRole,
   CoachingRelationship,
   CoachingStatusEvent,
   DataAccessLevel,
@@ -78,6 +81,18 @@ export const coachingApi = {
   },
   revokeSharing(relationshipId: string, permissionId: string, expectedPermissionVersion: number, reason?: string, commandKey = createCommandKey()) {
     return request(`/coaching/relationships/${relationshipId}/sharing-permissions/${permissionId}/revoke`, { method: 'POST', body: { expectedPermissionVersion, commandKey, ...(reason?.trim() ? { reason: reason.trim() } : {}) } });
+  },
+  getMyQr(role: CoachingQrRole) {
+    return request<CoachingQrIdentity>(`/coaching/qr/me?role=${encodeURIComponent(role)}`, { method: 'GET' });
+  },
+  issueMyQr(role: CoachingQrRole) {
+    return request<CoachingQrIdentity>('/coaching/qr/me', { method: 'POST', body: { role } });
+  },
+  rotateMyQr(role: CoachingQrRole, expectedVersion: number, commandKey = createCommandKey()) {
+    return request<CoachingQrIdentity>('/coaching/qr/me/rotate', { method: 'POST', body: { role, expectedVersion, commandKey } });
+  },
+  resolveQr(publicCode: string, expectedTargetRole: CoachingQrRole, payloadVersion = 1) {
+    return request<CoachingQrProfilePreview>('/coaching/qr/resolve', { method: 'POST', body: { publicCode, expectedTargetRole, payloadVersion } });
   },
 };
 

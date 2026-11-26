@@ -5,6 +5,10 @@ description: Design or implement Fitness Goal, Goal Target, proposal, version, t
 
 # Fitness Goal and Coaching
 
+## Approved Phase 2 QR extension (2026-11-25)
+
+Read [F12 / P2-A-QR](../../../docs/07-development/features/phase-2-dev-a-coaching-qr.md) for QR discovery. D08 assigns this bounded extension to Dev A: real backend-issued QR via camera/image → minimal profile → existing coaching invitation → counterparty acceptance. No friendship or automatic sharing. B03 eligibility, receipts, periods and history remain authoritative. Scope approved, implementation PLANNED; historical name/email lookup contracts do not establish QR implementation.
+
 Read `digital-fitness-core` first.
 
 ## Fitness Goal model
