@@ -6,8 +6,9 @@ import {
   registerSessionExpiredHandler,
 } from '@/services/apiClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
-import { clearQueryCache } from '@/services/queryClient';
+import { clearQueryCache, queryClient } from '@/services/queryClient';
 import { pushApi } from '@/services/pushApi';
+import { clearPendingCoachingQrIntent } from '@/features/coaching/pendingQrIntent';
 import {
   ApiError,
   CurrentUserResponse,
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const expiredEpoch = sessionEpochRef.current;
     invalidateAuthSession?.();
     clearQueryCache();
+    clearPendingCoachingQrIntent();
     safeClearActiveCapability(() => sessionEpochRef.current === expiredEpoch).catch(() => {});
     userRef.current = null;
     activeCapabilityRef.current = null;
@@ -278,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (sessionEpochRef.current === logoutEpoch) {
         clearQueryCache();
+        clearPendingCoachingQrIntent();
         await safeClearActiveCapability(() => sessionEpochRef.current === logoutEpoch);
         if (sessionEpochRef.current === logoutEpoch) {
           userRef.current = null;
@@ -338,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userRef.current = currentUser;
       activeCapabilityRef.current = resolved;
       setUser(currentUser);
+      queryClient.removeQueries({ queryKey: ['coaching', 'qr'] });
       setActiveCapabilityState(resolved);
       return currentUser;
     },
@@ -375,6 +379,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      queryClient.removeQueries({ queryKey: ['coaching', 'qr'] });
       activeCapabilityRef.current = resolved;
       setActiveCapabilityState(resolved);
     },

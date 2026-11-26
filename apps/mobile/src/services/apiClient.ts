@@ -88,7 +88,11 @@ async function parseResponse<T>(response: Response): Promise<T> {
       }
     }
 
-    throw new ApiError(response.status, apiErrorMessage({ status: response.status, errorResponse }, 'Yêu cầu không thành công. Vui lòng thử lại.'), errorResponse, rawData);
+    const retryAfterHeader = response.headers.get('Retry-After');
+    const parsedRetryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : NaN;
+    const retryAfterSeconds = Number.isFinite(parsedRetryAfter) && parsedRetryAfter > 0 ? parsedRetryAfter : undefined;
+
+    throw new ApiError(response.status, apiErrorMessage({ status: response.status, errorResponse }, 'Yêu cầu không thành công. Vui lòng thử lại.'), errorResponse, rawData, retryAfterSeconds);
   }
 
   if (response.status === 204) {

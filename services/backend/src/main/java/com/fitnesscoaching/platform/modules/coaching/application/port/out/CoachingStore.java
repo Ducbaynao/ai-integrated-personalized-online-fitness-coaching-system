@@ -15,6 +15,7 @@ public interface CoachingStore {
     boolean pendingPair(UUID studentId, UUID trainerId);
 
     boolean currentPair(UUID studentId, UUID trainerId);
+    Optional<Relationship> currentPairRelationship(UUID studentId, UUID trainerId);
     List<Relationship> pending(UUID actorId, boolean incoming, boolean studentCapability,
                                boolean trainerCapability, int limit, int offset);
     List<Relationship> relationships(UUID actorId, boolean studentCapability,

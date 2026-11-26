@@ -6,6 +6,7 @@ This section explains how to run, understand, plan, change, and verify the monor
 - [Project structure](project-structure.md)
 - [Phase 1 implementation plan](phase-1-implementation-plan.md)
 - [Phase 2 implementation plan — APPROVED](phase-2-implementation-plan.md)
+- [F12 Phase 2 Coaching QR — Dev A; approved scope, implementation PLANNED](features/phase-2-dev-a-coaching-qr.md)
 - [Testing guide](testing-guide.md)
 - [B03 Coaching Relationship and Coaching Period decisions](features/03-coaching.md)
 - [B06 Planned Workout occurrence decisions — APPROVED](features/06-schedule.md)

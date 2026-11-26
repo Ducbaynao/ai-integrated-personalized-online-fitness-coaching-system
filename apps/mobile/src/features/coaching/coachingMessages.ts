@@ -37,6 +37,15 @@ const codeMessages: Record<string, string> = {
   DATA_SHARING_PERMISSION_NOT_FOUND: 'Quyền chia sẻ không tồn tại hoặc không còn khả dụng.',
   DATA_SHARING_ACCESS_LEVEL_INSUFFICIENT: 'Mức quyền hiện tại không đủ cho thao tác này.',
   TRAINER_NOT_ELIGIBLE: 'Huấn luyện viên hiện không đủ điều kiện cho thao tác này.',
+  COACHING_QR_NOT_FOUND: 'Mã QR không hợp lệ, đã hết hiệu lực hoặc người dùng hiện không khả dụng.',
+  NOT_FOUND: 'Tính năng mã QR hiện chưa sẵn sàng trên máy chủ. Vui lòng thử lại sau.',
+  COACHING_QR_SELF_SCAN: 'Bạn không thể tự quét mã QR của chính mình.',
+  COACHING_QR_ROLE_MISMATCH: 'Mã QR này không khớp với tư cách đối tác bạn đang tìm.',
+  COACHING_QR_VERSION_CONFLICT: 'Mã QR của bạn đã thay đổi ở nơi khác. Vui lòng tải lại mã mới nhất.',
+  RATE_LIMIT_EXCEEDED: 'Bạn đã quét quá nhiều lần. Vui lòng thử lại sau ít phút.',
+  ACCOUNT_UNAVAILABLE: 'Tài khoản hiện không khả dụng cho thao tác này.',
+  STUDENT_CAPABILITY_UNAVAILABLE: 'Tài khoản chưa kích hoạt tư cách Học viên.',
+  TRAINER_CAPABILITY_UNAVAILABLE: 'Tài khoản chưa kích hoạt tư cách Huấn luyện viên.',
   ACCESS_DENIED: 'Bạn không có quyền thực hiện thao tác này.',
   VALIDATION_FAILED: 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.',
 };
@@ -44,6 +53,11 @@ const codeMessages: Record<string, string> = {
 export function coachingErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   const code = error.errorResponse?.errorCode;
+  if (error.status === 429 || code === 'RATE_LIMIT_EXCEEDED') {
+    return error.retryAfterSeconds
+      ? `Bạn đã quét quá nhiều lần. Vui lòng thử lại sau ${error.retryAfterSeconds} giây.`
+      : codeMessages.RATE_LIMIT_EXCEEDED;
+  }
   if (code && codeMessages[code]) return codeMessages[code];
   if (error.status === 0) return 'Không thể kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.';
   if (error.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
@@ -56,5 +70,5 @@ export function isStaleCoachingError(error: unknown): boolean {
   if (!(error instanceof ApiError) || error.status !== 409) return false;
   return ['COACHING_VERSION_CONFLICT', 'COACHING_RELATIONSHIP_STATE_CONFLICT',
     'COACHING_RESUME_REQUEST_VERSION_CONFLICT', 'COACHING_RESUME_REQUEST_STATE_CONFLICT',
-    'DATA_SHARING_PERMISSION_CONFLICT', 'COACHING_PERIOD_CONFLICT'].includes(error.errorResponse?.errorCode ?? '');
+    'DATA_SHARING_PERMISSION_CONFLICT', 'COACHING_PERIOD_CONFLICT', 'COACHING_QR_VERSION_CONFLICT'].includes(error.errorResponse?.errorCode ?? '');
 }

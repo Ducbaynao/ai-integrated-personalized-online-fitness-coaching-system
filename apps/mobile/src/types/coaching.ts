@@ -92,6 +92,44 @@ export interface PermissionSummary {
   items: PermissionSummaryItem[];
 }
 
+export type CoachingQrRole = 'STUDENT' | 'TRAINER';
+export type TrainerVerificationStatus = 'NOT_SUBMITTED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+
+export interface CoachingQrIdentity {
+  qrId: string;
+  role: CoachingQrRole;
+  publicCode: string;
+  qrUri: string;
+  payloadVersion: number;
+  displayName: string;
+  issuedAt: string;
+  version: number;
+}
+
+export interface CoachingQrTrainerSummary {
+  verificationStatus: TrainerVerificationStatus;
+  specialties: string[];
+  yearsExperience: number | null;
+  isAcceptingStudents: boolean;
+}
+
+export interface CoachingQrRelationshipState {
+  status: 'NONE' | 'PENDING' | 'ACTIVE' | 'PAUSED';
+  relationshipId: string | null;
+  direction: CoachingDirection | null;
+  version: number | null;
+  canInitiate: boolean;
+}
+
+export interface CoachingQrProfilePreview {
+  counterpartyId: string;
+  targetRole: CoachingQrRole;
+  displayName: string;
+  avatarUrl: string | null;
+  trainerSummary: CoachingQrTrainerSummary | null;
+  relationshipState: CoachingQrRelationshipState;
+}
+
 export interface SharingGrantInput {
   dataScope: DataScope;
   decision: SharingDecision;

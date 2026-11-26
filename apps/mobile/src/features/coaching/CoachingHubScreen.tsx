@@ -29,11 +29,17 @@ export function CoachingHubScreen() {
       {activeCapability === 'STUDENT' ? <CoachingButton testID="open-attention-button" label="Đánh giá và tín hiệu chú ý" secondary
         onPress={() => router.push('/attention' as never)} /> : null}
     </View>
-    {activeCapability === 'STUDENT'
-      ? <CoachingButton testID="browse-trainers-button" label="Tìm huấn luyện viên" onPress={() => router.push('/coaching/trainers' as never)} />
-      : user?.capabilities?.canCoach
-        ? <CoachingButton testID="lookup-student-button" label="Mời học viên bằng email" onPress={() => router.push('/coaching/invite' as never)} />
-        : <CoachingState testID="trainer-ineligible" title="Chưa thể mời học viên" message="Quyền huấn luyện hiện chưa có hiệu lực. Bạn vẫn có thể xử lý các quan hệ hiện có." />}
+    <View style={styles.row}>
+      {activeCapability === 'STUDENT' || user?.capabilities?.canCoach ? (
+        <CoachingButton testID="open-qr-scanner-button" label={activeCapability === 'TRAINER' ? 'Tìm học viên qua QR' : 'Tìm huấn luyện viên qua QR'}
+          onPress={() => router.push({ pathname: '/coaching/qr', params: { targetRole: activeCapability === 'TRAINER' ? 'STUDENT' : 'TRAINER' } } as never)} />
+      ) : null}
+      <CoachingButton testID="open-my-qr-button" label="Mã QR của tôi" secondary
+        onPress={() => router.push('/coaching/my-qr' as never)} />
+    </View>
+    {activeCapability === 'TRAINER' && !user?.capabilities?.canCoach
+      ? <CoachingState testID="trainer-ineligible" title="Chưa thể mời học viên" message="Quyền huấn luyện hiện chưa có hiệu lực. Bạn vẫn có thể xử lý các quan hệ hiện có." />
+      : null}
     {query.isPending ? <CoachingState testID="relationships-loading" busy title="Đang tải quan hệ" message="Vui lòng chờ trong giây lát." /> : null}
     {query.isError ? <CoachingState testID="relationships-error" title="Chưa thể tải quan hệ" message={coachingErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
     {!query.isPending && !query.isError && relationships.length === 0 ? <CoachingState testID="relationships-empty" title="Chưa có quan hệ huấn luyện" message={activeCapability === 'TRAINER' ? 'Các lời mời và quan hệ được phép xem sẽ xuất hiện tại đây.' : 'Bạn có thể tìm huấn luyện viên hoặc chờ lời mời.'} /> : null}

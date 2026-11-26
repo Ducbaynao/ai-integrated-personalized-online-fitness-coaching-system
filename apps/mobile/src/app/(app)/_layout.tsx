@@ -1,16 +1,28 @@
 import React from 'react';
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { canAccessMainApp, getAuthenticatedHomeRoute } from '@/features/auth/routeGuard';
+import { parseCoachingQrUri } from '@/features/coaching/coachingQrCodec';
+import { setPendingCoachingQrIntent } from '@/features/coaching/pendingQrIntent';
 
 export default function AppLayout() {
   const { status, user, isLoading } = useAuth();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams<{ c?: string; v?: string; targetRole?: string }>();
 
   if (isLoading) {
     return null;
   }
 
   if (status !== 'AUTHENTICATED') {
+    if (pathname?.endsWith('/coaching/qr') && (typeof params.c === 'string' || typeof params.v === 'string')) {
+      const rawUri = `ai-fitness-coaching://coaching/qr?v=${encodeURIComponent(params.v ?? '')}&c=${encodeURIComponent(params.c ?? '')}`;
+      const parsed = parseCoachingQrUri(rawUri);
+      if (parsed.ok) {
+        const targetRole = params.targetRole === 'TRAINER' || params.targetRole === 'STUDENT' ? params.targetRole : undefined;
+        setPendingCoachingQrIntent({ publicCode: parsed.publicCode, payloadVersion: parsed.payloadVersion, targetRole });
+      }
+    }
     return <Redirect href="/(auth)/sign-in" />;
   }
 
@@ -35,6 +47,9 @@ export default function AppLayout() {
       <Stack.Screen name="coaching/index" />
       <Stack.Screen name="coaching/trainers" />
       <Stack.Screen name="coaching/invite" />
+      <Stack.Screen name="coaching/qr" />
+      <Stack.Screen name="coaching/my-qr" />
+      <Stack.Screen name="coaching/qr-profile" />
       <Stack.Screen name="coaching/[relationshipId]/index" />
       <Stack.Screen name="coaching/[relationshipId]/sharing" />
       <Stack.Screen name="workout-plans/index" />

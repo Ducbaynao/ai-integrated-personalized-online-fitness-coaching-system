@@ -5,6 +5,7 @@
 | Common account và multi-role | Onboarding, role switcher, Become a Trainer | Student/Trainer | `student/student-screens.md` |
 | Trainer verification | Application status, review queue, detail | Trainer/Admin | `trainer/trainer-screens.md`, `admin/admin-screens.md` |
 | Coaching Period | Coaching status, history, transition | Student/Trainer | Student và Trainer screens |
+| F12 Coaching QR — Phase 2, Dev A, PLANNED | SH-07 camera/ảnh → SH-09 hồ sơ thật → lời mời B03 → counterparty chấp nhận; SH-08 QR cá nhân; entry ST-17/TR-01/TR-02 | Student/Trainer | [F12 và QR01–QR10](../../07-development/features/phase-2-dev-a-coaching-qr.md), Student/Trainer flows, screen inventory |
 | Data sharing permission | Permission summary và editor | Student/Trainer | Student flows |
 | Fitness Goal | Goal dashboard, detail, proposal, version history | Student/Trainer | Student screens |
 | Exercise Library | Browse/detail/picker; active, archived, unavailable and canonical mapping states | Student/Trainer/Admin | `screen-inventory.md`, `component-specifications.md`, `admin/admin-screens.md` |

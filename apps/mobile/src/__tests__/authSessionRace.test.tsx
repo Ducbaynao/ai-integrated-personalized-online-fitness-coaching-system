@@ -6,6 +6,11 @@ import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { authApi, request } from '@/services/apiClient';
 import { queryClient } from '@/services/queryClient';
 import { capabilityStorage, tokenStorage } from '@/services/storage';
+import {
+  clearPendingCoachingQrIntent,
+  getPendingCoachingQrIntent,
+  setPendingCoachingQrIntent,
+} from '@/features/coaching/pendingQrIntent';
 import { ApiError, CurrentUserResponse, TokenPairResponse } from '@/types/auth';
 
 jest.mock('@/services/pushApi', () => ({
@@ -382,6 +387,87 @@ describe('AuthProvider & apiClient session-epoch race protection (P1 regression)
     expect(r1).toEqual({ ok: 1 });
     expect(r2).toEqual({ ok: 2 });
     expect(await tokenStorage.getTokens()).toEqual({ accessToken: 'fresh-access-2', refreshToken: 'fresh-refresh-2' });
+    renderer.act(() => tree.unmount());
+  });
+
+  it('7. Logout and session expiration clear pendingQrIntent, while stale logout does NOT clear a newer session intent', async () => {
+    const userA = makeUser('user-a', 'Account A');
+    const userB = makeUser('user-b', 'Account B');
+    const tree = await mountWithUser(userA, 'a-access', 'a-refresh');
+
+    setPendingCoachingQrIntent({ publicCode: 'abc1234567', payloadVersion: 1 });
+    expect(getPendingCoachingQrIntent()).toEqual({ publicCode: 'abc1234567', payloadVersion: 1 });
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+    await renderer.act(async () => {
+      await handle.logout();
+    });
+    expect(getPendingCoachingQrIntent()).toBeNull();
+
+    // Re-login A, set pendingQrIntent, then expire session via 401 -> 401
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, makeTokenPair('a-access-2', 'a-refresh-2', userA)));
+    await renderer.act(async () => {
+      await handle.login({ email: 'a@example.com', password: 'Password123!' });
+    });
+    setPendingCoachingQrIntent({ publicCode: 'expired789', payloadVersion: 1 });
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, { errorCode: 'UNAUTHENTICATED', message: 'Expired' }))
+      .mockResolvedValueOnce(jsonResponse(401, { errorCode: 'UNAUTHENTICATED', message: 'Refresh failed' }));
+
+    await renderer.act(async () => {
+      try {
+        await handle.refreshUser();
+      } catch {
+        // expected session expiration
+      }
+    });
+    expect(getPendingCoachingQrIntent()).toBeNull();
+
+    // Race: logout A is still awaiting remote /auth/sessions DELETE while B logs in and sets new QR intent
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, makeTokenPair('a-access-3', 'a-refresh-3', userA)));
+    await renderer.act(async () => {
+      await handle.login({ email: 'a@example.com', password: 'Password123!' });
+    });
+
+    const pendingLogoutDelete = deferred<ReturnType<typeof jsonResponse>>();
+    fetchMock.mockImplementationOnce(() => pendingLogoutDelete.promise);
+
+    let logoutPromise!: Promise<void>;
+    await renderer.act(async () => {
+      logoutPromise = handle.logout();
+      await Promise.resolve();
+    });
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, makeTokenPair('b-access', 'b-refresh', userB)));
+    await renderer.act(async () => {
+      await handle.login({ email: 'b@example.com', password: 'Password123!' });
+    });
+    setPendingCoachingQrIntent({ publicCode: 'freshB1234', payloadVersion: 1 });
+
+    await renderer.act(async () => {
+      pendingLogoutDelete.resolve(jsonResponse(204, undefined));
+      await logoutPromise;
+    });
+
+    expect(tree.root.findByProps({ testID: 'user-id' }).props.children).toBe('user-b');
+    expect(getPendingCoachingQrIntent()).toEqual({ publicCode: 'freshB1234', payloadVersion: 1 });
+    clearPendingCoachingQrIntent();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('8. setActiveCapability removes QR query cache cleanly and updates capability', async () => {
+    const dualUser = makeUser('user-dual', 'Dual', true, true);
+    await capabilityStorage.saveActiveCapability('STUDENT');
+    const tree = await mountWithUser(dualUser, 'dual-access', 'dual-refresh');
+
+    queryClient.setQueryData(['coaching', 'qr', 'me', 'user-dual', 'STUDENT'], { publicCode: 'student-code' });
+    await renderer.act(async () => {
+      await handle.setActiveCapability('TRAINER');
+    });
+
+    expect(tree.root.findByProps({ testID: 'active-capability' }).props.children).toBe('TRAINER');
+    expect(queryClient.getQueryData(['coaching', 'qr', 'me', 'user-dual', 'STUDENT'])).toBeUndefined();
     renderer.act(() => tree.unmount());
   });
 });

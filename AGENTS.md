@@ -56,6 +56,10 @@ For any Phase 2 task, including Backend, Database, AI, Mobile, Admin, testing, r
 - Record unresolved operational values, specialist rule/catalog review, dataset/model selection and release measurements as milestone work. Approval of the plan does not approve unknown production thresholds or prove portion-estimation coverage.
 - Keep summaries, skills and relevant UI/API/domain documentation synchronized with an approved scope change. Assignee/reviewer ownership belongs to the task/issue; product roles do not identify developers.
 
+## Phase 2 Coaching QR extension
+
+D08/F12 was approved by the project owner on 2026-11-25 and assigned explicitly to Dev A. For QR discovery work read `docs/07-development/features/phase-2-dev-a-coaching-qr.md` alongside the three Phase 2 baseline documents. `P2-A-QR` covers real backend-issued per-capability QR, camera/image decode, minimal profile and existing bilateral coaching invitation/acceptance; no friendship or authority granted by QR. Scope approval is not implementation/test evidence. New QR APIs, migration and Mobile code are PLANNED until implemented and verified under QR01–QR10. This documentation checkpoint does not authorize starting feature code or extra Git operations.
+
 ## Git safety
 
 - Coding agents may inspect Git using read-only commands such as

@@ -25,6 +25,8 @@ Sau khi plan ACTIVE có phiên bản đã xuất bản hiện hành, Student có
 
 ## 3. Chuyển sang Human Coach
 
+**F12 Phase 2 — PLANNED, D08 ngày 25/11/2026:** Từ ST-17/“Tìm PT”, Student mở SH-07 để quét camera hoặc chọn ảnh QR thật của PT. Backend resolve tư cách TRAINER, kiểm account/eligibility/availability và trả hồ sơ tối thiểu SH-09. Student xem rồi chủ động gửi yêu cầu B03; PT quyết định ở yêu cầu đến. SH-08 hiển thị/lưu QR STUDENT thật cho chiều PT tìm học viên. Không kết bạn; quét/preview/PENDING không đổi mode hoặc cấp sharing. Thay UI tìm PT theo tên, giữ quan hệ và lời mời. [Kế hoạch F12 Dev A và QR01–QR10](../../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 1. Student chọn Trainer hoặc chấp nhận coaching request.
 2. Review phạm vi dữ liệu được chia sẻ, gồm loại dữ liệu và time scope.
 3. Tạo Coaching Relationship và Coaching Period mới.

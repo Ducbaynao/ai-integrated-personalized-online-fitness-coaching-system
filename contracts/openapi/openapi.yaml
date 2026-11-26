@@ -1139,6 +1139,106 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/CoachingForbidden' }
         '404': { $ref: '#/components/responses/CoachingConcealed' }
+  /coaching/qr/me:
+    get:
+      tags: [Coaching Lifecycle]
+      operationId: getMyCoachingQr
+      summary: Read active personal coaching QR identity for a capability
+      description: Pure read-only endpoint. Returns 404 when no QR has been issued yet for the requested capability; never rotates or creates a QR.
+      parameters:
+        - name: role
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/CoachingQrRole' }
+      responses:
+        '200':
+          description: Active personal coaching QR identity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingQrIdentity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: issueMyCoachingQr
+      summary: Issue personal coaching QR identity if absent
+      description: Idempotent issue-if-absent. Returns 201 when newly issued or 200 with the existing active QR without rotating it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueCoachingQrRequest' }
+      responses:
+        '200':
+          description: Existing active personal coaching QR identity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingQrIdentity' }
+        '201':
+          description: Newly issued personal coaching QR identity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingQrIdentity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/qr/me/rotate:
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: rotateMyCoachingQr
+      summary: Rotate personal coaching QR and revoke the prior active code
+      description: Atomically revokes the active QR, increments version monotonically, and supports actor-scoped idempotent replay while the rotated QR remains active.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RotateCoachingQrRequest' }
+      responses:
+        '200':
+          description: Newly rotated active coaching QR identity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingQrIdentity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+  /coaching/qr/resolve:
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: resolveCoachingQr
+      summary: Resolve a scanned coaching QR to minimal public profile and pair relationship state
+      description: >-
+        Authenticated, rate-limited resolver. Conceals non-existent, revoked, and unavailable
+        accounts with 404 before self-scan or role-mismatch checks. Does not create a relationship
+        or grant health-data access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveCoachingQrRequest' }
+      responses:
+        '200':
+          description: Minimal public profile preview and current pair relationship state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachingQrProfilePreview' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '404': { $ref: '#/components/responses/CoachingConcealed' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
+        '429':
+          description: Rate limit exceeded for QR resolution
+          headers:
+            Retry-After:
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
   /coaching/relationships/me:
     get:
       tags: [Coaching Lifecycle]
@@ -9423,6 +9523,74 @@ components:
       properties:
         trainerId: { type: string, format: uuid }
         displayName: { type: string }
+    CoachingQrRole:
+      type: string
+      enum: [STUDENT, TRAINER]
+    IssueCoachingQrRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role: { $ref: '#/components/schemas/CoachingQrRole' }
+    RotateCoachingQrRequest:
+      type: object
+      additionalProperties: false
+      required: [role, expectedVersion, commandKey]
+      properties:
+        role: { $ref: '#/components/schemas/CoachingQrRole' }
+        expectedVersion: { type: integer, format: int64, minimum: 1 }
+        commandKey: { type: string, format: uuid }
+    ResolveCoachingQrRequest:
+      type: object
+      additionalProperties: false
+      required: [publicCode, expectedTargetRole, payloadVersion]
+      properties:
+        publicCode: { type: string, pattern: '^[A-Za-z0-9_-]{32}$' }
+        expectedTargetRole: { $ref: '#/components/schemas/CoachingQrRole' }
+        payloadVersion: { type: integer, minimum: 1, maximum: 1 }
+    CoachingQrIdentity:
+      type: object
+      additionalProperties: false
+      required: [qrId, role, publicCode, qrUri, payloadVersion, displayName, issuedAt, version]
+      properties:
+        qrId: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/CoachingQrRole' }
+        publicCode: { type: string, pattern: '^[A-Za-z0-9_-]{32}$' }
+        qrUri: { type: string }
+        payloadVersion: { type: integer, minimum: 1, maximum: 1 }
+        displayName: { type: string }
+        issuedAt: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+    CoachingQrTrainerSummary:
+      type: object
+      additionalProperties: false
+      required: [verificationStatus, specialties, isAcceptingStudents]
+      properties:
+        verificationStatus: { type: string, enum: [NOT_SUBMITTED, PENDING, VERIFIED, REJECTED, SUSPENDED] }
+        specialties: { type: array, items: { type: string } }
+        yearsExperience: { type: number, nullable: true }
+        isAcceptingStudents: { type: boolean }
+    CoachingQrRelationshipState:
+      type: object
+      additionalProperties: false
+      required: [status, canInitiate]
+      properties:
+        status: { type: string, enum: [NONE, PENDING, ACTIVE, PAUSED] }
+        relationshipId: { type: string, format: uuid, nullable: true }
+        direction: { type: string, enum: [INCOMING, OUTGOING], nullable: true }
+        version: { type: integer, format: int64, nullable: true }
+        canInitiate: { type: boolean }
+    CoachingQrProfilePreview:
+      type: object
+      additionalProperties: false
+      required: [counterpartyId, targetRole, displayName, relationshipState]
+      properties:
+        counterpartyId: { type: string, format: uuid }
+        targetRole: { $ref: '#/components/schemas/CoachingQrRole' }
+        displayName: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        trainerSummary: { $ref: '#/components/schemas/CoachingQrTrainerSummary', nullable: true }
+        relationshipState: { $ref: '#/components/schemas/CoachingQrRelationshipState' }
     TrainerDirectoryPage:
       type: object
       additionalProperties: false

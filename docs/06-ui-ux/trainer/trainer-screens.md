@@ -8,6 +8,8 @@
 
 Filter: Needs Attention, On Track, Inactive, Review Due. Search theo tên. Row/card hiển thị goal, coaching status, last activity, adherence, top signal và next review. Không hiển thị metric ngoài sharing scope.
 
+**F12 Phase 2 (PLANNED, D08):** TR-01/TR-02 có “Tìm học viên” → SH-07 camera/ảnh QR → SH-09 hồ sơ backend và gửi lời mời; SH-08 hiển thị/lưu QR TRAINER thật. Thay UI lookup email cho người mới, không mở Student directory; tìm tên trong danh sách học viên đã có quan hệ vẫn giữ. Student chấp nhận ở Coaching hub. Backend kiểm lại eligibility/accepting-students. [Kế hoạch F12 Dev A](../../07-development/features/phase-2-dev-a-coaching-qr.md).
+
 ## TR-03 Student Coaching Workspace
 
 Sticky student header có current goal, mode, relationship, last activity và permission summary. Overview tổng hợp next action; các tab chuyên sâu không làm mất context Student. History hiển thị Goal/Coaching/Plan transitions.

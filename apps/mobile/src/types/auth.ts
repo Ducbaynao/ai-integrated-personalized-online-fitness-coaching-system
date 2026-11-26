@@ -110,13 +110,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly errorResponse?: ErrorResponse;
   readonly rawData?: unknown;
+  readonly retryAfterSeconds?: number;
 
-  constructor(status: number, message: string, errorResponse?: ErrorResponse, rawData?: unknown) {
+  constructor(status: number, message: string, errorResponse?: ErrorResponse, rawData?: unknown, retryAfterSeconds?: number) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.errorResponse = errorResponse;
     this.rawData = rawData;
+    this.retryAfterSeconds = retryAfterSeconds;
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }

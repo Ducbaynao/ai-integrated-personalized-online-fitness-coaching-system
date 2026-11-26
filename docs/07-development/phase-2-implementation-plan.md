@@ -1,11 +1,11 @@
 # Kế hoạch triển khai Phase 2
 
 **Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
-**Phiên bản tài liệu:** 1.0\
+**Phiên bản tài liệu:** 1.1 — bổ sung F12/D08; giữ baseline AI 1.0\
 **Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
-**Ngày cập nhật:** 04/10/2026\
+**Ngày cập nhật:** 25/11/2026\
 **Vị trí trong repository:** `docs/07-development/phase-2-implementation-plan.md`\
-**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026 (baseline); 25/11/2026 (F12/D08)\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Xác định phụ thuộc, đầu ra milestone, quy trình phối hợp và bằng chứng nghiệm thu Phase 2.
@@ -14,7 +14,7 @@ Tài liệu dành cho thành viên phát triển, người review và AI agent. 
 
 **Cách sử dụng:** đọc phạm vi phát hành → ma trận dữ liệu/quyền → kế hoạch triển khai. Tuân thủ `AGENTS.md` và hướng dẫn component trong repository khi thực hiện công việc. Tài liệu kế hoạch không tự cấp quyền Git, triển khai, xuất bản nội dung hoặc thay đổi dữ liệu. Khi tài liệu mới, tài liệu domain và code/schema khác nhau, ghi nhận xung đột và quyết định được phê duyệt trước phần triển khai bị ảnh hưởng; không tự chọn bản thuận tiện hơn. Nguồn trích dẫn tại baseline dùng để truy vết, không dùng để suy đoán các thay đổi về sau.
 
-Tài liệu liên quan: [phạm vi phát hành](../00-project-overview/phase-2-release-scope.md), [dữ liệu và quyền](../08-ai/phase-2-feature-data-authority-matrix.md). Mã P2-M0–P2-M6 chỉ thuộc Phase 2, không thay thế mã milestone Phase 1. Kế hoạch không gán công việc cho cá nhân; assignee và reviewer được xác định theo từng issue.
+Tài liệu liên quan: [phạm vi phát hành](../00-project-overview/phase-2-release-scope.md), [dữ liệu và quyền](../08-ai/phase-2-feature-data-authority-matrix.md). Mã P2-M0–P2-M6 chỉ thuộc Phase 2, không thay thế mã milestone Phase 1. Phân công thông thường theo issue; riêng F12/P2-A-QR được chủ dự án giao trực tiếp cho Dev A ngày 25/11/2026. Reviewer F12 chưa chỉ định, phải bổ sung ở issue/PR khi triển khai.
 
 ## 1. Điều kiện bắt đầu
 
@@ -212,6 +212,16 @@ Quy tắc phối hợp:
 
 Mẫu issue tối thiểu: feature/milestone ID; mục tiêu; đầu vào/đầu ra; prerequisite; assignee/reviewer; paths/contracts; acceptance/test IDs; migration nếu có; bằng chứng bàn giao. Tài liệu phân công cá nhân, nếu có, được quản lý riêng và không phải nguồn quy tắc nghiệp vụ.
 
+### 9.1. P2-A-QR — F12, Dev A (D08, 25/11/2026)
+
+- **Owner:** Dev A end-to-end (Coaching backend/contract, QR identity, Mobile camera/ảnh/QR thật, tích hợp lời mời và tests); không chuyển toàn bộ B03/B08.
+- **Branch:** `feat/phase2-dev-a-coaching-qr`; **trạng thái:** PLANNED, phạm vi đã duyệt, chưa triển khai/kiểm thử.
+- **Luồng:** quét QR hoặc chọn ảnh → hồ sơ thật → gửi yêu cầu/lời mời huấn luyện → counterparty chấp nhận; thay UI tìm tên/email, không friendship.
+- **Trình tự:** A-QR-01 contract → A-QR-02 backend → A-QR-03 Mobile → A-QR-04 tích hợp B03 → A-QR-05 regression và thiết bị thật.
+- **Phụ thuộc:** Auth/capability, Trainer eligibility/availability, B03 commands/receipts/period/sharing và Expo SDK 57 native compatibility. Không phụ thuộc model/RAG, không dùng AI result types hoặc Recommendation Apply.
+- **Review/gate:** reviewer chưa chỉ định; review contract/schema dùng chung theo owner. QR01–QR10 và evidence thật bắt buộc trước P2-M6; giữ bảy milestone AI, không dùng fixture chứng minh camera thật.
+- **Chi tiết:** [kế hoạch F12 Dev A](features/phase-2-dev-a-coaching-qr.md) và [contract thiết kế A-QR-01](../05-api/coaching-qr-contract.md). Endpoint/DTO/migration mới đã chốt ở mức thiết kế và chỉ cập nhật vào executable OpenAPI/code/Flyway cùng implementation; checkpoint này chỉ sửa tài liệu.
+
 ## 10. Chuẩn bị dữ liệu RAG bắt đầu từ đâu
 
 | Bước | Việc cụ thể | Đầu ra |
@@ -338,6 +348,7 @@ Reviewer nội dung cần hiểu tập luyện/dinh dưỡng trong phạm vi đ�
 | F09 | Ma trận mục 10 | P2-M2 | T12/T20/T28 |
 | F10 | Ma trận mục 11 | P2-M2 Run/runner tối thiểu + P2-M6 đầy đủ | T04/T13/T19/T20/T24 |
 | F11 | Ma trận mục 12 | P2-M3 + P2-M6 | T18/T21 |
+| F12 | Ma trận mục 13.1 và kế hoạch Dev A | P2-A-QR; gate P2-M6 | QR01–QR10, riêng với T01–T28 của AI |
 
 Các tiêu chí áp dụng chung vẫn có hiệu lực dù không lặp trong cột test chính. F06/F07 Student-only ở request/confirmation nên các test Trainer chỉ kiểm đọc confirmed log theo scope, không cấp thêm use case Trainer nhập hộ.
 
@@ -350,8 +361,9 @@ Các tiêu chí áp dụng chung vẫn có hiệu lực dù không lặp trong c
 | 0.3 | Retry theo revision/payload; Food Confirmation nguyên tử; tương thích embedding; UI result types; T25–T28 |
 | 0.4 | Chuẩn hóa tài liệu dùng chung; tách phân công cá nhân; bổ sung liên kết, metadata phê duyệt và trách nhiệm theo issue; giữ nguyên scope kỹ thuật |
 | 1.0 | Chủ dự án phê duyệt phạm vi/thiết kế và D01–D07 ngày 04/10/2026; bổ sung routing agent. Giữ riêng gate triển khai/chuyên môn/evaluation, không ghi thành đã kiểm thử |
+| 1.1 | Chủ dự án bổ sung D08/F12 ngày 25/11/2026, giao Dev A work package P2-A-QR; QR thật hai chiều và gate QR01–QR10 trước P2-M6; chưa triển khai |
 
-Bộ tài liệu định nghĩa 11 chức năng, 7 milestone và 28 tình huống T01–T28. Đây là phạm vi cần kiểm chứng, không phải báo cáo test đã đạt. Kết quả thực tế phải có phiên bản code/dataset, môi trường, thời điểm và evidence tại issue/PR hoặc báo cáo evaluation.
+Baseline AI định nghĩa F01–F11, 7 milestone và T01–T28. Bản 1.1 (25/11/2026) bổ sung D08/F12 không dùng AI, P2-A-QR do Dev A phụ trách và QR01–QR10, hoàn tất trước gate P2-M6. Đây là phạm vi cần kiểm chứng, không phải báo cáo test đã đạt. Kết quả thực tế phải có phiên bản code/dataset, môi trường, thời điểm và evidence tại issue/PR hoặc báo cáo evaluation.
 
 D01–D07 đã được phê duyệt. Các mục còn phải chốt/kiểm chứng: prerequisite Phase 1; ngưỡng rule chuyên môn; catalog/dataset/reviewer; model/provider; ngân sách, timeout, rate limit, retention; kết quả test/evaluation. Mỗi mục có người chịu trách nhiệm và gate tương ứng, không đóng chỉ vì đã có tài liệu.
 

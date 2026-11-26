@@ -1,5 +1,7 @@
 # B03 Coaching Relationship and Coaching Period
 
+> **Phase 2 extension (D08, approved 2026-11-25):** [F12 / P2-A-QR — Dev A](phase-2-dev-a-coaching-qr.md) replaces name/email selection UI with real QR camera/image decode → minimal profile → B03 invitation → counterparty acceptance. Implementation is PLANNED. The checkpoints below describe historical/existing contracts; their read-only/no-migration scope does not prohibit reviewed new QR backend/schema work under F12. Existing discovery endpoints are not claimed removed. F12 preserves B03 eligibility/availability, receipts, periods, sharing and history; QR grants no relationship or data authority. This bounded assignment does not transfer all B03/B08 ownership to Dev A.
+
 ## 1. Checkpoint and objective
 
 - **Feature ID:** `B03`.

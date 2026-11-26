@@ -3,12 +3,14 @@ package com.fitnesscoaching.platform.modules.coaching.adapter.in.web;
 import com.fitnesscoaching.platform.common.exception.ErrorResponse;
 import com.fitnesscoaching.platform.common.web.RequestIdHolder;
 import com.fitnesscoaching.platform.modules.coaching.application.CoachingFailure;
+import com.fitnesscoaching.platform.modules.coaching.application.CoachingQrRateLimitException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,7 +21,7 @@ import java.time.Instant;
 import java.sql.SQLException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = CoachingController.class)
+@RestControllerAdvice(assignableTypes = {CoachingController.class, CoachingQrController.class})
 public class CoachingErrorAdvice {
     private static final Logger log = LoggerFactory.getLogger(CoachingErrorAdvice.class);
     private final Clock clock;
@@ -30,6 +32,14 @@ public class CoachingErrorAdvice {
     public ResponseEntity<ErrorResponse> handle(CoachingFailure ex) {
         return ResponseEntity.status(ex.status()).body(ErrorResponse.of(
                 ex.code(), "Coaching operation could not be completed", Instant.now(clock), RequestIdHolder.get()));
+    }
+
+    @ExceptionHandler(CoachingQrRateLimitException.class)
+    public ResponseEntity<ErrorResponse> rateLimited(CoachingQrRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()))
+                .body(ErrorResponse.of(
+                        "RATE_LIMIT_EXCEEDED", "Too many QR resolve requests", Instant.now(clock), RequestIdHolder.get()));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

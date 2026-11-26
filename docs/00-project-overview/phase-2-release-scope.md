@@ -1,11 +1,11 @@
 # Phạm vi phát hành Phase 2
 
 **Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
-**Phiên bản tài liệu:** 1.0\
+**Phiên bản tài liệu:** 1.1 — bổ sung F12/D08; giữ baseline AI 1.0\
 **Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
-**Ngày cập nhật:** 04/10/2026\
+**Ngày cập nhật:** 25/11/2026\
 **Vị trí trong repository:** `docs/00-project-overview/phase-2-release-scope.md`\
-**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026 (baseline); 25/11/2026 (F12/D08)\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Xác định phạm vi phát hành, giới hạn, người sử dụng và điều kiện nghiệm thu Phase 2.
@@ -64,6 +64,12 @@ Tất cả F01–F11 là **bắt buộc ở bản kết thúc Phase 2 theo phạ
 
 **Phân loại tác động:** F01/F04/F08 vẫn có thể ghi AI Run hoặc audit; “thông tin” nghĩa là không thay đổi Goal, Plan, Appointment, Measurement, Actual Workout, Food Log hoặc Nutrition Target. Feedback không thay thế Accept/Reject. Publish tri thức là thay đổi dữ liệu hệ thống, không phải human approval cho giáo án.
 
+### 4.1. F12 — Coaching QR hai chiều (D08, 25/11/2026)
+
+F12 là phần bổ sung **bắt buộc trong Phase 2**, không phải chức năng AI: Student tìm PT và PT tìm Student bằng camera hoặc ảnh QR → xem hồ sơ thật → gửi lời mời huấn luyện → counterparty chấp nhận. Thay UI tìm tên/email, không có bước kết bạn. QR do backend cấp, giải mã và resolve đúng account/capability thật; ảnh QR mock hoặc hồ sơ giả không đạt nghiệm thu.
+
+**Owner do chủ dự án chỉ định:** Dev A; work package `P2-A-QR`, hoàn tất trước gate P2-M6. Reviewer chưa chỉ định; trạng thái triển khai PLANNED. Tái sử dụng lifecycle, period, audit, sharing và lời mời B03; không mở marketplace hoặc cấp quyền health data qua QR. Chi tiết và QR01–QR10 tại [kế hoạch F12 Dev A](../07-development/features/phase-2-dev-a-coaching-qr.md). F01–F11 và D01–D07 giữ nguyên nghĩa/phạm vi.
+
 ## 5. Thứ tự triển khai và công nghệ
 
 | Thứ tự | Công việc | Công nghệ/vai trò, theo kiến trúc sẵn có |
@@ -117,7 +123,7 @@ Các giới hạn/hoãn trong bảng được chấp thuận trong baseline 1.0,
 
 Chỉ coi là hoàn thành khi đồng thời:
 
-1. F01–F11 đạt tiêu chí riêng trong ma trận; có UI cần thiết cho Student, Trainer và Admin tương ứng.
+1. F01–F11 đạt tiêu chí riêng trong ma trận; có UI cần thiết cho Student, Trainer và Admin tương ứng. F12 bổ sung theo D08 đạt QR01–QR10: QR/backend thật, camera và ảnh ở cả hai chiều; emulator-only hoặc scanner mock không đóng gate camera thật.
 2. Không có đường gọi từ client trực tiếp đến AI để vượt kiểm tra Spring; không có quyền ghi nghiệp vụ từ model.
 3. Tất cả kiểm thử quyền, source conflict, lịch sử, dữ liệu thiếu và xác nhận phải đạt. Lỗi mô hình không được tạo đề xuất có thể áp dụng.
 4. RAG có tập nguồn đã review, truy xuất đúng version và không lấy DRAFT/ARCHIVED; benchmark và kết quả được lưu.
@@ -126,7 +132,7 @@ Chỉ coi là hoàn thành khi đồng thời:
 7. Food Log có identity/quantity được Student xác nhận, tính toán xác định và provenance; ảnh hoặc text không tự biến thành log đã xác nhận.
 8. Admin replay không ghi domain state; nhật ký và giao diện không làm lộ dữ liệu ngoài quyền.
 9. Báo cáo chất lượng, độ trễ, chi phí theo chức năng, giới hạn catalog, xử lý sự cố và rollback cấu hình đã được review. Ngưỡng đề xuất ở kế hoạch không được báo cáo thành số đo thực tế.
-10. Các quyết định D01–D07 dưới đây có người duyệt; không có câu hỏi quyền truy cập hoặc chính sách nghiệp vụ quan trọng còn bỏ ngỏ.
+10. Các quyết định D01–D08 dưới đây có người duyệt; không có câu hỏi quyền truy cập hoặc chính sách nghiệp vụ quan trọng còn bỏ ngỏ.
 11. Portion estimation có tập hỗ trợ, ground truth, coverage và sai số đã đo theo kế hoạch mục 11.2. Luôn trả unknown/manual không đủ để nghiệm thu khả năng ước lượng; nếu chưa đạt phải ghi experimental/chưa hoàn thành hoặc duyệt thay đổi phạm vi.
 12. Có bảng bàn giao Phase 1 và bảng bổ sung cho AI riêng, kèm evidence và owner. Chưa có bằng chứng prerequisite thì chưa cam kết lịch tích hợp tương ứng.
 13. Retry payload khác, Food Confirmation rollback/retry, UI theo resultType và embedding mismatch đạt T25–T28. Tài liệu lifecycle/API/schema được đồng bộ theo V1 được duyệt trước tích hợp, không còn hai cách diễn giải trạng thái trái nhau.
@@ -142,6 +148,7 @@ Chỉ coi là hoàn thành khi đồng thời:
 | D05 | Hoãn AI sinh Goal/strategic Nutrition Target Proposal; F08 chỉ phân tích/review | Giới hạn bản phát hành đã phê duyệt; giữ trong scope; workflow thủ công vẫn giữ |
 | D06 | Benchmark, catalog thử nghiệm và rule policy phải được review trước mở tính năng | Có thể tiếp tục phát triển bằng fixture, không bật một chức năng khi chính sách chưa được duyệt |
 | D07 | Gán owner/reviewer theo issue; migration, authority và contract dùng chung có trách nhiệm review/tích hợp rõ ràng theo kế hoạch mục 9 | Phân công cá nhân quản lý riêng; đổi người thực hiện không đổi quy tắc nghiệp vụ |
+| D08 | Bổ sung F12/P2-A-QR vào Phase 2, giao Dev A: QR thật hai chiều → hồ sơ → lời mời huấn luyện → chấp nhận; thay UI tìm tên/email, không kết bạn | Cấp/resolve QR backend, Mobile camera/ảnh/QR cá nhân; giữ B03; nghiệm thu QR01–QR10 trước P2-M6 |
 
 ### 9.1. Ghi nhận phê duyệt
 
@@ -156,6 +163,9 @@ D01–D07 được duyệt theo yêu cầu trực tiếp của chủ dự án tr
 | D05 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
 | D06 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
 | D07 | APPROVED — bản 1.0 | Chủ dự án (người dùng) | 04/10/2026; yêu cầu phê duyệt trong phiên làm việc này |
+| D08 | APPROVED — bổ sung bản 1.1 | Chủ dự án (người dùng) | 25/11/2026; hội thoại chốt QR thật, bỏ kết bạn và giao Dev A; implementation PLANNED |
+
+D08 được chủ dự án phê duyệt trực tiếp trong hội thoại ngày 25/11/2026: chốt QR thật không kết bạn và chỉ định Dev A ở Phase 2. Đây là phê duyệt phạm vi/kế hoạch, chưa phải implementation hoặc kiểm thử; chưa có issue/PR phê duyệt riêng. Bản 1.1 bổ sung F12, không gán phê duyệt mới vào ngày 04/10/2026.
 
 ## Tài liệu hiện hành trong repository
 

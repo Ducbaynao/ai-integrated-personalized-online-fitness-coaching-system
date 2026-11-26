@@ -17,7 +17,18 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
+      "package": "com.anonymous.aifitnesscoaching"
     },
     "web": {
       "output": "static",
@@ -35,7 +46,26 @@
       ],
       "expo-secure-store",
       "expo-notifications",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ứng dụng cần quyền máy ảnh để quét mã QR huấn luyện."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ứng dụng cần quyền thư viện ảnh để chọn ảnh chứa mã QR."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Ứng dụng cần quyền thư viện ảnh để lưu mã QR của bạn.",
+          "savePhotosPermission": "Ứng dụng cần quyền lưu ảnh mã QR vào thư viện."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

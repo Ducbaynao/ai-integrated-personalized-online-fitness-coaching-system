@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import {
@@ -14,6 +14,8 @@ import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { SessionGateScreen } from '@/features/auth/SessionGateScreen';
 import { queryClient } from '@/services/queryClient';
 import { PushReceiptListener } from '@/features/chat/PushReceiptListener';
+import { parseCoachingQrUri } from '@/features/coaching/coachingQrCodec';
+import { setPendingCoachingQrIntent } from '@/features/coaching/pendingQrIntent';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -21,6 +23,22 @@ if (Platform.OS !== 'web') {
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const { status, user, isLoading, restoreError, retrySessionRestore } = useAuth();
+
+  useEffect(() => {
+    const captureUrl = (url: string | null) => {
+      if (!url || status === 'AUTHENTICATED') return;
+      const parsed = parseCoachingQrUri(url);
+      if (parsed.ok) {
+        setPendingCoachingQrIntent({
+          publicCode: parsed.publicCode,
+          payloadVersion: parsed.payloadVersion,
+        });
+      }
+    };
+    Linking.getInitialURL().then(captureUrl).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => captureUrl(url));
+    return () => sub.remove();
+  }, [status]);
 
   useEffect(() => {
     if (fontsReady && !isLoading && Platform.OS !== 'web') {

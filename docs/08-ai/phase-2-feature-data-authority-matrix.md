@@ -1,11 +1,11 @@
 # Dữ liệu và quyền từng chức năng Phase 2
 
 **Dự án:** HỆ THỐNG HUẤN LUYỆN THỂ HÌNH TRỰC TUYẾN ĐƯỢC CÁ NHÂN HÓA TÍCH HỢP TRÍ TUỆ NHÂN TẠO\
-**Phiên bản tài liệu:** 1.0\
+**Phiên bản tài liệu:** 1.1 — bổ sung F12/D08; giữ baseline AI 1.0\
 **Trạng thái:** APPROVED — đã phê duyệt phạm vi và thiết kế, sẵn sàng lập backlog/triển khai\
-**Ngày cập nhật:** 04/10/2026\
+**Ngày cập nhật:** 25/11/2026\
 **Vị trí trong repository:** `docs/08-ai/phase-2-feature-data-authority-matrix.md`\
-**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026\
+**Người phê duyệt / ngày phê duyệt:** Chủ dự án (người dùng) / 04/10/2026 (baseline); 25/11/2026 (F12/D08)\
 **Baseline tham chiếu:** `d354e0a594b5e703d18a43264c0bf4325a0911a6` — snapshot lịch sử, không đại diện trạng thái nhánh hiện tại.
 
 **Mục đích:** Định nghĩa đầu vào, nguồn dữ liệu, quyền, xử lý dữ liệu thiếu và tính nhất quán khi áp dụng từng chức năng AI.
@@ -328,6 +328,20 @@ successor history, and audit. See section 19 of
 6. Chuẩn unit/date/timezone, dữ liệu không có, revision token và policy version thống nhất giữa Spring/FastAPI/client.
 7. Contract operation identity, server-side payload fingerprint, committed receipt và conflict cho payload/revision khác; Nutrition confirmation riêng theo mục 1.9.
 8. Retrieval contract chỉ rõ embedding space/index và dimension theo mục 1.10.
+
+### 13.1. F12 — QR Coaching, phần mở rộng không dùng AI (D08)
+
+| Hạng mục | Contract quyền/dữ liệu đã chốt |
+|---|---|
+| Owner / actor | Dev A; Student tìm Trainer và eligible Trainer tìm Student; account nhiều capability chọn tư cách rõ ràng |
+| Source of truth | Coaching-owned QR identity trong PostgreSQL; User/Student/Trainer qua public ports; không AI/RAG/hồ sơ mock |
+| Resolve / preview | Đăng nhập, mã hợp lệ, capability đối ứng; public DTO tối thiểu, không email/health/log/history; quét không tạo quan hệ |
+| Write / decision | Tái sử dụng B03 request/invitation/accept/reject/cancel; recheck quyền/lifecycle tại mutation; receipts/version/audit/transaction theo B03 |
+| Authority | QR không cấp quyền; ACTIVE vẫn cần period và sharing scope/level/time; Student giữ ownership/history |
+| Không khả dụng | Mã đã tạo lại hoặc account không khả dụng bị che giấu; đổi eligibility/account sau preview được kiểm lại lúc gửi/accept |
+| Contract / gate | [F12 Dev A](../07-development/features/phase-2-dev-a-coaching-qr.md), QR01–QR10 trước P2-M6; PLANNED, chưa có endpoint QR mới trong checkpoint này |
+
+F12 không có AI Run, resultType INFORMATION/PROPOSAL/ESTIMATE hoặc Recommendation Apply. Approval trực tiếp ngày 25/11/2026 bổ sung D08, không thay D01–D07 hoặc contract F01–F11.
 
 ## Tài liệu hiện hành trong repository
 
