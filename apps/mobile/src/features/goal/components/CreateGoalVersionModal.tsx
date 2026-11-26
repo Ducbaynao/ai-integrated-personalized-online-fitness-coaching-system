@@ -13,15 +13,22 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
+import { formatGoalTypeDisplay } from '@/features/goal/goalTypeOptions';
 import {
-  GOAL_TYPE_OPTIONS,
   resolveGoalModalErrorMessage,
   useGoalModalSessionGuard,
 } from './CreateGoalModal';
 
+function normalizeGoalTypeCode(code?: string | null): string | null {
+  const trimmed = code?.trim();
+  return trimmed ? trimmed : null;
+}
+
 interface CreateGoalVersionModalProps {
   visible: boolean;
   currentTitle: string;
+  currentGoalTypeCode?: string | null;
+  targetMismatchError?: string | null;
   isSubmitting: boolean;
   isDark: boolean;
   sessionId?: number;
@@ -38,6 +45,8 @@ interface CreateGoalVersionModalProps {
 export function CreateGoalVersionModal({
   visible,
   currentTitle,
+  currentGoalTypeCode,
+  targetMismatchError,
   isSubmitting,
   isDark,
   sessionId = 0,
@@ -47,7 +56,9 @@ export function CreateGoalVersionModal({
   const [title, setTitle] = useState(currentTitle);
   const [changeReason, setChangeReason] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
-  const [selectedGoalType, setSelectedGoalType] = useState('FAT_LOSS');
+  const [lockedGoalType, setLockedGoalType] = useState<string | null>(() =>
+    normalizeGoalTypeCode(currentGoalTypeCode)
+  );
   const [durationDays, setDurationDays] = useState('');
 
   const themeColors = getSemanticColors(isDark);
@@ -56,7 +67,7 @@ export function CreateGoalVersionModal({
     setTitle(currentTitle);
     setChangeReason('');
     setChangeSummary('');
-    setSelectedGoalType('FAT_LOSS');
+    setLockedGoalType(normalizeGoalTypeCode(currentGoalTypeCode));
     setDurationDays('');
   };
 
@@ -88,6 +99,16 @@ export function CreateGoalVersionModal({
 
   const handleSubmit = async () => {
     if (isBusy) return;
+    if (targetMismatchError) {
+      setValidationError(targetMismatchError);
+      return;
+    }
+    if (!lockedGoalType) {
+      setValidationError(
+        'Chưa xác định được loại mục tiêu chính (PRIMARY) hiện tại. Không thể lưu phiên bản mới.'
+      );
+      return;
+    }
     const trimmedReason = changeReason.trim();
     if (!trimmedReason) {
       setValidationError('Vui lòng nêu lý do tạo phiên bản mục tiêu mới.');
@@ -115,7 +136,7 @@ export function CreateGoalVersionModal({
         changeReason: trimmedReason,
         changeSummary: changeSummary.trim() || undefined,
         durationDays: parsedDuration,
-        goalTypeCode: selectedGoalType,
+        goalTypeCode: lockedGoalType,
       });
       if (guard.isCurrent()) {
         performClose();
@@ -153,7 +174,7 @@ export function CreateGoalVersionModal({
               Tạo phiên bản mới để điều chỉnh chỉ tiêu hoặc thời hạn, đồng thời giữ nguyên toàn bộ lịch sử trước đó.
             </Text>
 
-            {validationError && (
+            {(targetMismatchError || validationError) && (
               <View
                 testID="goal-version-error-banner"
                 style={[
@@ -161,7 +182,7 @@ export function CreateGoalVersionModal({
                   { backgroundColor: themeColors.dangerSurface, borderColor: themeColors.dangerText },
                 ]}>
                 <Text style={[styles.errorText, { color: themeColors.dangerText }]}>
-                  {validationError}
+                  {targetMismatchError || validationError}
                 </Text>
               </View>
             )}
@@ -246,47 +267,44 @@ export function CreateGoalVersionModal({
               />
             </View>
 
-            {/* Objective Type Selection */}
+            {/* Read-only Primary Objective Type */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                Loại mục tiêu
+                Loại mục tiêu chính (PRIMARY)
               </Text>
-              <View style={styles.typeOptionsContainer}>
-                {GOAL_TYPE_OPTIONS.map((opt) => {
-                  const isSelected = selectedGoalType === opt.code;
-                  return (
-                    <Pressable
-                      key={opt.code}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setSelectedGoalType(opt.code);
-                        if (validationError) setValidationError(null);
-                      }}
-                      style={[
-                        styles.typeChip,
-                        {
-                          backgroundColor: isSelected
-                            ? themeColors.primary
-                            : themeColors.surfaceSubtle,
-                          borderColor: isSelected
-                            ? themeColors.primary
-                            : themeColors.border,
-                        },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.typeChipText,
-                          {
-                            color: isSelected ? '#ffffff' : themeColors.textPrimary,
-                            fontWeight: isSelected ? '700' : '400',
-                          },
-                        ]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              {lockedGoalType ? (
+                <View
+                  testID="goal-version-primary-readonly"
+                  style={[
+                    styles.readonlyCard,
+                    {
+                      backgroundColor: themeColors.surfaceSubtle,
+                      borderColor: themeColors.border,
+                    },
+                  ]}>
+                  <Text style={[styles.readonlyValue, { color: themeColors.textPrimary }]}>
+                    {formatGoalTypeDisplay(lockedGoalType)}
+                  </Text>
+                  <Text style={[styles.readonlyHint, { color: themeColors.textSecondary }]}>
+                    Phiên bản mới giữ nguyên loại mục tiêu chính hiện tại. Để đổi loại mục tiêu, hãy dùng luồng chuyển sang mục tiêu mới.
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  testID="goal-version-primary-missing"
+                  style={[
+                    styles.errorBanner,
+                    {
+                      backgroundColor: themeColors.dangerSurface,
+                      borderColor: themeColors.dangerText,
+                      marginBottom: 0,
+                    },
+                  ]}>
+                  <Text style={[styles.errorText, { color: themeColors.dangerText }]}>
+                    Chưa xác định loại mục tiêu chính (PRIMARY) hiện tại. Không thể lưu phiên bản mới.
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Duration Input */}
@@ -332,14 +350,14 @@ export function CreateGoalVersionModal({
                 testID="goal-version-submit-button"
                 accessibilityRole="button"
                 accessibilityLabel="Lưu phiên bản đã điều chỉnh"
-                disabled={isBusy}
+                disabled={isBusy || !lockedGoalType || Boolean(targetMismatchError)}
                 onPress={handleSubmit}
                 style={[
                   styles.button,
                   styles.primaryButton,
                   {
                     backgroundColor: themeColors.primary,
-                    opacity: isBusy ? 0.7 : 1,
+                    opacity: isBusy || !lockedGoalType || Boolean(targetMismatchError) ? 0.5 : 1,
                   },
                 ]}>
                 {isBusy ? (
@@ -413,17 +431,18 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
-  typeOptionsContainer: {
+  readonlyCard: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-  typeChip: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
+  readonlyValue: {
+    ...typography.label,
   },
-  typeChipText: {
-    ...typography.bodySmall,
+  readonlyHint: {
+    ...typography.caption,
   },
   actions: {
     flexDirection: 'row',

@@ -46,6 +46,16 @@ type ReconciliationState =
   | { identity: string; status: 'failed'; error?: string }
   | null;
 
+type GoalEditorContext = {
+  target: 'version' | 'transition';
+  goalId: string;
+  goalTitle: string;
+  goalTypeCode: string | null;
+} | null;
+
+const GOAL_TARGET_MISMATCH_MESSAGE =
+  'Mục tiêu đang hiển thị đã thay đổi. Vui lòng đóng và mở lại biểu mẫu cho đúng mục tiêu hiện tại.';
+
 const CURRENT_GOAL_IDENTITY = 'current:me';
 
 function getGoalRouteIdentity(goalId?: string): string {
@@ -80,6 +90,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [createVersionModalVisible, setCreateVersionModalVisible] = useState(false);
   const [createTransitionModalVisible, setCreateTransitionModalVisible] = useState(false);
+  const [goalEditorContext, setGoalEditorContext] = useState<GoalEditorContext>(null);
   const [isCreateGoalSubmitting, setIsCreateGoalSubmitting] = useState(false);
   const [conflictBanner, setConflictBanner] = useState<string | null>(null);
 
@@ -109,6 +120,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     GoalLifecycleStatus | undefined
   >(goal?.status);
   const currentGoalRef = useRef(goal);
+  const goalEditorContextRef = useRef<GoalEditorContext>(null);
 
   if (renderedIdentity !== currentIdentity) {
     setRenderedIdentity(currentIdentity);
@@ -122,6 +134,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     setCreateGoalModalVisible(false);
     setCreateVersionModalVisible(false);
     setCreateTransitionModalVisible(false);
+    setGoalEditorContext(null);
     setIsCreateGoalSubmitting(false);
     setModalSessionId((prev) => prev + 1);
     setGoalModalSessionId((prev) => prev + 1);
@@ -156,6 +169,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
 
   useEffect(() => {
     currentIdentityRef.current = currentIdentity;
+    goalEditorContextRef.current = null;
     loadRequestSeqRef.current++;
     mutationRequestSeqRef.current++;
     goalModalSessionSeqRef.current++;
@@ -231,6 +245,8 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             setCreateGoalModalVisible(false);
             setCreateVersionModalVisible(false);
             setCreateTransitionModalVisible(false);
+            setGoalEditorContext(null);
+            goalEditorContextRef.current = null;
             setIsModalSubmitting(false);
             setIsCreateGoalSubmitting(false);
             setModalSessionId((prev) => prev + 1);
@@ -292,6 +308,8 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         setCreateGoalModalVisible(false);
         setCreateVersionModalVisible(false);
         setCreateTransitionModalVisible(false);
+        setGoalEditorContext(null);
+        goalEditorContextRef.current = null;
         setIsCreateGoalSubmitting(false);
         setModalSessionId((prev) => prev + 1);
         setGoalModalSessionId((prev) => prev + 1);
@@ -442,6 +460,23 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     target: 'create' | 'version' | 'transition',
     nextVisible: boolean
   ) => {
+    if (nextVisible && (target === 'version' || target === 'transition')) {
+      const activeGoal = currentGoalRef.current ?? goal;
+      if (!activeGoal || !isGoalMatchingRoute) return;
+      const captured: GoalEditorContext = {
+        target,
+        goalId: activeGoal.id,
+        goalTitle: activeGoal.title,
+        goalTypeCode:
+          activeGoal.currentVersion?.objectives?.find((o) => o.priority === 'PRIMARY')
+            ?.goalTypeCode ?? null,
+      };
+      goalEditorContextRef.current = captured;
+      setGoalEditorContext(captured);
+    } else {
+      goalEditorContextRef.current = null;
+      setGoalEditorContext(null);
+    }
     goalModalSessionSeqRef.current += 1;
     goalMutationSeqRef.current += 1;
     setGoalModalSessionId((prev) => prev + 1);
@@ -471,6 +506,8 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         goalModalSessionSeqRef.current === modalSessionSeq &&
         goalMutationSeqRef.current === mutationSeq;
       if (isSameModalSession) {
+        goalEditorContextRef.current = null;
+        setGoalEditorContext(null);
         if (target === 'create') setCreateGoalModalVisible(false);
         if (target === 'version') setCreateVersionModalVisible(false);
         if (target === 'transition') setCreateTransitionModalVisible(false);
@@ -555,8 +592,17 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     durationDays?: number;
     goalTypeCode: string;
   }) => {
-    if (!goal) return;
-    const targetGoalId = goal.id;
+    const captured = goalEditorContextRef.current;
+    const latestGoal = currentGoalRef.current ?? goal;
+    if (
+      !captured ||
+      captured.target !== 'version' ||
+      !latestGoal ||
+      latestGoal.id !== captured.goalId
+    ) {
+      throw new Error(GOAL_TARGET_MISMATCH_MESSAGE);
+    }
+    const targetGoalId = captured.goalId;
     await runGoalFormMutation(
       'version',
       async () => {
@@ -588,8 +634,17 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     goalTypeCode: string;
     durationDays?: number;
   }) => {
-    if (!goal) return;
-    const targetGoalId = goal.id;
+    const captured = goalEditorContextRef.current;
+    const latestGoal = currentGoalRef.current ?? goal;
+    if (
+      !captured ||
+      captured.target !== 'transition' ||
+      !latestGoal ||
+      latestGoal.id !== captured.goalId
+    ) {
+      throw new Error(GOAL_TARGET_MISMATCH_MESSAGE);
+    }
+    const targetGoalId = captured.goalId;
     await runGoalFormMutation(
       'transition',
       async () => {
@@ -990,7 +1045,21 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       {goal && (
         <CreateGoalVersionModal
           visible={createVersionModalVisible}
-          currentTitle={goal.title}
+          currentTitle={
+            goalEditorContext?.target === 'version' ? goalEditorContext.goalTitle : goal.title
+          }
+          currentGoalTypeCode={
+            goalEditorContext?.target === 'version'
+              ? goalEditorContext.goalTypeCode
+              : goal.currentVersion?.objectives?.find((o) => o.priority === 'PRIMARY')?.goalTypeCode
+          }
+          targetMismatchError={
+            createVersionModalVisible &&
+            goalEditorContext?.target === 'version' &&
+            goal.id !== goalEditorContext.goalId
+              ? GOAL_TARGET_MISMATCH_MESSAGE
+              : null
+          }
           isSubmitting={isCreateGoalSubmitting}
           isDark={isDark}
           sessionId={goalModalSessionId}
@@ -1003,6 +1072,13 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       {goal && (
         <CreateGoalTransitionModal
           visible={createTransitionModalVisible}
+          targetMismatchError={
+            createTransitionModalVisible &&
+            goalEditorContext?.target === 'transition' &&
+            goal.id !== goalEditorContext.goalId
+              ? GOAL_TARGET_MISMATCH_MESSAGE
+              : null
+          }
           isSubmitting={isCreateGoalSubmitting}
           isDark={isDark}
           sessionId={goalModalSessionId}

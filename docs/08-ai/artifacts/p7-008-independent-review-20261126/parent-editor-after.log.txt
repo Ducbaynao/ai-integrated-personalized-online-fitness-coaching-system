@@ -1,0 +1,21 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS version A blocked at UI+parent; fresh B succeeds
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS version same goal refresh retains draft and target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS version stale completion and reconciliation error/retry preserve new editor
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS version focus cleanup rejects obsolete callback and opens fresh context
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS version route cleanup rejects obsolete parent callback
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS transition A blocked at UI+parent; fresh B succeeds
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS transition same goal refresh retains draft and target
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS transition stale completion and reconciliation error/retry preserve new editor
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS transition focus cleanup rejects obsolete callback and opens fresh context
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS transition route cleanup rejects obsolete parent callback
+Independent result: 10 PASS, 0 FAIL

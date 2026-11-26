@@ -1,0 +1,23 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS missing PRIMARY undefined
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS missing PRIMARY null
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS missing PRIMARY ""
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS missing PRIMARY "   "
+PASS retain read-only MUSCLE_GAIN
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS retain read-only WEIGHT_GAIN
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS retain read-only WEIGHT_LOSS
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS retain read-only CUSTOM_ENDURANCE
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+PASS close/reopen and session context reset
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+Reconcile actual: target=Title goal-B editorOpen=true reason=Unsaved draft for A
+Actual mutation calls: [["goal-B",{"title":"Title goal-A","changeReason":"Unsaved draft for A","objectives":[{"goalTypeCode":"MUSCLE_GAIN","priority":"PRIMARY"}]}]]
+FAIL pull refresh pending then editor A must not submit to goal B: Old A draft must not mutate goal B
+Independent result: 9 PASS, 1 FAIL
