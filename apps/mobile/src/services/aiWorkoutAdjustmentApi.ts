@@ -49,10 +49,78 @@ function classifySnapshotDiagnostic(diagnostic: string): 'SHARED' | 'SOURCE' | n
   return null;
 }
 
+/**
+ * Fixed copy for 409 AI_RUN_LIFECYCLE_CONFLICT diagnostics verified in AiWorkoutAdjustmentService.
+ * Patterns are anchored to the exact Backend sentences (lower-cased); anything else stays generic.
+ */
+const LIFECYCLE_DIAGNOSTIC_COPY: { pattern: RegExp; copy: string }[] = [
+  {
+    // "Recommendation has expired and cannot be accepted|rejected|edited|shared."
+    pattern: /^recommendation has expired and cannot be (accepted|rejected|edited|shared)\.?$/,
+    copy: 'Đề xuất điều chỉnh đã hết hạn nên không thể tiếp tục thao tác.',
+  },
+  {
+    // "Cannot adjust occurrence with status X (only SCHEDULED occurrences can be adjusted)."
+    pattern: /^cannot adjust occurrence with status [a-z_]+ \(only scheduled occurrences can be adjusted\)\.?$/,
+    copy: 'Chỉ có thể điều chỉnh buổi tập đang ở trạng thái đã lên lịch.',
+  },
+  {
+    // "Cannot share adjustment for occurrence with status X (only SCHEDULED occurrences can be shared)."
+    pattern: /^cannot share adjustment for occurrence with status [a-z_]+ \(only scheduled occurrences can be shared\)\.?$/,
+    copy: 'Chỉ có thể chia sẻ đề xuất cho buổi tập đang ở trạng thái đã lên lịch.',
+  },
+  {
+    // "Idempotency conflict: commandKey matches a previous command with differing parameters."
+    pattern: /^idempotency conflict: commandkey matches a previous command with differing parameters\.?$/,
+    copy: 'Xung đột thao tác (trùng khóa lệnh nhưng nội dung hoặc phiên bản kỳ vọng khác nhau).',
+  },
+  {
+    // "Revision conflict: expected revision N but current is M" /
+    // "Revision conflict: draft has been modified to revision M; expectedRevision is required when accepting."
+    pattern:
+      /^revision conflict: (expected revision (\d+|null) but current is \d+|draft has been modified to revision \d+; expectedrevision is required when accepting)\b/,
+    copy: 'Bản nháp đã được cập nhật sang phiên bản khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.',
+  },
+  {
+    // "Recommendation has already been applied."
+    pattern: /^recommendation has already been applied\.?$/,
+    copy: 'Đề xuất điều chỉnh này đã được áp dụng trước đó.',
+  },
+];
+
+/** Fixed copy for 403 AI_FORBIDDEN diagnostics verified in AiWorkoutAdjustmentService. */
+const FORBIDDEN_DIAGNOSTIC_COPY: { pattern: RegExp; copy: string }[] = [
+  {
+    // "Access denied: Private trainer draft has not been shared with the student."
+    pattern: /^access denied: private trainer draft has not been shared with the student\.?$/,
+    copy: 'Bản nháp của Huấn luyện viên chưa được chia sẻ cho học viên.',
+  },
+  {
+    // "Draft sharing is only supported in HUMAN_COACH mode."
+    pattern: /^draft sharing is only supported in human_coach mode\.?$/,
+    copy: 'Chỉ có thể chia sẻ bản nháp ở chế độ Có huấn luyện viên.',
+  },
+  {
+    // "Only the currently assigned coach has authority to edit this recommendation." /
+    // "Only the student has authority to edit this recommendation."
+    pattern: /^only the (currently assigned coach|student) has authority to edit this recommendation\.?$/,
+    copy: 'Bạn không có thẩm quyền chỉnh sửa đề xuất điều chỉnh này trong chế độ hiện tại.',
+  },
+  {
+    // "Only the currently assigned coach has authority to share drafts with the student."
+    pattern: /^only the currently assigned coach has authority to share drafts with the student\.?$/,
+    copy: 'Chỉ huấn luyện viên đang phụ trách mới có thể chia sẻ bản nháp cho học viên.',
+  },
+];
+
+function copyForDiagnostic(diagnostic: string, table: { pattern: RegExp; copy: string }[]): string | null {
+  if (!diagnostic) return null;
+  return table.find((entry) => entry.pattern.test(diagnostic))?.copy ?? null;
+}
+
 export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const code = error.errorResponse?.errorCode;
-    const msg = error.message || '';
     if (code === 'PLANNED_WORKOUT_ADJUSTMENTS_SEALED') {
       return 'Buổi tập đã bắt đầu hoặc hoàn thành, không thể điều chỉnh.';
     }
@@ -73,20 +141,10 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       if (snapshotIssue === 'SOURCE') {
         return 'Dữ liệu nguồn được lưu khi tạo đề xuất bị thiếu hoặc không hợp lệ. Vui lòng tạo đề xuất mới.';
       }
-      if (msg.includes('expired')) {
-        return 'Đề xuất điều chỉnh đã hết hạn. Vui lòng tạo đề xuất mới.';
-      }
-      if (msg.includes('only SCHEDULED')) {
-        return 'Chỉ có thể điều chỉnh các buổi tập ở trạng thái ĐÃ LÊN LỊCH (SCHEDULED).';
-      }
-      if (msg.includes('Idempotency conflict')) {
-        return 'Xung đột thao tác (trùng khóa lệnh nhưng nội dung hoặc phiên bản kỳ vọng khác nhau).';
-      }
-      if (msg.includes('Revision conflict')) {
-        return 'Bản thảo đã bị chỉnh sửa ở một phiên khác (xung đột phiên bản). Vui lòng tải lại đề xuất mới nhất.';
-      }
-      if (msg.includes('already been decided') || msg.includes('already been applied')) {
-        return 'Đề xuất điều chỉnh này đã được quyết định trước đó.';
+      const lifecycleCopy =
+        error.status === 409 ? copyForDiagnostic(backendDiagnostic(error), LIFECYCLE_DIAGNOSTIC_COPY) : null;
+      if (lifecycleCopy) {
+        return lifecycleCopy;
       }
       return 'Xung đột trạng thái đề xuất điều chỉnh. Vui lòng tải lại trang và xem xét lại.';
     }
@@ -97,22 +155,14 @@ export function getWorkoutAdjustmentErrorMessage(error: unknown): string {
       if (error.errorResponse?.fieldErrors && error.errorResponse.fieldErrors.length > 0) {
         return 'Vui lòng kiểm tra và hoàn thiện các trường thông tin bắt buộc còn thiếu bên dưới.';
       }
-      if (msg.includes('invalid load') || msg.includes('load must be positive')) {
-        return 'Mức tạ điều chỉnh không hợp lệ. Vui lòng kiểm tra lại.';
-      }
-      if (msg.includes('Cannot share draft in SELF_DIRECTED')) {
-        return 'Không thể chia sẻ bản nháp trong chế độ tự tập luyện (SELF_DIRECTED).';
-      }
     }
     if (error.status === 403 || code === 'AI_RUN_ACCESS_DENIED' || code === 'AI_FORBIDDEN') {
-      if (msg.includes('Private trainer draft has not been shared') || msg.includes('not been shared')) {
-        return 'Bản nháp của Huấn luyện viên chưa được chia sẻ cho học viên.';
-      }
-      if (msg.includes('Cannot share draft in SELF_DIRECTED')) {
-        return 'Không thể chia sẻ bản nháp trong chế độ tự tập luyện (SELF_DIRECTED).';
-      }
-      if (msg.includes('Only trainer may edit') || msg.includes('Only student may edit')) {
-        return 'Bạn không có thẩm quyền chỉnh sửa đề xuất điều chỉnh này trong chế độ hiện tại.';
+      const forbiddenCopy =
+        error.status === 403 && code === 'AI_FORBIDDEN'
+          ? copyForDiagnostic(backendDiagnostic(error), FORBIDDEN_DIAGNOSTIC_COPY)
+          : null;
+      if (forbiddenCopy) {
+        return forbiddenCopy;
       }
       return 'Bạn không có thẩm quyền quyết định đối với đề xuất điều chỉnh này trong chế độ huấn luyện hiện tại.';
     }
