@@ -32,6 +32,7 @@ import {
   KnowledgeCitation,
 } from '@/types/aiKnowledge';
 import { CoachingRelationship } from '@/types/coaching';
+import { aiRequestTypeLabel, aiRunStatusLabel } from '@/localization/aiRunLabels';
 
 /**
  * Example questions aligned with the ACTIVE knowledge corpus (WHO & ISSN guidelines).
@@ -477,7 +478,7 @@ export function AiKnowledgeScreen({
                   <Text
                     testID="ai-knowledge-no-students-warning"
                     style={[styles.noStudentsText, { color: theme.dangerText }]}>
-                    Bạn chưa có học viên nào đang trong kỳ huấn luyện hoạt động (ACTIVE).
+                    Bạn chưa có học viên nào trong kỳ huấn luyện đang hoạt động.
                   </Text>
                 ) : (
                   <>
@@ -559,10 +560,14 @@ export function AiKnowledgeScreen({
               testID="ai-knowledge-readback-card"
               style={[styles.card, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
               <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                Lịch sử tra cứu (Run ID: {readbackRun.runId})
+                Lịch sử tra cứu
               </Text>
               <Text style={[styles.stateBody, { color: theme.textSecondary }]}>
-                Trạng thái: {readbackRun.runStatus} • Loại yêu cầu: {readbackRun.requestType}
+                Trạng thái: {aiRunStatusLabel(readbackRun.runStatus)} • Loại yêu cầu:{' '}
+                {aiRequestTypeLabel(readbackRun.requestType)}
+              </Text>
+              <Text style={[styles.charCount, { color: theme.textSecondary }]}>
+                Mã lần xử lý: {readbackRun.runId}
               </Text>
               {readbackRun.completedAt && (
                 <Text style={[styles.charCount, { color: theme.textSecondary }]}>

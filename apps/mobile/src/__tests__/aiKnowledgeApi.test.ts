@@ -189,7 +189,7 @@ describe('aiKnowledgeApi', () => {
   describe('getRun readback API', () => {
     it('throws validation error when runId is empty', async () => {
       await expect(aiKnowledgeApi.getRun('')).rejects.toThrow(AiKnowledgeValidationError);
-      await expect(aiKnowledgeApi.getRun('   ')).rejects.toThrow('Run ID không được để trống.');
+      await expect(aiKnowledgeApi.getRun('   ')).rejects.toThrow('Mã lần xử lý không được để trống.');
       expect(request).not.toHaveBeenCalled();
     });
 

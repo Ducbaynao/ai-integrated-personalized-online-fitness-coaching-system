@@ -23,11 +23,16 @@ import {
   aiProgressSummaryApi,
   getAiProgressSummaryErrorMessage,
   getUserTimezone,
-  CONTINUITY_STATE_LABELS,
   METRIC_LABELS,
   METRIC_OPTIONS,
-  TREND_DIRECTION_LABELS,
 } from '@/services/aiProgressSummaryApi';
+import {
+  CONTINUITY_SECTION_TITLE,
+  continuityStateLabel,
+  metricLabel,
+  progressSummaryResultTypeLabel,
+  trendLabel,
+} from '@/localization/progressLabels';
 import {
   F04ProgressSummaryResponse,
 } from '@/types/aiProgressSummary';
@@ -71,6 +76,8 @@ export function ProgressSummaryScreen({
   const [isLoadingRun, setIsLoadingRun] = useState(() => Boolean(initialRunId));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<F04ProgressSummaryResponse | null>(null);
+
+  const resultTypeBadge = result ? progressSummaryResultTypeLabel(result.resultType) : null;
 
   // Request counter and abort controller for robust race-condition and cancellation protection (covers A -> B -> A)
   const activeRequestIdRef = useRef(0);
@@ -703,7 +710,7 @@ export function ProgressSummaryScreen({
           )}
 
           {/* Results Presentation */}
-          {result && (
+          {result && resultTypeBadge && (
             <View testID="progress-summary-result-container" style={styles.resultContainer}>
               {/* Header Badge */}
               <View style={styles.resultTypeHeader}>
@@ -712,36 +719,39 @@ export function ProgressSummaryScreen({
                     styles.resultTypeBadge,
                     {
                       backgroundColor:
-                        result.resultType === 'INFORMATION'
+                        resultTypeBadge.tone === 'info'
                           ? colors.brand[50]
-                          : result.resultType === 'INSUFFICIENT_DATA'
+                          : resultTypeBadge.tone === 'warning'
                           ? theme.warningSurface
-                          : theme.dangerSurface,
+                          : resultTypeBadge.tone === 'danger'
+                          ? theme.dangerSurface
+                          : theme.surfaceSubtle,
                       borderColor:
-                        result.resultType === 'INFORMATION'
+                        resultTypeBadge.tone === 'info'
                           ? colors.brand[300]
-                          : result.resultType === 'INSUFFICIENT_DATA'
+                          : resultTypeBadge.tone === 'warning'
                           ? colors.warning[600]
-                          : theme.dangerText,
+                          : resultTypeBadge.tone === 'danger'
+                          ? theme.dangerText
+                          : theme.border,
                     },
                   ]}>
                   <Text
+                    testID="progress-summary-result-type"
                     style={[
                       styles.resultTypeBadgeText,
                       {
                         color:
-                          result.resultType === 'INFORMATION'
+                          resultTypeBadge.tone === 'info'
                             ? colors.brand[700]
-                            : result.resultType === 'INSUFFICIENT_DATA'
+                            : resultTypeBadge.tone === 'warning'
                             ? theme.warningText
-                            : theme.dangerText,
+                            : resultTypeBadge.tone === 'danger'
+                            ? theme.dangerText
+                            : theme.textSecondary,
                       },
                     ]}>
-                    {result.resultType === 'INFORMATION'
-                      ? 'THÔNG TIN TIẾN ĐỘ'
-                      : result.resultType === 'INSUFFICIENT_DATA'
-                      ? 'CHƯA ĐỦ DỮ LIỆU ĐỂ KẾT LUẬN'
-                      : 'BỊ CHẶN BỞI CHÍNH SÁCH'}
+                    {resultTypeBadge.label}
                   </Text>
                 </View>
               </View>
@@ -776,13 +786,12 @@ export function ProgressSummaryScreen({
               {result.continuityEvaluation && (
                 <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                    Tính liền mạch tập luyện
+                    {CONTINUITY_SECTION_TITLE}
                   </Text>
                   <View style={styles.continuityRow}>
                     <Text style={[styles.label, { color: theme.textSecondary }]}>Trạng thái:</Text>
                     <Text testID="continuity-state-label" style={[styles.value, { color: theme.primary }]}>
-                      {CONTINUITY_STATE_LABELS[result.continuityEvaluation.state] ||
-                        result.continuityEvaluation.state}
+                      {continuityStateLabel(result.continuityEvaluation.state)}
                     </Text>
                   </View>
                   <Text style={[styles.bodySmall, { color: theme.textSecondary }]}>
@@ -846,20 +855,18 @@ export function ProgressSummaryScreen({
                   result.measurementProgressSummary.metricsEvaluations.length > 0 ? (
                     <View testID="measurement-progress-section" style={styles.evaluationsList}>
                       {result.measurementProgressSummary.metricsEvaluations.map((metric) => {
-                        const trend =
-                          TREND_DIRECTION_LABELS[metric.trendDirection] || {
-                            label: metric.trendDirection,
-                            symbol: '•',
-                          };
-                        const metricLabel =
-                          METRIC_LABELS[metric.metricCode] ||
+                        const trend = trendLabel(metric.trendDirection);
+                        const metricName =
+                          (Object.prototype.hasOwnProperty.call(METRIC_LABELS, metric.metricCode)
+                            ? METRIC_LABELS[metric.metricCode]
+                            : undefined) ||
                           METRIC_OPTIONS.find((m) => m.code === metric.metricCode)?.label ||
-                          metric.metricCode;
+                          metricLabel(metric.metricCode);
                         return (
                           <View key={metric.metricCode} style={styles.metricItemRow}>
                             <View style={styles.metricHeaderRow}>
                               <Text style={[styles.metricCodeText, { color: theme.textPrimary }]}>
-                                {metricLabel}
+                                {metricName}
                               </Text>
                               <View
                                 style={[

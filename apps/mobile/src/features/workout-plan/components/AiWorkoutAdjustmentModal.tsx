@@ -726,7 +726,7 @@ export function AiWorkoutAdjustmentModal({
             : resolveUnitId(targetUnit);
 
           if (resolvedId == null) {
-            errors.editLoadUnit = `Không thể xác định mã định danh đơn vị (unit ID) cho đơn vị "${editLoadUnit.trim()}". Vui lòng chọn đơn vị có trong giáo án hoặc danh mục hệ thống.`;
+            errors.editLoadUnit = `Không thể xác định mã định danh đơn vị cho "${editLoadUnit.trim()}". Vui lòng chọn đơn vị có trong giáo án hoặc danh mục hệ thống.`;
           }
 
           let beforeInTargetUnit = beforeLoad;
@@ -1332,7 +1332,7 @@ export function AiWorkoutAdjustmentModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Text accessibilityRole="header" style={[styles.headerTitle, { color: theme.textPrimary }]}>
-            Đề xuất điều chỉnh giáo án (AI)
+            Đề xuất điều chỉnh giáo án bằng AI
           </Text>
           <TouchableOpacity
             testID="close-adjustment-modal"
@@ -1397,7 +1397,7 @@ export function AiWorkoutAdjustmentModal({
                   Tìm đề xuất đã có
                 </Text>
                 <Text style={[styles.hintText, { color: theme.textSecondary }]}>
-                  Nhập mã đề xuất (Recommendation ID) để xem bản thảo hoặc đề xuất được chia sẻ.
+                  Nhập mã đề xuất để xem bản thảo hoặc đề xuất được chia sẻ.
                 </Text>
                 <View style={styles.row}>
                   <TextInput
@@ -1598,7 +1598,7 @@ export function AiWorkoutAdjustmentModal({
                         ...typography.label,
                       }}
                     >
-                      Điều chỉnh mức tạ (Load Adjustment)
+                      Điều chỉnh mức tạ
                     </Text>
                   </TouchableOpacity>
 
@@ -1625,7 +1625,7 @@ export function AiWorkoutAdjustmentModal({
                         ...typography.label,
                       }}
                     >
-                      Điều chỉnh hiệp / lần lặp / thời lượng (Volume Adjustment)
+                      Điều chỉnh hiệp / lần lặp / thời lượng
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1855,7 +1855,7 @@ export function AiWorkoutAdjustmentModal({
                     Có chỉnh sửa mới chưa chia sẻ
                   </Text>
                   <Text style={[styles.warningBody, { color: theme.textSecondary }]}>
-                    Bạn đang có chỉnh sửa mới (v{proposal.revision}) chưa chia sẻ lại cho học viên. Học viên hiện đang thấy snapshot v{proposal.sharedRevision}.
+                    Bạn đang có chỉnh sửa mới (v{proposal.revision}) chưa chia sẻ lại cho học viên. Học viên hiện đang thấy phiên bản đã chia sẻ v{proposal.sharedRevision}.
                   </Text>
                   <View style={{ marginTop: spacing.sm }}>
                     <WorkoutButton
@@ -1886,7 +1886,7 @@ export function AiWorkoutAdjustmentModal({
                 <WorkoutCard testID="adjustment-diff-summary-card">
                   <View style={styles.diffSummaryHeader}>
                     <Text style={[styles.sectionTitle, { color: theme.primary }]}>
-                      So sánh bản sửa đổi (Revision Diff)
+                      So sánh bản sửa đổi
                     </Text>
                     <Text style={[styles.badge, { backgroundColor: theme.primary, color: theme.textOnPrimary }]}>
                       {proposal.diff.changeType || 'CUSTOMIZED'}
@@ -1973,7 +1973,7 @@ export function AiWorkoutAdjustmentModal({
                       {/* Button to open catalog picker */}
                       <WorkoutButton
                         testID="adjustment-open-catalog-picker-button"
-                        label="Chọn từ danh mục bài tập (Exercise Catalog)"
+                        label="Chọn từ danh mục bài tập"
                         secondary
                         disabled={isAnyOperationInFlight}
                         onPress={() => {
@@ -2066,7 +2066,7 @@ export function AiWorkoutAdjustmentModal({
                           if (txt.trim() && !resolved) {
                             setEditFieldErrors((prev) => ({
                               ...prev,
-                              editLoadUnit: `Không thể xác định mã định danh đơn vị (unit ID) cho đơn vị "${txt.trim()}". Vui lòng chọn đơn vị có trong giáo án hoặc danh mục hệ thống.`,
+                              editLoadUnit: `Không thể xác định mã định danh đơn vị cho "${txt.trim()}". Vui lòng chọn đơn vị có trong giáo án hoặc danh mục hệ thống.`,
                             }));
                           } else {
                             setEditFieldErrors((prev) => {
@@ -2105,11 +2105,11 @@ export function AiWorkoutAdjustmentModal({
                       ) : null}
 
                       <Text style={[styles.label, { color: theme.textPrimary, marginTop: spacing.sm }]}>
-                        Số reps tối thiểu (Reps Min)
+                        Số reps tối thiểu
                       </Text>
                       <TextInput
                         testID="adjustment-edit-reps-min-input"
-                        accessibilityLabel="Reps tối thiểu"
+                        accessibilityLabel="Số reps tối thiểu"
                         keyboardType="numeric"
                         value={editTargetRepsMin}
                         onChangeText={setEditTargetRepsMin}
@@ -2122,11 +2122,11 @@ export function AiWorkoutAdjustmentModal({
                       ) : null}
 
                       <Text style={[styles.label, { color: theme.textPrimary, marginTop: spacing.sm }]}>
-                        Số reps tối đa (Reps Max)
+                        Số reps tối đa
                       </Text>
                       <TextInput
                         testID="adjustment-edit-reps-max-input"
-                        accessibilityLabel="Reps tối đa"
+                        accessibilityLabel="Số reps tối đa"
                         keyboardType="numeric"
                         value={editTargetRepsMax}
                         onChangeText={setEditTargetRepsMax}
@@ -2227,7 +2227,7 @@ export function AiWorkoutAdjustmentModal({
               {!isEditing && !isAlreadyDecided && (canUserEdit || canUserShare) ? (
                 <WorkoutCard testID="adjustment-draft-controls-card">
                   <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                    Thao tác bản thảo (Draft Controls)
+                    Thao tác bản thảo
                   </Text>
                   <View style={styles.actionRow}>
                     {canUserEdit ? (

@@ -222,7 +222,7 @@ export const aiKnowledgeApi = {
    */
   async getRun(runId: string, signal?: AbortSignal): Promise<AiRunResponse> {
     if (!runId || !runId.trim()) {
-      throw new AiKnowledgeValidationError('Run ID không được để trống.');
+      throw new AiKnowledgeValidationError('Mã lần xử lý không được để trống.');
     }
     return await request<AiRunResponse>(`/ai/runs/${encodeURIComponent(runId.trim())}`, {
       method: 'GET',

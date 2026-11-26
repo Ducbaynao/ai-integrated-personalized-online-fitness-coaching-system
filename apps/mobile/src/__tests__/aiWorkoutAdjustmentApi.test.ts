@@ -229,8 +229,19 @@ describe('aiWorkoutAdjustmentApi', () => {
     });
 
     it('maps AI_RUN_LIFECYCLE_CONFLICT for snapshot corrupted/missing', () => {
-      const err = makeError(409, 'Shared draft snapshot data is missing or corrupted', 'AI_RUN_LIFECYCLE_CONFLICT');
-      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('thiếu hoặc hỏng dữ liệu snapshot');
+      // Exact Backend diagnostic (AiWorkoutAdjustmentService.java:374); the previous fixture text did not exist in Backend.
+      const err = makeError(409, 'Shared snapshot data is missing or corrupted.', 'AI_RUN_LIFECYCLE_CONFLICT');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('bản nháp đã chia sẻ');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('chia sẻ lại');
+      expect(getWorkoutAdjustmentErrorMessage(err)).not.toContain('snapshot');
+    });
+
+    it('maps a missing source snapshot to "create a new proposal", not to re-sharing', () => {
+      const err = makeError(409, 'Missing plannedWorkoutId in source snapshot.', 'AI_RUN_LIFECYCLE_CONFLICT');
+      const message = getWorkoutAdjustmentErrorMessage(err);
+      expect(message).toContain('tạo đề xuất mới');
+      expect(message).not.toContain('chia sẻ lại');
+      expect(message).not.toContain('snapshot');
     });
 
     it('maps 403 / AI_FORBIDDEN for private unshared trainer draft', () => {
@@ -264,7 +275,8 @@ describe('aiWorkoutAdjustmentApi', () => {
       expect(getWorkoutAdjustmentFieldErrors(new Error('general'))).toEqual({});
     });
 
-    it('maps field errors from ApiError', () => {
+    // P7-016: field errors are mapped by `code`; server `message` is not displayed even if it is Vietnamese.
+    it('maps field errors from ApiError by code', () => {
       const err = new ApiError(400, 'Validation error', {
         errorCode: 'VALIDATION_FAILED',
         message: 'Validation failed',
@@ -276,8 +288,8 @@ describe('aiWorkoutAdjustmentApi', () => {
         ],
       });
       expect(getWorkoutAdjustmentFieldErrors(err)).toEqual({
-        userReason: 'Lý do bắt buộc',
-        target: 'Mục tiêu không hợp lệ',
+        userReason: 'Vui lòng nhập thông tin này.',
+        target: 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.',
       });
     });
   });

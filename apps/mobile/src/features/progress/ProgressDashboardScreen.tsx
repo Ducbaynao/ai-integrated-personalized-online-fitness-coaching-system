@@ -15,6 +15,19 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
+import { apiErrorMessage, goalStatusLabels } from '@/localization/displayLabels';
+import {
+  CONTINUITY_SECTION_TITLE,
+  continuityExplanation,
+  continuityStateLabel,
+  daysSinceLastWorkoutText,
+  metricLabel,
+  photoViewLabel,
+  sectionNotice,
+  trendLabel,
+  unitLabel,
+  withUnit,
+} from '@/localization/progressLabels';
 import { measurementApi } from '@/services/measurementApi';
 import { progressDashboardApi } from '@/services/progressDashboardApi';
 import {
@@ -65,7 +78,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
       })
       .catch((err: any) => {
         if (!active) return;
-        setErrorMessage(err?.message || 'Không thể tải bảng tiến độ');
+        setErrorMessage(apiErrorMessage(err, 'Không thể tải bảng tiến độ. Vui lòng thử lại.'));
       })
       .finally(() => {
         if (!active) return;
@@ -105,35 +118,44 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
       await measurementApi.deleteProgressPhoto(photoId);
       setPhotos(prev => prev.filter(p => p.id !== photoId));
     } catch (err: any) {
-      alert(err?.message || 'Không thể xóa ảnh');
+      alert(apiErrorMessage(err, 'Không thể xóa ảnh. Vui lòng thử lại.'));
     }
   };
 
   const renderTrendChip = (direction?: string) => {
-    let text = 'Ổn định';
+    const trend = trendLabel(direction);
     let color = '#4B5563';
     let bg = '#F3F4F6';
 
-    if (direction === 'INCREASED') {
-      text = '▲ Tăng';
+    if (trend.tone === 'up') {
       color = '#1D4ED8';
       bg = '#EFF6FF';
-    } else if (direction === 'DECREASED') {
-      text = '▼ Giảm';
+    } else if (trend.tone === 'down') {
       color = '#047857';
       bg = '#ECFDF5';
-    } else if (direction === 'INSUFFICIENT_DATA') {
-      text = 'Chưa đủ dữ liệu';
-      color = '#9CA3AF';
+    } else if (trend.tone === 'unknown') {
+      color = '#6B7280';
       bg = '#F9FAFB';
     }
 
     return (
       <View style={[styles.trendChip, { backgroundColor: bg }]}>
-        <Text style={[styles.trendText, { color }]}>{text}</Text>
+        <Text style={[styles.trendText, { color }]}>
+          {trend.tone === 'unknown' ? trend.label : `${trend.symbol} ${trend.label}`}
+        </Text>
       </View>
     );
   };
+
+  const formatValue = (value?: number | null) => (value !== null && value !== undefined ? `${value}` : '—');
+  /** Missing stays "—" without a unit; a present value (including 0) gets its unit without a dangling space. */
+  const formatWithUnit = (value: number | null | undefined, unitCode?: string | null, metricCode?: string | null) =>
+    value !== null && value !== undefined ? withUnit(value, unitCode, { metricCode }) : '—';
+  const measurementNotice = summary
+    ? sectionNotice('measurement', summary.measurement.availability, (summary.measurement.metricDeltas?.length ?? 0) > 0)
+    : null;
+  const workoutNotice = summary ? sectionNotice('workout', summary.workout.availability, true) : null;
+  const daysSinceText = summary ? daysSinceLastWorkoutText(summary.continuity.daysSinceLastWorkout) : null;
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.canvas }]}>
@@ -167,7 +189,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
               styles.scopeTabText,
               { color: scope === 'LIFETIME' ? themeColors.primary : themeColors.textSecondary },
             ]}>
-            Toàn thời gian (Lifetime)
+            Toàn bộ thời gian
           </Text>
         </Pressable>
       </View>
@@ -210,7 +232,9 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
               <View style={styles.cardHeader}>
                 <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{summary.goal.title}</Text>
                 <View style={[styles.badge, { backgroundColor: '#DEF7EC' }]}>
-                  <Text style={[styles.badgeText, { color: '#03543F' }]}>{summary.goal.status}</Text>
+                  <Text style={[styles.badgeText, { color: '#03543F' }]}>
+                    {(goalStatusLabels as Record<string, string>)[summary.goal.status] ?? 'Chưa xác định trạng thái'}
+                  </Text>
                 </View>
               </View>
 
@@ -223,7 +247,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                   <Text style={[styles.sectionSubtitle, { color: themeColors.textSecondary }]}>Chỉ tiêu mục tiêu:</Text>
                   {summary.goal.targets.map((tgt, i) => (
                     <Text key={i} style={[styles.targetItem, { color: themeColors.textPrimary }]}>
-                      • {tgt.metricCode}: {tgt.targetNumericValue} {tgt.unitCode || ''}
+                      • {metricLabel(tgt.metricCode)}: {formatWithUnit(tgt.targetNumericValue, tgt.unitCode, tgt.metricCode)}
                     </Text>
                   ))}
                 </View>
@@ -236,7 +260,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
             testID="measurement-progress-card"
             style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <View style={styles.cardHeader}>
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Số đo cơ thể & Thay đổi</Text>
+              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Số đo cơ thể và thay đổi</Text>
               <Pressable
                 testID="nav-to-measurements-btn"
                 onPress={() => router.push('/(app)/measurements' as any)}>
@@ -244,12 +268,10 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
               </Pressable>
             </View>
 
-            {summary.measurement.availability === 'NO_DATA' ||
-            !summary.measurement.metricDeltas ||
-            summary.measurement.metricDeltas.length === 0 ? (
-              <View style={styles.emptyMetricBox}>
+            {measurementNotice || !summary.measurement.metricDeltas ? (
+              <View testID="measurement-section-notice" style={styles.emptyMetricBox}>
                 <Text style={[styles.emptySubText, { color: themeColors.textSecondary }]}>
-                  Chưa có dữ liệu số đo trong giai đoạn này.
+                  {measurementNotice}
                 </Text>
               </View>
             ) : (
@@ -262,18 +284,20 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                       style={[styles.deltaRow, { borderBottomColor: themeColors.border }]}>
                       <View style={styles.deltaLeft}>
                         <Text style={[styles.metricCodeText, { color: themeColors.textPrimary }]}>
-                          {delta.metricCode}
+                          {metricLabel(delta.metricCode)}
                         </Text>
                         <Text style={[styles.baselineLatestText, { color: themeColors.textSecondary }]}>
-                          Ban đầu: {delta.baselineValue !== null && delta.baselineValue !== undefined ? delta.baselineValue : '—'} → Hiện tại:{' '}
-                          {delta.latestValue !== null && delta.latestValue !== undefined ? delta.latestValue : '—'} {delta.unitCode || ''}
+                          Ban đầu: {formatValue(delta.baselineValue)} → Hiện tại:{' '}
+                          {formatWithUnit(delta.latestValue, delta.unitCode, delta.metricCode)}
                         </Text>
                       </View>
 
                       <View style={styles.deltaRight}>
                         {delta.deltaValue !== null && delta.deltaValue !== undefined ? (
                           <Text style={[styles.deltaValueText, { color: themeColors.textPrimary }]}>
-                            {delta.deltaValue > 0 ? `+${delta.deltaValue}` : `${delta.deltaValue}`} {delta.unitCode || ''}
+                            {withUnit(delta.deltaValue > 0 ? `+${delta.deltaValue}` : `${delta.deltaValue}`, delta.unitCode, {
+                              metricCode: delta.metricCode,
+                            })}
                           </Text>
                         ) : (
                           <Text style={[styles.deltaValueText, { color: themeColors.textSecondary }]}>—</Text>
@@ -291,13 +315,11 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
           <View
             testID="workout-progress-card"
             style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Tuân thủ & Khối lượng tập luyện</Text>
+            <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Tuân thủ và khối lượng tập luyện</Text>
 
-            {summary.workout.availability === 'NO_DATA' ? (
-              <View style={styles.emptyMetricBox}>
-                <Text style={[styles.emptySubText, { color: themeColors.textSecondary }]}>
-                  Chưa có lịch tập hoặc buổi tập nào hoàn thành trong giai đoạn này.
-                </Text>
+            {workoutNotice ? (
+              <View testID="workout-section-notice" style={styles.emptyMetricBox}>
+                <Text style={[styles.emptySubText, { color: themeColors.textSecondary }]}>{workoutNotice}</Text>
               </View>
             ) : (
               <View style={styles.statsGrid}>
@@ -315,7 +337,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                   <Text style={[styles.statValue, { color: themeColors.textPrimary }]}>
                     {summary.workout.volumeAndIntensity?.workingSetsCompleted ?? '—'}
                   </Text>
-                  <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Số hiệp chính (Sets)</Text>
+                  <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Số hiệp chính</Text>
                 </View>
 
                 <View style={styles.statCol}>
@@ -335,22 +357,22 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
           <View
             testID="continuity-card"
             style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-            <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Tính liên tục tập luyện</Text>
+            <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{CONTINUITY_SECTION_TITLE}</Text>
             <View style={styles.continuityRow}>
               <View style={[styles.badge, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={[styles.badgeText, { color: '#1E40AF' }]}>{summary.continuity.state}</Text>
-              </View>
-              {summary.continuity.daysSinceLastWorkout !== null && summary.continuity.daysSinceLastWorkout !== undefined && (
-                <Text style={[styles.daysSinceText, { color: themeColors.textSecondary }]}>
-                  {summary.continuity.daysSinceLastWorkout} ngày từ buổi tập gần nhất
+                <Text testID="continuity-state-label" style={[styles.badgeText, { color: '#1E40AF' }]}>
+                  {continuityStateLabel(summary.continuity.state)}
                 </Text>
-              )}
+              </View>
+              {daysSinceText ? (
+                <Text style={[styles.daysSinceText, { color: themeColors.textSecondary }]}>{daysSinceText}</Text>
+              ) : null}
             </View>
-            {summary.continuity.rationale ? (
-              <Text style={[styles.continuityRationale, { color: themeColors.textSecondary }]}>
-                {summary.continuity.rationale}
-              </Text>
-            ) : null}
+            <Text
+              testID="continuity-explanation"
+              style={[styles.continuityRationale, { color: themeColors.textSecondary }]}>
+              {continuityExplanation(summary.continuity)}
+            </Text>
           </View>
 
           {/* Progress Photos Gallery */}
@@ -383,11 +405,11 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                     style={[styles.photoCard, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
                     <View style={styles.photoPlaceholder}>
                       <Text style={[styles.photoViewTypeText, { color: themeColors.textSecondary }]}>
-                        {p.viewType}
+                        {photoViewLabel(p.viewType)}
                       </Text>
                       {p.weightAtTime ? (
                         <Text style={[styles.photoWeightText, { color: themeColors.textPrimary }]}>
-                          {p.weightAtTime} {p.weightUnitCode || 'kg'}
+                          {p.weightAtTime} {unitLabel(p.weightUnitCode) || 'kg'}
                         </Text>
                       ) : null}
                     </View>
@@ -409,13 +431,13 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
           {/* AI Progress Summary banner (Optional F04 integration) */}
           <View style={[styles.aiNoticeCard, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
             <Text style={[styles.aiNoticeText, { color: themeColors.textSecondary }]}>
-              ℹ️ Dữ liệu trên được trích xuất hoàn toàn tự động từ Progress Engine. AI không can thiệp thay đổi số liệu gốc.
+              ℹ️ Số liệu trên do hệ thống tính từ dữ liệu đã ghi nhận. AI không thay đổi số liệu gốc.
             </Text>
             <Pressable
               testID="btn-open-ai-summary"
               onPress={() => router.push('/(app)/progress-summary' as any)}
               style={[styles.btnAiSummary, { backgroundColor: themeColors.primary }]}>
-              <Text style={styles.btnAiSummaryText}>Xem tóm tắt phân tích bằng AI (F04) →</Text>
+              <Text style={styles.btnAiSummaryText}>Xem tóm tắt phân tích bằng AI →</Text>
             </Pressable>
           </View>
         </ScrollView>

@@ -436,6 +436,18 @@ describe('AiKnowledgeScreen', () => {
     expect(aiKnowledgeApi.getRun).toHaveBeenCalledWith('run-history-1111', expect.any(Object));
     const readbackCard = tree.root.findByProps({ testID: 'ai-knowledge-readback-card' });
     expect(readbackCard).toBeDefined();
+
+    // P7-016: run status / request type are labelled; unknown request type is neutral, raw codes hidden.
+    const flat = (c: any): string =>
+      Array.isArray(c) ? c.map(flat).join('') : typeof c === 'string' || typeof c === 'number' ? String(c) : '';
+    const cardText = readbackCard
+      .findAll((n) => typeof n.type === 'string')
+      .map((n) => flat(n.props.children))
+      .join(' | ');
+    expect(cardText).toContain('Đã hoàn tất');
+    expect(cardText).toContain('Loại yêu cầu khác');
+    expect(cardText).toContain('run-history-1111');
+    expect(cardText).not.toMatch(/SUCCEEDED|F01_KNOWLEDGE_QUERY|Run ID/);
   });
 
   it('Readback / History: handles 403 AI_FORBIDDEN when permissions are revoked', async () => {

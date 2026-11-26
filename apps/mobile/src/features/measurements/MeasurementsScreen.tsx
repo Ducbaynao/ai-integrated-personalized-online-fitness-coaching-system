@@ -24,6 +24,7 @@ import {
   MetricDefinition,
   RecordMeasurementRequest,
 } from '@/types/measurement';
+import { metricLabel, withUnit } from '@/localization/progressLabels';
 
 interface MeasurementsScreenProps {
   studentId?: string;
@@ -154,7 +155,7 @@ export function MeasurementsScreen({ studentId, readOnly = false }: Measurements
         ]}>
         <View style={styles.itemHeader}>
           <Text style={[styles.metricTitle, { color: themeColors.textPrimary }]}>
-            {item.metricDisplayName}
+            {metricLabel(item.metricCode, item.metricDisplayName)}
           </Text>
           {renderStatusBadge(item.validationStatus)}
         </View>
@@ -169,7 +170,7 @@ export function MeasurementsScreen({ studentId, readOnly = false }: Measurements
               },
             ]}>
             {item.numericValue !== null && item.numericValue !== undefined
-              ? `${item.numericValue} ${item.unitSymbol || item.unitCode || ''}`
+              ? withUnit(item.numericValue, item.unitCode, { metricCode: item.metricCode, symbol: item.unitSymbol })
               : item.textValue || '—'}
           </Text>
 
@@ -253,7 +254,7 @@ export function MeasurementsScreen({ studentId, readOnly = false }: Measurements
                     styles.filterChipText,
                     { color: isSelected ? '#FFFFFF' : themeColors.textPrimary },
                   ]}>
-                  {m.displayName}
+                  {metricLabel(m.code, m.displayName)}
                 </Text>
               </Pressable>
             );

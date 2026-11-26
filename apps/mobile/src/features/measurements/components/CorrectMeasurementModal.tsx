@@ -14,6 +14,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { CorrectMeasurementRequest, Measurement } from '@/types/measurement';
+import { metricLabel, unitTypeLabel, valueFieldLabel, withUnit } from '@/localization/progressLabels';
 
 interface CorrectMeasurementModalProps {
   visible: boolean;
@@ -91,13 +92,13 @@ export function CorrectMeasurementModal({
           <ScrollView style={styles.scroll}>
             <View style={[styles.infoBox, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
               <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
-                Chỉ số: <Text style={{ color: themeColors.textPrimary, fontWeight: '700' }}>{measurement.metricDisplayName}</Text>
+                Chỉ số: <Text style={{ color: themeColors.textPrimary, fontWeight: '700' }}>{metricLabel(measurement.metricCode, measurement.metricDisplayName)}</Text>
               </Text>
               <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
                 Giá trị ban đầu:{' '}
                 <Text style={{ color: themeColors.textPrimary, fontWeight: '700' }}>
                   {measurement.numericValue !== null && measurement.numericValue !== undefined
-                    ? `${measurement.numericValue} ${measurement.unitSymbol || measurement.unitCode || ''}`
+                    ? withUnit(measurement.numericValue, measurement.unitCode, { metricCode: measurement.metricCode, symbol: measurement.unitSymbol })
                     : measurement.textValue || '—'}
                 </Text>
               </Text>
@@ -109,7 +110,10 @@ export function CorrectMeasurementModal({
             {measurement.numericValue !== null && measurement.numericValue !== undefined && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: themeColors.textSecondary }]}>
-                  Giá trị mới ({measurement.unitSymbol || measurement.unitCode || ''}):
+                  {valueFieldLabel(
+                    'Giá trị mới',
+                    unitTypeLabel(measurement.unitCode, { metricCode: measurement.metricCode, symbol: measurement.unitSymbol })
+                  )}
                 </Text>
                 <TextInput
                   testID="input-correct-numeric-value"

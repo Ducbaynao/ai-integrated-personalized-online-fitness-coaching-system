@@ -1,5 +1,5 @@
 import { request } from '@/services/apiClient';
-import { localizedServerMessage } from '@/localization/displayLabels';
+import { localizeFieldErrorsByCode } from '@/localization/fieldErrorMessages';
 import { createCommandKey } from '@/services/coachingApi';
 import type { AiWorkoutRescheduleDetail } from '@/types/aiWorkoutReschedule';
 import { ApiError } from '@/types/auth';
@@ -40,13 +40,7 @@ function requireCommandKey(commandKey: string): void {
 
 export function getWorkoutRescheduleFieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ApiError && error.errorResponse?.fieldErrors) {
-    const map: Record<string, string> = {};
-    for (const fe of error.errorResponse.fieldErrors) {
-      if (fe.field && fe.message) {
-        map[fe.field] = localizedServerMessage(fe.message, 'Giá trị chưa hợp lệ. Vui lòng kiểm tra lại.');
-      }
-    }
-    return map;
+    return localizeFieldErrorsByCode(error.errorResponse.fieldErrors);
   }
   return {};
 }
@@ -88,7 +82,7 @@ export function getWorkoutRescheduleErrorMessage(error: unknown): string {
         return 'Phiên bản buổi tập không khớp với đề xuất. Vui lòng tạo đề xuất mới.';
       }
       if (msg.includes('appointment') || msg.includes('Appointment')) {
-        return 'Lịch hẹn liên kết đã thay đổi hoặc không ở trạng thái CONFIRMED. Vui lòng tạo đề xuất mới.';
+        return 'Lịch hẹn liên kết đã thay đổi hoặc không còn ở trạng thái đã xác nhận. Vui lòng tạo đề xuất mới.';
       }
       return 'Xung đột trạng thái đề xuất dời lịch. Vui lòng tải lại và thử lại.';
     }

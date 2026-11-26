@@ -562,6 +562,48 @@ describe('ProgressSummaryScreen', () => {
     expect(summaryText.props.children).toContain('Bạn đã hoàn thành 4/4 buổi tập');
   });
 
+  describe('P7-016 result type, continuity and trend fallbacks', () => {
+    const renderRun = async (overrides: Partial<F04ProgressSummaryResponse>) => {
+      (aiProgressSummaryApi.getSummary as jest.Mock).mockResolvedValueOnce({ ...sampleSuccessResponse, ...overrides });
+      let tree!: renderer.ReactTestRenderer;
+      renderer.act(() => {
+        tree = renderer.create(<ProgressSummaryScreen initialRunId="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" />);
+      });
+      await settle();
+      return tree;
+    };
+
+    it('does not label BLOCKED as a policy block and does not turn unknown result types into BLOCKED', async () => {
+      const blocked = await renderRun({ resultType: 'BLOCKED' });
+      const blockedLabel = blocked.root.findByProps({ testID: 'progress-summary-result-type' }).props.children;
+      expect(blockedLabel).not.toMatch(/CHÍNH SÁCH/);
+
+      const unknown = await renderRun({ resultType: 'SOMETHING_NEW' as any });
+      const unknownLabel = unknown.root.findByProps({ testID: 'progress-summary-result-type' }).props.children;
+      expect(unknownLabel).not.toBe(blockedLabel);
+      expect(unknownLabel).not.toContain('SOMETHING_NEW');
+    });
+
+    it('uses the history-state title and a neutral label for unknown continuity / trend codes', async () => {
+      const tree = await renderRun({
+        continuityEvaluation: { state: 'FUTURE_STATE', message: 'Thông điệp từ AI.', hasSafetyAlert: false },
+        measurementProgressSummary: {
+          metricsEvaluations: [{ metricCode: 'HIP_CIRCUMFERENCE', trendDirection: 'SIDEWAYS', message: 'Chưa rõ.' }],
+        },
+      });
+      const label = tree.root.findByProps({ testID: 'continuity-state-label' }).props.children;
+      expect(label).toBe('Chưa xác định trạng thái');
+      const text = JSON.stringify(tree.toJSON());
+      expect(text).toContain('Tình trạng lịch sử tập luyện');
+      expect(text).not.toContain('Tính liền mạch');
+      expect(text).toContain('Vòng mông');
+      expect(text).toContain('Chưa xác định xu hướng');
+      expect(text).not.toMatch(/FUTURE_STATE|SIDEWAYS|HIP_CIRCUMFERENCE/);
+      // AI free text is shown unchanged
+      expect(text).toContain('Thông điệp từ AI.');
+    });
+  });
+
   it('displays error card when api call fails with ApiError', async () => {
     (aiProgressSummaryApi.generate as jest.Mock).mockRejectedValueOnce(
       new ApiError(403, 'Forbidden', {
