@@ -8,6 +8,8 @@ import { useRelationshipDetail, useSharingSummary } from '@/features/coaching/co
 import { useCurrentWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
 import { ApiError } from '@/types/auth';
@@ -196,8 +198,17 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       </WorkoutCard>
       <WorkoutCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Tuần bắt đầu</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Nhập ngày thứ Hai dạng YYYY-MM-DD. Tuần của mỗi buổi được tính từ ngày này.</Text>
-        <TextInput testID="week-anchor" accessibilityLabel="Ngày thứ Hai bắt đầu" placeholder="2026-10-12" value={anchor} onChangeText={(value) => { setAnchor(value); resetReview(); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+        <DateInputField
+          testID="week-anchor"
+          label="Ngày thứ Hai bắt đầu"
+          helperText="Tuần của mỗi buổi được tính từ ngày Thứ Hai này."
+          placeholder="Chọn Thứ Hai bắt đầu"
+          value={anchor}
+          mondayOnly
+          onChange={(value) => { setAnchor(value); resetReview(); }}
+          sessionKey={relationshipId}
+          accessibilityLabel="Ngày thứ Hai bắt đầu"
+        />
       </WorkoutCard>
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Chọn buổi từ phiên bản đã xuất bản</Text>
       {sessions.map((session) => {
@@ -214,16 +225,23 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
           {!eligible ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Thiếu metadata giám sát hợp lệ; không thể chọn.</Text> : null}
           <WorkoutButton testID={`select-session-${session.id}`} label={selected ? 'Bỏ buổi này' : 'Chọn buổi này'} secondary={!selected} disabled={!eligible} onPress={() => selectSession(session)} />
           {selected ? <>
-            <Text style={[styles.body, { color: theme.textSecondary }]}>Nhập tường minh ngày giờ địa phương dạng YYYY-MM-DDTHH:mm. Không suy thời lượng từ kế hoạch.</Text>
+            <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn ngày theo lịch và nhập giờ địa phương (HH:mm). Không suy thời lượng từ kế hoạch.</Text>
             {(['Start', 'End'] as const).map((part) => {
               const local = part === 'Start' ? selected.localStart : selected.localEnd;
               const options = validProposalOffsets(timezone, local);
               const chosen = part === 'Start' ? selected.startOffset : selected.endOffset;
               return <View key={part}>
-                <Text style={[styles.label, { color: theme.textPrimary }]}>{part === 'Start' ? 'Bắt đầu' : 'Kết thúc'}</Text>
-                <TextInput testID={`${part.toLowerCase()}-${session.id}`} accessibilityLabel={`${part === 'Start' ? 'Bắt đầu' : 'Kết thúc'} địa phương của ${session.name}`}
-                  placeholder="2026-10-12T18:30" value={local} onChangeText={(value) => updateEntry(session.id, part === 'Start' ? { localStart: value, startOffset: '' } : { localEnd: value, endOffset: '' })}
-                  style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+                <LocalDateTimeInputField
+                  label={part === 'Start' ? 'Bắt đầu' : 'Kết thúc'}
+                  value={local}
+                  onChange={(value) => updateEntry(session.id, part === 'Start' ? { localStart: value, startOffset: '' } : { localEnd: value, endOffset: '' })}
+                  dateTestID={`${part.toLowerCase()}-${session.id}-date`}
+                  timeTestID={`${part.toLowerCase()}-${session.id}-time`}
+                  dateAccessibilityLabel={`Ngày ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} của ${session.name}`}
+                  timeAccessibilityLabel={`Giờ ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương của ${session.name} (HH:mm)`}
+                  initialBrowseDate={anchor || undefined}
+                  sessionKey={relationshipId}
+                />
                 {local && options.length === 0 ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Giờ không tồn tại trong múi giờ này hoặc sai định dạng.</Text> : null}
                 {options.length > 1 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ bị lặp khi đổi DST: chọn một offset rõ ràng.</Text> : null}
                 <View style={styles.row}>{options.map((option) => <WorkoutButton key={option.offset} label={`UTC${option.offset}`} secondary={chosen !== option.offset}

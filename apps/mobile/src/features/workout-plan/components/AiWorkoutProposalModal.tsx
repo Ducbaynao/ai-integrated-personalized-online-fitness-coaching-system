@@ -26,6 +26,7 @@ import {
   WorkoutProposalPreferences,
 } from '@/types/aiWorkoutProposal';
 import { WorkoutButton, WorkoutCard } from './WorkoutUi';
+import { DateInputField } from '@/components/ui/DateInputField';
 
 interface ModalProposalState extends WorkoutProposalResponse {
   revision?: number;
@@ -86,12 +87,14 @@ export function AiWorkoutProposalModal({
   const [currentActivePlan, setCurrentActivePlan] = useState<WorkoutPlanDetail | null>(null);
 
   // Adjust state during render when modal visibility or studentId changes (React recommended pattern)
+  const [formSessionSeq, setFormSessionSeq] = useState<number>(1);
   const [prevVisible, setPrevVisible] = useState(visible);
   const [prevStudentId, setPrevStudentId] = useState(studentId);
 
   if (visible !== prevVisible || studentId !== prevStudentId) {
     setPrevVisible(visible);
     setPrevStudentId(studentId);
+    setFormSessionSeq((seq) => seq + 1);
 
     // Reset proposals, active plan, editing, and error state
     setProposal(null);
@@ -574,36 +577,25 @@ export function AiWorkoutProposalModal({
               ) : null}
 
               {/* 3. Start Date */}
-              <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>
-                Ngày bắt đầu giáo án (YYYY-MM-DD) (*):
-              </Text>
-              <TextInput
-                testID="ai-proposal-start-date-input"
-                style={[
-                  styles.textInput,
-                  {
-                    color: theme.textPrimary,
-                    borderColor: fieldErrors['startDate'] ? theme.dangerText : theme.border,
-                    backgroundColor: theme.surfaceSubtle,
-                  },
-                ]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.textSecondary}
-                value={startDate}
-                onChangeText={(val) => {
-                  setStartDate(val);
-                  setFieldErrors((prev) => {
-                    const copy = { ...prev };
-                    delete copy.startDate;
-                    return copy;
-                  });
-                }}
-              />
-              {fieldErrors['startDate'] ? (
-                <Text style={[styles.fieldErrorText, { color: theme.dangerText }]}>
-                  {fieldErrors['startDate']}
-                </Text>
-              ) : null}
+              <View style={{ marginTop: 12 }}>
+                <DateInputField
+                  testID="ai-proposal-start-date-input"
+                  label="Ngày bắt đầu giáo án (*)"
+                  accessibilityLabel="Ngày bắt đầu giáo án"
+                  placeholder="Chọn ngày bắt đầu"
+                  value={startDate}
+                  onChange={(val) => {
+                    setStartDate(val);
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.startDate;
+                      return copy;
+                    });
+                  }}
+                  error={fieldErrors['startDate']}
+                  sessionKey={`${visible}:${studentId ?? ''}:${formSessionSeq}`}
+                />
+              </View>
 
               {/* 4. Equipment Selection */}
               <Text style={[styles.label, { color: theme.textPrimary, marginTop: 12 }]}>

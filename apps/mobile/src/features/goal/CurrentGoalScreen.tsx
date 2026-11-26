@@ -46,6 +46,16 @@ type ReconciliationState =
   | { identity: string; status: 'failed'; error?: string }
   | null;
 
+type GoalEditorContext = {
+  target: 'version' | 'transition';
+  goalId: string;
+  goalTitle: string;
+  goalTypeCode: string | null;
+} | null;
+
+const GOAL_TARGET_MISMATCH_MESSAGE =
+  'Mục tiêu đang hiển thị đã thay đổi. Vui lòng đóng và mở lại biểu mẫu cho đúng mục tiêu hiện tại.';
+
 const CURRENT_GOAL_IDENTITY = 'current:me';
 
 function getGoalRouteIdentity(goalId?: string): string {
@@ -80,6 +90,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [createVersionModalVisible, setCreateVersionModalVisible] = useState(false);
   const [createTransitionModalVisible, setCreateTransitionModalVisible] = useState(false);
+  const [goalEditorContext, setGoalEditorContext] = useState<GoalEditorContext>(null);
   const [isCreateGoalSubmitting, setIsCreateGoalSubmitting] = useState(false);
   const [conflictBanner, setConflictBanner] = useState<string | null>(null);
 
@@ -94,6 +105,8 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
   const loadRequestSeqRef = useRef(0);
   const mutationRequestSeqRef = useRef(0);
   const latestSubmittedMutationSeqRef = useRef(0);
+  const goalModalSessionSeqRef = useRef(0);
+  const goalMutationSeqRef = useRef(0);
   const currentIdentityRef = useRef(currentIdentity);
 
   const isMountedRef = useRef(true);
@@ -101,11 +114,13 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
 
   // Modal session key to ensure clean mount and discard previous input state
   const [modalSessionId, setModalSessionId] = useState(0);
+  const [goalModalSessionId, setGoalModalSessionId] = useState(0);
 
   const [prevGoalStatus, setPrevGoalStatus] = useState<
     GoalLifecycleStatus | undefined
   >(goal?.status);
   const currentGoalRef = useRef(goal);
+  const goalEditorContextRef = useRef<GoalEditorContext>(null);
 
   if (renderedIdentity !== currentIdentity) {
     setRenderedIdentity(currentIdentity);
@@ -116,7 +131,13 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     setIsRefreshing(false);
     setModalVisible(false);
     setIsModalSubmitting(false);
+    setCreateGoalModalVisible(false);
+    setCreateVersionModalVisible(false);
+    setCreateTransitionModalVisible(false);
+    setGoalEditorContext(null);
+    setIsCreateGoalSubmitting(false);
     setModalSessionId((prev) => prev + 1);
+    setGoalModalSessionId((prev) => prev + 1);
     setActiveTab('overview');
     setReconciliationState(null);
     setPrevGoalStatus(undefined);
@@ -148,8 +169,11 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
 
   useEffect(() => {
     currentIdentityRef.current = currentIdentity;
+    goalEditorContextRef.current = null;
     loadRequestSeqRef.current++;
     mutationRequestSeqRef.current++;
+    goalModalSessionSeqRef.current++;
+    goalMutationSeqRef.current++;
     latestSubmittedMutationSeqRef.current = 0;
   }, [currentIdentity]);
 
@@ -201,7 +225,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
           loadRequestSeqRef.current === requestId &&
           currentIdentityRef.current === targetIdentity
         ) {
-          if (options?.isReconciliation) {
+          const isAccessOrMissingError =
+            err instanceof ApiError &&
+            (err.status === 401 || err.status === 403 || err.status === 404);
+          if (options?.isReconciliation && !isAccessOrMissingError) {
             setReconciliationState({
               identity: targetIdentity,
               status: 'failed',
@@ -209,8 +236,23 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             });
             return;
           }
-          if (options?.silent) {
+          if (options?.silent && !isAccessOrMissingError) {
             return;
+          }
+          setReconciliationState(null);
+          if (isAccessOrMissingError) {
+            setModalVisible(false);
+            setCreateGoalModalVisible(false);
+            setCreateVersionModalVisible(false);
+            setCreateTransitionModalVisible(false);
+            setGoalEditorContext(null);
+            goalEditorContextRef.current = null;
+            setIsModalSubmitting(false);
+            setIsCreateGoalSubmitting(false);
+            setModalSessionId((prev) => prev + 1);
+            setGoalModalSessionId((prev) => prev + 1);
+            goalModalSessionSeqRef.current += 1;
+            goalMutationSeqRef.current += 1;
           }
           if (err instanceof ApiError && err.status === 404) {
             if (goalId) {
@@ -259,9 +301,18 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         isFocusedRef.current = false;
         loadRequestSeqRef.current++;
         mutationRequestSeqRef.current++;
+        goalModalSessionSeqRef.current++;
+        goalMutationSeqRef.current++;
         setModalVisible(false);
         setIsModalSubmitting(false);
+        setCreateGoalModalVisible(false);
+        setCreateVersionModalVisible(false);
+        setCreateTransitionModalVisible(false);
+        setGoalEditorContext(null);
+        goalEditorContextRef.current = null;
+        setIsCreateGoalSubmitting(false);
         setModalSessionId((prev) => prev + 1);
+        setGoalModalSessionId((prev) => prev + 1);
       };
     }, [loadGoal])
   );
@@ -405,44 +456,133 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     }
   };
 
+  const setGoalFormModalState = (
+    target: 'create' | 'version' | 'transition',
+    nextVisible: boolean
+  ) => {
+    if (nextVisible && (target === 'version' || target === 'transition')) {
+      const activeGoal = currentGoalRef.current ?? goal;
+      if (!activeGoal || !isGoalMatchingRoute) return;
+      const captured: GoalEditorContext = {
+        target,
+        goalId: activeGoal.id,
+        goalTitle: activeGoal.title,
+        goalTypeCode:
+          activeGoal.currentVersion?.objectives?.find((o) => o.priority === 'PRIMARY')
+            ?.goalTypeCode ?? null,
+      };
+      goalEditorContextRef.current = captured;
+      setGoalEditorContext(captured);
+    } else {
+      goalEditorContextRef.current = null;
+      setGoalEditorContext(null);
+    }
+    goalModalSessionSeqRef.current += 1;
+    goalMutationSeqRef.current += 1;
+    setGoalModalSessionId((prev) => prev + 1);
+    setIsCreateGoalSubmitting(false);
+    if (target === 'create') setCreateGoalModalVisible(nextVisible);
+    if (target === 'version') setCreateVersionModalVisible(nextVisible);
+    if (target === 'transition') setCreateTransitionModalVisible(nextVisible);
+  };
+
+  const runGoalFormMutation = async (
+    target: 'create' | 'version' | 'transition',
+    operation: () => Promise<void>,
+    messages: { conflict: string; alertTitle: string; fallback: string }
+  ) => {
+    if (isCreateGoalSubmitting) return;
+    const mutationIdentity = currentIdentity;
+    const modalSessionSeq = goalModalSessionSeqRef.current;
+    const mutationSeq = ++goalMutationSeqRef.current;
+    setIsCreateGoalSubmitting(true);
+    setConflictBanner(null);
+    try {
+      await operation();
+      const isSameModalSession =
+        isMountedRef.current &&
+        isFocusedRef.current &&
+        currentIdentityRef.current === mutationIdentity &&
+        goalModalSessionSeqRef.current === modalSessionSeq &&
+        goalMutationSeqRef.current === mutationSeq;
+      if (isSameModalSession) {
+        goalEditorContextRef.current = null;
+        setGoalEditorContext(null);
+        if (target === 'create') setCreateGoalModalVisible(false);
+        if (target === 'version') setCreateVersionModalVisible(false);
+        if (target === 'transition') setCreateTransitionModalVisible(false);
+      }
+      if (
+        isMountedRef.current &&
+        isFocusedRef.current &&
+        currentIdentityRef.current === mutationIdentity
+      ) {
+        if (isSameModalSession) {
+          await loadGoal({ showLoading: true });
+        } else {
+          await loadGoal({
+            showLoading: false,
+            silent: true,
+            isReconciliation: currentGoalRef.current !== null,
+          });
+        }
+      }
+    } catch (err: any) {
+      const isSameRequest =
+        isMountedRef.current &&
+        isFocusedRef.current &&
+        currentIdentityRef.current === mutationIdentity &&
+        goalMutationSeqRef.current === mutationSeq;
+      if (isSameRequest) {
+        if (err instanceof ApiError && err.status === 409) {
+          setConflictBanner(messages.conflict);
+        } else {
+          Alert.alert(messages.alertTitle, apiErrorMessage(err, messages.fallback));
+        }
+      }
+      throw err;
+    } finally {
+      if (
+        isMountedRef.current &&
+        currentIdentityRef.current === mutationIdentity &&
+        goalMutationSeqRef.current === mutationSeq
+      ) {
+        setIsCreateGoalSubmitting(false);
+      }
+    }
+  };
+
   const handleCreateGoal = async (payload: {
     title: string;
     goalTypeCode: string;
     durationDays?: number;
     notes?: string;
   }) => {
-    if (isCreateGoalSubmitting) return;
-    setIsCreateGoalSubmitting(true);
-    setConflictBanner(null);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      await fitnessGoalApi.createGoal({
-        title: payload.title,
-        startDate: today,
-        durationDays: payload.durationDays,
-        activateImmediately: true,
-        objectives: [
-          {
-            goalTypeCode: payload.goalTypeCode,
-            priority: 'PRIMARY',
-            notes: payload.notes,
-          },
-        ],
-      });
-      setCreateGoalModalVisible(false);
-      await loadGoal({ showLoading: true });
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 409) {
-        setConflictBanner(
-          'Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.'
-        );
-      } else {
-        Alert.alert('Không thể tạo mục tiêu', apiErrorMessage(err, 'Không thể tạo mục tiêu thể chất.'));
+    await runGoalFormMutation(
+      'create',
+      async () => {
+        const today = new Date().toISOString().split('T')[0];
+        await fitnessGoalApi.createGoal({
+          title: payload.title,
+          startDate: today,
+          durationDays: payload.durationDays,
+          activateImmediately: true,
+          objectives: [
+            {
+              goalTypeCode: payload.goalTypeCode,
+              priority: 'PRIMARY',
+              notes: payload.notes,
+            },
+          ],
+        });
+      },
+      {
+        conflict:
+          'Bạn đã có một mục tiêu thể chất đang hoạt động. Mỗi lần chỉ được có một mục tiêu đang hoạt động.',
+        alertTitle: 'Không thể tạo mục tiêu',
+        fallback: 'Không thể tạo mục tiêu thể chất.',
       }
-      throw err;
-    } finally {
-      setIsCreateGoalSubmitting(false);
-    }
+    );
   };
 
   const handleCreateVersion = async (payload: {
@@ -452,36 +592,39 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     durationDays?: number;
     goalTypeCode: string;
   }) => {
-    if (!goal || isCreateGoalSubmitting) return;
-    setIsCreateGoalSubmitting(true);
-    setConflictBanner(null);
-    try {
-      await fitnessGoalApi.createGoalVersion(goal.id, {
-        title: payload.title,
-        changeReason: payload.changeReason,
-        changeSummary: payload.changeSummary,
-        durationDays: payload.durationDays,
-        objectives: [
-          {
-            goalTypeCode: payload.goalTypeCode,
-            priority: 'PRIMARY',
-          },
-        ],
-      });
-      setCreateVersionModalVisible(false);
-      await loadGoal({ showLoading: true });
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 409) {
-        setConflictBanner(
-          'Phiên bản mục tiêu đã thay đổi. Vui lòng tải lại.'
-        );
-      } else {
-        Alert.alert('Không thể điều chỉnh phiên bản', apiErrorMessage(err, 'Không thể điều chỉnh mục tiêu.'));
-      }
-      throw err;
-    } finally {
-      setIsCreateGoalSubmitting(false);
+    const captured = goalEditorContextRef.current;
+    const latestGoal = currentGoalRef.current ?? goal;
+    if (
+      !captured ||
+      captured.target !== 'version' ||
+      !latestGoal ||
+      latestGoal.id !== captured.goalId
+    ) {
+      throw new Error(GOAL_TARGET_MISMATCH_MESSAGE);
     }
+    const targetGoalId = captured.goalId;
+    await runGoalFormMutation(
+      'version',
+      async () => {
+        await fitnessGoalApi.createGoalVersion(targetGoalId, {
+          title: payload.title,
+          changeReason: payload.changeReason,
+          changeSummary: payload.changeSummary,
+          durationDays: payload.durationDays,
+          objectives: [
+            {
+              goalTypeCode: payload.goalTypeCode,
+              priority: 'PRIMARY',
+            },
+          ],
+        });
+      },
+      {
+        conflict: 'Phiên bản mục tiêu đã thay đổi. Vui lòng tải lại.',
+        alertTitle: 'Không thể điều chỉnh phiên bản',
+        fallback: 'Không thể điều chỉnh mục tiêu.',
+      }
+    );
   };
 
   const handleCreateTransition = async (payload: {
@@ -491,38 +634,41 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     goalTypeCode: string;
     durationDays?: number;
   }) => {
-    if (!goal || isCreateGoalSubmitting) return;
-    setIsCreateGoalSubmitting(true);
-    setConflictBanner(null);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      await fitnessGoalApi.createGoalTransition(goal.id, {
-        transitionReason: payload.transitionReason,
-        notes: payload.notes,
-        title: payload.title,
-        startDate: today,
-        durationDays: payload.durationDays,
-        objectives: [
-          {
-            goalTypeCode: payload.goalTypeCode,
-            priority: 'PRIMARY',
-          },
-        ],
-      });
-      setCreateTransitionModalVisible(false);
-      await loadGoal({ showLoading: true });
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 409) {
-        setConflictBanner(
-          'Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại.'
-        );
-      } else {
-        Alert.alert('Không thể chuyển mục tiêu', apiErrorMessage(err, 'Không thể chuyển sang hành trình mục tiêu mới.'));
-      }
-      throw err;
-    } finally {
-      setIsCreateGoalSubmitting(false);
+    const captured = goalEditorContextRef.current;
+    const latestGoal = currentGoalRef.current ?? goal;
+    if (
+      !captured ||
+      captured.target !== 'transition' ||
+      !latestGoal ||
+      latestGoal.id !== captured.goalId
+    ) {
+      throw new Error(GOAL_TARGET_MISMATCH_MESSAGE);
     }
+    const targetGoalId = captured.goalId;
+    await runGoalFormMutation(
+      'transition',
+      async () => {
+        const today = new Date().toISOString().split('T')[0];
+        await fitnessGoalApi.createGoalTransition(targetGoalId, {
+          transitionReason: payload.transitionReason,
+          notes: payload.notes,
+          title: payload.title,
+          startDate: today,
+          durationDays: payload.durationDays,
+          objectives: [
+            {
+              goalTypeCode: payload.goalTypeCode,
+              priority: 'PRIMARY',
+            },
+          ],
+        });
+      },
+      {
+        conflict: 'Trạng thái mục tiêu đã thay đổi. Vui lòng tải lại.',
+        alertTitle: 'Không thể chuyển mục tiêu',
+        fallback: 'Không thể chuyển sang hành trình mục tiêu mới.',
+      }
+    );
   };
 
   const renderTabContent = () => {
@@ -549,7 +695,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Tạo mục tiêu thể chất mới"
             style={[styles.primaryActionButton, { backgroundColor: themeColors.primary, marginBottom: spacing.sm }]}
-            onPress={() => setCreateGoalModalVisible(true)}>
+            onPress={() => setGoalFormModalState('create', true)}>
             <Text style={styles.primaryActionText}>Tạo mục tiêu thể chất</Text>
           </Pressable>
 
@@ -744,7 +890,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                           backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
                         },
                       ]}
-                      onPress={() => setCreateVersionModalVisible(true)}>
+                      onPress={() => setGoalFormModalState('version', true)}>
                       <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
                         ✎ Điều chỉnh mục tiêu
                       </Text>
@@ -761,7 +907,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                           backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
                         },
                       ]}
-                      onPress={() => setCreateTransitionModalVisible(true)}>
+                      onPress={() => setGoalFormModalState('transition', true)}>
                       <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
                         ↻ Chuyển đổi
                       </Text>
@@ -890,7 +1036,8 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         visible={createGoalModalVisible}
         isSubmitting={isCreateGoalSubmitting}
         isDark={isDark}
-        onClose={() => setCreateGoalModalVisible(false)}
+        sessionId={goalModalSessionId}
+        onClose={() => setGoalFormModalState('create', false)}
         onSubmit={handleCreateGoal}
       />
 
@@ -898,10 +1045,25 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       {goal && (
         <CreateGoalVersionModal
           visible={createVersionModalVisible}
-          currentTitle={goal.title}
+          currentTitle={
+            goalEditorContext?.target === 'version' ? goalEditorContext.goalTitle : goal.title
+          }
+          currentGoalTypeCode={
+            goalEditorContext?.target === 'version'
+              ? goalEditorContext.goalTypeCode
+              : goal.currentVersion?.objectives?.find((o) => o.priority === 'PRIMARY')?.goalTypeCode
+          }
+          targetMismatchError={
+            createVersionModalVisible &&
+            goalEditorContext?.target === 'version' &&
+            goal.id !== goalEditorContext.goalId
+              ? GOAL_TARGET_MISMATCH_MESSAGE
+              : null
+          }
           isSubmitting={isCreateGoalSubmitting}
           isDark={isDark}
-          onClose={() => setCreateVersionModalVisible(false)}
+          sessionId={goalModalSessionId}
+          onClose={() => setGoalFormModalState('version', false)}
           onSubmit={handleCreateVersion}
         />
       )}
@@ -910,9 +1072,17 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
       {goal && (
         <CreateGoalTransitionModal
           visible={createTransitionModalVisible}
+          targetMismatchError={
+            createTransitionModalVisible &&
+            goalEditorContext?.target === 'transition' &&
+            goal.id !== goalEditorContext.goalId
+              ? GOAL_TARGET_MISMATCH_MESSAGE
+              : null
+          }
           isSubmitting={isCreateGoalSubmitting}
           isDark={isDark}
-          onClose={() => setCreateTransitionModalVisible(false)}
+          sessionId={goalModalSessionId}
+          onClose={() => setGoalFormModalState('transition', false)}
           onSubmit={handleCreateTransition}
         />
       )}

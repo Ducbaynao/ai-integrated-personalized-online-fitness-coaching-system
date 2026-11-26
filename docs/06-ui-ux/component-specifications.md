@@ -100,3 +100,8 @@ Hỗ trợ search, filter, sort, pagination, column visibility và row actions t
 
 Hiển thị target, action, impact, required reason, permission, step-up requirement và audit notice. Hành động nguy hiểm không được hoàn tất chỉ bằng một click từ table.
 
+## DateInputField, DatePickerModal & LocalDateTimeInputField
+
+- `DateInputField` + `DatePickerModal` là thành phần chọn ngày chuẩn cross-platform (Android & Web) thay thế nhập chuỗi `YYYY-MM-DD`: hiển thị ngày tiếng Việt `DD/MM/YYYY`, giữ payload nội bộ `YYYY-MM-DD` không convert qua UTC, không tự điền ngày mặc định khi field đang rỗng, hỗ trợ chọn năm xa/tháng/ngày không áp trần giả trước 1920, xử lý minh bạch ngày không tồn tại khi đổi tháng/năm (không clamp âm thầm), hủy không đổi giá trị, nút xóa cho field tùy chọn, giới hạn `minDate`/`maxDate`/`mondayOnly`, layout responsive theo `useWindowDimensions` bảo đảm chạm tối thiểu `44 × 44` ngay cả ở màn hình `360px` không tràn ngang, `SafeAreaView` và cô lập callback theo operation ID bất biến từng lần mở + unmount/disabled/`sessionKey`.
+- `LocalDateTimeInputField` ghép `DateInputField` cho phần ngày với ô giờ `HH:mm` riêng cho các màn lịch hẹn/lịch tập địa phương để giữ nguyên chọn IANA timezone và phân giải DST UTC offset tường minh.
+

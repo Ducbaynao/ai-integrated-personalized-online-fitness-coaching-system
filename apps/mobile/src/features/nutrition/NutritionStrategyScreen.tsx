@@ -7,6 +7,8 @@ import { useSharingSummary } from '@/features/coaching/coachingQueries';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { nutritionApi, type NutritionChangeBody, type NutritionStrategyProposal,
   type NutritionTargetNutrient, type NutritionTargetSpec } from './nutritionApi';
@@ -232,7 +234,16 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
         onPress={() => { setGoalTypeId(type.id); setPreviewChange(null); }} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={[styles.body, { color: theme.textPrimary }]}>{goalTypeId === type.id ? '◉' : '○'} {type.name}</Text></Pressable>)}
       {input('Múi giờ IANA của lịch chỉ tiêu', timezone, (value) => { setTimezone(value); setDayConfirmed(false); setPreviewChange(null); })}
-      {input('Có hiệu lực từ ngày (YYYY-MM-DD)', effectiveFrom, (value) => { setEffectiveFrom(value); setPreviewChange(null); })}
+      <DateInputField
+        testID="strategy-effective-from-input"
+        label="Có hiệu lực từ ngày"
+        placeholder="Chọn ngày hiệu lực"
+        value={effectiveFrom}
+        onChange={(value) => { setEffectiveFrom(value); setPreviewChange(null); }}
+        initialBrowseDate={getTodayDateOnly(timezone)}
+        sessionKey={`${actor}:${studentId ?? ''}:${kind}`}
+        accessibilityLabel="Có hiệu lực từ ngày"
+      />
       <Text style={[styles.body, { color: theme.textSecondary }]}>Ngày đầu chỉ dùng khi chưa chốt chỉ tiêu; thay đổi sau phải từ ngày kế tiếp hoặc tương lai. Hệ thống sẽ kiểm tra mốc thời gian.</Text>
       {nutrientsQuery.data?.map((nutrient) => <View key={nutrient.id}>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{nutrient.name} ({nutrient.unitSymbol})</Text>
@@ -277,7 +288,16 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     </WorkoutCard>
     {!trainer ? <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Mục tiêu cho một ngày</Text>
-      {input('Ngày (YYYY-MM-DD)', day, (value) => { setDay(value); setDayConfirmed(false); })}
+      <DateInputField
+        testID="strategy-student-day-input"
+        label="Ngày"
+        placeholder="Chọn ngày"
+        value={day}
+        onChange={(value) => { setDay(value); setDayConfirmed(false); }}
+        initialBrowseDate={getTodayDateOnly(timezone)}
+        sessionKey={`${actor}:student-day`}
+        accessibilityLabel="Ngày"
+      />
       <Text style={[styles.body, { color: theme.textSecondary }]}>Múi giờ của chỉ tiêu: {timezone || 'chưa chọn'}. Dữ liệu chỉ là bản xem trước; lần ghi đầu hoặc xác nhận ngày sẽ chốt dữ liệu tại thời điểm đó.</Text>
       <WorkoutButton label="Xem ngày theo múi giờ đã chọn" disabled={!moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}
         onPress={() => setDayConfirmed(true)} />
@@ -329,7 +349,16 @@ export function NutritionStrategyScreen({ studentId, relationshipId }: { student
     {trainer ? <WorkoutCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử điều chỉnh chỉ tiêu đã chốt</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ đọc khi còn quyền NUTRITION_GOAL VIEW hiện hành; không có nút sửa.</Text>
-      {input('Ngày (YYYY-MM-DD)', day, (value) => { setDay(value); setDayConfirmed(false); })}
+      <DateInputField
+        testID="strategy-trainer-day-input"
+        label="Ngày"
+        placeholder="Chọn ngày"
+        value={day}
+        onChange={(value) => { setDay(value); setDayConfirmed(false); }}
+        initialBrowseDate={getTodayDateOnly(timezone)}
+        sessionKey={`${actor}:${studentId ?? ''}:trainer-day`}
+        accessibilityLabel="Ngày"
+      />
       {input('Múi giờ IANA của chỉ tiêu', timezone, (value) => { setTimezone(value); setDayConfirmed(false); })}
       <WorkoutButton label="Xem lịch sử ngày này" secondary
         disabled={!moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}

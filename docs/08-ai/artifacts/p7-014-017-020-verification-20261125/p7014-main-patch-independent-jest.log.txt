@@ -1,0 +1,20 @@
+
+> @fitness-coaching/mobile@1.0.0 test
+> jest --runInBand --testTimeout=15000 src/__tests__/goalModalP2Races.test.tsx src/__tests__/CurrentGoalScreen.test.tsx src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/accessibilityAndTokens.test.tsx src/__tests__/aiKnowledgeNavigation.test.tsx src/__tests__/coachingNavigation.test.tsx src/__tests__/exerciseNavigation.test.tsx src/__tests__/progressSummaryNavigation.test.tsx src/__tests__/studentWorkoutPlanNavigation.test.tsx
+
+PASS src/__tests__/CurrentGoalScreen.test.tsx (17.949 s)
+PASS src/__tests__/foodAnalysisScreen.test.tsx
+PASS src/__tests__/goalModalP2Races.test.tsx
+PASS src/__tests__/nutritionScreens.test.tsx
+PASS src/__tests__/accessibilityAndTokens.test.tsx
+PASS src/__tests__/aiKnowledgeNavigation.test.tsx
+PASS src/__tests__/exerciseNavigation.test.tsx
+PASS src/__tests__/coachingNavigation.test.tsx
+PASS src/__tests__/progressSummaryNavigation.test.tsx
+PASS src/__tests__/studentWorkoutPlanNavigation.test.tsx
+
+Test Suites: 10 passed, 10 total
+Tests:       142 passed, 142 total
+Snapshots:   0 total
+Time:        43.528 s
+Ran all test suites matching /src\\__tests__\\goalModalP2Races.test.tsx|src\\__tests__\\CurrentGoalScreen.test.tsx|src\\__tests__\\foodAnalysisScreen.test.tsx|src\\__tests__\\nutritionScreens.test.tsx|src\\__tests__\\accessibilityAndTokens.test.tsx|src\\__tests__\\aiKnowledgeNavigation.test.tsx|src\\__tests__\\coachingNavigation.test.tsx|src\\__tests__\\exerciseNavigation.test.tsx|src\\__tests__\\progressSummaryNavigation.test.tsx|src\\__tests__\\studentWorkoutPlanNavigation.test.tsx/i.

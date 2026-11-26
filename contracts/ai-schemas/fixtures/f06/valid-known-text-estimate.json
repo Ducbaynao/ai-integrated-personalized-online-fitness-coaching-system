@@ -1,0 +1,16 @@
+{
+  "resultType": "ESTIMATE",
+  "items": [
+    {
+      "detectedName": "trứng luộc",
+      "candidateNames": ["trứng gà luộc"],
+      "quantity": 2,
+      "unitText": "quả",
+      "confidence": 0.82,
+      "missingData": [],
+      "limitations": ["Khối lượng mỗi quả cần đối chiếu với portion được duyệt trong catalog."]
+    }
+  ],
+  "missingData": [],
+  "limitations": []
+}

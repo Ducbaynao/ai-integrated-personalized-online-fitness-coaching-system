@@ -5,6 +5,8 @@ import moment from 'moment-timezone';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { nutritionApi } from './nutritionApi';
 import { nutrientLabel, nutrientText } from './NutritionScreen';
@@ -31,9 +33,16 @@ export function TrainerNutritionScreen({ studentId }: { studentId: string }) {
     <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng học viên</Text>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ đọc theo quyền NUTRITION_LOGS VIEW hiện hành.</Text>
     <WorkoutCard>
-      <Text style={[styles.label, { color: theme.textPrimary }]}>Ngày (YYYY-MM-DD)</Text>
-      <TextInput accessibilityLabel="Ngày xem" value={day} onChangeText={(value) => { setDay(value); setConfirmed(false); }}
-        style={{ borderWidth: 1, borderColor: theme.border, color: theme.textPrimary, minHeight: 48, padding: 10 }} />
+      <DateInputField
+        testID="trainer-nutrition-day-input"
+        label="Ngày xem"
+        placeholder="Chọn ngày"
+        value={day}
+        onChange={(value) => { setDay(value); setConfirmed(false); }}
+        initialBrowseDate={getTodayDateOnly(timezone || user?.timezone)}
+        sessionKey={`${user?.id ?? ''}:${studentId}`}
+        accessibilityLabel="Ngày xem"
+      />
       <Text style={[styles.label, { color: theme.textPrimary }]}>Múi giờ IANA của ngày log</Text>
       <TextInput accessibilityLabel="Múi giờ của ngày log" value={timezone} onChangeText={(value) => { setTimezone(value); setConfirmed(false); }}
         style={{ borderWidth: 1, borderColor: theme.border, color: theme.textPrimary, minHeight: 48, padding: 10 }} />

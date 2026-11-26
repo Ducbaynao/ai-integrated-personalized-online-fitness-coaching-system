@@ -98,6 +98,24 @@ export function apiErrorMessage(error: unknown, fallback = 'Có lỗi xảy ra. 
   const errorCode = response && typeof response === 'object' && 'errorCode' in response ? response.errorCode : undefined;
   if (errorCode === 'INVALID_CREDENTIALS') return 'Email hoặc mật khẩu không đúng.';
   if (errorCode === 'INVALID_OR_EXPIRED_TOKEN') return 'Mã xác minh không hợp lệ hoặc đã hết hạn.';
+  if (errorCode === 'SCANNER_UNAVAILABLE') {
+    return 'Hệ thống quét an toàn tệp hiện chưa sẵn sàng. Bạn có thể nộp hồ sơ kèm ghi chú hoặc thử tải tệp lại sau.';
+  }
+  if (errorCode === 'STORAGE_UNAVAILABLE') {
+    return 'Hệ thống lưu trữ tài liệu hiện chưa sẵn sàng. Bạn có thể thử tải tệp lại sau hoặc nộp hồ sơ kèm ghi chú.';
+  }
+  if (errorCode === 'TRAINER_APPLICATION_ALREADY_ACTIVE') {
+    return 'Bạn đã có một hồ sơ xác minh đang chờ xét duyệt.';
+  }
+  if (errorCode === 'TRAINER_CAPABILITY_UNAVAILABLE') {
+    return 'Hồ sơ hoặc vai trò Huấn luyện viên hiện chưa khả dụng.';
+  }
+  if (errorCode === 'TRAINER_CAPABILITY_REVOKED') {
+    return 'Quyền Huấn luyện viên của tài khoản đã bị thu hồi.';
+  }
+  if (errorCode === 'INVALID_LIFECYCLE_TRANSITION') {
+    return 'Trạng thái hồ sơ hiện tại không cho phép thực hiện thao tác này. Vui lòng làm mới trạng thái.';
+  }
   switch (error.status) {
     case 0: return 'Không thể kết nối mạng. Vui lòng kiểm tra kết nối Internet.';
     case 400: return 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.';

@@ -1,0 +1,96 @@
+node.exe : FAIL src/__tests__/goalModalP2Races.test.tsx (13.123 s)
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/__test....tsx (13.123 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  P7-017 P2 regression: resolveGoalModalErrorMessage order & sanitization
+    √ maps 401 with goalTypeCode field error to auth message, not goal type guidance (6 ms)
+    √ never leaks raw Vietnamese server messages containing database URIs on 403 or 500 (2 ms)
+    √ still shows actionable goal-type message for 400/422 goalType validation errors (1 ms)
+    √ handles 409 conflict, AbortError cancellation, network/timeout, and unrecognized errors safely (2 ms)
+  P7-017 P2 regression: stale modal submit generation isolation across all 3 modals
+    CreateGoalModal
+      √ Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(1915 ms)
+      √ Case B: stale resolve after close/reopen does not close or reset the newly opened form (53 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (60 ms)
+    CreateGoalVersionModal
+      √ Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(127 ms)
+      √ Case B: stale resolve after close/reopen does not close or reset the newly opened form (107 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (148 ms)
+    CreateGoalTransitionModal
+      √ Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(185 ms)
+      √ Case B: stale resolve after close/reopen does not close or reset the newly opened form (121 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (112 ms)
+    CurrentGoalScreen parent integration
+      √ CurrentGoalScreen parent handler prevents old createGoal settle/finally from closing or unlocking reopened
+modal (889 ms)
+      √ CurrentGoalScreen parent handler prevents old createGoal resolve after close/reopen from closing new modal
+while still refreshing valid server state (245 ms)
+      × preserves open CreateGoalVersionModal draft and valid goal when stale version sync GET fails transiently, and
+retries GET only without resetting draft (1290 ms)
+      × preserves open CreateGoalTransitionModal draft and valid goal when stale transition sync GET fails
+transiently, and retries GET only without resetting draft (1575 ms)
+      √ follows access/404 policy on background sync 401/403/404 instead of preserving stale goal data or open editor
+(886 ms)
+      √ renders initial load error card on network failure and ignores stale reconciliation error after route change
+(381 ms)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CurrentGoalScreen parent
+integration › preserves open CreateGoalVersionModal draft and valid goal when stale version sync GET fails
+transiently, and retries GET only without resetting draft
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 0
+    Received length: 2
+    Received array:  [{"_fiber": [FiberNode]}, {"_fiber": [FiberNode]}]
+
+      621 |
+      622 |       // Editor must stay mounted & open with user draft intact; no blocking error card; no duplicate
+mutation
+    > 623 |       expect(root.findAllByProps({ testID: 'goal-error-card' })).toHaveLength(0);
+          |                                                                  ^
+      624 |       expect(root.findByProps({ testID: 'create-goal-version-modal' }).props.visible).toBe(true);
+      625 |       expect(root.findByProps({ testID: 'goal-version-title-input' }).props.value).toBe('Draft Version
+v3');
+      626 |       expect(root.findByProps({ testID: 'goal-version-reason-input' }).props.value).toBe('Draft Reason
+v3');
+
+      at Object.toHaveLength (src/__tests__/goalModalP2Races.test.tsx:623:66)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CurrentGoalScreen parent
+integration › preserves open CreateGoalTransitionModal draft and valid goal when stale transition sync GET fails
+transiently, and retries GET only without resetting draft
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 0
+    Received length: 2
+    Received array:  [{"_fiber": [FiberNode]}, {"_fiber": [FiberNode]}]
+
+      704 |       });
+      705 |
+    > 706 |       expect(root.findAllByProps({ testID: 'goal-error-card' })).toHaveLength(0);
+          |                                                                  ^
+      707 |       expect(root.findByProps({ testID: 'create-goal-transition-modal' }).props.visible).toBe(true);
+      708 |       expect(root.findByProps({ testID: 'goal-transition-reason-input' }).props.value).toBe('Draft
+Transition Reason');
+      709 |       expect(root.findByProps({ testID: 'goal-transition-title-input' }).props.value).toBe('Draft
+Transition Title');
+
+      at Object.toHaveLength (src/__tests__/goalModalP2Races.test.tsx:706:66)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 17 passed, 19 total
+Snapshots:   0 total
+Time:        13.995 s
+Ran all test suites matching /src\\__tests__\\goalModalP2Races.test.tsx/i.

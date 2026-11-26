@@ -1,0 +1,28 @@
+{
+  "observedAtUtc": "2026-11-24T17:24:22.017719+00:00",
+  "stage": "comma rejected; no dot save yet",
+  "drafts": [
+    {
+      "id": "446d2d57-7535-4760-8d12-6ab8bfe7c61f",
+      "status": "READY_FOR_CONFIRMATION",
+      "quantity": null,
+      "portion_id": null,
+      "item_revision": 0,
+      "draft_revision": 1,
+      "quantity_basis": null,
+      "selected_food_id": null,
+      "confirmed_food_log_item_id": null
+    },
+    {
+      "id": "bf52a900-b2f6-4ee3-86d6-dd87131190e8",
+      "status": "READY_FOR_CONFIRMATION",
+      "quantity": null,
+      "portion_id": null,
+      "item_revision": 0,
+      "draft_revision": 1,
+      "quantity_basis": null,
+      "selected_food_id": null,
+      "confirmed_food_log_item_id": null
+    }
+  ]
+}

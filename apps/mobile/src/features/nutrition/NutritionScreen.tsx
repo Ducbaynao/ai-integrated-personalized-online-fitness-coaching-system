@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment-timezone';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -8,6 +9,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { DateInputField } from '@/components/ui/DateInputField';
+import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { nutritionApi, type CatalogItemBody, type CorrectionBody, type FoodBody, type ItemBody, type NutritionDay, type NutritionItem, type PrivateFood } from './nutritionApi';
 
@@ -179,14 +182,32 @@ export function NutritionScreen() {
       <TextInput accessibilityLabel={label} value={value} onChangeText={change} keyboardType={keyboardType}
         style={{ borderWidth: 1, borderColor: theme.border, color: theme.textPrimary, minHeight: 48, padding: 10, borderRadius: 8 }} /></View>;
 
-  if (activeCapability !== 'STUDENT') return <WorkoutState title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />;
-  return <ScrollView testID="nutrition-student-screen" style={[styles.screen, { backgroundColor: theme.canvas }]}
-    contentContainerStyle={styles.content}>
+  if (activeCapability !== 'STUDENT') {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+        <WorkoutState title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />
+      </SafeAreaView>
+    );
+  }
+  return (
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
+      <ScrollView testID="nutrition-student-screen" style={styles.screen}
+        contentContainerStyle={styles.content}>
     <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng</Text>
     <WorkoutButton label="Mục tiêu dinh dưỡng và đề xuất" secondary onPress={() => router.push('/nutrition/strategy' as never)} />
+    <WorkoutButton testID="entry-food-text-analysis" label="Ước tính từ mô tả bữa ăn (AI)" secondary onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: { day, timezone, mealType } } as never)} />
     <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu bạn tự khai báo. Chưa biết không có nghĩa là 0.</Text>
     <WorkoutCard>
-      {input('Ngày ghi (YYYY-MM-DD)', day, (value) => { setDay(value); setConfirmedContext(false); })}
+      <DateInputField
+        testID="nutrition-day-input"
+        label="Ngày ghi"
+        placeholder="Chọn ngày ghi"
+        value={day}
+        onChange={(value) => { setDay(value); setConfirmedContext(false); }}
+        initialBrowseDate={getTodayDateOnly(timezone || user?.timezone)}
+        sessionKey={actor}
+        accessibilityLabel="Ngày ghi"
+      />
       {input('Múi giờ IANA', timezone, (value) => { setTimezone(value); setConfirmedContext(false); })}
       <WorkoutButton label={confirmedContext ? 'Đã xác nhận ngày và múi giờ' : 'Xác nhận ngày và múi giờ'}
         disabled={!day || !moment(day, 'YYYY-MM-DD', true).isValid() || !moment.tz.zone(timezone)}
@@ -315,5 +336,7 @@ export function NutritionScreen() {
         <WorkoutButton label="Ghi thực phẩm trong danh mục" disabled={busy || !validContext} onPress={addCatalogItem} />
       </> : null}
     </WorkoutCard>
-  </ScrollView>;
+      </ScrollView>
+    </SafeAreaView>
+  );
 }

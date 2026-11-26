@@ -1,0 +1,15 @@
+{
+    "checkedAtUtc":  "2026-11-24T15:38:52.6939586Z",
+    "sourceSha":  "f299540367b9b883414a4ac2bec06daee8e155c4",
+    "metroHttpStatus":  200,
+    "metroStatus":  "packager-status:running",
+    "hostListener":  "[::1]:18081",
+    "ipv4HostProbe":  "127.0.0.1:18081 did not connect",
+    "adbSerial":  "emulator-5580",
+    "adbReverse":  "tcp:18081 -\u003e tcp:18081",
+    "foregroundObserved":  "NexusLauncher; F06 app not yet opened",
+    "appLaunch":  "NOT RUN: combined command containing Expo Go VIEW launch rejected by automatic approval review: blocked by policy; manual handoff requested, no alternate launch attempted",
+    "appScenarios":  "NOT RUN pending observed app connection",
+    "runtimeCleanup":  "runtime kept running for requested manual app-open handoff",
+    "credentialsIncluded":  false
+}

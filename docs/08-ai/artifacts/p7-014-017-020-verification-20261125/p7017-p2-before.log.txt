@@ -1,0 +1,243 @@
+node.exe : FAIL src/__tests__/goalModalP2Races.test.tsx (14.984 s)
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:\nvm4w\nodejs/node_modules/npm/bin/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL src/__test....tsx (14.984 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  P7-017 P2 regression: resolveGoalModalErrorMessage order & sanitization
+    × maps 401 with goalTypeCode field error to auth message, not goal type guidance (16 ms)
+    × never leaks raw Vietnamese server messages containing database URIs on 403 or 500 (3 ms)
+    √ still shows actionable goal-type message for 400/422 goalType validation errors (2 ms)
+    × handles 409 conflict, AbortError cancellation, network/timeout, and unrecognized errors safely (2 ms)
+  P7-017 P2 regression: stale modal submit generation isolation across all 3 modals
+    × CurrentGoalScreen parent handler prevents old createGoal settle/finally from closing or unlocking reopened modal
+(810 ms)
+    CreateGoalModal
+      × Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(1818 ms)
+      × Case B: stale resolve after close/reopen does not close or reset the newly opened form (69 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (55 ms)
+    CreateGoalVersionModal
+      × Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(70 ms)
+      × Case B: stale resolve after close/reopen does not close or reset the newly opened form (110 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (71 ms)
+    CreateGoalTransitionModal
+      × Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+(81 ms)
+      × Case B: stale resolve after close/reopen does not close or reset the newly opened form (81 ms)
+      √ Case C & D: current request error surfaces inline keeping input, and current success closes normally (85 ms)
+
+  ● P7-017 P2 regression: resolveGoalModalErrorMessage order & sanitization › maps 401 with goalTypeCode field error
+to auth message, not goal type guidance
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+    Received: "Loại mục tiêu hiện chưa sẵn sàng hoặc không hợp lệ trên hệ thống. Vui lòng chọn loại khác hoặc thử lại
+sau."
+
+      74 |     });
+      75 |     const msg = resolveGoalModalErrorMessage(err, 'Fallback');
+    > 76 |     expect(msg).toBe('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+         |                 ^
+      77 |     expect(msg).not.toContain('Loại mục tiêu');
+      78 |   });
+      79 |
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:76:17)
+
+  ● P7-017 P2 regression: resolveGoalModalErrorMessage order & sanitization › never leaks raw Vietnamese server
+messages containing database URIs on 403 or 500
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Bạn không có quyền thực hiện thao tác này."
+    Received: "Từ chối quyền tại postgres://[REDACTED_TEST_CREDENTIALS]@db.internal:5432/fitness_prod"
+
+      87 |     });
+      88 |     const msg403 = resolveGoalModalErrorMessage(err403, 'Fallback');
+    > 89 |     expect(msg403).toBe('Bạn không có quyền thực hiện thao tác này.');
+         |                    ^
+      90 |     expect(msg403).not.toContain('postgres://');
+      91 |     expect(msg403).not.toContain('db.internal');
+      92 |
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:89:20)
+
+  ● P7-017 P2 regression: resolveGoalModalErrorMessage order & sanitization › handles 409 conflict, AbortError
+cancellation, network/timeout, and unrecognized errors safely
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Dữ liệu đã thay đổi. Vui lòng tải lại và thử lại."
+    Received: "Xung đột dữ liệu postgres://secret@internal/db"
+
+      124 |     });
+      125 |     const msg409 = resolveGoalModalErrorMessage(err409, 'Fallback');
+    > 126 |     expect(msg409).toBe('Dữ liệu đã thay đổi. Vui lòng tải lại và thử lại.');
+          |                    ^
+      127 |     expect(msg409).not.toContain('postgres://');
+      128 |
+      129 |     const abortErr = new Error('Aborted');
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:126:20)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalModal › Case A & B2:
+stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      235 |       });
+      236 |       expect(onSubmit).toHaveBeenCalledTimes(2);
+    > 237 |       expect(tree.root.findByProps({ testID: spec.submitTestId }).props.disabled).toBe(true);
+          |                                                                                   ^
+      238 |
+      239 |       // Old request 1 rejects after reopen + Attempt 2 started
+      240 |       await renderer.act(async () => {
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:237:83)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalModal › Case B:
+stale resolve after close/reopen does not close or reset the newly opened form
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: called with 0 arguments
+
+      285 |       });
+      286 |
+    > 287 |       expect(onClose).not.toHaveBeenCalled();
+          |                           ^
+      288 |       expect(tree.root.findByProps({ testID: spec.primaryInputTestId }).props.value).toBe('Attempt 2
+Fresh');
+      289 |       expect(tree.root.findAllByProps({ testID: spec.bannerTestId }).length).toBe(0);
+      290 |     });
+
+      at Object.toHaveBeenCalled (src/__tests__/goalModalP2Races.test.tsx:287:27)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalVersionModal › Case
+A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      235 |       });
+      236 |       expect(onSubmit).toHaveBeenCalledTimes(2);
+    > 237 |       expect(tree.root.findByProps({ testID: spec.submitTestId }).props.disabled).toBe(true);
+          |                                                                                   ^
+      238 |
+      239 |       // Old request 1 rejects after reopen + Attempt 2 started
+      240 |       await renderer.act(async () => {
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:237:83)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalVersionModal › Case
+B: stale resolve after close/reopen does not close or reset the newly opened form
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: called with 0 arguments
+
+      285 |       });
+      286 |
+    > 287 |       expect(onClose).not.toHaveBeenCalled();
+          |                           ^
+      288 |       expect(tree.root.findByProps({ testID: spec.primaryInputTestId }).props.value).toBe('Attempt 2
+Fresh');
+      289 |       expect(tree.root.findAllByProps({ testID: spec.bannerTestId }).length).toBe(0);
+      290 |     });
+
+      at Object.toHaveBeenCalled (src/__tests__/goalModalP2Races.test.tsx:287:27)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalTransitionModal ›
+Case A & B2: stale reject & finally do not inject old banner or unlock newer pending submit after close/reopen
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      235 |       });
+      236 |       expect(onSubmit).toHaveBeenCalledTimes(2);
+    > 237 |       expect(tree.root.findByProps({ testID: spec.submitTestId }).props.disabled).toBe(true);
+          |                                                                                   ^
+      238 |
+      239 |       // Old request 1 rejects after reopen + Attempt 2 started
+      240 |       await renderer.act(async () => {
+
+      at Object.toBe (src/__tests__/goalModalP2Races.test.tsx:237:83)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CreateGoalTransitionModal ›
+Case B: stale resolve after close/reopen does not close or reset the newly opened form
+
+    expect(jest.fn()).not.toHaveBeenCalled()
+
+    Expected number of calls: 0
+    Received number of calls: 1
+
+    1: called with 0 arguments
+
+      285 |       });
+      286 |
+    > 287 |       expect(onClose).not.toHaveBeenCalled();
+          |                           ^
+      288 |       expect(tree.root.findByProps({ testID: spec.primaryInputTestId }).props.value).toBe('Attempt 2
+Fresh');
+      289 |       expect(tree.root.findAllByProps({ testID: spec.bannerTestId }).length).toBe(0);
+      290 |     });
+
+      at Object.toHaveBeenCalled (src/__tests__/goalModalP2Races.test.tsx:287:27)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● P7-017 P2 regression: stale modal submit generation isolation across all 3 modals › CurrentGoalScreen parent
+handler prevents old createGoal settle/finally from closing or unlocking reopened modal
+
+    TypeError: root.findByProps(...).props.onClose is not a function
+
+      367 |     // Parent modal closes & reopens (#2)
+      368 |     await renderer.act(async () => {
+    > 369 |       root.findByProps({ testID: 'create-goal-modal' }).props.onClose();
+          |                                                               ^
+      370 |     });
+      371 |     await renderer.act(async () => {
+      372 |       root.findByProps({ testID: 'create-first-goal-button' }).props.onPress();
+
+      at onClose (src/__tests__/goalModalP2Races.test.tsx:369:63)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at Object.act (src/__tests__/goalModalP2Races.test.tsx:368:20)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       10 failed, 4 passed, 14 total
+Snapshots:   0 total
+Time:        15.982 s
+Ran all test suites matching /src\\__tests__\\goalModalP2Races.test.tsx/i.

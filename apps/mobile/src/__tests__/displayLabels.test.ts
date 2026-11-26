@@ -32,6 +32,10 @@ describe('Vietnamese display labels', () => {
     expect(apiErrorMessage({ status: 403 })).toContain('không có quyền');
     expect(apiErrorMessage({ status: 404 })).toContain('Không tìm thấy');
     expect(apiErrorMessage({ status: 409 })).toContain('đã thay đổi');
+    expect(apiErrorMessage({ status: 503, errorResponse: { errorCode: 'SCANNER_UNAVAILABLE' } })).toContain('quét an toàn');
+    expect(apiErrorMessage({ status: 503, errorResponse: { errorCode: 'STORAGE_UNAVAILABLE' } })).toContain('lưu trữ tài liệu');
+    expect(apiErrorMessage({ status: 409, errorResponse: { errorCode: 'TRAINER_APPLICATION_ALREADY_ACTIVE' } })).toContain('đang chờ xét duyệt');
+    expect(apiErrorMessage({ status: 400, errorResponse: { errorCode: 'INVALID_LIFECYCLE_TRANSITION' } })).toContain('Trạng thái hồ sơ');
     expect(localizedServerMessage('Giờ không hợp lệ', 'Giá trị chưa hợp lệ')).toBe('Giờ không hợp lệ');
     expect(localizedServerMessage('Invalid time', 'Giá trị chưa hợp lệ')).toBe('Giá trị chưa hợp lệ');
     expect(scheduleFieldLabel('localStart')).toBe('giờ bắt đầu');

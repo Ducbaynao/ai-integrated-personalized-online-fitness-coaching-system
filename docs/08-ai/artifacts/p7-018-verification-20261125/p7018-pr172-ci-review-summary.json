@@ -1,0 +1,65 @@
+{
+  "scope": "PR #172 Backend CI test alignment",
+  "reviewer": "Codex independent review",
+  "reviewedHead": "f1113fbbbdbd198ca4b602f1b4b6d084ac2f9775",
+  "findings": "None in the three-test scope; exact permission equality and revoked-role denial remain intact.",
+  "java": "Microsoft OpenJDK 21.0.8",
+  "maven": "3.9.16",
+  "command": ".\\mvnw.cmd -B test -Dtest=AuthSessionIntegrationTest,ContentManagementIntegrationTest,CurrentUserIntegrationTest",
+  "exitCode": 0,
+  "tests": 53,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": [
+    {
+      "tests": 26,
+      "name": "AuthSessionIntegrationTest"
+    },
+    {
+      "tests": 5,
+      "name": "ContentManagementIntegrationTest"
+    },
+    {
+      "tests": 22,
+      "name": "CurrentUserIntegrationTest"
+    }
+  ],
+  "surefireXmlVerified": true,
+  "testInfrastructure": "Testcontainers disposable PostgreSQL; Flyway V63",
+  "historicalEvidence": [
+    {
+      "errors": 0,
+      "failures": 3,
+      "skipped": 0,
+      "result": "FAIL",
+      "tests": 53,
+      "source": "p7018-backend-3suites-before.log.txt (local only)"
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "result": "PASS",
+      "tests": 53,
+      "source": "p7018-backend-3suites-after.log.txt (Antigravity, local only)"
+    },
+    {
+      "errors": 0,
+      "failures": 3,
+      "skipped": 5,
+      "result": "FAIL",
+      "runId": "45639754550",
+      "tests": 2128,
+      "source": "p7018-pr172-backend-ci-before.log.txt (local only)"
+    }
+  ],
+  "publicationNote": "Raw logs retained locally, excluded from Git because they contain credential-shaped test output. This summary preserves original FAIL results without publishing secrets.",
+  "liveQaEvidence": "p7018-live-http-db-qa.json",
+  "limits": [
+    "Local full Backend NOT RUN; new CI required",
+    "Live HTTP/DB journey is historical Antigravity evidence, not repeated by this reviewer",
+    "PDF/PNG/JPEG probes returned 503 SCANNER_UNAVAILABLE; clean upload NOT RUN",
+    "Native picker/device QA NOT RUN"
+  ]
+}

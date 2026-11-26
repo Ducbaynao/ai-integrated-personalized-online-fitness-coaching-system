@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,6 +18,9 @@ import { apiErrorMessage, coachingBlockingLabels, trainerActivityLabels, unspeci
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/features/auth/AuthContext';
+import { coachingQueryKeys } from '@/features/coaching/coachingQueries';
+import { queryClient } from '@/services/queryClient';
+import { AuthSessionBinding, getAuthSessionBinding } from '@/services/apiClient';
 import { trainerProfileApi } from '@/services/trainerProfileApi';
 import { trainerApplicationApi } from '@/services/trainerApplicationApi';
 import { ApiError } from '@/types/auth';
@@ -34,14 +38,22 @@ import { typography } from '@/design-system/tokens/typography';
 
 export function TrainerProfileScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, activeCapability, refreshUser } = useAuth();
   const isDark = useColorScheme() === 'dark';
   const themeColors = getSemanticColors(isDark);
 
   const canCoach = Boolean(user?.capabilities?.canCoach);
+  const actorKey = `${user?.id ?? ''}:${activeCapability ?? ''}`;
+  const currentBindingSnapshot = getAuthSessionBinding?.();
+  const sessionFingerprint = `${actorKey}:${currentBindingSnapshot?.authEpoch ?? 0}:${currentBindingSnapshot?.capabilityEpoch ?? 0}`;
 
-  const [profile, setProfile] = useState<TrainerProfileResponse | null>(null);
+  const [profileState, setProfileState] = useState<{
+    actorKey: string;
+    data: TrainerProfileResponse;
+  } | null>(null);
+  const profile = profileState?.actorKey === actorKey ? profileState.data : null;
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Edit mode state
@@ -51,6 +63,46 @@ export function TrainerProfileScreen() {
   const [editYears, setEditYears] = useState('');
   const [editAccepting, setEditAccepting] = useState(false);
 
+  const isMountedRef = useRef(true);
+  const refreshUserRef = useRef(refreshUser);
+  const canCoachRef = useRef(canCoach);
+  const actorKeyRef = useRef(actorKey);
+  const actorEpochRef = useRef(0);
+  const lastCommittedActorKeyRef = useRef(actorKey);
+  const profileRef = useRef<TrainerProfileResponse | null>(profile);
+  const isEditingRef = useRef(isEditing);
+  const profileRequestGenRef = useRef(0);
+  const activeRefreshGenRef = useRef(0);
+  const editorGenerationRef = useRef(0);
+  const uploadOpGenRef = useRef(0);
+  const activeUploadRef = useRef<{
+    opId: number;
+    actorKey: string;
+    actorEpoch: number;
+    binding?: AuthSessionBinding;
+  } | null>(null);
+
+  useEffect(() => {
+    refreshUserRef.current = refreshUser;
+    canCoachRef.current = canCoach;
+    profileRef.current = profile;
+    isEditingRef.current = isEditing;
+  }, [refreshUser, canCoach, profile, isEditing]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      profileRequestGenRef.current += 1;
+      uploadOpGenRef.current += 1;
+      activeUploadRef.current = null;
+    };
+  }, []);
+
+  const markDraftEdited = useCallback(() => {
+    editorGenerationRef.current += 1;
+  }, []);
+
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -58,51 +110,153 @@ export function TrainerProfileScreen() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Application state
-  const [application, setApplication] = useState<TrainerApplicationResponse | null>(null);
+  const [applicationState, setApplicationState] = useState<{
+    actorKey: string;
+    data: TrainerApplicationResponse | null;
+  } | null>(null);
+  const application = applicationState?.actorKey === actorKey ? applicationState.data : null;
   const [applicantNote, setApplicantNote] = useState('');
   const [isSubmittingApp, setIsSubmittingApp] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [appSuccess, setAppSuccess] = useState<string | null>(null);
-  const [uploadedDocs, setUploadedDocs] = useState<TrainerDocumentUploadResponse[]>([]);
-  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
-  const [docUploadError, setDocUploadError] = useState<string | null>(null);
+  const [uploadedDocsState, setUploadedDocsState] = useState<{
+    fingerprint: string;
+    items: TrainerDocumentUploadResponse[];
+  }>(() => ({ fingerprint: sessionFingerprint, items: [] }));
+  const [uploadingState, setUploadingState] = useState<{
+    opId: number;
+    fingerprint: string;
+  } | null>(null);
+  const [docUploadErrorState, setDocUploadErrorState] = useState<{
+    fingerprint: string;
+    message: string;
+  } | null>(null);
+
+  const uploadedDocs =
+    uploadedDocsState.fingerprint === sessionFingerprint ? uploadedDocsState.items : [];
+  const isUploadingDoc =
+    uploadingState !== null && uploadingState.fingerprint === sessionFingerprint;
+  const docUploadError =
+    docUploadErrorState !== null && docUploadErrorState.fingerprint === sessionFingerprint
+      ? docUploadErrorState.message
+      : null;
+
+  const isUploadContextCurrent = useCallback(
+    (ctx: {
+      opId: number;
+      actorKey: string;
+      actorEpoch: number;
+      binding?: AuthSessionBinding;
+    }) => {
+      if (!isMountedRef.current) return false;
+      if (uploadOpGenRef.current !== ctx.opId) return false;
+      if (actorEpochRef.current !== ctx.actorEpoch) return false;
+      if (actorKeyRef.current !== ctx.actorKey) return false;
+      if (ctx.binding && getAuthSessionBinding) {
+        const nowBinding = getAuthSessionBinding();
+        if (
+          nowBinding.authEpoch !== ctx.binding.authEpoch ||
+          nowBinding.capabilityEpoch !== ctx.binding.capabilityEpoch
+        ) {
+          return false;
+        }
+      }
+      return true;
+    },
+    [],
+  );
 
   const handlePickAndUploadDocument = async () => {
-    if (isUploadingDoc) return;
-    setDocUploadError(null);
+    if (activeUploadRef.current && isUploadContextCurrent(activeUploadRef.current)) {
+      return;
+    }
+
+    const opId = ++uploadOpGenRef.current;
+    const initialBinding = getAuthSessionBinding?.();
+    const startedActorKey = actorKeyRef.current;
+    const startedActorEpoch = actorEpochRef.current;
+    const startedFingerprint = `${startedActorKey}:${initialBinding?.authEpoch ?? 0}:${initialBinding?.capabilityEpoch ?? 0}`;
+    const opCtx = {
+      opId,
+      actorKey: startedActorKey,
+      actorEpoch: startedActorEpoch,
+      binding: initialBinding,
+    };
+    const isCurrentOp = () => isUploadContextCurrent(opCtx);
+
+    activeUploadRef.current = opCtx;
+    setDocUploadErrorState(null);
+    setUploadingState({ opId, fingerprint: startedFingerprint });
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/png', 'image/jpeg'],
         copyToCacheDirectory: true,
       });
 
+      if (!isCurrentOp()) {
+        return;
+      }
       if (result.canceled || !result.assets || result.assets.length === 0) {
         return;
       }
 
       const asset = result.assets[0];
       if (asset.size && asset.size > 10 * 1024 * 1024) {
-        setDocUploadError('Tệp vượt quá giới hạn 10 MB.');
+        setDocUploadErrorState({
+          fingerprint: startedFingerprint,
+          message: 'Tệp vượt quá giới hạn 10 MB.',
+        });
         return;
       }
 
-      setIsUploadingDoc(true);
       const mime = asset.mimeType || (asset.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-      const uploaded = await trainerApplicationApi.uploadDocument(asset.uri, asset.name, mime);
-      setUploadedDocs((prev) => [...prev, uploaded]);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setDocUploadError(apiErrorMessage(err, 'Không thể tải tài liệu lên.'));
-      } else {
-        setDocUploadError('Không thể chọn hoặc tải tài liệu lên.');
+      const webFile = (asset as { file?: Blob }).file;
+      const uploaded = await trainerApplicationApi.uploadDocument(
+        asset.uri,
+        asset.name,
+        mime,
+        webFile,
+        {
+          ...(initialBinding ? { sessionBinding: initialBinding } : {}),
+          shouldContinue: isCurrentOp,
+        },
+      );
+      if (!isCurrentOp()) {
+        return;
       }
+      setUploadedDocsState((prev) => ({
+        fingerprint: startedFingerprint,
+        items:
+          prev.fingerprint === startedFingerprint
+            ? [...prev.items, uploaded]
+            : [uploaded],
+      }));
+    } catch (err) {
+      if (!isCurrentOp()) {
+        return;
+      }
+      setDocUploadErrorState({
+        fingerprint: startedFingerprint,
+        message:
+          err instanceof ApiError
+            ? apiErrorMessage(err, 'Không thể tải tài liệu lên.')
+            : 'Không thể chọn hoặc tải tài liệu lên.',
+      });
     } finally {
-      setIsUploadingDoc(false);
+      if (isCurrentOp()) {
+        activeUploadRef.current = null;
+        setUploadingState((prev) => (prev?.opId === opId ? null : prev));
+      }
     }
   };
 
   const handleRemoveDocument = (docId: string) => {
-    setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
+    setUploadedDocsState((prev) =>
+      prev.fingerprint === sessionFingerprint
+        ? { ...prev, items: prev.items.filter((d) => d.id !== docId) }
+        : prev,
+    );
   };
 
   const populateForm = useCallback((data: TrainerProfileResponse) => {
@@ -112,77 +266,141 @@ export function TrainerProfileScreen() {
     setEditAccepting(Boolean(data.acceptingStudents));
   }, []);
 
-  const fetchApplication = useCallback(async () => {
+  const syncAuthAndCoachingCache = useCallback(async () => {
     try {
-      const app = await trainerApplicationApi.getCurrentApplication();
-      setApplication(app);
+      await refreshUserRef.current?.();
     } catch {
-      setApplication(null);
+      // Keep fetched trainer profile state even if /users/me transiently fails.
     }
+    await queryClient.invalidateQueries({ queryKey: coachingQueryKeys.all });
   }, []);
+
+  const loadProfileState = useCallback(async (options?: {
+    mode?: 'mount' | 'reload' | 'refresh' | 'sync';
+    syncAuthMode?: 'always' | 'ifNeeded' | 'never';
+  }): Promise<TrainerProfileResponse | null> => {
+    const mode = options?.mode ?? 'reload';
+    const syncAuthMode = options?.syncAuthMode ?? 'always';
+    const requestGen = ++profileRequestGenRef.current;
+    const startedActorKey = actorKeyRef.current;
+    const startedEditorGen = editorGenerationRef.current;
+    const isCurrentRequest = () =>
+      isMountedRef.current &&
+      requestGen === profileRequestGenRef.current &&
+      startedActorKey === actorKeyRef.current;
+
+    if (mode === 'refresh') {
+      activeRefreshGenRef.current = requestGen;
+    }
+
+    try {
+      const data = await trainerProfileApi.getMyTrainerProfile();
+      if (!isCurrentRequest()) return null;
+
+      if (lastCommittedActorKeyRef.current !== startedActorKey) {
+        lastCommittedActorKeyRef.current = startedActorKey;
+        const nowBinding = getAuthSessionBinding?.();
+        setUploadedDocsState({
+          fingerprint: `${startedActorKey}:${nowBinding?.authEpoch ?? 0}:${nowBinding?.capabilityEpoch ?? 0}`,
+          items: [],
+        });
+        setApplicantNote('');
+        isEditingRef.current = false;
+        setIsEditing(false);
+      }
+
+      profileRef.current = data;
+      setProfileState({ actorKey: startedActorKey, data });
+
+      // Keep server profile updates separate from active/dirty editor drafts.
+      if (!isEditingRef.current && editorGenerationRef.current === startedEditorGen) {
+        populateForm(data);
+      }
+
+      if (data.verificationStatus !== 'NOT_SUBMITTED') {
+        try {
+          const app = await trainerApplicationApi.getCurrentApplication();
+          if (!isCurrentRequest()) return null;
+          setApplicationState({ actorKey: startedActorKey, data: app });
+        } catch {
+          if (!isCurrentRequest()) return null;
+          setApplicationState({ actorKey: startedActorKey, data: null });
+        }
+      } else {
+        setApplicationState({ actorKey: startedActorKey, data: null });
+      }
+
+      const needsSync =
+        syncAuthMode === 'always' ||
+        (syncAuthMode === 'ifNeeded' &&
+          (Boolean(data.coachingEligibility?.eligible) !== canCoachRef.current ||
+            data.verificationStatus === 'VERIFIED'));
+      if (needsSync) {
+        await syncAuthAndCoachingCache();
+        if (!isCurrentRequest()) return null;
+      }
+
+      return data;
+    } catch (err) {
+      if (!isCurrentRequest()) return null;
+      if (mode === 'refresh') {
+        setSubmitError(
+          err instanceof ApiError
+            ? apiErrorMessage(err, 'Không thể làm mới hồ sơ huấn luyện viên.')
+            : 'Không thể làm mới hồ sơ huấn luyện viên. Vui lòng thử lại.',
+        );
+      } else if (mode === 'mount' || mode === 'reload') {
+        setLoadError(
+          err instanceof ApiError
+            ? apiErrorMessage(err, 'Không thể tải hồ sơ huấn luyện viên.')
+            : 'Không thể tải hồ sơ huấn luyện viên. Vui lòng thử lại.',
+        );
+      }
+      return null;
+    } finally {
+      if (isMountedRef.current && startedActorKey === actorKeyRef.current) {
+        if ((mode === 'mount' || mode === 'reload') && requestGen === profileRequestGenRef.current) {
+          setIsLoading(false);
+        }
+        if (mode === 'refresh' && requestGen === activeRefreshGenRef.current) {
+          setIsRefreshing(false);
+        }
+      }
+    }
+  }, [populateForm, syncAuthAndCoachingCache]);
 
   const fetchProfile = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    try {
-      const data = await trainerProfileApi.getMyTrainerProfile();
-      setProfile(data);
-      populateForm(data);
-      if (data.verificationStatus !== 'NOT_SUBMITTED') {
-        await fetchApplication();
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setLoadError(apiErrorMessage(err, 'Không thể tải hồ sơ huấn luyện viên.'));
-      } else {
-        setLoadError('Không thể tải hồ sơ huấn luyện viên. Vui lòng thử lại.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [populateForm, fetchApplication]);
+    await loadProfileState({ mode: 'reload', syncAuthMode: 'always' });
+  }, [loadProfileState]);
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setLoadError(null);
+    setSubmitError(null);
+    await loadProfileState({ mode: 'refresh', syncAuthMode: 'always' });
+  }, [isRefreshing, loadProfileState]);
 
   useEffect(() => {
-    let isMounted = true;
-    async function load() {
-      try {
-        const data = await trainerProfileApi.getMyTrainerProfile();
-        if (isMounted) {
-          setProfile(data);
-          populateForm(data);
-          if (data.verificationStatus !== 'NOT_SUBMITTED') {
-            try {
-              const app = await trainerApplicationApi.getCurrentApplication();
-              if (isMounted) {
-                setApplication(app);
-              }
-            } catch {
-              if (isMounted) {
-                setApplication(null);
-              }
-            }
-          }
-          setIsLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          if (err instanceof ApiError) {
-            setLoadError(apiErrorMessage(err, 'Không thể tải hồ sơ huấn luyện viên.'));
-          } else {
-            setLoadError('Không thể tải hồ sơ huấn luyện viên. Vui lòng thử lại.');
-          }
-          setIsLoading(false);
-        }
-      }
+    actorKeyRef.current = actorKey;
+    actorEpochRef.current += 1;
+    uploadOpGenRef.current += 1;
+    activeUploadRef.current = null;
+    profileRef.current = null;
+    isEditingRef.current = false;
+    editorGenerationRef.current += 1;
+    async function loadInitialProfile() {
+      await loadProfileState({ mode: 'mount', syncAuthMode: 'ifNeeded' });
     }
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [populateForm]);
+    void loadInitialProfile();
+  }, [actorKey, loadProfileState]);
 
   const handleSubmitApplication = async () => {
     if (isSubmittingApp || isUploadingDoc) return;
+    const startedActorKey = actorKeyRef.current;
+    const submitFingerprint = sessionFingerprint;
     setIsSubmittingApp(true);
     setAppError(null);
     setAppSuccess(null);
@@ -191,31 +409,50 @@ export function TrainerProfileScreen() {
         applicantNote: applicantNote.trim() || undefined,
         documentMediaIds: uploadedDocs.length > 0 ? uploadedDocs.map((d) => d.id) : undefined,
       });
-      setApplication(res);
+      if (!isMountedRef.current || actorKeyRef.current !== startedActorKey) return;
+      setApplicationState({ actorKey: startedActorKey, data: res });
       setApplicantNote('');
-      setUploadedDocs([]);
-      const isResubmit = profile?.verificationStatus === 'REJECTED';
+      setUploadedDocsState({ fingerprint: submitFingerprint, items: [] });
+      const isResubmit = profileRef.current?.verificationStatus === 'REJECTED';
       setAppSuccess(
         isResubmit
           ? 'Đã nộp lại đơn. Hồ sơ đang chờ xét duyệt.'
           : 'Đã nộp đơn. Hồ sơ đang chờ xét duyệt.'
       );
+      const syncGen = ++profileRequestGenRef.current;
       const updatedProfile = await trainerProfileApi.getMyTrainerProfile();
-      setProfile(updatedProfile);
+      if (
+        !isMountedRef.current ||
+        actorKeyRef.current !== startedActorKey ||
+        syncGen !== profileRequestGenRef.current
+      ) {
+        return;
+      }
+      profileRef.current = updatedProfile;
+      setProfileState({ actorKey: startedActorKey, data: updatedProfile });
+      await syncAuthAndCoachingCache();
     } catch (err) {
+      if (!isMountedRef.current || actorKeyRef.current !== startedActorKey) return;
       if (err instanceof ApiError) {
         setAppError(apiErrorMessage(err, 'Không thể nộp đơn.'));
+        if (err.status === 409 && err.errorResponse?.errorCode === 'TRAINER_APPLICATION_ALREADY_ACTIVE') {
+          await loadProfileState({ mode: 'sync', syncAuthMode: 'always' });
+        }
       } else {
         setAppError('Không thể nộp đơn. Vui lòng thử lại.');
       }
     } finally {
-      setIsSubmittingApp(false);
+      if (isMountedRef.current) {
+        setIsSubmittingApp(false);
+      }
     }
   };
 
   const startEditing = () => {
-    if (profile) {
-      populateForm(profile);
+    editorGenerationRef.current += 1;
+    isEditingRef.current = true;
+    if (profileRef.current) {
+      populateForm(profileRef.current);
     }
     setFieldErrors({});
     setSubmitError(null);
@@ -224,8 +461,10 @@ export function TrainerProfileScreen() {
   };
 
   const cancelEditing = () => {
-    if (profile) {
-      populateForm(profile);
+    editorGenerationRef.current += 1;
+    isEditingRef.current = false;
+    if (profileRef.current) {
+      populateForm(profileRef.current);
     }
     setFieldErrors({});
     setSubmitError(null);
@@ -291,16 +530,28 @@ export function TrainerProfileScreen() {
       return;
     }
 
+    const startedActorKey = actorKeyRef.current;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
       const updated = await trainerProfileApi.updateMyTrainerProfile(payload);
-      setProfile(updated);
+      if (!isMountedRef.current || actorKeyRef.current !== startedActorKey) {
+        return;
+      }
+      profileRequestGenRef.current += 1;
+      editorGenerationRef.current += 1;
+      isEditingRef.current = false;
+      profileRef.current = updated;
+      setProfileState({ actorKey: startedActorKey, data: updated });
       populateForm(updated);
       setIsEditing(false);
       setSuccessMessage('Đã cập nhật hồ sơ huấn luyện viên.');
+      await syncAuthAndCoachingCache();
     } catch (err) {
+      if (!isMountedRef.current || actorKeyRef.current !== startedActorKey) {
+        return;
+      }
       if (err instanceof ApiError) {
         if (err.status === 409 && err.errorResponse?.errorCode === 'TRAINER_SLUG_ALREADY_EXISTS') {
           setFieldErrors({
@@ -323,7 +574,9 @@ export function TrainerProfileScreen() {
       }
     } finally {
       isSubmittingRef.current = false;
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -371,6 +624,7 @@ export function TrainerProfileScreen() {
       <ScrollView
         testID="trainer-profile-screen"
         contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
         keyboardShouldPersistTaps="handled">
         {/* Navigation Bar */}
         <View style={styles.navBar}>
@@ -773,7 +1027,7 @@ export function TrainerProfileScreen() {
                 {isSubmittingApp ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Nộp hồ sơ</Text>
+                  <Text style={styles.primaryButtonText}>Nộp hồ sơ xác minh</Text>
                 )}
               </Pressable>
             </View>
@@ -791,13 +1045,24 @@ export function TrainerProfileScreen() {
                 </Text>
               </View>
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
-                Quản trị nền tảng đang xem xét hồ sơ xác minh của bạn. Bạn sẽ được thông báo khi có quyết định.
+                Quản trị nền tảng đang xem xét hồ sơ xác minh của bạn. Sau khi được phê duyệt và bật chế độ nhận học viên, học viên mới có thể tìm thấy bạn theo tên.
               </Text>
               {application?.submittedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
                   Đã gửi: {new Date(application.submittedAt).toLocaleDateString('vi-VN')}
                 </Text>
               )}
+              <Pressable
+                testID="trainer-application-refresh-button"
+                accessibilityRole="button"
+                accessibilityLabel="Làm mới trạng thái xác minh"
+                disabled={isRefreshing}
+                onPress={handleRefresh}
+                style={[styles.editButton, { borderColor: themeColors.border, alignSelf: 'flex-start', marginTop: spacing.xs, opacity: isRefreshing ? 0.6 : 1 }]}>
+                <Text style={[styles.editButtonText, { color: themeColors.primary }]}>
+                  {isRefreshing ? 'Đang làm mới…' : 'Làm mới trạng thái'}
+                </Text>
+              </Pressable>
             </View>
           )}
 
@@ -965,11 +1230,66 @@ export function TrainerProfileScreen() {
               <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
                 Hồ sơ xác minh của bạn đã được phê duyệt. Bạn có thể huấn luyện học viên khi bật chế độ nhận học viên.
               </Text>
+              {!profile?.acceptingStudents && (
+                <View
+                  testID="trainer-accepting-students-notice"
+                  style={[
+                    styles.rejectionReasonBox,
+                    {
+                      backgroundColor: themeColors.warningSurface,
+                      borderColor: themeColors.warningText,
+                    },
+                  ]}>
+                  <Text style={[styles.rejectionReasonText, { color: themeColors.warningText }]}>
+                    Chế độ nhận học viên đang Tắt, nên học viên chưa tìm thấy bạn theo tên. Hãy bật &ldquo;Đang nhận học viên mới&rdquo; trong hồ sơ.
+                  </Text>
+                  <Pressable
+                    testID="trainer-enable-accepting-button"
+                    accessibilityRole="button"
+                    accessibilityLabel="Bật nhận học viên ngay"
+                    onPress={startEditing}
+                    style={[styles.editButton, { borderColor: themeColors.warningText, alignSelf: 'flex-start', marginTop: spacing.xs }]}>
+                    <Text style={[styles.editButtonText, { color: themeColors.warningText }]}>
+                      Bật nhận học viên ngay
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+              {!canCoach && (
+                <Pressable
+                  testID="trainer-application-refresh-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Làm mới quyền huấn luyện"
+                  disabled={isRefreshing}
+                  onPress={handleRefresh}
+                  style={[styles.editButton, { borderColor: themeColors.border, alignSelf: 'flex-start', marginTop: spacing.xs, opacity: isRefreshing ? 0.6 : 1 }]}>
+                  <Text style={[styles.editButtonText, { color: themeColors.primary }]}>
+                    {isRefreshing ? 'Đang làm mới…' : 'Làm mới quyền huấn luyện'}
+                  </Text>
+                </Pressable>
+              )}
               {profile?.verifiedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
                   Xác minh ngày: {new Date(profile.verifiedAt).toLocaleDateString('vi-VN')}
                 </Text>
               )}
+            </View>
+          )}
+
+          {profile?.verificationStatus === 'SUSPENDED' && (
+            <View testID="trainer-application-suspended-banner" style={styles.appStateContainer}>
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: themeColors.dangerSurface, alignSelf: 'flex-start', marginBottom: spacing.xs },
+                ]}>
+                <Text style={[styles.badgeText, { color: themeColors.dangerText }]}>
+                  HỒ SƠ XÁC MINH BỊ TẠM NGƯNG
+                </Text>
+              </View>
+              <Text style={[styles.appStateDescription, { color: themeColors.textSecondary }]}>
+                Trạng thái xác minh hiện đang bị tạm ngưng. Bạn tạm thời không thể nhận hoặc xuất hiện trong danh bạ tìm kiếm học viên.
+              </Text>
             </View>
           )}
         </View>
@@ -1003,6 +1323,7 @@ export function TrainerProfileScreen() {
                   placeholderTextColor={themeColors.textSecondary}
                   value={editSlug}
                   onChangeText={(val) => {
+                    markDraftEdited();
                     setEditSlug(val);
                     if (fieldErrors.publicSlug) {
                       setFieldErrors((prev) => ({ ...prev, publicSlug: '' }));
@@ -1041,6 +1362,7 @@ export function TrainerProfileScreen() {
                   placeholderTextColor={themeColors.textSecondary}
                   value={editBio}
                   onChangeText={(val) => {
+                    markDraftEdited();
                     setEditBio(val);
                     if (fieldErrors.bio) {
                       setFieldErrors((prev) => ({ ...prev, bio: '' }));
@@ -1075,6 +1397,7 @@ export function TrainerProfileScreen() {
                   placeholderTextColor={themeColors.textSecondary}
                   value={editYears}
                   onChangeText={(val) => {
+                    markDraftEdited();
                     setEditYears(val);
                     if (fieldErrors.yearsExperience) {
                       setFieldErrors((prev) => ({ ...prev, yearsExperience: '' }));
@@ -1112,7 +1435,10 @@ export function TrainerProfileScreen() {
                   testID="trainer-profile-accepting-switch"
                   accessibilityLabel="Đang nhận học viên mới"
                   value={editAccepting}
-                  onValueChange={setEditAccepting}
+                  onValueChange={(val) => {
+                    markDraftEdited();
+                    setEditAccepting(val);
+                  }}
                   trackColor={{ false: colors.neutral[300], true: themeColors.primary }}
                   thumbColor={Platform.OS === 'android' ? '#ffffff' : undefined}
                 />
@@ -1122,10 +1448,13 @@ export function TrainerProfileScreen() {
             <View style={styles.detailRows}>
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>
-                  Định danh công khai
+                  Định danh công khai (public slug)
                 </Text>
                 <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
                   {profile?.publicSlug ? `@${profile.publicSlug}` : unspecified}
+                </Text>
+                <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
+                  Chỉ là định danh URL tùy chọn; không phải xác minh và học viên tìm theo tên hiển thị sau khi Admin duyệt.
                 </Text>
               </View>
 

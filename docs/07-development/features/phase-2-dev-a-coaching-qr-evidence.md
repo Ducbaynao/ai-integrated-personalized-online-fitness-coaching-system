@@ -248,3 +248,22 @@
   - DB candidate `:5435`: container Docker `digital-fitness-qr-candidate-pg` (dừng khi xong: `docker stop digital-fitness-qr-candidate-pg`).
   - Backend QR `:18080` (`digital_fitness_qr_test` trên `:5434`) và Backend Candidate `:18085` (`digital_fitness_clean_test` trên `:5435`) đang được giữ chạy để người dùng tiếp tục kiểm thử.
 - **Gate chưa đóng:** Điện thoại thật (`QR01–QR10` camera trực tiếp) và independent approval vẫn giữ **`NOT VERIFIED`**.
+
+## 9. Tích hợp `origin/main` (`f8e564dc`) & giải quyết conflict PR #177 (`2026-11-26 21:24 UTC+7`)
+
+- **Merge chưa commit (`git merge --no-commit --no-ff origin/main`):** tích hợp `origin/main` SHA `f8e564dca39a27acdc5f7192e31dbb399d471216` vào `feat/phase2-dev-a-coaching-qr` (`HEAD`: `ac0d761b19b056efe2fdf07c290d3b2c53c487c9`).
+- **Xử lý conflict `apps/mobile/src/features/auth/AuthContext.tsx` (3 điểm):**
+  1. `handleSessionExpired`: giữ `safeClearActiveCapability(() => sessionEpochRef.current === expiredEpoch)` của `main` kèm `clearPendingCoachingQrIntent()`.
+  2. `logout`: đặt `clearQueryCache()`, `clearPendingCoachingQrIntent()` và `safeClearActiveCapability(...)` bên trong guard `sessionEpochRef.current === logoutEpoch` để callback logout cũ không xóa intent/state của phiên mới.
+  3. `setActiveCapability`: kiểm tra guard epoch/status của `main` trước khi chạy `queryClient.removeQueries({ queryKey: ['coaching', 'qr'] })` và cập nhật `activeCapabilityRef.current = resolved`.
+- **Giải quyết trùng Flyway migration:**
+  - `origin/main` (`f8e564dc`) đã có `V61`–`V64` (`V64__seed_fitness_goal_types.sql` là bản mới nhất).
+  - Giữ nguyên toàn bộ migration trên `main`, dời `V61__coaching_qr_identities.sql` → `V65__coaching_qr_identities.sql` (nội dung SQL giữ nguyên, `SHA-256: DDD7A4B9D140472EF5172D5589D6DC0A1B45F91E889E248B90652E0B9A086237`).
+  - Các bản ghi lịch sử `V61` ở mục 1–6 được giữ nguyên; DB QR cô lập `:5434` vẫn giữ nguyên trên `V61`, không tự migrate.
+- **Kiểm thử sau giải quyết conflict:**
+  - Mobile Jest (`authSessionRace.test.tsx` gồm 2 test mới #7/#8 cho logout/hết phiên/race/đổi capability + Auth + QR + B03): **10/10 suites, 69/69 tests PASS**.
+  - `typecheck:mobile`: **0 errors**; `lint:mobile`: **0 errors** (12 warnings `@typescript-eslint/no-require-imports` ở file test).
+  - `validate:contracts` (OpenAPI + 11 schemas + 52 fixtures), `test:contracts` (**22/22 PASS**), `validate:ux-docs` (**18 files PASS**).
+  - Backend QR + B03 (`CoachingQrServiceUnitTest`, `CoachingQrIntegrationTest`, `CoachingErrorAdviceTest`, `CoachingMobileReadContractsIntegrationTest`, `CoachingLifecycleIntegrationTest`, `CoachingSharingIntegrationTest` trên Testcontainers PostgreSQL 18 sạch `V1..V65`): **50/50 PASS** (`Failures: 0, Errors: 0, Skipped: 0`).
+  - Backend Migration (`V62FoodErasureMigrationTest`, `V64GoalTypesSeedMigrationTest`): **4/4 PASS**.
+- **Trạng thái chờ duyệt:** Merge đang ở trạng thái staged/unresolved-commit để chủ dự án review (chưa commit, chưa push; PR #177 trên GitHub vẫn báo conflict cho tới khi push commit merge). Gate thiết bị thật (`QR01–QR10`) và independent approval vẫn **`NOT VERIFIED`**.

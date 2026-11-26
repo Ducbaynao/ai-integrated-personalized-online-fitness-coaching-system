@@ -1,8 +1,38 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { StudentOnboardingScreen } from '@/features/student/StudentOnboardingScreen';
+import { validateDateOfBirth } from '@/features/student/studentValidation';
 import { studentProfileApi } from '@/services/studentProfileApi';
 import { ApiError } from '@/types/auth';
+
+function selectDateViaPicker(
+  root: renderer.ReactTestInstance,
+  triggerTestID: string,
+  isoDate: string
+) {
+  const [yStr, mStr] = isoDate.split('-');
+  renderer.act(() => {
+    root.findByProps({ testID: triggerTestID }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: `date-picker-year-${Number(yStr)}` }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: `date-picker-month-${Number(mStr)}` }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: `date-picker-day-${isoDate}` }).props.onPress();
+  });
+  renderer.act(() => {
+    root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+  });
+}
 
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -64,28 +94,26 @@ describe('Student Onboarding Flow', () => {
     expect(root.findByProps({ testID: 'skip-button' })).toBeDefined();
   });
 
-  it('displays validation error and does not call API when date of birth is in the future', async () => {
+  it('prevents selecting future years in date picker and rejects future dates in validator', async () => {
     let tree: renderer.ReactTestRenderer;
     renderer.act(() => {
       tree = renderer.create(<StudentOnboardingScreen />);
     });
     const root = tree!.root;
 
-    const dobInput = root.findByProps({ testID: 'dob-input' });
     renderer.act(() => {
-      dobInput.props.onChangeText('2099-01-01');
+      root.findByProps({ testID: 'dob-input-trigger' }).props.onPress();
+    });
+    renderer.act(() => {
+      root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress();
+    });
+    expect(root.findAllByProps({ testID: 'date-picker-year-2099' }).length).toBe(0);
+    renderer.act(() => {
+      root.findByProps({ testID: 'date-picker-cancel-button' }).props.onPress();
     });
 
-    const submitBtn = root.findByProps({ testID: 'submit-button' });
-    await renderer.act(async () => {
-      submitBtn.props.onPress();
-    });
-
-    expect(studentProfileApi.createStudentProfile).not.toHaveBeenCalled();
-    const dobError = root.findAll((node) =>
-      typeof node.props.children === 'string' && node.props.children.includes('không được ở tương lai')
-    );
-    expect(dobError.length).toBeGreaterThan(0);
+    expect(root.findByProps({ testID: 'dob-input-trigger' }).props.accessibilityValue.text).toBe('Chưa chọn');
+    expect(validateDateOfBirth('2099-01-01')).toContain('không được ở tương lai');
   });
 
   it('successfully creates profile, calls refreshUser, and redirects to /(app)', async () => {
@@ -111,8 +139,8 @@ describe('Student Onboarding Flow', () => {
     const root = tree!.root;
 
     // Fill in form
+    selectDateViaPicker(root, 'dob-input-trigger', '1995-06-15');
     renderer.act(() => {
-      root.findByProps({ testID: 'dob-input' }).props.onChangeText('1995-06-15');
       root.findByProps({ testID: 'gender-chip-MALE' }).props.onPress();
       root.findByProps({ testID: 'experience-chip-BEGINNER' }).props.onPress();
       root.findByProps({ testID: 'months-input' }).props.onChangeText('12');
@@ -188,9 +216,7 @@ describe('Student Onboarding Flow', () => {
     const root = tree!.root;
 
     // Enter valid date of birth so client validation passes
-    renderer.act(() => {
-      root.findByProps({ testID: 'dob-input' }).props.onChangeText('1995-06-15');
-    });
+    selectDateViaPicker(root, 'dob-input-trigger', '1995-06-15');
 
     const submitBtn = root.findByProps({ testID: 'submit-button' });
 

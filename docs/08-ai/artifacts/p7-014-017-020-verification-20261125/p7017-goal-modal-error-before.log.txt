@@ -1,0 +1,100 @@
+FAIL src/__tests__/CurrentGoalScreen.test.tsx (28.004 s)
+  CurrentGoalScreen
+    × renders active goal overview tab with title and Pause button (10395 ms)
+    √ allows student to pause an active goal with mandatory reason and confirmation (116 ms)
+    √ renders paused goal with paused banner and Resume button (33 ms)
+    √ allows student to resume a paused goal with mandatory reason (64 ms)
+    √ navigates through tabs: targets, history, and proposals (281 ms)
+    Pause/Resume 409 error hierarchy mapping
+      √ maps ACTIVE_FITNESS_GOAL_ALREADY_EXISTS specifically first (67 ms)
+      √ maps GOAL_LIFECYCLE_CONFLICT specifically second (63 ms)
+      √ falls back to generic 409 message when no recognized error code is provided (54 ms)
+    HTTP 404 semantics
+      √ renders empty state when no active goal exists on /me/current (404 without goalId) (25 ms)
+      √ renders error screen when goalId is provided and returns 404 (21 ms)
+    Stale response guard with deferred promises
+      √ discards stale response when an older slow request completes after a newer request (39 ms)
+      √ invalidates goal A and shows loading skeleton while request B is pending, then displays only goal B upon completion (55 ms)
+      √ discards in-flight pause/resume mutation of goal A when route switches to goal B (89 ms)
+      √ does not display alert or fail route B when an in-flight mutation of goal A rejects after route change (87 ms)
+      √ resets state when transitioning from current goal route to detail goal route (67 ms)
+      √ does not invalidate in-flight mutation when load/refresh occurs on the same route (Test A) (67 ms)
+      √ resets modal state when blurred and does not leave modal locked upon refocus (Test B) (136 ms)
+      √ prevents old focus session mutation from affecting new focus session modal and state (Test C) (91 ms)
+      √ prevents older refresh response from overwriting newer mutation result when refresh resolves after mutation (37 ms)
+      √ allows a new refresh started after mutation success to update the UI (31 ms)
+      √ does not invalidate in-flight load when a mutation fails (55 ms)
+      √ reconciles latest server state when older mutation resolves after refocus on the same route identity (P1) (40 ms)
+      √ does not reconcile or overwrite new route when old mutation completes after route identity changed (Test 4A) (40 ms)
+      √ loads and displays latest server state when older mutation completes while un-focused and user refocuses later (Test 4C) (29 ms)
+      √ discards error and does not show alert when old mutation fails after refocus (Test 4D) (34 ms)
+      √ disallows actions and shows retry banner when reconciliation fails, and restores state on retry (Test A) (40 ms)
+      √ closes open modal immediately when reconciliation starts pending, keeps it closed on failure, and recovers on retry (Test B) (60 ms)
+      √ guards against submitting modal when action and status mismatch (Test C) (27 ms)
+      √ does not affect a new pending mutation when older mutation completes (Test D) (97 ms)
+    Goal Creation, Version Adjustment, and Journey Transition
+      √ allows student to open create first goal modal and submit new goal (56 ms)
+      √ allows student to open adjust version modal and submit with mandatory reason (76 ms)
+      √ allows student to transition journey with mandatory transition reason (68 ms)
+      √ displays conflict banner when version adjustment encounters 409 conflict, and recovers on reload (75 ms)
+      × P7-017: surfaces actionable inline error banner inside CreateGoalModal without closing or wiping form on 400 failure (38 ms)
+      × P7-017: surfaces inline error banner inside CreateGoalVersionModal and CreateGoalTransitionModal on rejection (57 ms)
+
+  ● CurrentGoalScreen › renders active goal overview tab with title and Pause button
+
+    thrown: "Exceeded timeout of 5000 ms for a test.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+      143 |   });
+      144 |
+    > 145 |   it('renders active goal overview tab with title and Pause button', async () => {
+          |   ^
+      146 |     (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValueOnce(activeGoal);
+      147 |
+      148 |     let tree: renderer.ReactTestRenderer;
+
+      at it (src/__tests__/CurrentGoalScreen.test.tsx:145:3)
+      at Object.describe (src/__tests__/CurrentGoalScreen.test.tsx:69:1)
+
+  ● CurrentGoalScreen › Goal Creation, Version Adjustment, and Journey Transition › P7-017: surfaces actionable inline error banner inside CreateGoalModal without closing or wiping form on 400 failure
+
+    No instances found with props: {"testID":"create-goal-error-banner"}
+
+      2010 |       });
+      2011 |
+    > 2012 |       const banner = root.findByProps({ testID: 'create-goal-error-banner' });
+           |                           ^
+      2013 |       expect(banner).toBeDefined();
+      2014 |       expect(JSON.stringify(banner.props.children)).toContain('Loại mục tiêu');
+      2015 |       expect(root.findByProps({ testID: 'create-goal-modal' }).props.visible).toBe(true);
+
+      at expectOne (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15161:13)
+      at ReactTestInstance.Object.<anonymous>.process.env.NODE_ENV._proto.findByProps (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17219:18)
+      at Object.findByProps (src/__tests__/CurrentGoalScreen.test.tsx:2012:27)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● CurrentGoalScreen › Goal Creation, Version Adjustment, and Journey Transition › P7-017: surfaces inline error banner inside CreateGoalVersionModal and CreateGoalTransitionModal on rejection
+
+    No instances found with props: {"testID":"goal-version-error-banner"}
+
+      2044 |       });
+      2045 |
+    > 2046 |       const versionBanner = root.findByProps({ testID: 'goal-version-error-banner' });
+           |                                  ^
+      2047 |       expect(versionBanner).toBeDefined();
+      2048 |       expect(root.findByProps({ testID: 'create-goal-version-modal' }).props.visible).toBe(true);
+      2049 |
+
+      at expectOne (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15161:13)
+      at ReactTestInstance.Object.<anonymous>.process.env.NODE_ENV._proto.findByProps (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17219:18)
+      at Object.findByProps (src/__tests__/CurrentGoalScreen.test.tsx:2046:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 32 passed, 35 total
+Snapshots:   0 total
+Time:        34.103 s
+Ran all test suites matching /src\\__tests__\\CurrentGoalScreen.test.tsx/i.
+BEFORE_FIX_EXIT=1

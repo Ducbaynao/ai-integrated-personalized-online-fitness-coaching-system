@@ -1,0 +1,16 @@
+{
+  "observedAtUtc": "2026-11-24T16:06:56.609203+00:00",
+  "sourceSha": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "manifestHttpStatus": 200,
+  "manifestContentType": "text/plain",
+  "appLoaded": false,
+  "foregroundObservation": "Expo Go native error log still shows Failed to download remote update at 22:44:39",
+  "blockedAction": "Open project exp://10.0.2.2:18081 in Expo Go using adb am start",
+  "priorAutomaticApprovalMessage": "blocked by policy",
+  "actionRetried": false,
+  "approvalEscalationAvailable": false,
+  "scenarioResult": "F06 app scenarios NOT RUN; no sign-in observed",
+  "runtimeDisposition": "Retained for manual project-open handoff; no cleanup",
+  "manifestRuntimeVersion": "exposdk:57.0.0",
+  "bundleUrl": "http://10.0.2.2:18081/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=src%2Fapp&transform.reactCompiler=true&unstable_transformProfile=hermes-stable"
+}

@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config/env';
 import { apiErrorMessage } from '@/localization/displayLabels';
-import { tokenStorage } from '@/services/storage';
+import { StaleStorageMutationError, tokenStorage } from '@/services/storage';
 import {
   ApiError,
   ConfirmEmailRequest,
@@ -24,11 +24,43 @@ export function registerSessionExpiredHandler(handler: SessionExpiredHandler | n
 
 // Single-flight refresh mutex to prevent concurrent refresh requests (avoiding refresh replay detection)
 let refreshPromise: Promise<TokenPairResponse> | null = null;
+let tokenEpoch = 0;
+let capabilityEpoch = 0;
+
+/** Invalidates any in-flight token refresh or session-bound retry from writing storage/expiring a newer session. */
+export function invalidateAuthSession(): void {
+  tokenEpoch += 1;
+  capabilityEpoch += 1;
+  refreshPromise = null;
+}
+
+export function invalidateCapabilitySession(): void {
+  capabilityEpoch += 1;
+}
+
+export interface AuthSessionBinding {
+  authEpoch: number;
+  capabilityEpoch: number;
+}
+
+export function getAuthSessionBinding(): AuthSessionBinding {
+  return { authEpoch: tokenEpoch, capabilityEpoch };
+}
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   requiresAuth?: boolean;
   body?: unknown;
   _isRetry?: boolean;
+  expectedAuthEpoch?: number;
+  expectedCapabilityEpoch?: number;
+  retryOn401?: boolean;
+  shouldContinue?: () => boolean;
+}
+
+function createAbortError(): Error {
+  const abortError = new Error('The operation was aborted');
+  abortError.name = 'AbortError';
+  return abortError;
 }
 
 /**
@@ -74,17 +106,32 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return (await response.text()) as unknown as T;
 }
 
+function staleAuthSessionError(): ApiError {
+  return new ApiError(401, 'Phiên đăng nhập đã thay đổi.');
+}
+
 /**
- * Executes a single-flight token refresh.
+ * Executes a single-flight token refresh scoped to expectedEpoch and the active refreshToken.
  */
-async function performTokenRefresh(): Promise<TokenPairResponse> {
+async function performTokenRefresh(expectedEpoch: number): Promise<TokenPairResponse> {
   const refreshToken = await tokenStorage.getRefreshToken();
+  if (expectedEpoch !== tokenEpoch) {
+    throw staleAuthSessionError();
+  }
   if (!refreshToken) {
-    await tokenStorage.clearTokens();
-    sessionExpiredHandler?.();
+    if (expectedEpoch === tokenEpoch) {
+      await tokenStorage.clearTokens({ shouldApply: () => expectedEpoch === tokenEpoch });
+      if (expectedEpoch === tokenEpoch) {
+        sessionExpiredHandler?.();
+      }
+    }
     throw new ApiError(401, 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
   }
 
+  const isSameRefreshSession = async (): Promise<boolean> =>
+    expectedEpoch === tokenEpoch && (await tokenStorage.getRefreshToken()) === refreshToken;
+
+  let staleSession = false;
   try {
     const response = await fetch(`${API_BASE_URL}/auth/token-refreshes`, {
       method: 'POST',
@@ -96,11 +143,27 @@ async function performTokenRefresh(): Promise<TokenPairResponse> {
     });
 
     const tokenPair = await parseResponse<TokenPairResponse>(response);
-    await tokenStorage.saveTokens(tokenPair.accessToken, tokenPair.refreshToken);
+    if (!(await isSameRefreshSession())) {
+      staleSession = true;
+      throw staleAuthSessionError();
+    }
+    await tokenStorage.saveTokens(tokenPair.accessToken, tokenPair.refreshToken, {
+      shouldApply: () => expectedEpoch === tokenEpoch,
+    });
+    if (expectedEpoch !== tokenEpoch) {
+      throw staleAuthSessionError();
+    }
     return tokenPair;
   } catch (error) {
-    await tokenStorage.clearTokens();
-    sessionExpiredHandler?.();
+    if (error instanceof StaleStorageMutationError) {
+      throw staleAuthSessionError();
+    }
+    if (!staleSession && (await isSameRefreshSession())) {
+      await tokenStorage.clearTokens({ shouldApply: () => expectedEpoch === tokenEpoch });
+      if (expectedEpoch === tokenEpoch) {
+        sessionExpiredHandler?.();
+      }
+    }
     throw error;
   }
 }
@@ -109,7 +172,27 @@ async function performTokenRefresh(): Promise<TokenPairResponse> {
  * Core HTTP request runner with automatic Bearer token injection and single-flight 401 refresh.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { requiresAuth = true, body, _isRetry = false, headers = {}, ...rest } = options;
+  const {
+    requiresAuth = true,
+    body,
+    _isRetry = false,
+    expectedAuthEpoch,
+    expectedCapabilityEpoch,
+    retryOn401 = true,
+    shouldContinue,
+    headers = {},
+    ...rest
+  } = options;
+  const isSessionBindingValid = () =>
+    (expectedAuthEpoch === undefined || expectedAuthEpoch === tokenEpoch) &&
+    (expectedCapabilityEpoch === undefined || expectedCapabilityEpoch === capabilityEpoch);
+  if (!isSessionBindingValid()) {
+    throw staleAuthSessionError();
+  }
+  if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+    throw createAbortError();
+  }
+  const requestEpoch = expectedAuthEpoch ?? tokenEpoch;
 
   const requestHeaders: Record<string, string> = {
     Accept: 'application/json',
@@ -122,9 +205,19 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (requiresAuth) {
     const accessToken = await tokenStorage.getAccessToken();
+    if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
+      throw staleAuthSessionError();
+    }
+    if (shouldContinue && !shouldContinue()) {
+      throw createAbortError();
+    }
     if (accessToken) {
       requestHeaders.Authorization = `Bearer ${accessToken}`;
     }
+  }
+
+  if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+    throw createAbortError();
   }
 
   const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
@@ -145,24 +238,33 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   // Intercept 401 for authenticated requests (and only if not already retried)
   if (response.status === 401 && requiresAuth && !_isRetry) {
-    if (rest.signal?.aborted) {
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-      throw abortError;
+    if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
+      throw staleAuthSessionError();
+    }
+    if (!retryOn401) {
+      return parseResponse<T>(response);
+    }
+    if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+      throw createAbortError();
     }
 
     try {
       if (!refreshPromise) {
-        refreshPromise = performTokenRefresh().finally(() => {
-          refreshPromise = null;
+        const activeRefresh = performTokenRefresh(requestEpoch).finally(() => {
+          if (refreshPromise === activeRefresh) {
+            refreshPromise = null;
+          }
         });
+        refreshPromise = activeRefresh;
       }
       await refreshPromise;
 
-      if (rest.signal?.aborted) {
-        const abortError = new Error('The operation was aborted');
-        abortError.name = 'AbortError';
-        throw abortError;
+      if (requestEpoch !== tokenEpoch || !isSessionBindingValid()) {
+        throw staleAuthSessionError();
+      }
+
+      if (rest.signal?.aborted || (shouldContinue && !shouldContinue())) {
+        throw createAbortError();
       }
 
       // Retry request once with the new access token
@@ -180,7 +282,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
 /** Authenticated binary read. Never expose a public storage URL or cache the response. */
 export async function downloadAuthenticated(path: string, retried = false): Promise<Uint8Array> {
+  const requestEpoch = tokenEpoch;
   const accessToken = await tokenStorage.getAccessToken();
+  if (requestEpoch !== tokenEpoch) {
+    throw staleAuthSessionError();
+  }
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -190,8 +296,21 @@ export async function downloadAuthenticated(path: string, retried = false): Prom
     throw new ApiError(0, 'Không thể kết nối mạng.');
   }
   if (response.status === 401 && !retried) {
-    if (!refreshPromise) refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
+    if (requestEpoch !== tokenEpoch) {
+      throw staleAuthSessionError();
+    }
+    if (!refreshPromise) {
+      const activeRefresh = performTokenRefresh(requestEpoch).finally(() => {
+        if (refreshPromise === activeRefresh) {
+          refreshPromise = null;
+        }
+      });
+      refreshPromise = activeRefresh;
+    }
     await refreshPromise;
+    if (requestEpoch !== tokenEpoch) {
+      throw staleAuthSessionError();
+    }
     return downloadAuthenticated(path, true);
   }
   if (!response.ok) {
@@ -222,16 +341,35 @@ export const authApi = {
   },
 
   async login(data: LoginRequest): Promise<TokenPairResponse> {
+    invalidateAuthSession();
+    const loginEpoch = tokenEpoch;
     const tokenPair = await request<TokenPairResponse>('/auth/sessions', {
       method: 'POST',
       requiresAuth: false,
       body: data,
     });
-    await tokenStorage.saveTokens(tokenPair.accessToken, tokenPair.refreshToken);
+    if (loginEpoch !== tokenEpoch) {
+      throw staleAuthSessionError();
+    }
+    try {
+      await tokenStorage.saveTokens(tokenPair.accessToken, tokenPair.refreshToken, {
+        shouldApply: () => loginEpoch === tokenEpoch,
+      });
+    } catch (error) {
+      if (error instanceof StaleStorageMutationError) {
+        throw staleAuthSessionError();
+      }
+      throw error;
+    }
+    if (loginEpoch !== tokenEpoch) {
+      throw staleAuthSessionError();
+    }
     return tokenPair;
   },
 
   async logout(): Promise<void> {
+    invalidateAuthSession();
+    const logoutEpoch = tokenEpoch;
     const refreshToken = await tokenStorage.getRefreshToken();
     try {
       if (refreshToken) {
@@ -244,7 +382,11 @@ export const authApi = {
     } catch {
       // Swallowed on purpose: client logout must succeed even if server revocation fails or network is down
     } finally {
-      await tokenStorage.clearTokens();
+      if (logoutEpoch === tokenEpoch) {
+        await tokenStorage.clearTokens({
+          shouldApply: () => logoutEpoch === tokenEpoch,
+        });
+      }
     }
   },
 

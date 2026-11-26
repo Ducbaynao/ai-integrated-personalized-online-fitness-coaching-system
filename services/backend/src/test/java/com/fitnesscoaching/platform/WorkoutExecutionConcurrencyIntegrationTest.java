@@ -34,6 +34,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -68,17 +69,21 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         Fixture fixture = fixture();
         CountDownLatch firstEffectReady = new CountDownLatch(1);
         CountDownLatch releaseFirstCommit = new CountDownLatch(1);
-        CountDownLatch secondInvoked = new CountDownLatch(1);
+        AtomicInteger firstPid = new AtomicInteger();
         try (var pool = Executors.newFixedThreadPool(2)) {
             Future<WorkoutExecution> first = pool.submit(() -> heldTransaction(
                     () -> executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
-                            "concurrent-start-a-" + fixture.occurrenceId())), firstEffectReady, releaseFirstCommit));
+                            "concurrent-start-a-" + fixture.occurrenceId())),
+                    firstEffectReady, releaseFirstCommit, firstPid));
             assertThat(firstEffectReady.await(10, TimeUnit.SECONDS)).isTrue();
-            Future<String> second = pool.submit(() -> transactionOutcome(secondInvoked, () ->
+            Future<String> second = pool.submit(() -> directOutcome(() ->
                     executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
                             "concurrent-start-b-" + fixture.occurrenceId()))));
-            assertThat(secondInvoked.await(10, TimeUnit.SECONDS)).isTrue();
-            releaseFirstCommit.countDown();
+            try {
+                awaitBlockedBy(firstPid.get(), second);
+            } finally {
+                releaseFirstCommit.countDown();
+            }
 
             WorkoutExecution winner = first.get(10, TimeUnit.SECONDS);
             assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo("ACTIVE_WORKOUT_EXECUTION_EXISTS");
@@ -191,27 +196,48 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         Fixture fixture = fixture();
         WorkoutExecution started = executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
                 "start-set-complete-" + fixture.occurrenceId()));
+        assertThat(runSetCommitBeforeComplete(fixture, started, 1)).isEqualTo("SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.workout_session_logs WHERE id=?",
+                String.class, started.id())).isEqualTo("COMPLETED");
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
+                String.class, fixture.occurrenceId())).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void setCommitBeforeCompleteWithStaleVersionReportsVersionConflict() throws Exception {
+        Fixture fixture = fixture();
+        WorkoutExecution started = executions.start(new StartCommand(fixture.occurrenceId(), fixture.studentId(), 0,
+                "start-set-stale-complete-" + fixture.occurrenceId()));
+        assertThat(runSetCommitBeforeComplete(fixture, started, 0)).isEqualTo("WORKOUT_EXECUTION_VERSION_CONFLICT");
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.workout_session_logs WHERE id=?",
+                String.class, started.id())).isEqualTo("IN_PROGRESS");
+        assertThat(jdbc.queryForObject("SELECT version FROM fitness.workout_session_logs WHERE id=?",
+                Long.class, started.id())).isOne();
+        assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
+                String.class, fixture.occurrenceId())).isEqualTo("SCHEDULED");
+    }
+
+    private String runSetCommitBeforeComplete(Fixture fixture, WorkoutExecution started,
+                                              long expectedCompleteVersion) throws Exception {
         SetExecution set = completedSet(UUID.randomUUID());
         CountDownLatch setReady = new CountDownLatch(1);
         CountDownLatch releaseSet = new CountDownLatch(1);
-        CountDownLatch completeInvoked = new CountDownLatch(1);
+        AtomicInteger setPid = new AtomicInteger();
         try (var pool = Executors.newFixedThreadPool(2)) {
             Future<WorkoutExecution> setWrite = pool.submit(() -> heldTransaction(() -> executions.upsertSet(
                     new UpsertSetCommand(started.id(), started.exercises().getFirst().id(), fixture.studentId(), 0, set)),
-                    setReady, releaseSet));
+                    setReady, releaseSet, setPid));
             assertThat(setReady.await(10, TimeUnit.SECONDS)).isTrue();
-            Future<String> complete = pool.submit(() -> transactionOutcome(completeInvoked, () -> executions.complete(
-                    new TerminalCommand(started.id(), fixture.studentId(), 1,
+            Future<String> complete = pool.submit(() -> directOutcome(() -> executions.complete(
+                    new TerminalCommand(started.id(), fixture.studentId(), expectedCompleteVersion,
                             "complete-after-set-" + started.id(), null, "Done"))));
-            assertThat(completeInvoked.await(10, TimeUnit.SECONDS)).isTrue();
-            releaseSet.countDown();
-
+            try {
+                awaitBlockedBy(setPid.get(), complete);
+            } finally {
+                releaseSet.countDown();
+            }
             assertThat(setWrite.get(10, TimeUnit.SECONDS).version()).isOne();
-            assertThat(complete.get(10, TimeUnit.SECONDS)).isEqualTo("SUCCESS");
-            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.workout_session_logs WHERE id=?",
-                    String.class, started.id())).isEqualTo("COMPLETED");
-            assertThat(jdbc.queryForObject("SELECT status::text FROM fitness.planned_workouts WHERE id=?",
-                    String.class, fixture.occurrenceId())).isEqualTo("COMPLETED");
+            return complete.get(10, TimeUnit.SECONDS);
         }
     }
 
@@ -285,9 +311,18 @@ class WorkoutExecutionConcurrencyIntegrationTest {
 
     private <T> T heldTransaction(Callable<T> action, CountDownLatch effectReady,
                                   CountDownLatch releaseCommit) {
+        return heldTransaction(action, effectReady, releaseCommit, null);
+    }
+
+    private <T> T heldTransaction(Callable<T> action, CountDownLatch effectReady,
+                                  CountDownLatch releaseCommit, AtomicInteger backendPid) {
         return transactionTemplate().execute(status -> {
             try {
                 T result = action.call();
+                if (backendPid != null) {
+                    Integer pid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+                    backendPid.set(pid == null ? 0 : pid);
+                }
                 effectReady.countDown();
                 if (!releaseCommit.await(10, TimeUnit.SECONDS)) throw new AssertionError("Commit release timed out");
                 return result;
@@ -299,19 +334,9 @@ class WorkoutExecutionConcurrencyIntegrationTest {
         });
     }
 
-    private String transactionOutcome(CountDownLatch invoked, Callable<?> action) {
-        invoked.countDown();
+    private String directOutcome(Callable<?> action) {
         try {
-            transactionTemplate().execute(status -> {
-                try {
-                action.call();
-                    return null;
-                } catch (RuntimeException failure) {
-                    throw failure;
-                } catch (Exception failure) {
-                    throw new IllegalStateException(failure);
-                }
-            });
+            action.call();
             return "SUCCESS";
         } catch (WorkoutExecutionFailure failure) {
             return failure.error().name();
@@ -319,32 +344,46 @@ class WorkoutExecutionConcurrencyIntegrationTest {
             return failure.error().name();
         } catch (RuntimeException failure) {
             return "RAW:" + failure.getClass().getSimpleName();
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
         }
     }
 
-    private String transactionOutcomeWithSnapshot(CountDownLatch snapshotReady, Callable<?> action) {
-        try {
-            transactionTemplate().execute(status -> {
-                try {
-                    // Establish the REPEATABLE READ snapshot before the competing commit.
-                    jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts", Integer.class);
-                    snapshotReady.countDown();
-                    action.call();
-                    return null;
-                } catch (RuntimeException failure) {
-                    throw failure;
-                } catch (Exception failure) {
-                    throw new IllegalStateException(failure);
-                }
-            });
-            return "SUCCESS";
-        } catch (WorkoutExecutionFailure failure) {
-            return failure.error().name();
-        } catch (WorkoutPlanFailure failure) {
-            return failure.error().name();
-        } catch (RuntimeException failure) {
-            return "RAW:" + failure.getClass().getSimpleName();
+    private void awaitBlockedBy(int blockerPid, Future<String> waiting) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (waiting.isDone()) {
+                throw new AssertionError("Command finished before waiting on lock: " + waiting.get(1, TimeUnit.SECONDS));
+            }
+            Boolean blocked = jdbc.queryForObject("""
+                    SELECT EXISTS(SELECT 1 FROM pg_stat_activity a
+                    WHERE a.wait_event_type='Lock' AND ?=ANY(pg_blocking_pids(a.pid)))
+                    """, Boolean.class, blockerPid);
+            if (Boolean.TRUE.equals(blocked)) return;
+            Thread.onSpinWait();
         }
+        throw new AssertionError("Timed out waiting for concurrent command to block on blocker pid " + blockerPid);
+    }
+
+    private String transactionOutcome(CountDownLatch invoked, Callable<?> action) {
+        invoked.countDown();
+        return directOutcome(action);
+    }
+
+    private String transactionOutcomeWithSnapshot(CountDownLatch snapshotReady, Callable<?> action) {
+        return directOutcome(() -> transactionTemplate().execute(status -> {
+            try {
+                // Establish the REPEATABLE READ snapshot before the competing commit.
+                jdbc.queryForObject("SELECT count(*) FROM fitness.planned_workouts", Integer.class);
+                snapshotReady.countDown();
+                action.call();
+                return null;
+            } catch (RuntimeException failure) {
+                throw failure;
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        }));
     }
 
     private TransactionTemplate transactionTemplate() {

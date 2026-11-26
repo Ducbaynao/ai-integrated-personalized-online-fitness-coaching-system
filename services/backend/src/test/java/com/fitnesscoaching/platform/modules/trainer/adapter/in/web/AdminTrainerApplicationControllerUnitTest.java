@@ -32,10 +32,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -150,6 +153,27 @@ class AdminTrainerApplicationControllerUnitTest {
                 .andExpect(jsonPath("$.size", is(20)))
                 .andExpect(jsonPath("$.totalItems", is(1)))
                 .andExpect(jsonPath("$.totalPages", is(1)));
+    }
+
+    @Test
+    @DisplayName("GET /admin/trainer-applications: status=ALL sets allStatuses=true and null status")
+    void getApplications_allStatus_setsAllStatusesTrue() throws Exception {
+        TrainerApplication app = sampleApplication(TrainerVerificationStatus.PENDING);
+        AdminTrainerApplicationPage page = new AdminTrainerApplicationPage(List.of(app), 0, 20, 1L, 1);
+
+        when(getApplicationsUseCase.getApplications(any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/admin/trainer-applications")
+                        .param("status", "all")
+                        .with(jwt().jwt(j -> j.subject(ADMIN_ID.toString()).claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationsQuery> captor =
+                ArgumentCaptor.forClass(com.fitnesscoaching.platform.modules.trainer.application.port.in.GetAdminTrainerApplicationsQuery.class);
+        verify(getApplicationsUseCase).getApplications(captor.capture());
+        assertThat(captor.getValue().allStatuses()).isTrue();
+        assertThat(captor.getValue().status()).isNull();
     }
 
     @Test

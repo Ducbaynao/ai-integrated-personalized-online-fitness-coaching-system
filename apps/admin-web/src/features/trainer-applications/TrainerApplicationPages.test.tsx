@@ -89,6 +89,11 @@ describe('Trainer Application Pages', () => {
       })
 
       expect(screen.getByText('Đã phê duyệt')).toBeInTheDocument()
+      expect(trainerApplicationApi.getApplications).toHaveBeenCalledWith({
+        page: 0,
+        size: 15,
+        status: 'ALL',
+      })
 
       const user = userEvent.setup()
       const select = screen.getByLabelText('Lọc theo trạng thái')

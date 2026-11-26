@@ -5,6 +5,7 @@ import com.fitnesscoaching.platform.modules.audit.AuditService;
 import com.fitnesscoaching.platform.modules.auth.domain.AccountStatus;
 import com.fitnesscoaching.platform.modules.student.application.port.in.StudentCapabilityQuery;
 import com.fitnesscoaching.platform.modules.user.application.port.in.UserAccountStatusQuery;
+import com.fitnesscoaching.platform.modules.user.application.port.in.AccountErasureFence;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 @Component
 final class NutritionStrategyCommands {
@@ -24,21 +26,26 @@ final class NutritionStrategyCommands {
     private final AuditService audit;
     private final UserAccountStatusQuery accounts;
     private final StudentCapabilityQuery students;
+    private final AccountErasureFence erasureFence;
 
     NutritionStrategyCommands(JdbcTemplate jdbc, ObjectMapper mapper, AuditService audit,
-                              UserAccountStatusQuery accounts, StudentCapabilityQuery students) {
+                              UserAccountStatusQuery accounts, StudentCapabilityQuery students, AccountErasureFence erasureFence) {
         this.jdbc = jdbc; this.mapper = mapper; this.audit = audit;
         this.accounts = accounts; this.students = students;
+        this.erasureFence = erasureFence;
     }
 
     void requireStudent(UUID actor) {
         if (actor == null || accounts.getAccountStatus(actor).orElse(null) != AccountStatus.ACTIVE
-                || !students.hasProfile(actor)) throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
+                || !students.hasProfile(actor) || !erasureFence.isActiveWithoutErasure(actor))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     void lockStudent(UUID student) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 707))",
                 rs -> { while (rs.next()) { /* held through transaction */ } }, student.toString());
+        if (!erasureFence.lockActiveWithoutErasure(student))
+            throw new NutritionFailure("NUTRITION_ACCESS_DENIED", 403);
     }
 
     Instant databaseNow() {
@@ -49,12 +56,21 @@ final class NutritionStrategyCommands {
 
     <T> T receipt(UUID actor, String key, String command, Object payload, Class<T> responseType,
                   Supplier<T> work) {
+        return receipt(actor, key, command, payload, responseType, id -> work.get());
+    }
+
+    <T> T receipt(UUID actor, String key, String command, Object payload, Class<T> responseType,
+                  Function<UUID, T> work) {
         if (key == null || key.isBlank() || key.length() > 120)
             throw new NutritionFailure("VALIDATION_FAILED", 400);
         // Student-scoped lock precedes this actor-scoped receipt lock for every mutation.
         // A Trainer can command two different Students with the same key concurrently.
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 709))",
                 rs -> { while (rs.next()) { /* held through transaction */ } }, actor.toString());
+        if (Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM fitness.food_analysis_requests WHERE student_id=? AND command_key=?)
+                """, Boolean.class, actor, key)))
+            throw new NutritionFailure("NUTRITION_IDEMPOTENCY_CONFLICT", 409);
         String hash = sha(json(payload));
         var rows = jdbc.query("""
                 SELECT command_name,payload_hash,response_json::text FROM fitness.nutrition_command_receipts
@@ -67,11 +83,12 @@ final class NutritionStrategyCommands {
             try { return mapper.readValue(prior.response(), responseType); }
             catch (Exception invalid) { throw new IllegalStateException("Invalid nutrition receipt", invalid); }
         }
-        T result = work.get();
+        UUID receiptId = UUID.randomUUID();
+        T result = work.apply(receiptId);
         jdbc.update("""
-                INSERT INTO fitness.nutrition_command_receipts(actor_id,command_key,command_name,payload_hash,response_json)
-                VALUES (?,?,?,?,?::jsonb)
-                """, actor, key, command, hash, json(result));
+                INSERT INTO fitness.nutrition_command_receipts(actor_id,command_key,command_name,payload_hash,response_json,receipt_id)
+                VALUES (?,?,?,?,?::jsonb,?)
+                """, actor, key, command, hash, json(result), receiptId);
         return result;
     }
 

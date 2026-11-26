@@ -1,0 +1,17 @@
+{
+  "observedAtUtc": "2026-11-24T16:00:12Z",
+  "checkpoint": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "serial": "emulator-5580",
+  "hostMetro": {"listener": "127.0.0.1:18081", "pid": 39000, "status": "HTTP 200 packager-status:running"},
+  "emulatorDirectMetro": {"address": "10.0.2.2:18081", "method": "Android shell printf HTTP/1.1 request piped to toybox nc", "result": "HTTP/1.1 200 OK; packager-status:running"},
+  "emulatorReverseMetro": {"address": "127.0.0.1:18081", "mapping": "tcp:18081 -> tcp:18081", "result": "No HTTP response before or after removing/recreating this exact mapping"},
+  "probeCaveat": "An earlier stdin-based probe produced HTTP 400 on the direct address; shell printf with explicit CRLF produced HTTP 200. No transport root cause inferred from the malformed probe.",
+  "backend": {"pid": 17492, "port": 18080, "emulatorReadiness": "HTTP 200"},
+  "fastApi": {"pid": 20912, "listener": "127.0.0.1:18001"},
+  "database": "f06-mobile-qa-20261124 running; retained without reset",
+  "bootCompleted": true,
+  "projectReloaded": false,
+  "appScenarios": "NOT RUN; manual open of exp://10.0.2.2:18081 requested after verified direct HTTP connectivity",
+  "sourceOrDependencyChanged": false,
+  "runtimeDisposition": "Retained for manual open and subsequent QA; user owns Metro. No cleanup performed."
+}

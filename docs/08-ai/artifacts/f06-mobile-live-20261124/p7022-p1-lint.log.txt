@@ -1,0 +1,5 @@
+
+C:\VScode\CodePTIT\Đồ Án Tốt Nghiệp\b06-phase1-schedule-appointment-closure\apps\mobile\src\__tests__\authSessionRace.test.tsx
+  9:10  warning  'ApiError' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)

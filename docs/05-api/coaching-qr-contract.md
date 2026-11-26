@@ -1,7 +1,7 @@
 # F12 Coaching QR — Contract thiết kế (A-QR-01)
 
 > **Trạng thái:** `A-QR-02 BACKEND + OPENAPI & A-QR-03/A-QR-04 MOBILE IMPLEMENTED` (`A-QR-05` kiểm thử camera/ảnh trên thiết bị thật `QR01–QR10` vẫn `PLANNED`; **reviewer kỹ thuật chưa được chỉ định**).  
-> **Lưu ý quan trọng:** Migration thực tế đã thêm là `V61__coaching_qr_identities.sql` và các endpoint `/api/v1/coaching/qr/*` đã có trong `contracts/openapi/openapi.yaml` + `services/backend`. Không đánh dấu `QR01–QR10` hoàn tất cho đến khi xong Mobile và kiểm thử camera/ảnh trên thiết bị thật.
+> **Lưu ý quan trọng:** Migration thực tế sau khi tích hợp `main` là `V65__coaching_qr_identities.sql` (chuyển từ checkpoint `V61__coaching_qr_identities.sql` sau `V61`–`V64` trên `main`) và các endpoint `/api/v1/coaching/qr/*` đã có trong `contracts/openapi/openapi.yaml` + `services/backend`. Không đánh dấu `QR01–QR10` hoàn tất cho đến khi xong Mobile và kiểm thử camera/ảnh trên thiết bị thật.
 
 ## 1. Phạm vi và nguyên tắc
 
@@ -220,7 +220,7 @@ Tất cả endpoint dưới đây yêu cầu `Authorization: Bearer <JWT>`, tài
 
 ## 8. Đề xuất Persistence, Module Ports và Migration (Mức thiết kế)
 
-- **Migration dự kiến (tentative):** `V61__coaching_qr_identities.sql` (số `V61` là **dự kiến** theo snapshot hiện tại sau `V60__ai_recommendation_draft_sharing.sql`; khi bắt đầu `A-QR-02` **bắt buộc** rà lại `services/backend/src/main/resources/db/migration/` để chọn số trống tiếp theo, tuyệt đối không ghi đè hoặc sửa migration đã có):
+- **Migration áp dụng sau tích hợp `main`:** `V65__coaching_qr_identities.sql` (lịch sử checkpoint trước tích hợp là `V61__coaching_qr_identities.sql`; sau khi tích hợp `origin/main` `f8e564dca39a27acdc5f7192e31dbb399d471216` đã có `V61`–`V64`, migration QR được dời sang `V65` mà không sửa migration đã có trên `main`):
   - Bảng `fitness.coaching_qr_codes`:
     - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
     - `user_id uuid NOT NULL REFERENCES fitness.users(id) ON DELETE CASCADE`

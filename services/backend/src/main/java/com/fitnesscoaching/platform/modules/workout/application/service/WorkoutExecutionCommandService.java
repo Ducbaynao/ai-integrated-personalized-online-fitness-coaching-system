@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Service
-@Transactional(isolation = Isolation.REPEATABLE_READ)
+@Transactional(isolation = Isolation.READ_COMMITTED)
 public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUseCase {
     private final WorkoutExecutionPersistencePort store;
     private final WorkoutExecutionSnapshotUseCase snapshots;
@@ -162,7 +162,7 @@ public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUs
         Receipt replay = replay(key, command.actorId(), name, payload);
         if (replay != null) return requiredExecution(replay.executionId());
         long occurrenceVersion = occurrences.lockForExecutionMutation(observed.plannedWorkoutId(), command.actorId());
-        WorkoutExecution locked = store.lockExecution(command.executionId());
+        WorkoutExecution locked = lockExecutionOrConflict(command.executionId());
         requireVersion(locked, command.expectedVersion());
         WorkoutExecutionStatus target;
         if (abort) {
@@ -193,6 +193,15 @@ public class WorkoutExecutionCommandService implements WorkoutExecutionCommandUs
                              WorkoutExecution execution, String plannedStatus, Instant at) {
         store.saveReceipt(new Receipt(actor, key, name, payload, occurrence, execution.id(),
                 execution.status().name(), plannedStatus, execution.version(), at, "{}", at));
+    }
+
+    private WorkoutExecution lockExecutionOrConflict(UUID executionId) {
+        try {
+            return store.lockExecution(executionId);
+        } catch (CannotAcquireLockException concurrentUpdate) {
+            if (!isSerializationFailure(concurrentUpdate)) throw concurrentUpdate;
+            throw failure(WorkoutExecutionError.WORKOUT_EXECUTION_VERSION_CONFLICT);
+        }
     }
 
     private WorkoutExecution requiredExecution(UUID id) {

@@ -5,7 +5,7 @@
 **Quyết định:** `D08`, chủ dự án phê duyệt trực tiếp trong hội thoại ngày 25/11/2026.  
 **Assignee:** Dev A theo chỉ định của chủ dự án; reviewer kỹ thuật chưa chỉ định.  
 **Branch:** `feat/phase2-dev-a-coaching-qr`.  
-**Trạng thái:** APPROVED về phạm vi/luồng; `A-QR-01` (contract), `A-QR-02` (backend + OpenAPI + Flyway `V61__coaching_qr_identities.sql`), `A-QR-03` (Mobile `SH-07/08/09`, camera/ảnh/PNG codec) và `A-QR-04` (nối hai chiều B03, deep link `c/v`, chuyển entry hub/redirect route cũ) đã triển khai; `A-QR-05` (kiểm thử camera/ảnh trên thiết bị thật `QR01–QR10`) vẫn `PLANNED`. Reviewer kỹ thuật chưa chỉ định. Chưa có issue/PR phê duyệt riêng.  
+**Trạng thái:** APPROVED về phạm vi/luồng; `A-QR-01` (contract), `A-QR-02` (backend + OpenAPI + Flyway `V65__coaching_qr_identities.sql`, lịch sử checkpoint `V61`), `A-QR-03` (Mobile `SH-07/08/09`, camera/ảnh/PNG codec) và `A-QR-04` (nối hai chiều B03, deep link `c/v`, chuyển entry hub/redirect route cũ) đã triển khai; `A-QR-05` (kiểm thử camera/ảnh trên thiết bị thật `QR01–QR10`) vẫn `PLANNED`. Reviewer kỹ thuật chưa chỉ định. Chưa có issue/PR phê duyệt riêng.
 **Module sở hữu:** Coaching; Auth/User/Student/Trainer cung cấp capability và hồ sơ qua public ports.
 
 ## 1. Phạm vi đã chốt
@@ -64,7 +64,7 @@ Tuân design tokens, tiếng Việt, target 44×44, dynamic type, screen-reader 
 | Thứ tự | Công việc | Đầu ra cần review |
 |---|---|---|
 | A-QR-01 | Chốt QR URI/version, DTO, lỗi, public fields và ranh giới B03 (**Đã chốt tài liệu thiết kế**) | [Contract thiết kế F12 Coaching QR](../../05-api/coaching-qr-contract.md); **reviewer kỹ thuật chưa được chỉ định**, phải gán ở issue/PR khi triển khai |
-| A-QR-02 | Cấp/đọc/tạo lại mã và authenticated resolver (**Đã triển khai backend + OpenAPI + Flyway `V61__coaching_qr_identities.sql`**, chưa có Mobile, reviewer chưa chỉ định) | `CoachingQrController`, `CoachingQrService`, `JdbcCoachingQrStore`, `TrainerPublicPreviewQuery`, `V61__coaching_qr_identities.sql`, `contracts/openapi/openapi.yaml`, unit + PostgreSQL integration tests |
+| A-QR-02 | Cấp/đọc/tạo lại mã và authenticated resolver (**Đã triển khai backend + OpenAPI + Flyway `V65__coaching_qr_identities.sql`**, lịch sử checkpoint `V61`, reviewer chưa chỉ định) | `CoachingQrController`, `CoachingQrService`, `JdbcCoachingQrStore`, `TrainerPublicPreviewQuery`, `V65__coaching_qr_identities.sql`, `contracts/openapi/openapi.yaml`, unit + PostgreSQL integration tests |
 | A-QR-03 | QR renderer/lưu ảnh, camera, image picker/decoder; phụ thuộc 01/02 (**Đã triển khai Mobile SH-07/08/09 + PNG round-trip tests**, chưa chạy thiết bị thật) | `SH-07/08/09`, `coachingQrCodec.ts`, `expo-camera`/`expo-image-picker`/`expo-media-library` (SDK 57), giữ entry cũ tới khi xong A-QR-04 |
 | A-QR-04 | Tái sử dụng B03 request/invitation/decision; phụ thuộc 02/03 (**Đã triển khai Mobile + HTTP B03 round-trip**) | `QrProfilePreviewScreen` (`requestTrainer`/`inviteStudent`, `commandKey` ổn định), deep link `c/v`, `CoachingHubScreen` + redirect route cũ, HTTP/Jest tests |
 | A-QR-05 | Regression, QR round-trip, emulator và điện thoại thật; phụ thuộc 04 (**Tự động PASS, thiết bị thật NOT VERIFIED**) | [Báo cáo bằng chứng A-QR-05](phase-2-dev-a-coaching-qr-evidence.md): 48/48 backend + 858/858 mobile tests pass; còn mở gate camera/ảnh trên thiết bị thật |

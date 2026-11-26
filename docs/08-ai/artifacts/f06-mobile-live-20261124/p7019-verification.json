@@ -1,0 +1,37 @@
+{
+  "observedAtUtc": "2026-11-24T17:29:10.261842+00:00",
+  "baseHead": "f299540367b9b883414a4ac2bec06daee8e155c4",
+  "sourceState": "uncommitted working tree fix; one-line callback closure; shared WorkoutUi unchanged",
+  "sourceSha256": "efb069d20f5efdb58b2453f3aba210e454b0f277dfc6318326acd900ad6447d8",
+  "testSha256": "55d599e8f1472bad45f3f06764a6cf96d442da7c086e770f0ad2470183218af6",
+  "before": {
+    "command": "npm test -- --runInBand src/__tests__/foodAnalysisScreen.test.tsx --testNamePattern=\"native Correct press\"",
+    "exitCode": 1,
+    "failed": 1,
+    "skipped": 39,
+    "failure": "Expected full Correct body quantity 1.25; received undefined"
+  },
+  "after": {
+    "command": "npm test -- --runInBand src/__tests__/foodTextAnalysisApi.test.ts src/__tests__/foodAnalysisScreen.test.tsx src/__tests__/nutritionScreens.test.tsx src/__tests__/apiClient.test.ts",
+    "exitCode": 0,
+    "passed": 104,
+    "suites": 4,
+    "skipped": 0
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exitCode": 0
+  },
+  "lint": {
+    "command": "npm run lint",
+    "exitCode": 0
+  },
+  "review": "self verification; not a new Antigravity review",
+  "processDeathAttempt": {
+    "command": "adb shell am kill host.exp.exponent after Home",
+    "pidBefore": 3260,
+    "pidAfter": 3260,
+    "result": "Did not kill; process-death scenario NOT RUN, only background/Recents retention observed"
+  },
+  "screenReader": "enabled_accessibility_services=null; screen-reader scenario NOT RUN"
+}

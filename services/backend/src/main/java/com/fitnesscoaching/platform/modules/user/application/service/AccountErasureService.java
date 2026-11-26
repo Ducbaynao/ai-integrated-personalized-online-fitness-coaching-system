@@ -160,6 +160,7 @@ public class AccountErasureService {
             // this same short transaction. These partial effects do not attest a domain.
             workouts.minimizeAuthoredVersionSummaries(userId);
             nutrition.minimizeAuthoredMealText(userId);
+            nutrition.minimizeFoodTextAnalyses(userId, id);
             progress.minimizeOwnedConnectionIdentifiers(userId);
             progress.tombstoneStudentMeasurements(userId, id);
             progress.minimizeSubjectScopedPhotoAndBatchValues(userId);

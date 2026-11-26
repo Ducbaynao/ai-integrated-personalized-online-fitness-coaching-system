@@ -1,0 +1,17 @@
+{
+  "observedAtUtc": "2026-11-24T16:18:40.376646+00:00",
+  "avd": "Pixel_7",
+  "serial": "emulator-5580",
+  "previousHeadlessStopped": true,
+  "launcherPid": 40860,
+  "qemuPid": 3544,
+  "windowTitle": "Android Emulator - Pixel_7:5580",
+  "windowType": "qtwindow",
+  "bootCompleted": "1",
+  "extraEmulatorStarted": false,
+  "foregroundActivation": "Not verified; computer-use native pipe unavailable",
+  "metro": "Port 18081 no longer listening; agent did not stop or restart Metro",
+  "backendPid": 17492,
+  "fastApiPid": 20912,
+  "database": "retained; no reset"
+}

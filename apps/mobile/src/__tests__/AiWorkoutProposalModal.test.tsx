@@ -767,4 +767,86 @@ describe('AiWorkoutProposalModal', () => {
     expect(() => tree!.root.findByProps({ testID: 'ai-proposal-detail-view' })).toThrow();
     expect(tree!.root.findByProps({ testID: 'ai-proposal-request-form' })).toBeDefined();
   });
+
+  it('P2-1: ignores stale DatePickerModal callbacks after closing and reopening form for the same student', async () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-A"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Open picker in session 1 and capture DatePickerModal callbacks
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'ai-proposal-start-date-input-trigger' }).props.onPress();
+    });
+    const staleConfirm = tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress;
+
+    // Close modal completely, then reopen form for the same student
+    renderer.act(() => {
+      tree.update(
+        <AiWorkoutProposalModal
+          visible={false}
+          studentId="student-A"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    renderer.act(() => {
+      tree.update(
+        <AiWorkoutProposalModal
+          visible={true}
+          studentId="student-A"
+          isTrainer={true}
+          onClose={jest.fn()}
+        />
+      );
+    });
+    await flushPromises();
+
+    // Pick a new start date 2026-12-15 in the reopened session
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'ai-proposal-start-date-input-trigger' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-year-toggle' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-year-2026' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-month-toggle' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-month-12' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-day-2026-12-15' }).props.onPress();
+    });
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'date-picker-confirm-button' }).props.onPress();
+    });
+    expect(
+      tree.root.findByProps({ testID: 'ai-proposal-start-date-input-trigger' }).props.accessibilityValue.text
+    ).toBe('15/12/2026');
+
+    // Open picker again in session 2, then fire staleConfirm from session 1 -> must NOT revert date or close modal
+    renderer.act(() => {
+      tree.root.findByProps({ testID: 'ai-proposal-start-date-input-trigger' }).props.onPress();
+    });
+    renderer.act(() => {
+      staleConfirm();
+    });
+    expect(tree.root.findByProps({ testID: 'date-picker-modal' })).toBeTruthy();
+    expect(
+      tree.root.findByProps({ testID: 'ai-proposal-start-date-input-trigger' }).props.accessibilityValue.text
+    ).toBe('15/12/2026');
+  });
 });

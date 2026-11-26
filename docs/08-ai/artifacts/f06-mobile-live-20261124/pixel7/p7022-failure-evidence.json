@@ -1,0 +1,19 @@
+{
+  "observedAtUtc": "2026-11-25T02:17:25.211793+00:00",
+  "baseHead": "f9d624be02e6b1eaa7c474bab70b51ad98e3ac9c",
+  "draftId": "c361a55c-f8a3-4807-b0c1-c4dc76d764c4",
+  "studentId": "475a47d5-8d91-41dc-836b-a07d6943f597",
+  "userStatusInDb": "ACTIVE",
+  "sessionRevocationEventCount": 0,
+  "backendLogTimestamp": "2026-11-25T09:17:10.671+07:00",
+  "backendThread": "o-18080-exec-10",
+  "captures": [
+    "docs/08-ai/artifacts/f06-mobile-live-20261124/pixel7/173-followup-confirm-retry.png",
+    "docs/08-ai/artifacts/f06-mobile-live-20261124/pixel7/174-followup-confirm-receipt.png",
+    "docs/08-ai/artifacts/f06-mobile-live-20261124/pixel7/174-followup-confirm-receipt.xml",
+    "docs/08-ai/artifacts/f06-mobile-live-20261124/pixel7/followup-after-partial-confirm-db.json"
+  ],
+  "observedUiTitle": "Không thể truy cập bản nháp",
+  "observedUiMessage": "Bạn không còn quyền xác nhận bản nháp này.",
+  "rootCauseSummary": "15-minute access token TTL elapsed; foodTextAnalysisApi.ts passes _isRetry: true on mutations so apiClient skips token refresh and surfaces 401; FoodAnalysisScreen.tsx grouped 401 with 403/404 and called clearAccess(), wiping confirmIntent and draftId even though refresh token and ACTIVE account were valid."
+}

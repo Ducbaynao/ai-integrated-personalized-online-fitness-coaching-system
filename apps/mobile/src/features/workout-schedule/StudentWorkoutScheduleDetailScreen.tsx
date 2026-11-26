@@ -9,10 +9,11 @@ import { ApiError } from '@/types/auth';
 import type { CancelPlannedWorkoutRequest, ReschedulePlannedWorkoutRequest, WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from '@/features/workout-plan/components/AiWorkoutAdjustmentModal';
-import { AiWorkoutRescheduleModal } from './components/AiWorkoutRescheduleModal';
+import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWorkoutRescheduleModal';
+import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
-import { useRelationships } from '@/features/coaching/coachingQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
+import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
 import { spacing } from '@/design-system/tokens/spacing';
 import { proposalTimezones, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { workoutScheduleQueryKeys, useWorkoutScheduleDetail } from './workoutScheduleQueries';
@@ -40,17 +41,6 @@ export function StudentWorkoutScheduleDetailScreen({
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
   const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
-  const relationshipsQuery = useRelationships();
-  // Fail-safe principle: While loading, on error, or if relationship data is not yet verified,
-  // safely treat as HUMAN_COACH to never prematurely grant SELF_DIRECTED authority.
-  const coachingMode = useMemo(() => {
-    if (relationshipsQuery.isSuccess && relationshipsQuery.data) {
-      const items = relationshipsQuery.data.pages.flatMap((p) => p.items);
-      const hasActive = items.some((rel) => rel.status === 'ACTIVE');
-      return hasActive ? 'HUMAN_COACH' : 'SELF_DIRECTED';
-    }
-    return 'HUMAN_COACH';
-  }, [relationshipsQuery.isSuccess, relationshipsQuery.data]);
   const [permissionLost, setPermissionLost] = useState(false);
   const query = useWorkoutScheduleDetail(studentId, occurrenceId, allowed && !permissionLost);
   const item = query.data;
@@ -118,9 +108,14 @@ export function StudentWorkoutScheduleDetailScreen({
   useEffect(() => {
     if (!permissionLost && query.error instanceof ApiError && [403, 404].includes(query.error.status)) {
       client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+      client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
       queueMicrotask(() => setPermissionLost(true));
     }
   }, [client, permissionLost, query.error, studentId]);
+
+  useEffect(() => {
+    if (!allowed && studentId) client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
+  }, [allowed, client, studentId]);
 
   const resetCommand = () => { setRetryCommand(null); setPreview(false); setError(''); };
   const editDestination = (patch: Partial<WorkoutScheduleChangeDestination>) => {
@@ -131,6 +126,7 @@ export function StudentWorkoutScheduleDetailScreen({
     setPermissionLost(true);
     setRetryCommand(null);
     client.removeQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
+    client.removeQueries({ queryKey: rescheduleQueryKeys.scope(studentId, 'STUDENT', studentId) });
   };
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
@@ -238,10 +234,16 @@ export function StudentWorkoutScheduleDetailScreen({
             const offset = part === 'Start' ? destination.startUtcOffset : destination.endUtcOffset;
             const choices = validProposalOffsets(destination.timezone, local);
             return <View key={part} style={{ gap: spacing.xs }}>
-              <Text style={[styles.label, { color: theme.textPrimary }]}>{part === 'Start' ? 'Bắt đầu mới' : 'Kết thúc mới'}</Text>
-              <TextInput testID={`schedule-local-${part.toLowerCase()}`} accessibilityLabel={`${part === 'Start' ? 'Bắt đầu' : 'Kết thúc'} địa phương`} placeholder="YYYY-MM-DDTHH:mm" value={local}
-                onChangeText={(value) => editDestination(part === 'Start' ? { localStart: value, startUtcOffset: '' } : { localEnd: value, endUtcOffset: '' })}
-                style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
+              <LocalDateTimeInputField
+                label={part === 'Start' ? 'Bắt đầu mới' : 'Kết thúc mới'}
+                value={local}
+                onChange={(value) => editDestination(part === 'Start' ? { localStart: value, startUtcOffset: '' } : { localEnd: value, endUtcOffset: '' })}
+                dateTestID={`schedule-local-${part.toLowerCase()}-date`}
+                timeTestID={`schedule-local-${part.toLowerCase()}-time`}
+                dateAccessibilityLabel={`Ngày ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương`}
+                timeAccessibilityLabel={`Giờ ${part === 'Start' ? 'bắt đầu' : 'kết thúc'} địa phương (HH:mm)`}
+                sessionKey={`${occurrenceId}:${mode}`}
+              />
               {local && !choices.length ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Giờ không tồn tại trong múi giờ này hoặc sai định dạng.</Text> : null}
               {choices.length > 1 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ lặp khi đổi DST. Hãy chọn một offset tường minh.</Text> : null}
               <View style={styles.row}>{choices.map((choice) => <WorkoutButton key={choice.offset} label={`UTC${choice.offset}`} secondary={offset !== choice.offset}
@@ -309,17 +311,13 @@ export function StudentWorkoutScheduleDetailScreen({
           await query.refetch();
         }}
       />
-      <AiWorkoutRescheduleModal
-        visible={isRescheduleModalVisible}
+      {isRescheduleModalVisible ? <AiWorkoutRescheduleModal
+        visible={true}
+        actorId={studentId}
+        capability="STUDENT"
         studentId={studentId}
-        occurrenceId={occurrenceId}
-        occurrenceVersion={item.occurrenceVersion}
-        sessionName={item.sessionSummary?.name || undefined}
-        currentPlannedStartAt={item.plannedStartAt}
-        timezone={item.timezone || user?.timezone || undefined}
-        linkedAppointmentId={item.linkedAppointmentId}
-        linkedAppointmentVersion={item.linkedAppointmentVersion}
-        coachingMode={coachingMode}
+        occurrence={item}
+        authorized={allowed && !permissionLost}
         onClose={async () => {
           setIsRescheduleModalVisible(false);
           await client.invalidateQueries({ queryKey: workoutScheduleQueryKeys.student(studentId) });
@@ -332,12 +330,8 @@ export function StudentWorkoutScheduleDetailScreen({
             await query.refetch();
           }
         }}
-        onRescheduleApplied={(result) => {
-          if (result.resultingEntityId) {
-            setLastAppliedSuccessorId(result.resultingEntityId);
-          }
-        }}
-      />
+        onApplied={(result) => setLastAppliedSuccessorId(result.resultingEntityId || null)}
+      /> : null}
     </> : null}
   </ScrollView>;
 }
