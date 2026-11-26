@@ -214,17 +214,19 @@ describe('aiWorkoutAdjustmentApi', () => {
     });
 
     it('maps AI_RUN_LIFECYCLE_CONFLICT for only SCHEDULED', () => {
-      const err = makeError(409, 'only SCHEDULED occurrences can be adjusted', 'AI_RUN_LIFECYCLE_CONFLICT');
-      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('trạng thái ĐÃ LÊN LỊCH (SCHEDULED)');
+      // Exact Backend diagnostic (AiWorkoutAdjustmentService.java:580).
+      const err = makeError(409, 'Cannot adjust occurrence with status COMPLETED (only SCHEDULED occurrences can be adjusted).', 'AI_RUN_LIFECYCLE_CONFLICT');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('trạng thái đã lên lịch');
+      expect(getWorkoutAdjustmentErrorMessage(err)).not.toContain('SCHEDULED');
     });
 
     it('maps AI_RUN_LIFECYCLE_CONFLICT for Idempotency conflict', () => {
-      const err = makeError(409, 'Idempotency conflict detected', 'AI_RUN_LIFECYCLE_CONFLICT');
+      const err = makeError(409, 'Idempotency conflict: commandKey matches a previous command with differing parameters.', 'AI_RUN_LIFECYCLE_CONFLICT');
       expect(getWorkoutAdjustmentErrorMessage(err)).toContain('Xung đột thao tác');
     });
 
     it('maps AI_RUN_LIFECYCLE_CONFLICT for Revision conflict', () => {
-      const err = makeError(409, 'Revision conflict: expected revision 1 but was 2', 'AI_RUN_LIFECYCLE_CONFLICT');
+      const err = makeError(409, 'Revision conflict: expected revision 1 but current is 2', 'AI_RUN_LIFECYCLE_CONFLICT');
       expect(getWorkoutAdjustmentErrorMessage(err)).toContain('xung đột phiên bản');
     });
 
@@ -249,9 +251,11 @@ describe('aiWorkoutAdjustmentApi', () => {
       expect(getWorkoutAdjustmentErrorMessage(err)).toContain('chưa được chia sẻ cho học viên');
     });
 
-    it('maps 403 for share draft in SELF_DIRECTED', () => {
-      const err = makeError(403, 'Cannot share draft in SELF_DIRECTED coaching mode.', 'AI_FORBIDDEN');
-      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('tự tập luyện (SELF_DIRECTED)');
+    it('maps 403 for draft sharing outside HUMAN_COACH mode', () => {
+      // Exact Backend diagnostic (AiWorkoutAdjustmentService.java:1253); the previous fixture text did not exist in Backend.
+      const err = makeError(403, 'Draft sharing is only supported in HUMAN_COACH mode.', 'AI_FORBIDDEN');
+      expect(getWorkoutAdjustmentErrorMessage(err)).toContain('chế độ Có huấn luyện viên');
+      expect(getWorkoutAdjustmentErrorMessage(err)).not.toContain('HUMAN_COACH');
     });
 
     it('maps 403 / AI_RUN_ACCESS_DENIED to authority explanation', () => {
