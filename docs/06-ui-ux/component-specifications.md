@@ -10,6 +10,14 @@ Mọi component hỗ trợ nội dung dài, localization, dynamic type và trạ
 - Size: `medium` 48 px, `large` 54 px.
 - State: default, pressed, focused, loading, disabled.
 - Destructive action phải ghi rõ đối tượng bị ảnh hưởng; không dùng icon đơn độc.
+- Implementation `AppButton` tại `apps/mobile/src/design-system/components`: icon trang trí tùy chọn, nhãn tự xuống dòng, loading giữ nhãn + spinner và chặn thao tác cùng disabled/busy semantics; focus bàn phím có viền. Hiện áp dụng cho Student Home, chưa thay các button nghiệp vụ khác.
+
+## AppCard, AppIcon & NavigationAction
+
+- `AppCard`: surface theo theme, border nhẹ, radius 16, padding 16 và gap 12; không thêm dữ liệu hay semantics tương tác.
+- `AppIcon`: dùng `expo-symbols` hiện có (Material Symbols trên Android/web, SF Symbols trên iOS), mặc định 24 px/regular; icon chỉ trang trí, nhãn được cung cấp bởi action cha.
+- `NavigationAction`: icon + nhãn + chevron cho hàng, hoặc icon + nhãn trong tile co giãn; touch target tối thiểu 44 px, hỗ trợ xuống dòng và pressed state. Không cắt nhãn tiếng Việt.
+- ST-01 dùng CTA kế hoạch chính, nhóm tập luyện/theo dõi/coaching-AI, rồi account/capability/logout. Đây là thiết kế bổ sung cho Home hiện có, chưa triển khai các summary dữ liệu trong đặc tả mục tiêu ST-01.
 
 ## AppTextField
 

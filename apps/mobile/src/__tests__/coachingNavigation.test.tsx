@@ -21,7 +21,7 @@ describe('coaching navigation entries', () => {
   it('provides an accessible Student entry', () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<HomeScreen />); });
-    const entry = tree.root.findByProps({ testID: 'view-coaching-button' });
+    const entry = tree.root.findByProps({ testID: 'view-coaching-button' }).findByProps({ accessibilityRole: 'button' });
     expect(entry.props.accessibilityRole).toBe('button');
     expect(entry.props.accessibilityLabel).toBe('Quản lý quan hệ huấn luyện');
     renderer.act(() => entry.props.onPress());

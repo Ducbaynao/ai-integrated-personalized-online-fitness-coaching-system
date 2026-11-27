@@ -71,3 +71,5 @@ Không sử dụng body text nhỏ hơn 14 px trên mobile cho nội dung cần 
 | AI | tím nhạt | tím đậm | AI Recommendation |
 | Neutral | xám nhạt | xám đậm | Draft, unknown, unavailable |
 
+
+Component sizing triển khai trong `spacing.ts`: button 48/54 px (min-height), icon 20/24/32 px, feature icon container 64 px, content Home tối đa 640 px trên viewport rộng. Nội dung dài được tự xuống dòng và tăng chiều cao.

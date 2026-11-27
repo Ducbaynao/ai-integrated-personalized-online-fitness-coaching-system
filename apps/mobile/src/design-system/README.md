@@ -22,3 +22,5 @@ Component được khuyến nghị:
 
 API và trạng thái của component được mô tả tại `docs/06-ui-ux/component-specifications.md`.
 
+
+Các component đã triển khai trong `components/`: `AppButton`, `AppCard`, `AppIcon`, `NavigationAction`; hiện được dùng ở Student Home. Icon dùng thư viện `expo-symbols` sẵn có, không thêm dependency. Các component được khuyến nghị khác ở trên chưa đồng nghĩa đã triển khai.

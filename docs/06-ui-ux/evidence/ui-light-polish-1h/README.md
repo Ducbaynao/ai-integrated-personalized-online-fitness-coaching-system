@@ -1,0 +1,11 @@
+# Student Home light polish — 27/11/2026
+
+- Timebox: 11:34–12:34 UTC+7; base main `6a20ace40cfa1c0b1d178955691b884dbe4abe94` (no newer main delta at start).
+- ST-01 existing navigation hub: grouped actions, meaningful icons, primary plan CTA, wrapping account rows. No fabricated domain summaries. Account/capability/logout and all ten existing destinations retained.
+- Viewed actual Figma canvas screenshots through connected Chrome: Workout plans `2835:719`, My Workout `2785:86`, Notification `2763:61`, file `ONFwRWdC9bj4Z6mPSe6yr4`. Student workspace composition is supplementary design, not a matching Figma frame.
+- `before-390.jpg`: original Home from base; `after-390.jpg`: patched Home. Actual CSS viewport measured at 390 px. Chrome zoom 80% required a 312 px viewport override and equivalent screenshot clip to remove capture padding.
+- Real Expo product checkout, port 8097. Synthetic account fixture on 8197 provides login/me only; domain reads return 404. No Backend/Docker/emulator started. Local preview adapters used SPA rendering, the package's media-library legacy web export (baseline native module fails on web), and forced light appearance. These adapters and fixture are excluded from the patch; screenshots are layout evidence, not live backend/device acceptance.
+- DOM layout checks at 360/390/430 px: no horizontal/button overflow; all action targets at least 44 px. Desktop ~1024 px DOM check: bounded content, no overflow. Primary CTA → `/workout-plans`, Back → Home, logout disabled while pending then returned to sign-in. Lower-section screenshot capture timed out; account/capability content was inspected through DOM and covered by focused tests.
+- Shared AppButton states: primary/secondary/ghost/danger, pressed/focus, disabled and loading; loading keeps the label and exposes native busy/disabled plus web aria-busy. Existing business buttons are not migrated.
+- Deferred: Trainer Home, separate Goal/Nutrition/Schedule/onboarding screens, dark polish, native-device/dynamic-font QA and full-app/release acceptance.
+- Validation: 10 focused suites / 48 tests passed; final AppButton/Home recheck 2 suites / 10 tests passed after ARIA/token cleanup. Typecheck passed; lint passed with 12 existing warnings in unchanged tests; UX docs validation and diff whitespace check passed.

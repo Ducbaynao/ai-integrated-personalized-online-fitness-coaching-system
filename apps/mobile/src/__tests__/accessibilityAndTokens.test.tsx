@@ -182,7 +182,7 @@ describe('Accessibility Attributes on Auth Screens', () => {
     });
     const root = tree!.root;
 
-    const logoutBtn = root.findByProps({ testID: 'logout-button' });
+    const logoutBtn = root.findByProps({ testID: 'logout-button' }).findByProps({ accessibilityRole: 'button' });
     expect(logoutBtn.props.accessibilityRole).toBe('button');
     expect(logoutBtn.props.accessibilityLabel).toBe('Đăng xuất');
     expect(logoutBtn.props.accessibilityState).toEqual({ disabled: false, busy: false });

@@ -38,7 +38,7 @@ describe('Progress Summary Navigation Entries', () => {
       tree = renderer.create(<HomeScreen />);
     });
 
-    const button = tree.root.findByProps({ testID: 'view-progress-summary-button' });
+    const button = tree.root.findByProps({ testID: 'view-progress-summary-button' }).findByProps({ accessibilityRole: 'button' });
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Xem tóm tắt tiến độ AI');
 
