@@ -33,7 +33,7 @@ describe('coaching navigation entries', () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<TrainerHomeScreen />); });
     expect(tree.root.findByType(SafeAreaView).props.edges).toEqual(['top']);
-    const entry = tree.root.findByProps({ testID: 'trainer-view-coaching-button' });
+    const entry = tree.root.findByProps({ testID: 'trainer-view-coaching-button' }).findByProps({ accessibilityRole: 'button' });
     expect(entry.props.accessibilityRole).toBe('button');
     renderer.act(() => entry.props.onPress());
     expect(mockPush).toHaveBeenCalledWith('/coaching');

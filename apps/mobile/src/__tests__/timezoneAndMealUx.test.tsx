@@ -242,8 +242,12 @@ describe('P7-011 timezone UX & P7-009 meal selector regressions', () => {
       });
       const tree = renderWithQuery(<NutritionScreen />);
       pickDate(tree, 'nutrition-day-input-trigger', '2026-10-13');
+      // A native press cannot activate the confirmation until its context query settles.
+      await settle();
+      const confirmDayContext = tree.root.findByProps({ accessibilityLabel: 'Xác nhận ngày và múi giờ' });
+      expect(confirmDayContext.props.accessibilityState.disabled).toBe(false);
       renderer.act(() => {
-        tree.root.findByProps({ accessibilityLabel: 'Xác nhận ngày và múi giờ' }).props.onPress();
+        confirmDayContext.props.onPress({ nativeEvent: { timestamp: 1, pageX: 10, pageY: 10 } });
       });
       await settle();
       expect(JSON.stringify(tree.toJSON())).toContain('Đã xác nhận ngày và múi giờ');

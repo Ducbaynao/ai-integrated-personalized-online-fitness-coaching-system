@@ -1,6 +1,9 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,7 +15,7 @@ import {
 import { router } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
-import { spacing } from '@/design-system/tokens/spacing';
+import { layout, spacing } from '@/design-system/tokens/spacing';
 import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
 import { apiErrorMessage, goalStatusLabels } from '@/localization/displayLabels';
@@ -159,11 +162,14 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
   const daysSinceText = summary ? daysSinceLastWorkoutText(summary.continuity.daysSinceLastWorkout) : null;
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.canvas }]}>
+    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: themeColors.canvas }]}>
+      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', padding: spacing.lg }}>
+        <AppIcon name="progress" color={themeColors.primary} /><Text accessibilityRole="header" style={[typography.h1, { color: themeColors.textPrimary, flex: 1 }]}>Tiến độ</Text>
+      </View>
       {/* Scope Selector Bar */}
       <View style={[styles.scopeBar, { borderBottomColor: themeColors.border }]}>
         <Pressable
-          testID="scope-tab-current-goal"
+          testID="scope-tab-current-goal" accessibilityRole="tab" accessibilityState={{ selected: scope === 'CURRENT_GOAL' }}
           onPress={() => setScope('CURRENT_GOAL')}
           style={[
             styles.scopeTab,
@@ -179,7 +185,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
         </Pressable>
 
         <Pressable
-          testID="scope-tab-lifetime"
+          testID="scope-tab-lifetime" accessibilityRole="tab" accessibilityState={{ selected: scope === 'LIFETIME' }}
           onPress={() => setScope('LIFETIME')}
           style={[
             styles.scopeTab,
@@ -198,21 +204,16 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
       {/* Main Content Area */}
       {isLoading ? (
         <View testID="progress-loading" style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={[styles.centerText, { color: themeColors.textSecondary }]}>Đang phân tích tiến độ...</Text>
+          <AppCard state="loading" title="Đang phân tích tiến độ..." />
         </View>
       ) : errorMessage ? (
         <View testID="progress-error" style={styles.centerContainer}>
-          <Text style={[styles.errorTitle, { color: themeColors.dangerText }]}>{errorMessage}</Text>
-          <Pressable
-            testID="progress-retry-btn"
-            onPress={() => {
+          <AppCard state="error" title={errorMessage}>
+          <AppButton testID="progress-retry-btn" onPress={() => {
               setIsLoading(true);
               loadData();
-            }}
-            style={[styles.btnRetry, { backgroundColor: themeColors.primary }]}>
-            <Text style={styles.btnRetryText}>Thử lại</Text>
-          </Pressable>
+            }} label="Thử lại" icon="refresh" variant="secondary" />
+          </AppCard>
         </View>
       ) : summary ? (
         <ScrollView
@@ -227,9 +228,9 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
           }>
           {/* Goal Info Card (when in CURRENT_GOAL scope) */}
           {scope === 'CURRENT_GOAL' && summary.goal && (
-            <View
+            <AppCard
               testID="current-goal-card"
-              style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+              style={{ marginBottom: spacing.md }}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{summary.goal.title}</Text>
                 <View style={[styles.badge, { backgroundColor: '#DEF7EC' }]}>
@@ -253,20 +254,16 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                   ))}
                 </View>
               )}
-            </View>
+            </AppCard>
           )}
 
           {/* Measurements Progress & Deltas Card */}
-          <View
+          <AppCard
             testID="measurement-progress-card"
-            style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+            style={{ marginBottom: spacing.md }}>
             <View style={styles.cardHeader}>
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Số đo cơ thể và thay đổi</Text>
-              <Pressable
-                testID="nav-to-measurements-btn"
-                onPress={() => router.push('/(app)/measurements' as any)}>
-                <Text style={[styles.linkText, { color: themeColors.primary }]}>Chi tiết số đo →</Text>
-              </Pressable>
+              <AppIcon name="measurement" color={themeColors.primary} /><Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Số đo cơ thể và thay đổi</Text>
+              <AppButton testID="nav-to-measurements-btn" onPress={() => router.push('/(app)/measurements' as any)} label="Chi tiết số đo" icon="measurement" variant="secondary" />
             </View>
 
             {measurementNotice || !summary.measurement.metricDeltas ? (
@@ -310,12 +307,12 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                 })}
               </View>
             )}
-          </View>
+          </AppCard>
 
           {/* Workout Adherence & Volume Card */}
-          <View
+          <AppCard
             testID="workout-progress-card"
-            style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+            style={{ marginBottom: spacing.md }}>
             <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Tuân thủ và khối lượng tập luyện</Text>
 
             {workoutNotice ? (
@@ -352,12 +349,12 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                 </View>
               </View>
             )}
-          </View>
+          </AppCard>
 
           {/* Training Continuity Card */}
-          <View
+          <AppCard
             testID="continuity-card"
-            style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+            style={{ marginBottom: spacing.md }}>
             <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{CONTINUITY_SECTION_TITLE}</Text>
             <View style={styles.continuityRow}>
               <View style={[styles.badge, { backgroundColor: '#EFF6FF' }]}>
@@ -374,20 +371,16 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
               style={[styles.continuityRationale, { color: themeColors.textSecondary }]}>
               {continuityExplanation(summary.continuity)}
             </Text>
-          </View>
+          </AppCard>
 
           {/* Progress Photos Gallery */}
-          <View
+          <AppCard
             testID="photos-gallery-card"
-            style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+            style={{ marginBottom: spacing.md }}>
             <View style={styles.cardHeader}>
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Hình ảnh tiến độ</Text>
+              <AppIcon name="photo" color={themeColors.primary} /><Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Hình ảnh tiến độ</Text>
               {!readOnly && (
-                <Pressable
-                  testID="upload-photo-btn"
-                  onPress={() => setIsUploadModalOpen(true)}>
-                  <Text style={[styles.linkText, { color: themeColors.primary }]}>+ Thêm ảnh</Text>
-                </Pressable>
+                <AppButton testID="upload-photo-btn" onPress={() => setIsUploadModalOpen(true)} label="Thêm ảnh" icon="plus" variant="secondary" />
               )}
             </View>
 
@@ -418,31 +411,21 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                       {formatContextFreeInstant(p.takenAt) ?? 'Chưa rõ thời điểm chụp'}
                     </Text>
                     {!readOnly && (
-                      <Pressable
-                        testID={`btn-delete-photo-${p.id}`}
-                        onPress={() => handleDeletePhoto(p.id)}
-                        style={styles.btnDeletePhoto}>
-                        <Text style={styles.deletePhotoText}>Xóa</Text>
-                      </Pressable>
+                      <AppButton testID={`btn-delete-photo-${p.id}`} onPress={() => handleDeletePhoto(p.id)} label="Xóa" icon="trash" variant="danger" />
                     )}
                   </View>
                 ))}
               </ScrollView>
             )}
-          </View>
+          </AppCard>
 
           {/* AI Progress Summary banner (Optional F04 integration) */}
-          <View style={[styles.aiNoticeCard, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
+          <AppCard style={[styles.aiNoticeCard, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
             <Text style={[styles.aiNoticeText, { color: themeColors.textSecondary }]}>
-              ℹ️ Số liệu trên do hệ thống tính từ dữ liệu đã ghi nhận. AI không thay đổi số liệu gốc.
+              Số liệu trên do hệ thống tính từ dữ liệu đã ghi nhận. AI không thay đổi số liệu gốc.
             </Text>
-            <Pressable
-              testID="btn-open-ai-summary"
-              onPress={() => router.push('/(app)/progress-summary' as any)}
-              style={[styles.btnAiSummary, { backgroundColor: themeColors.primary }]}>
-              <Text style={styles.btnAiSummaryText}>Xem tóm tắt phân tích bằng AI →</Text>
-            </Pressable>
-          </View>
+            <AppButton testID="btn-open-ai-summary" onPress={() => router.push('/(app)/progress-summary' as any)} label="Xem tóm tắt phân tích bằng AI" icon="summary" variant="secondary" />
+          </AppCard>
         </ScrollView>
       ) : null}
 
@@ -453,7 +436,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
         onClose={() => setIsUploadModalOpen(false)}
         onSubmit={handleUploadPhoto}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -466,6 +449,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   scopeTab: {
+    minHeight: layout.minimumTouchTarget, paddingHorizontal: spacing.sm,
     flex: 1,
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -479,6 +463,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
   },
   scrollContent: {
+    width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center',
     padding: spacing.md,
   },
   card: {
@@ -488,12 +473,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   cardHeader: {
+    flexWrap: 'wrap', gap: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   cardTitle: {
+    flexShrink: 1,
     ...typography.h3,
     fontFamily: fontFamily.bold,
   },

@@ -1,3 +1,5 @@
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import { formatInstantDateVietnam, formatInstantVietnam } from '@/localization/instantDisplay';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -35,8 +37,8 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
               borderColor: themeColors.warningText,
             },
           ]}>
-          <Text style={[styles.bannerTitle, { color: themeColors.warningText }]}>
-            ⏸ Mục tiêu hiện đang bị tạm dừng
+          <AppIcon name="pause" color={themeColors.warningText} /><Text style={[styles.bannerTitle, { color: themeColors.warningText }]}>
+            Mục tiêu hiện đang bị tạm dừng
           </Text>
           <Text style={[styles.bannerBody, { color: themeColors.textPrimary }]}>
             Thời gian tập luyện tích lũy tạm dừng. Ngày mục tiêu và lịch sử vẫn được giữ nguyên.
@@ -55,7 +57,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
       )}
 
       {/* Main Info Card */}
-      <View
+      <AppCard isDark={isDark}
         style={[
           styles.card,
           {
@@ -63,8 +65,8 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
             borderColor: themeColors.border,
           },
         ]}>
-        <View style={styles.headerRow}>
-          <Text testID="goal-title" style={[styles.title, { color: themeColors.textPrimary }]}>{goal.title}</Text>
+        <View style={styles.headerRow}><AppIcon name="goal" color={themeColors.primary} />
+          <Text testID="goal-title" style={[styles.title, { color: themeColors.textPrimary, flex: 1 }]}>{goal.title}</Text>
           <GoalStatusBadge status={goal.status} />
         </View>
 
@@ -111,10 +113,10 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
             </Text>
           </View>
         )}
-      </View>
+      </AppCard>
 
       {/* Objectives Card */}
-      <View
+      <AppCard isDark={isDark}
         style={[
           styles.card,
           {
@@ -177,7 +179,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
             )}
           </View>
         ))}
-      </View>
+      </AppCard>
     </View>
   );
 }
@@ -215,10 +217,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerRow: {
+    flexWrap: 'wrap', gap: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: spacing.sm,
     marginBottom: spacing.xs,
   },
   title: {
@@ -230,14 +232,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   row: {
+    flexWrap: 'wrap', gap: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   label: {
+    flexShrink: 1,
     ...typography.bodySmall,
   },
   value: {
+    flexShrink: 1, maxWidth: '100%', textAlign: 'right',
     ...typography.label,
   },
   reasonRow: {

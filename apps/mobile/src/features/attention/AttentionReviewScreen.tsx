@@ -1,3 +1,7 @@
+import { layout, spacing } from '@/design-system/tokens/spacing';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteD
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRelationshipDetail } from '@/features/coaching/coachingQueries';
-import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
+import { coachingUiStyles as styles } from '@/features/coaching/components/CoachingUi';
 import { attentionReviewApi, AttentionPage, AttentionSignal, CompleteReviewBody, ReviewTask, SignalActionBody } from '@/services/attentionReviewApi';
 import { createCommandKey } from '@/services/coachingApi';
 import { ApiError } from '@/types/auth';
@@ -147,20 +151,20 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
-    <ScrollView testID="attention-review-screen" style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: theme.textPrimary }]}>Đánh giá và tín hiệu</Text>
-      <CoachingButton label="Quay lại" secondary onPress={() => {
+    <ScrollView testID="attention-review-screen" style={styles.screen} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="attention" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Đánh giá và tín hiệu</Text></View>
+      <AppButton icon="back" label="Quay lại" variant="ghost" onPress={() => {
         if (router.canGoBack()) router.back();
         else router.replace(relationshipId ? `/coaching/${relationshipId}` as never : '/coaching' as never);
       }} />
       {relationshipId && (relation.isPending || (!relation.isFetchedAfterMount && relation.isFetching))
-        ? <CoachingState busy title="Đang kiểm tra quyền" message="Vui lòng chờ." /> : null}
+        ? <AppCard state="loading" title="Đang kiểm tra quyền" message="Vui lòng chờ." /> : null}
       {!canView && (!relationshipId || !relation.isFetching)
-        ? <CoachingState title="Không thể xem dữ liệu" message="Quyền hoặc kỳ huấn luyện không còn hiệu lực." /> : null}
-      {canView && !trainer ? <CoachingCard>
+        ? <AppCard state="info" icon="shield" title="Không thể xem dữ liệu" message="Quyền hoặc kỳ huấn luyện không còn hiệu lực." /> : null}
+      {canView && !trainer ? <AppCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Múi giờ đánh giá</Text>
-        {timezone.isPending ? <CoachingState busy title="Đang tải múi giờ" message="Vui lòng chờ." /> : null}
-        {timezone.isError ? <CoachingState title="Không thể tải múi giờ" message={message(timezone.error)} onRetry={() => timezone.refetch()} /> : null}
+        {timezone.isPending ? <AppCard state="loading" title="Đang tải múi giờ" message="Vui lòng chờ." /> : null}
+        {timezone.isError ? <AppCard state="error" title="Không thể tải múi giờ" message={message(timezone.error)} onRetry={() => timezone.refetch()} /> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{timezone.data
           ? `Đã xác nhận: ${formatTimezoneDisplay(timezone.data.timezone)}`
           : 'Chưa xác nhận. Múi giờ tài khoản hoặc thiết bị không được dùng ngầm cho chu kỳ đánh giá.'}</Text>
@@ -176,23 +180,23 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           extraTimezones={[timezone.data?.timezone, user?.timezone]}
           onChange={zone => { setSelectedReviewZone(zone); setPickerExpanded(false); }}
         />
-        <CoachingButton label="Xác nhận múi giờ" disabled={mutation.isPending}
+        <AppButton icon="check" label="Xác nhận múi giờ" disabled={mutation.isPending}
           onPress={() => run({ kind: 'timezone', timezone: targetReviewZone, key: createCommandKey() })} />
-      </CoachingCard> : null}
+      </AppCard> : null}
       {canView ? <>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Chu kỳ đánh giá</Text>
-        {reviews.isPending ? <CoachingState busy title="Đang tải đánh giá" message="Vui lòng chờ." /> : null}
-        {reviews.isError ? <CoachingState title="Không thể tải đánh giá" message={message(reviews.error)} onRetry={() => reviews.refetch()} /> : null}
+        {reviews.isPending ? <AppCard state="loading" title="Đang tải đánh giá" message="Vui lòng chờ." /> : null}
+        {reviews.isError ? <AppCard state="error" title="Không thể tải đánh giá" message={message(reviews.error)} onRetry={() => reviews.refetch()} /> : null}
         {!reviews.isPending && !reviews.isError && reviewRows.length === 0
-          ? <CoachingState title="Chưa có nhiệm vụ đánh giá" message="Nhiệm vụ cần kỳ huấn luyện con người và múi giờ đã được học viên xác nhận." /> : null}
-        {reviewRows.map(task => <CoachingCard key={task.id} testID={`review-${task.id}`}>
+          ? <AppCard state="empty" title="Chưa có nhiệm vụ đánh giá" message="Nhiệm vụ cần kỳ huấn luyện con người và múi giờ đã được học viên xác nhận." /> : null}
+        {reviewRows.map(task => <AppCard key={task.id} testID={`review-${task.id}`}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{labelStatus[task.status]}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chu kỳ {task.cycleStartDate} · hạn {task.dueDate} · {formatTimezoneDisplay(task.timezone)}</Text>
           {task.summary ? <Text style={[styles.body, { color: theme.textPrimary }]}>Tóm tắt: {task.summary}</Text> : null}
           {task.evidenceRefs.length ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bằng chứng buổi tập: {task.evidenceRefs.length} mục</Text> : null}
           {task.missingData.length ? <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu thiếu/không xác định: {task.missingData.join('; ')}</Text> : null}
           {!trainer && task.status === 'COMPLETED' && !task.studentAcknowledgedAt
-            ? <CoachingButton label="Xác nhận đã xem" disabled={mutation.isPending}
+            ? <AppButton label="Xác nhận đã xem" disabled={mutation.isPending}
                 onPress={() => run({ kind: 'ackReview', id: task.id, version: task.version, key: createCommandKey() })} /> : null}
           {trainer && task.status === 'OPEN' ? <View>
             <Text style={[styles.label, { color: theme.textPrimary }]}>Tóm tắt đánh giá</Text>
@@ -204,7 +208,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
             <Text style={[styles.label, { color: theme.textPrimary }]}>Dữ liệu thiếu/không xác định (phân tách dấu phẩy)</Text>
             <TextInput accessibilityLabel="Dữ liệu thiếu hoặc không xác định" value={missingText} onChangeText={setMissingText}
               style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
-            <CoachingButton label="Hoàn tất đánh giá" disabled={mutation.isPending || !summary.trim()
+            <AppButton label="Hoàn tất đánh giá" disabled={mutation.isPending || !summary.trim()
               || evidenceText.split(',').map(x => x.trim()).filter(Boolean).some(id => !uuid.test(id))}
               onPress={() => run({ kind: 'complete', id: task.id, body: {
                 expectedVersion: task.version, commandKey: createCommandKey(), summary: summary.trim(),
@@ -212,21 +216,21 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
                 missingData: missingText.split(',').map(x => x.trim()).filter(Boolean),
               } })} />
           </View> : null}
-        </CoachingCard>)}
-        {reviews.hasNextPage ? <CoachingButton label="Tải thêm đánh giá" secondary disabled={reviews.isFetchingNextPage}
-          busy={reviews.isFetchingNextPage} onPress={() => reviews.fetchNextPage()} /> : null}
+        </AppCard>)}
+        {reviews.hasNextPage ? <AppButton label="Tải thêm đánh giá" variant="secondary" disabled={reviews.isFetchingNextPage}
+          loading={reviews.isFetchingNextPage} onPress={() => reviews.fetchNextPage()} /> : null}
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Tín hiệu từ quy tắc</Text>
-        {!returnDenied && returnStatus.isPending ? <CoachingState busy title="Đang kiểm tra bằng chứng 100 ngày" message="Vui lòng chờ." /> : null}
-        {returnDenied ? <CoachingState title="Chưa có quyền xem lịch sử tập luyện"
+        {!returnDenied && returnStatus.isPending ? <AppCard state="loading" title="Đang kiểm tra bằng chứng 100 ngày" message="Vui lòng chờ." /> : null}
+        {returnDenied ? <AppCard state="error" title="Chưa có quyền xem lịch sử tập luyện"
           message="Chu kỳ đánh giá và tín hiệu quá hạn vẫn có thể xem."
           onRetry={() => {
             setDeniedReturnScope(null);
             void cache.invalidateQueries({ queryKey: [...scope, 'signals'], exact: true });
           }} /> : null}
         {!returnDenied && returnStatus.isError
-          ? <CoachingState title="Không thể kiểm tra bằng chứng 100 ngày" message={message(returnStatus.error)}
+          ? <AppCard state="error" title="Không thể kiểm tra bằng chứng 100 ngày" message={message(returnStatus.error)}
               onRetry={() => returnStatus.refetch()} /> : null}
-        {!returnDenied && returnStatus.data ? <CoachingCard testID="return-100-day-status">
+        {!returnDenied && returnStatus.data ? <AppCard testID="return-100-day-status">
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Trở lại sau 100 ngày</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>{returnStatus.data.status === 'UNKNOWN'
             ? returnStatus.data.reason === 'TIMEZONE_UNCONFIRMED'
@@ -240,12 +244,12 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
           {returnStatus.data.timezone ? <Text style={[styles.body, { color: theme.textSecondary }]}>
             Múi giờ đã xác nhận: {formatTimezoneDisplay(returnStatus.data.timezone)}
           </Text> : null}
-        </CoachingCard> : null}
-        {signals.isPending ? <CoachingState busy title="Đang tải tín hiệu" message="Vui lòng chờ." /> : null}
-        {signals.isError ? <CoachingState title="Không thể tải tín hiệu" message={message(signals.error)} onRetry={() => signals.refetch()} /> : null}
+        </AppCard> : null}
+        {signals.isPending ? <AppCard state="loading" title="Đang tải tín hiệu" message="Vui lòng chờ." /> : null}
+        {signals.isError ? <AppCard state="error" title="Không thể tải tín hiệu" message={message(signals.error)} onRetry={() => signals.refetch()} /> : null}
         {!signals.isPending && !signals.isError && signalRows.length === 0
-          ? <CoachingState title="Chưa có tín hiệu" message="Nếu thiếu buổi tập hoàn tất trước đó hoặc múi giờ đã xác nhận, kết quả 100 ngày là chưa xác định, không phải cảnh báo." /> : null}
-        {signalRows.map(signal => <CoachingCard key={signal.id} testID={`attention-${signal.id}`}>
+          ? <AppCard state="empty" title="Chưa có tín hiệu" message="Nếu thiếu buổi tập hoàn tất trước đó hoặc múi giờ đã xác nhận, kết quả 100 ngày là chưa xác định, không phải cảnh báo." /> : null}
+        {signalRows.map(signal => <AppCard key={signal.id} testID={`attention-${signal.id}`}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{signalTitle[signal.rule]}</Text>
           <Text style={[styles.label, { color: theme.textPrimary }]}>Quy tắc hệ thống · {signal.severity === 'MEDIUM' ? 'Ưu tiên vừa' : 'Ưu tiên thấp'} · {signalStatus[signal.status]}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Phát hiện {formatInstantVietnam(signal.detectedAt) ?? UNKNOWN_TIME_LABEL}</Text>
@@ -257,10 +261,10 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
             {' · '}{signal.returnEvidence.calendarDays} ngày lịch · {formatTimezoneDisplay(signal.returnEvidence.timezone)}.
             Đây là tín hiệu để xem lại, không tự đổi kế hoạch tập.
           </Text> : null}
-          <CoachingButton label="Xem lịch sử xử lý" secondary onPress={() => setSelectedSignal(signal.id)} />
+          <AppButton label="Xem lịch sử xử lý" variant="secondary" onPress={() => setSelectedSignal(signal.id)} />
           {selectedSignal === signal.id ? <View>
-            {history.isPending ? <CoachingState busy title="Đang tải lịch sử" message="Vui lòng chờ." /> : null}
-            {history.isError ? <CoachingState title="Không thể tải lịch sử" message={message(history.error)} onRetry={() => history.refetch()} /> : null}
+            {history.isPending ? <AppCard state="loading" title="Đang tải lịch sử" message="Vui lòng chờ." /> : null}
+            {history.isError ? <AppCard state="error" title="Không thể tải lịch sử" message={message(history.error)} onRetry={() => history.refetch()} /> : null}
             {history.data?.map((event, index) => <Text key={`${event.occurredAt}-${index}`} style={[styles.body, { color: theme.textSecondary }]}>
               {event.eventType} · {formatInstantVietnam(event.occurredAt) ?? UNKNOWN_TIME_LABEL} · {event.resultingSeverity}
               {event.reason ? ` · ${event.reason}` : ''}
@@ -271,24 +275,24 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
             <TextInput accessibilityLabel="Lý do xử lý tín hiệu" value={reason} onChangeText={setReason}
               maxLength={2000} multiline style={[styles.input, { color: theme.textPrimary, borderColor: theme.border }]} />
             <View style={styles.row}>
-              {signal.status === 'OPEN' ? <CoachingButton label="Ghi nhận" secondary disabled={mutation.isPending}
+              {signal.status === 'OPEN' ? <AppButton label="Ghi nhận" variant="secondary" disabled={mutation.isPending}
                 onPress={() => run({ kind: 'signal', id: signal.id,
                   body: { action: 'ACK', expectedVersion: signal.version, commandKey: createCommandKey() } })} /> : null}
-              <CoachingButton label="Đã xử lý" disabled={mutation.isPending || !reason.trim()}
+              <AppButton label="Đã xử lý" disabled={mutation.isPending || !reason.trim()}
                 onPress={() => run({ kind: 'signal', id: signal.id,
                   body: { action: 'RESOLVE', expectedVersion: signal.version, commandKey: createCommandKey(), reason: reason.trim() } })} />
-              <CoachingButton label="Bỏ qua" danger disabled={mutation.isPending || !reason.trim()}
+              <AppButton label="Bỏ qua" variant="danger" disabled={mutation.isPending || !reason.trim()}
                 onPress={() => run({ kind: 'signal', id: signal.id,
                   body: { action: 'DISMISS', expectedVersion: signal.version, commandKey: createCommandKey(), reason: reason.trim() } })} />
             </View>
           </View> : null}
-        </CoachingCard>)}
-        {signals.hasNextPage ? <CoachingButton label="Tải thêm tín hiệu" secondary disabled={signals.isFetchingNextPage}
-          busy={signals.isFetchingNextPage} onPress={() => signals.fetchNextPage()} /> : null}
+        </AppCard>)}
+        {signals.hasNextPage ? <AppButton label="Tải thêm tín hiệu" variant="secondary" disabled={signals.isFetchingNextPage}
+          loading={signals.isFetchingNextPage} onPress={() => signals.fetchNextPage()} /> : null}
       </> : null}
-      {mutation.isError ? <CoachingState title="Chưa thể lưu thao tác" message={message(mutation.error)} /> : null}
+      {mutation.isError ? <AppCard state="error" title="Chưa thể lưu thao tác" message={message(mutation.error)} /> : null}
       {pending && mutation.isError && mutation.error instanceof ApiError && mutation.error.status === 0
-        ? <CoachingButton label="Thử lại cùng lệnh" disabled={mutation.isPending} onPress={retry} /> : null}
+        ? <AppButton label="Thử lại cùng lệnh" disabled={mutation.isPending} onPress={retry} /> : null}
     </ScrollView>
   </SafeAreaView>;
 }

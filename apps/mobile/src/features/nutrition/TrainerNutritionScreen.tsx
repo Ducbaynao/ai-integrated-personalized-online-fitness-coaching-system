@@ -1,5 +1,9 @@
+import { layout, spacing } from '@/design-system/tokens/spacing';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, useColorScheme } from 'react-native';
+import { ScrollView, Text, View, useColorScheme } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import moment from 'moment-timezone';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -16,7 +20,7 @@ import {
   resolveStrategyGoalTimezone,
   type StrategyGoalTimezoneLike,
 } from '@/features/shared/timezoneUtils';
-import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
+import { workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { nutritionApi } from './nutritionApi';
 import { nutrientLabel, nutrientText } from './NutritionScreen';
 
@@ -84,12 +88,12 @@ export function TrainerNutritionScreen({ studentId }: { studentId: string }) {
   useEffect(() => {
     if (concealed) client.removeQueries({ queryKey: ['nutrition-trainer', actor, studentId] });
   }, [actor, client, concealed, studentId]);
-  if (activeCapability !== 'TRAINER') return <WorkoutState title="Chỉ dành cho huấn luyện viên" message="Chuyển sang vai trò huấn luyện viên." />;
+  if (activeCapability !== 'TRAINER') return <AppCard state="info" icon="shield" title="Chỉ dành cho huấn luyện viên" message="Chuyển sang vai trò huấn luyện viên." />;
   return <ScrollView testID="nutrition-trainer-screen" style={[styles.screen, { backgroundColor: theme.canvas }]}
-    contentContainerStyle={styles.content}>
-    <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng học viên</Text>
+    contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="nutrition" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Nhật ký dinh dưỡng học viên</Text></View>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Chỉ đọc theo quyền NUTRITION_LOGS VIEW hiện hành.</Text>
-    <WorkoutCard>
+    <AppCard>
       <DateInputField
         testID="trainer-nutrition-day-input"
         label="Ngày xem"
@@ -116,27 +120,27 @@ export function TrainerNutritionScreen({ studentId }: { studentId: string }) {
           setConfirmedScope(null);
         }}
       />
-      <WorkoutButton label="Xem ngày" disabled={!validDayInput || !strategyResolved} onPress={() => setConfirmedScope({ actor, studentId, day, timezone })} />
-    </WorkoutCard>
-    {valid && query.isFetching ? <WorkoutState title="Đang tải" message="Đang kiểm tra quyền hiện hành." busy /> : null}
-    {concealed ? <WorkoutState title="Không thể xem nhật ký" message="Quyền xem hiện không còn hoặc dữ liệu không khả dụng." /> : null}
+      <AppButton icon="calendar" label="Xem ngày" disabled={!validDayInput || !strategyResolved} onPress={() => setConfirmedScope({ actor, studentId, day, timezone })} />
+    </AppCard>
+    {valid && query.isFetching ? <AppCard title="Đang tải" message="Đang kiểm tra quyền hiện hành." state="loading" /> : null}
+    {concealed ? <AppCard state="info" icon="shield" title="Không thể xem nhật ký" message="Quyền xem hiện không còn hoặc dữ liệu không khả dụng." /> : null}
     {valid && timezoneConflict ? (
-      <WorkoutState
+      <AppCard state="empty"
         title="Ngày nhật ký dùng khung giờ khác"
         message="Ngày này của học viên được ghi nhận theo một khung giờ khác. Hãy tìm và chọn đúng thành phố/khu vực từ danh sách thân thiện ở trên rồi nhấn Xem ngày."
       />
     ) : null}
-    {valid && query.isError && !concealed && !timezoneConflict ? <WorkoutState title="Không thể tải nhật ký" message="Kiểm tra kết nối và khung giờ." onRetry={() => query.refetch()} /> : null}
+    {valid && query.isError && !concealed && !timezoneConflict ? <AppCard state="error" title="Không thể tải nhật ký" message="Kiểm tra kết nối và khung giờ." onRetry={() => query.refetch()} /> : null}
     {valid && dayDataMatchesScope && query.data && !query.isFetching && !concealed ? <>
-      <WorkoutCard>
+      <AppCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{query.data.date} · {formatTimezoneDisplay(query.data.timezone, 'Múi giờ cũ chưa được ghi')}</Text>
         <Text style={[styles.body, { color: theme.textPrimary }]}>{query.data.completeness === 'NOT_LOGGED' ? 'Chưa ghi' : query.data.completeness === 'COMPLETE' ? 'Đã xác nhận' : 'Đang ghi'}</Text>
         {query.data.nutrients.map((value) => <Text key={value.code} style={[styles.body, { color: theme.textPrimary }]}>{nutrientLabel(value.code)}: {nutrientText(value.total, value.knownSubtotal)}</Text>)}
-      </WorkoutCard>
-      {query.data.items.map((item) => <WorkoutCard key={item.id}><Text style={[styles.h2, { color: theme.textPrimary }]}>{item.name}</Text>
+      </AppCard>
+      {query.data.items.map((item) => <AppCard key={item.id}><Text style={[styles.h2, { color: theme.textPrimary }]}>{item.name}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>{item.kind === 'DESCRIPTION_ONLY' ? 'Chưa định lượng' : `${item.servings ?? '?'} ${item.servingLabel ?? 'khẩu phần'}`}</Text>
-      </WorkoutCard>)}
-      {query.data.items.length === 0 ? <WorkoutState title="Chưa có món" message="Không suy intake bằng 0 từ ngày chưa ghi." /> : null}
+      </AppCard>)}
+      {query.data.items.length === 0 ? <AppCard state="empty" title="Chưa có món" message="Không suy intake bằng 0 từ ngày chưa ghi." /> : null}
     </> : null}
   </ScrollView>;
 }

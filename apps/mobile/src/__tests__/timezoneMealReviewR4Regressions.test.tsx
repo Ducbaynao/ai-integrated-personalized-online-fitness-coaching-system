@@ -3,6 +3,7 @@ import renderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { WorkoutButton } from '@/features/workout-plan/components/WorkoutUi';
+import { AppButton } from '@/design-system/components/AppButton';
 import { NutritionScreen } from '@/features/nutrition/NutritionScreen';
 import { NutritionStrategyScreen } from '@/features/nutrition/NutritionStrategyScreen';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -114,7 +115,7 @@ async function rerender(tree: renderer.ReactTestRenderer, node: React.ReactEleme
   await flush();
 }
 function button(tree: renderer.ReactTestRenderer, label: string) {
-  const found = tree.root.findAll((node) => node.type === WorkoutButton && node.props.label === label);
+  const found = tree.root.findAll((node) => (node.type === WorkoutButton || node.type === AppButton) && node.props.label === label);
   if (!found.length) throw new Error(`button not found: ${label}`);
   return found[0];
 }
