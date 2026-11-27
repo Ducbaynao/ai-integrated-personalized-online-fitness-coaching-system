@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { AccessibilityInfo, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { AppButton } from '@/design-system/components/AppButton';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 import { ExerciseSummary } from '@/types/exercise';
 import { ExerciseCatalogContent } from './components/ExerciseCatalogContent';
@@ -42,41 +42,33 @@ export function ExercisePicker({
           <Text style={[styles.selectionLabel, { color: colors.textSecondary }]}>Bài tập đã chọn</Text>
           <Text
             testID="exercise-picker-selection-summary"
-            style={[styles.selectionValue, { color: selectedIsExcluded ? colors.warningText : colors.textPrimary }]}
-            numberOfLines={2}>
+            style={[styles.selectionValue, { color: selectedIsExcluded ? colors.warningText : colors.textPrimary }]}>
             {selectedIsExcluded
               ? 'Bài tập này đã được thêm'
               : selectedExercise?.name ?? 'Chưa chọn bài tập'}
           </Text>
         </View>
         <View style={styles.buttons}>
-          <Pressable
+          <AppButton
+            label="Hủy"
+            icon="back"
+            variant="secondary"
             testID="cancel-exercise-picker"
-            accessibilityRole="button"
             accessibilityLabel="Hủy chọn bài tập"
             accessibilityHint="Đóng trình chọn mà không trả về bài tập"
             onPress={onCancel}
-            style={[styles.secondaryButton, { borderColor: colors.primary }]}>
-            <Text style={[styles.buttonText, { color: colors.primary }]}>Hủy</Text>
-          </Pressable>
-          <Pressable
+            style={styles.button} />
+          <AppButton
+            label="Xác nhận"
+            icon="check"
             testID="confirm-exercise-picker"
-            accessibilityRole="button"
             accessibilityLabel="Xác nhận bài tập đã chọn"
             accessibilityHint="Trả bài tập đã chọn về màn hình tạo kế hoạch"
-            accessibilityState={{ disabled: !canConfirm }}
             disabled={!canConfirm}
             onPress={() => {
               if (canConfirm && selectedExercise) onConfirm(selectedExercise);
             }}
-            style={[
-              styles.primaryButton,
-              { backgroundColor: canConfirm ? colors.primary : colors.surfaceSubtle },
-            ]}>
-            <Text style={[styles.buttonText, { color: canConfirm ? colors.textOnPrimary : colors.textSecondary }]}>
-              Xác nhận
-            </Text>
-          </Pressable>
+            style={styles.button} />
         </View>
       </View>
     );
@@ -117,21 +109,6 @@ const styles = StyleSheet.create({
   selectionSummary: { gap: spacing.xxs },
   selectionLabel: { ...typography.caption },
   selectionValue: { ...typography.label },
-  buttons: { flexDirection: 'row', gap: spacing.md },
-  secondaryButton: {
-    flex: 1,
-    minHeight: layout.minimumTouchTarget,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButton: {
-    flex: 1,
-    minHeight: layout.minimumTouchTarget,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: { ...typography.label },
+  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  button: { flexGrow: 1, flexBasis: '45%', minWidth: layout.minimumTouchTarget },
 });

@@ -1,3 +1,7 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -7,14 +11,14 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
 import { ApiError } from '@/types/auth';
 import type { CancelPlannedWorkoutRequest, ReschedulePlannedWorkoutRequest, WorkoutScheduleChangeDestination } from '@/types/workoutSchedule';
-import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
+import { workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from '@/features/workout-plan/components/AiWorkoutAdjustmentModal';
 import { AiWorkoutRescheduleModal } from '@/features/ai-workout-reschedule/AiWorkoutRescheduleModal';
 import { rescheduleQueryKeys } from '@/features/ai-workout-reschedule/rescheduleQueries';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from '@/features/workout-plan/workoutPlanQueries';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { LocalDateTimeInputField } from '@/components/ui/LocalDateTimeInputField';
-import { spacing } from '@/design-system/tokens/spacing';
+import { layout, spacing } from '@/design-system/tokens/spacing';
 import { validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
 import { formatTimezoneDisplay, resolveExistingRecordTimezone } from '@/features/shared/timezoneUtils';
 import { workoutScheduleQueryKeys, useWorkoutScheduleDetail } from './workoutScheduleQueries';
@@ -188,15 +192,15 @@ export function StudentWorkoutScheduleDetailScreen({
     }
   };
 
-  if (!allowed) return <WorkoutState title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem lịch tập." />;
-  return <ScrollView testID="student-schedule-detail" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
-    <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Chi tiết buổi tập theo lịch</Text>
-    <WorkoutButton label="Quay lại lịch tập" secondary onPress={() => router.back()} />
-    {query.isPending ? <WorkoutState busy title="Đang tải buổi tập" message="Vui lòng chờ." /> : null}
-    {query.isError && !permissionLost ? <WorkoutState testID="schedule-detail-error" title="Không thể tải buổi tập" message={scheduleChangeErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
-    {permissionLost ? <WorkoutState testID="schedule-detail-concealed" title="Không còn quyền xem" message="Buổi tập không còn khả dụng. Hãy quay lại lịch và tải dữ liệu mới." /> : null}
+  if (!allowed) return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem lịch tập." state="info" />;
+  return <SafeAreaView style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="student-schedule-detail" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="calendar" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Chi tiết buổi tập theo lịch</Text></View>
+    <AppButton label="Quay lại lịch tập" onPress={() => router.back()} variant="secondary" icon="back" />
+    {query.isPending ? <AppCard title="Đang tải buổi tập" message="Vui lòng chờ." state="loading" /> : null}
+    {query.isError && !permissionLost ? <AppCard testID="schedule-detail-error" title="Không thể tải buổi tập" message={scheduleChangeErrorMessage(query.error)} onRetry={() => query.refetch()} state="error" /> : null}
+    {permissionLost ? <AppCard testID="schedule-detail-concealed" title="Không còn quyền xem" message="Buổi tập không còn khả dụng. Hãy quay lại lịch và tải dữ liệu mới." state="info" /> : null}
     {item && !query.isError && !permissionLost ? <>
-      <WorkoutCard>
+      <AppCard>
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{item.sessionSummary?.name?.trim() || 'Buổi tập theo lịch'}</Text>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{plannedWorkoutStatusLabels[item.status]}</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Kế hoạch: {item.planSummary?.planName?.trim() || 'Chưa có tên kế hoạch trong bản ghi cũ'}</Text>
@@ -207,22 +211,22 @@ export function StudentWorkoutScheduleDetailScreen({
           ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ địa phương: {item.localStart} UTC{item.startUtcOffset} → {item.localEnd} UTC{item.endUtcOffset} · {formatTimezoneDisplay(item.timezone)}</Text>
           : <Text style={[styles.body, { color: theme.textSecondary }]}>Bản ghi cũ chưa có đủ giờ địa phương, múi giờ hoặc UTC offset.</Text>}
         <Text style={[styles.body, { color: theme.textSecondary }]}>Mốc đầu chuỗi: {formatScheduleTime(item.originalPlannedStartAt, item.timezone, user?.timezone)}</Text>
-        {item.rescheduledFromOccurrenceId ? <WorkoutButton testID="schedule-predecessor" label="Xem buổi tập trước khi đổi lịch" secondary onPress={() => router.push(`/workouts/schedule/${item.rescheduledFromOccurrenceId}` as never)} /> : null}
-        {item.replacementOccurrenceId ? <WorkoutButton testID="schedule-replacement" label="Xem buổi tập thay thế" secondary onPress={() => router.push(`/workouts/schedule/${item.replacementOccurrenceId}` as never)} /> : null}
+        {item.rescheduledFromOccurrenceId ? <AppButton testID="schedule-predecessor" label="Xem buổi tập trước khi đổi lịch" onPress={() => router.push(`/workouts/schedule/${item.rescheduledFromOccurrenceId}` as never)} variant="secondary" icon="calendar" /> : null}
+        {item.replacementOccurrenceId ? <AppButton testID="schedule-replacement" label="Xem buổi tập thay thế" onPress={() => router.push(`/workouts/schedule/${item.replacementOccurrenceId}` as never)} variant="secondary" /> : null}
         {item.linkedAppointmentId ? <>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi tập đang liên kết với một lịch hẹn riêng. Đổi lịch chỉ hợp lệ khi buổi mới vẫn nằm trọn trong chính lịch hẹn đó.</Text>
-          <WorkoutButton label="Xem lịch hẹn đang liên kết" secondary onPress={() => router.push(`/appointments/${item.linkedAppointmentId}` as never)} />
+          <AppButton label="Xem lịch hẹn đang liên kết" onPress={() => router.push(`/appointments/${item.linkedAppointmentId}` as never)} variant="secondary" icon="calendar" />
         </> : null}
-      </WorkoutCard>
-      {needsReview ? <WorkoutState testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} /> : null}
+      </AppCard>
+      {needsReview ? <AppCard testID="schedule-change-review" title="Lịch đã thay đổi" message="Dữ liệu mới đã được tải. Hãy xem lại rồi chọn thao tác và xác nhận lại; lệnh cũ không được gửi lại." onRetry={() => { setNeedsReview(false); setError(''); }} state="error" /> : null}
       {mode === 'VIEW' && !needsReview ? <View style={styles.row}>
-        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
-        {item.status === 'SCHEDULED' ? <WorkoutButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" secondary onPress={handleOpenRescheduleModal} /> : null}
-        {item.availableActions.includes('RESCHEDULE') ? <WorkoutButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination({ ...EMPTY_DESTINATION, timezone: resolveExistingRecordTimezone(item.timezone) }); resetCommand(); }} /> : null}
-        {item.availableActions.includes('CANCEL') ? <WorkoutButton testID="schedule-cancel" label="Hủy buổi này" danger onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} /> : null}
+        {item.status === 'SCHEDULED' ? <AppButton testID="ai-workout-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" onPress={() => setIsAdjustmentModalVisible(true)} variant="secondary" icon="knowledge" /> : null}
+        {item.status === 'SCHEDULED' ? <AppButton testID="ai-workout-reschedule-button" label="Đề xuất dời lịch tập (AI)" onPress={handleOpenRescheduleModal} variant="secondary" icon="calendar" /> : null}
+        {item.availableActions.includes('RESCHEDULE') ? <AppButton testID="schedule-reschedule" label="Đổi lịch buổi này" onPress={() => { setMode('RESCHEDULE'); setDestination({ ...EMPTY_DESTINATION, timezone: resolveExistingRecordTimezone(item.timezone) }); resetCommand(); }} icon="calendar" /> : null}
+        {item.availableActions.includes('CANCEL') ? <AppButton testID="schedule-cancel" label="Hủy buổi này" onPress={() => { setMode('CANCEL'); setReason(''); resetCommand(); }} variant="danger" /> : null}
       </View> : null}
       {mode === 'RESCHEDULE' && item.availableActions.includes('RESCHEDULE') && !needsReview ? <>
-        <WorkoutCard testID="schedule-reschedule-form">
+        <AppCard testID="schedule-reschedule-form">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Chọn giờ mới</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Chọn ngày giờ địa phương và xác nhận UTC offset phù hợp. Không suy giờ kết thúc từ kế hoạch.</Text>
           <Text testID="schedule-timezone-display" style={[styles.label, { color: theme.textPrimary }]}>Khung giờ áp dụng: {formatTimezoneDisplay(destination.timezone)}</Text>
@@ -243,36 +247,37 @@ export function StudentWorkoutScheduleDetailScreen({
               />
               {local && !choices.length ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Giờ không tồn tại trong múi giờ này hoặc sai định dạng.</Text> : null}
               {choices.length > 1 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Giờ lặp khi đổi DST. Hãy chọn một offset tường minh.</Text> : null}
-              <View style={styles.row}>{choices.map((choice) => <WorkoutButton key={choice.offset} label={`UTC${choice.offset}`} secondary={offset !== choice.offset}
-                onPress={() => editDestination(part === 'Start' ? { startUtcOffset: choice.offset } : { endUtcOffset: choice.offset })} />)}</View>
+              <View style={styles.row}>{choices.map((choice) => <AppButton key={choice.offset} label={`UTC${choice.offset}`}
+                onPress={() => editDestination(part === 'Start' ? { startUtcOffset: choice.offset } : { endUtcOffset: choice.offset })} variant={offset !== choice.offset ? 'secondary' : 'primary'} />)}</View>
             </View>;
           })}
-          <WorkoutButton testID="schedule-review-reschedule" label="Xem trước lịch mới" disabled={mutation.isPending} onPress={() => {
+          <AppButton testID="schedule-review-reschedule" label="Xem trước lịch mới" disabled={mutation.isPending} onPress={() => {
             const issue = validateScheduleDestination(destination); setError(issue ?? ''); setPreview(!issue);
-          }} />
-        </WorkoutCard>
-        {preview ? <WorkoutCard testID="schedule-reschedule-preview">
+          }} icon="calendar" />
+        </AppCard>
+        {preview ? <AppCard testID="schedule-reschedule-preview">
           <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận đổi một buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi cũ được giữ trong lịch sử; buổi mới sẽ có ID riêng, giữ nguyên nguồn kế hoạch và nội dung tập.</Text>
           {item.linkedAppointmentId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch hẹn không tự dời. Buổi mới phải nằm trọn trong lịch hẹn đã xác nhận hiện tại; liên kết đang hoạt động sẽ chuyển sang buổi mới. Nếu cần giờ ngoài lịch hẹn, hãy hoàn tất yêu cầu đổi lịch hẹn trước rồi xem và xác nhận lại buổi tập.</Text> : null}
           <Text style={[styles.body, { color: theme.textPrimary }]}>{destination.localStart} UTC{destination.startUtcOffset} → {destination.localEnd} UTC{destination.endUtcOffset} · {formatTimezoneDisplay(destination.timezone)}</Text>
-          <WorkoutButton testID="schedule-confirm-reschedule" label="Xác nhận đổi lịch" busy={mutation.isPending} disabled={mutation.isPending} onPress={submit} />
-        </WorkoutCard> : null}
+          <AppButton testID="schedule-confirm-reschedule" label="Xác nhận đổi lịch" loading={mutation.isPending} disabled={mutation.isPending} onPress={submit} icon="check" />
+        </AppCard> : null}
       </> : null}
-      {mode === 'CANCEL' && item.availableActions.includes('CANCEL') && !needsReview ? <WorkoutCard testID="schedule-cancel-form">
+      {mode === 'CANCEL' && item.availableActions.includes('CANCEL') && !needsReview ? <AppCard testID="schedule-cancel-form">
         <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận hủy buổi tập</Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi này sẽ chuyển sang Đã hủy và vẫn xem được trong lịch sử. Không tạo buổi thay thế.</Text>
         {item.linkedAppointmentId ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Hủy buổi tập không hủy lịch hẹn. Lịch hẹn vẫn được xác nhận; Huấn luyện viên sẽ được thông báo. Nếu muốn hủy lịch hẹn, hãy thực hiện riêng trong phần Lịch hẹn.</Text> : null}
+        <Text style={[styles.label, { color: theme.textPrimary }]}>Lý do hủy buổi tập</Text>
         <TextInput testID="schedule-cancel-reason" accessibilityLabel="Lý do hủy buổi tập" placeholder="Lý do hủy (bắt buộc nếu đã qua giờ bắt đầu)" multiline maxLength={1000} value={reason}
           onChangeText={(value) => { setReason(value); resetCommand(); }} style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]} />
-        <WorkoutButton testID="schedule-review-cancel" label="Xem lại trước khi hủy" onPress={() => {
+        <AppButton testID="schedule-review-cancel" label="Xem lại trước khi hủy" onPress={() => {
           const missing = new Date(item.plannedStartAt).getTime() <= Date.now() && !reason.trim();
           setError(missing ? 'Buổi tập đã qua giờ bắt đầu; hãy nhập lý do hủy.' : ''); setPreview(!missing);
         }} />
-        {preview ? <WorkoutButton testID="schedule-confirm-cancel" label="Xác nhận hủy buổi này" danger busy={mutation.isPending} disabled={mutation.isPending} onPress={submit} /> : null}
-      </WorkoutCard> : null}
-      {mode !== 'VIEW' ? <WorkoutButton label="Không thay đổi" secondary disabled={mutation.isPending} onPress={() => { setMode('VIEW'); resetCommand(); }} /> : null}
-      {error ? <WorkoutState testID="schedule-change-error" title="Chưa thể cập nhật lịch" message={error} onRetry={retryCommand && !needsReview && !permissionLost ? () => send(retryCommand) : undefined} /> : null}
+        {preview ? <AppButton testID="schedule-confirm-cancel" label="Xác nhận hủy buổi này" loading={mutation.isPending} disabled={mutation.isPending} onPress={submit} variant="danger" icon="check" /> : null}
+      </AppCard> : null}
+      {mode !== 'VIEW' ? <AppButton label="Không thay đổi" disabled={mutation.isPending} onPress={() => { setMode('VIEW'); resetCommand(); }} variant="secondary" icon="back" /> : null}
+      {error ? <AppCard testID="schedule-change-error" title="Chưa thể cập nhật lịch" message={error} onRetry={retryCommand && !needsReview && !permissionLost ? () => send(retryCommand) : undefined} state="error" /> : null}
       <AiWorkoutAdjustmentModal
         visible={isAdjustmentModalVisible}
         studentId={studentId}
@@ -330,5 +335,5 @@ export function StudentWorkoutScheduleDetailScreen({
         onApplied={(result) => setLastAppliedSuccessorId(result.resultingEntityId || null)}
       /> : null}
     </> : null}
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }

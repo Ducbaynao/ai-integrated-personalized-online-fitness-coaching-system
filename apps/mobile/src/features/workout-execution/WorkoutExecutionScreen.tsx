@@ -1,9 +1,14 @@
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import { formatInstantVietnam } from '@/localization/instantDisplay';
 import { formatRecordedScheduleTime } from '@/features/workout-schedule/scheduleDisplay';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +22,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
-import { layout, spacing } from '@/design-system/tokens/spacing';
+import { typography } from '@/design-system/tokens/typography';
+import { iconSize, layout, spacing } from '@/design-system/tokens/spacing';
 import { ExercisePicker } from '@/features/exercise/ExercisePicker';
 import { useExerciseDetail } from '@/features/exercise/exerciseQueries';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -33,12 +39,7 @@ import {
   WorkoutSetExecution,
   WorkoutExecutionSetCompletionStatus,
 } from '@/types/workoutExecution';
-import {
-  ExecutionButton,
-  ExecutionCard,
-  ExecutionState,
-  executionStyles as styles,
-} from './components/WorkoutExecutionUi';
+import { executionStyles as styles } from './components/WorkoutExecutionUi';
 import {
   useCurrentWorkoutExecution,
   useWorkoutExecutionDetail,
@@ -241,11 +242,12 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
   return (
     <View
       testID={`workout-set-${set.clientSetId}`}
-      style={[local.setCard, { borderColor: theme.border }]}>
-      <Text style={[styles.label, { color: theme.textPrimary }]}>
+      style={[local.setCard, { borderColor: theme.border, backgroundColor: theme.surfaceSubtle }]}>
+      <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>
         Hiệp {set.setNumber} · {workoutSetTypeLabels[set.setType]}
       </Text>
-      <View accessibilityRole="radiogroup" style={styles.row}>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>Giá trị trống là chưa ghi.</Text>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Trạng thái hiệp" style={styles.row}>
         {setStatuses.map((item) => {
           const selected = status === item;
           return (
@@ -263,7 +265,8 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
                   backgroundColor: selected ? theme.brandSoft : theme.surface,
                 },
               ]}>
-              <Text style={[styles.caption, { color: selected ? theme.primary : theme.textSecondary }]}>
+              {selected ? <AppIcon name="check" size={iconSize.small} color={theme.primary} /> : null}
+              <Text style={[styles.body, { color: selected ? theme.primary : theme.textPrimary, flexShrink: 1 }]}>
                 {workoutSetStatusLabels[item]}
               </Text>
             </Pressable>
@@ -300,20 +303,18 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
       <LabeledInput label="Ghi chú hiệp" value={note} onChangeText={setNote} multiline />
       {validation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{validation}</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{error}</Text> : null}
-      <ExecutionButton
+      <AppButton
         testID={`save-workout-set-${set.clientSetId}`}
         label={busy ? 'Đang lưu hiệp' : 'Lưu hiệp'}
-        busy={busy}
+        loading={busy}
         disabled={busy}
-        onPress={save}
+        onPress={save} icon="check"
       />
       {onRemove ? (
-        <ExecutionButton
+        <AppButton
           label="Hủy thêm hiệp này"
-          secondary
-          danger
           disabled={busy}
-          onPress={onRemove}
+          onPress={onRemove} variant="secondary" tone="danger" icon="trash"
         />
       ) : null}
     </View>
@@ -374,6 +375,7 @@ function LabeledInput({
       multiline={multiline}
       style={[
         styles.input,
+        keyboardType ? local.numericInput : null,
         trailingUnit ? local.inputWithUnitControl : null,
         multiline ? local.multiline : null,
         {
@@ -386,7 +388,7 @@ function LabeledInput({
   );
   return (
     <View style={local.field}>
-      <Text style={[styles.caption, { color: theme.textSecondary }]}>{label}</Text>
+      <Text style={[styles.label, { color: theme.textPrimary }]}>{label}</Text>
       {trailingUnit ? (
         <View
           style={[
@@ -422,22 +424,22 @@ export function CurrentWorkoutExecutionScreen() {
   const query = useCurrentWorkoutExecution(studentId, allowed);
 
   if (!allowed) {
-    return <ExecutionState title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để ghi buổi tập của bạn." />;
+    return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để ghi buổi tập của bạn." state="info" />;
   }
-  if (query.isPending) return <ExecutionState busy title="Đang tải buổi tập" message="Vui lòng chờ trong giây lát." />;
+  if (query.isPending) return <AppCard title="Đang tải buổi tập" message="Vui lòng chờ trong giây lát." state="loading" />;
   if (query.isError && isCurrentExecutionMissing(query.error)) {
     return (
-      <ExecutionState
+      <AppCard
         testID="current-workout-empty"
         title="Không có buổi tập đang diễn ra"
         message="Chưa có buổi tập nào được bắt đầu. Hãy quay lại khi lịch tập của bạn đã sẵn sàng."
-        actionLabel="Xem lịch sử tập luyện"
-        onAction={() => router.push('/workouts/history' as never)}
-      />
+        state="empty">
+        <AppButton label="Xem lịch sử tập luyện" variant="secondary" icon="history" onPress={() => router.push('/workouts/history' as never)} />
+      </AppCard>
     );
   }
   if (query.isError || !query.data) {
-    return <ExecutionState testID="current-workout-error" title="Không thể tải buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} />;
+    return <AppCard testID="current-workout-error" title="Không thể tải buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} state="error" />;
   }
   return <WorkoutExecutionContent detail={query.data} currentRoute onRefresh={() => query.refetch()} />;
 }
@@ -448,9 +450,9 @@ export function WorkoutExecutionDetailScreen({ executionId }: { executionId: str
   const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
   const query = useWorkoutExecutionDetail(studentId, executionId, allowed);
 
-  if (!allowed) return <ExecutionState title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem buổi tập của bạn." />;
-  if (query.isPending) return <ExecutionState busy title="Đang tải chi tiết" message="Vui lòng chờ trong giây lát." />;
-  if (query.isError || !query.data) return <ExecutionState testID="workout-detail-error" title="Không thể mở buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} />;
+  if (!allowed) return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem buổi tập của bạn." state="info" />;
+  if (query.isPending) return <AppCard title="Đang tải chi tiết" message="Vui lòng chờ trong giây lát." state="loading" />;
+  if (query.isError || !query.data) return <AppCard testID="workout-detail-error" title="Không thể mở buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} state="error" />;
   return <WorkoutExecutionContent detail={query.data} onRefresh={() => query.refetch()} />;
 }
 
@@ -643,19 +645,20 @@ function WorkoutExecutionContent({
   };
 
   return (
-    <ScrollView
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView
       testID="workout-execution-screen"
       style={[styles.screen, { backgroundColor: theme.canvas }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, local.content]}
+      automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled">
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>
+      <View style={local.heading}><AppIcon name="workout" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>
         {inProgress ? 'Buổi tập đang diễn ra' : 'Kết quả buổi tập'}
-      </Text>
+      </Text></View>
       <View style={styles.row}>
-        <ExecutionButton label="Quay lại" secondary onPress={() => router.back()} />
-        <ExecutionButton label="Lịch sử tập luyện" secondary onPress={() => router.push('/workouts/history' as never)} />
+        <AppButton label="Quay lại" onPress={() => router.back()} variant="secondary" icon="back" />
+        <AppButton label="Lịch sử tập luyện" onPress={() => router.push('/workouts/history' as never)} variant="secondary" icon="history" />
       </View>
-      <ExecutionCard testID="workout-execution-summary">
+      <AppCard testID="workout-execution-summary">
         <Text style={[styles.h2, { color: theme.textPrimary }]}>
           {workoutExecutionStatusLabels[detail.execution.status]}
         </Text>
@@ -687,20 +690,20 @@ function WorkoutExecutionContent({
             Kết thúc thực tế: {formatInstantVietnam(detail.execution.performedEndedAt) ?? 'Chưa rõ thời điểm'}
           </Text>
         ) : null}
-      </ExecutionCard>
+      </AppCard>
 
       {detail.exercises.length === 0 ? (
-        <ExecutionState title="Không có chi tiết bài tập" message="Bản ghi này không chứa dữ liệu bài tập có thể hiển thị." />
+        <AppCard title="Không có chi tiết bài tập" message="Bản ghi này không chứa dữ liệu bài tập có thể hiển thị." state="empty" />
       ) : null}
       {detail.exercises.map((exercise, index) => {
         const added = Object.values(extraSets)
           .filter((item) => item.exerciseExecutionId === exercise.exerciseExecutionId)
           .map((item) => item.set);
         return (
-          <ExecutionCard key={exercise.exerciseExecutionId} testID={`workout-exercise-${exercise.exerciseExecutionId}`}>
-            <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>
+          <AppCard key={exercise.exerciseExecutionId} testID={`workout-exercise-${exercise.exerciseExecutionId}`}>
+            <View style={local.heading}><AppIcon name="exercise" color={theme.primary} /><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary, flex: 1 }]}>
               {index + 1}. {displayExercise(exercise)}
-            </Text>
+            </Text></View>
             <Text style={[styles.body, { color: theme.textSecondary }]}>{targetText(exercise)}</Text>
             {exercise.instructions ? <Text style={[styles.body, { color: theme.textPrimary }]}>{exercise.instructions}</Text> : null}
             {exercise.substitutionReason ? <Text style={[styles.body, { color: theme.warningText }]}>Lý do thay bài: {exercise.substitutionReason}</Text> : null}
@@ -723,10 +726,9 @@ function WorkoutExecutionContent({
             ))}
             {inProgress ? (
               <View style={styles.row}>
-                <ExecutionButton label="Thêm hiệp" secondary disabled={setMutation.isPending} onPress={() => addSet(exercise)} />
-                <ExecutionButton
+                <AppButton label="Thêm hiệp" disabled={setMutation.isPending} onPress={() => addSet(exercise)} variant="secondary" icon="plus" />
+                <AppButton
                   label="Thay bài tập"
-                  secondary
                   disabled={substitutionMutation.isPending || setMutation.isPending}
                   onPress={() => {
                     substitutionMutation.reset();
@@ -734,25 +736,25 @@ function WorkoutExecutionContent({
                     setPickerSelection(null);
                     setSelectedExercise(null);
                     setSubstitutionReason('');
-                  }}
+                  }} variant="secondary" icon="edit"
                 />
               </View>
             ) : null}
-          </ExecutionCard>
+          </AppCard>
         );
       })}
 
       {inProgress ? (
-        <ExecutionCard>
+        <AppCard>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Kết thúc buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
             Hệ thống sẽ xác định kết quả hoàn thành hoặc hoàn thành một phần từ các hiệp đã ghi.
           </Text>
           <View style={styles.row}>
-            <ExecutionButton testID="complete-workout-button" label="Hoàn thành buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('complete')} />
-            <ExecutionButton testID="abort-workout-button" label="Hủy buổi tập" secondary danger disabled={setMutation.isPending} onPress={() => openTerminal('abort')} />
+            <AppButton testID="complete-workout-button" label="Hoàn thành buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('complete')} icon="check" />
+            <AppButton testID="abort-workout-button" label="Hủy buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('abort')} variant="secondary" tone="danger" />
           </View>
-        </ExecutionCard>
+        </AppCard>
       ) : null}
 
       <Modal
@@ -778,70 +780,78 @@ function WorkoutExecutionContent({
               ].filter(Boolean)}
             />
           ) : (
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={[styles.content, local.content]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
               <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Chọn biến thể</Text>
               <Text style={[styles.body, { color: theme.textSecondary }]}>{selectedExercise.name}</Text>
               <LabeledInput label="Lý do thay bài (không bắt buộc)" value={substitutionReason} onChangeText={(value) => { setSubstitutionReason(value); }} multiline />
-              {exerciseDetail.isPending ? <ExecutionState busy title="Đang tải biến thể" message="Vui lòng chờ trong giây lát." /> : null}
-              {exerciseDetail.isError ? <ExecutionState title="Không thể tải biến thể" message="Hãy thử lại." onRetry={() => exerciseDetail.refetch()} /> : null}
+              {exerciseDetail.isPending ? <AppCard title="Đang tải biến thể" message="Vui lòng chờ trong giây lát." state="loading" /> : null}
+              {exerciseDetail.isError ? <AppCard title="Không thể tải biến thể" message="Hãy thử lại." onRetry={() => exerciseDetail.refetch()} state="error" /> : null}
               {exerciseDetail.data?.variations.map((variation) => (
-                <ExecutionButton
+                <AppButton
                   key={variation.id}
                   label={`${variation.name}${variation.defaultVariation ? ' · Mặc định' : ''}`}
-                  secondary
-                  busy={substitutionMutation.isPending}
+                  loading={substitutionMutation.isPending}
                   disabled={substitutionMutation.isPending}
-                  onPress={() => substitutionMutation.mutate(variation.id)}
+                  onPress={() => substitutionMutation.mutate(variation.id)} variant="secondary"
                 />
               ))}
-              {substitutionMutation.isError ? <ExecutionState title="Chưa thể thay bài tập" message={workoutExecutionErrorMessage(substitutionMutation.error)} /> : null}
-              <ExecutionButton label="Chọn bài tập khác" secondary disabled={substitutionMutation.isPending} onPress={() => { setSelectedExercise(null); setPickerSelection(null); }} />
-              <ExecutionButton label="Hủy thay bài" secondary disabled={substitutionMutation.isPending} onPress={() => { substitutionMutation.reset(); setSubstitutionTarget(null); setPickerSelection(null); }} />
+              {substitutionMutation.isError ? <AppCard title="Chưa thể thay bài tập" message={workoutExecutionErrorMessage(substitutionMutation.error)} state="error" /> : null}
+              <AppButton label="Chọn bài tập khác" disabled={substitutionMutation.isPending} onPress={() => { setSelectedExercise(null); setPickerSelection(null); }} variant="secondary" icon="back" />
+              <AppButton label="Hủy thay bài" disabled={substitutionMutation.isPending} onPress={() => { substitutionMutation.reset(); setSubstitutionTarget(null); setPickerSelection(null); }} variant="secondary" icon="back" />
             </ScrollView>
           )}
         </SafeAreaView>
       </Modal>
 
       <Modal visible={terminal !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={() => !terminalMutation.isPending && setTerminal(null)}>
-        <View style={[local.backdrop, { backgroundColor: theme.canvas }]}>
-          <ExecutionCard testID="workout-terminal-confirmation">
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}><KeyboardAvoidingView style={[local.backdrop, { backgroundColor: theme.canvas }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView style={local.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+          <AppCard testID="workout-terminal-confirmation">
             <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>
               {terminal === 'complete' ? 'Xác nhận hoàn thành' : 'Xác nhận hủy buổi tập'}
             </Text>
             <LabeledInput label="RPE toàn buổi (1–10, không bắt buộc)" value={overallRpe} onChangeText={(value) => { terminalKey.current = null; setOverallRpe(value); }} keyboardType="decimal-pad" />
             <LabeledInput label="Ghi chú buổi tập" value={sessionNote} onChangeText={(value) => { terminalKey.current = null; setSessionNote(value); }} multiline />
             {terminalValidation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{terminalValidation}</Text> : null}
-            {terminalMutation.isError ? <ExecutionState title="Chưa thể kết thúc buổi tập" message={workoutExecutionErrorMessage(terminalMutation.error)} /> : null}
+            {terminalMutation.isError ? <AppCard title="Chưa thể kết thúc buổi tập" message={workoutExecutionErrorMessage(terminalMutation.error)} state="error" /> : null}
             <View style={styles.row}>
-              <ExecutionButton label="Quay lại" secondary disabled={terminalMutation.isPending} onPress={() => { setTerminal(null); terminalKey.current = null; }} />
-              <ExecutionButton
+              <AppButton label="Quay lại" disabled={terminalMutation.isPending} onPress={() => { setTerminal(null); terminalKey.current = null; }} variant="secondary" icon="back" />
+              <AppButton
                 testID="confirm-workout-terminal"
                 label={terminalMutation.isPending ? 'Đang xử lý' : 'Xác nhận'}
-                busy={terminalMutation.isPending}
+                loading={terminalMutation.isPending}
                 disabled={terminalMutation.isPending}
-                danger={terminal === 'abort'}
-                onPress={submitTerminal}
+                onPress={submitTerminal} variant={terminal === 'abort' ? 'danger' : 'primary'} icon="check"
               />
             </View>
-          </ExecutionCard>
-        </View>
+          </AppCard>
+          </ScrollView>
+        </KeyboardAvoidingView></SafeAreaView>
       </Modal>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 
 const local = StyleSheet.create({
-  setCard: { borderTopWidth: 1, paddingTop: spacing.md, gap: spacing.sm },
+  content: { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' },
+  heading: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  modalScroll: { flexGrow: 0, width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' },
+  setCard: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.md },
   choice: {
     minHeight: layout.minimumTouchTarget,
+    minWidth: layout.minimumTouchTarget,
+    maxWidth: '100%',
     borderWidth: 1,
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  field: { minWidth: 132, flexGrow: 1, flexBasis: 132, gap: spacing.xs },
+  field: { minWidth: 0, maxWidth: '100%', flexGrow: 1, flexBasis: '45%', gap: spacing.sm },
+  numericInput: { ...typography.h3, fontVariant: ['tabular-nums'] },
   inputWithUnit: {
     minHeight: 48,
     borderWidth: 1,
@@ -849,8 +859,8 @@ const local = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  inputWithUnitControl: { flex: 1, minWidth: 72, borderWidth: 0, backgroundColor: 'transparent' },
-  unitSuffix: { paddingRight: spacing.md },
+  inputWithUnitControl: { flex: 1, minWidth: 0, borderWidth: 0, backgroundColor: 'transparent' },
+  unitSuffix: { paddingRight: spacing.md, maxWidth: '55%', flexShrink: 1 },
   multiline: { minHeight: 88, paddingVertical: spacing.md, textAlignVertical: 'top' },
   modalScreen: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg },
