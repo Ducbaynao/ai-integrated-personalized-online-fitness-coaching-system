@@ -1,5 +1,10 @@
+import { layout, spacing } from '@/design-system/tokens/spacing';
+import { NavigationAction } from '@/design-system/components/NavigationAction';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -65,20 +70,17 @@ export function ChatInboxScreen() {
   const concealed = query.isError && query.error instanceof ApiError && [403, 404].includes(query.error.status);
   const cache = useQueryClient();
   useEffect(() => { if (concealed) cache.removeQueries({ queryKey: ['chat', actor, role] }); }, [concealed, actor, role, cache]);
-  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-inbox" style={styles.screen} contentContainerStyle={styles.content}>
-    <Text style={[styles.title, { color: theme.textPrimary }]}>Tin nhắn</Text>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-inbox" style={styles.screen} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="chat" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Tin nhắn</Text></View>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Lịch sử được kiểm tra quyền khi tải. Tin nhắn mới chỉ đến từ kỳ huấn luyện hiện hành.</Text>
-    <CoachingButton label="Thông báo" secondary onPress={() => router.push('/notifications' as never)} />
-    {query.isPending ? <CoachingState busy title="Đang tải hội thoại" message="Vui lòng chờ." /> : null}
-    {query.isError ? <CoachingState title="Không thể tải hội thoại" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
-    {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có tin nhắn" message="Mở quan hệ huấn luyện hiện hành để gửi tin đầu tiên." /> : null}
-    {!concealed && !query.isError && rows.map((row: ChatConversation) => <Pressable key={row.id} accessibilityRole="button"
-      accessibilityLabel={conversationOpenLabel(row.updatedAt)}
-      onPress={() => router.push(`/chat/${row.id}` as never)}>
-      <CoachingCard><Text style={[styles.h2, { color: theme.textPrimary }]}>Hội thoại huấn luyện</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Cập nhật {formatInstantVietnam(row.updatedAt) ?? UNKNOWN_TIME_LABEL}</Text></CoachingCard>
-    </Pressable>)}
-    {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary busy={query.isFetchingNextPage}
+    <NavigationAction onPress={() => router.push('/notifications' as never)} title="Thông báo" accessibilityLabel="Thông báo" icon="bell" />
+    {query.isPending ? <AppCard state="loading" title="Đang tải hội thoại" message="Vui lòng chờ." /> : null}
+    {query.isError ? <AppCard state="error" title="Không thể tải hội thoại" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
+    {!query.isPending && !query.isError && rows.length === 0 ? <AppCard state="empty" title="Chưa có tin nhắn" message="Mở quan hệ huấn luyện hiện hành để gửi tin đầu tiên." /> : null}
+    {!concealed && !query.isError && rows.map((row: ChatConversation) => <NavigationAction key={row.id} testID={`chat-conversation-${row.id}`} title="Hội thoại huấn luyện" icon="chat"
+      accessibilityLabel={conversationOpenLabel(row.updatedAt)} description={`Cập nhật ${formatInstantVietnam(row.updatedAt) ?? UNKNOWN_TIME_LABEL}`}
+      onPress={() => router.push(`/chat/${row.id}` as never)} />)}
+    {query.hasNextPage && !query.isError ? <AppButton label="Tải thêm" variant="secondary" loading={query.isFetchingNextPage}
       disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
   </ScrollView></SafeAreaView>;
 }
@@ -380,19 +382,20 @@ export function NotificationsScreen() {
       setDeliveryFailure({ actor, role, message: errorText(error) });
     }
   };
-  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-notifications" style={styles.screen} contentContainerStyle={styles.content}>
-    <Text style={[styles.title, { color: theme.textPrimary }]}>Thông báo trong ứng dụng</Text>
-    <CoachingButton label="Mở tin nhắn" secondary onPress={() => router.push('/chat' as never)} />
-    <CoachingButton label="Tùy chọn thông báo đẩy" secondary onPress={() => router.push('/notifications/push' as never)} />
-    {query.isPending ? <CoachingState busy title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
-    {query.isError ? <CoachingState title="Không thể tải thông báo" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
-    {deliveryError ? <CoachingState title="Không thể xem trạng thái thông báo đẩy" message={deliveryError} /> : null}
-    {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có thông báo" message="Tin nhắn và cập nhật lịch hẹn sẽ xuất hiện ở đây." /> : null}
-    {!query.isError && rows.map(item => <CoachingCard key={item.id}>
-      <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.title}</Text>
+  return <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="chat-notifications" style={styles.screen} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="bell" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Thông báo trong ứng dụng</Text></View>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+<NavigationAction onPress={() => router.push('/chat' as never)} title="Mở tin nhắn" accessibilityLabel="Mở tin nhắn" icon="chat" tile />
+    <NavigationAction onPress={() => router.push('/notifications/push' as never)} title="Tùy chọn thông báo đẩy" accessibilityLabel="Tùy chọn thông báo đẩy" icon="bell" tile />
+</View>
+    {query.isPending ? <AppCard state="loading" title="Đang tải thông báo" message="Vui lòng chờ." /> : null}
+    {query.isError ? <AppCard state="error" title="Không thể tải thông báo" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
+    {deliveryError ? <AppCard state="error" title="Không thể xem trạng thái thông báo đẩy" message={deliveryError} /> : null}
+    {!query.isPending && !query.isError && rows.length === 0 ? <AppCard state="empty" title="Chưa có thông báo" message="Tin nhắn và cập nhật lịch hẹn sẽ xuất hiện ở đây." /> : null}
+    {!query.isError && rows.map(item => <AppCard key={item.id} title={item.title} icon="bell">
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.body}</Text>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{formatInstantVietnam(item.createdAt) ?? UNKNOWN_TIME_LABEL}</Text>
-      <CoachingButton label="Xem trạng thái thông báo đẩy" secondary onPress={() => { void showDelivery(item.id); }} />
+      <AppButton icon="info" label="Xem trạng thái thông báo đẩy" variant="ghost" onPress={() => { void showDelivery(item.id); }} />
       {visibleDelivery?.id === item.id ? <Text style={[styles.body, { color: theme.textSecondary }]}>
         {visibleDelivery.items.length ? visibleDelivery.items.map(state => ({
           QUEUED: 'Đang chờ', TICKET_ACCEPTED: 'Expo đã nhận', PROVIDER_ACCEPTED: 'Nhà cung cấp đã nhận',
@@ -400,31 +403,31 @@ export function NotificationsScreen() {
         }[state.status])).join(', ') : 'Không có thiết bị được bật thông báo đẩy khi sự kiện xảy ra.'}
       </Text> : null}
       {item.relatedEntityType === 'APPOINTMENT_REQUEST' && item.relatedEntityId
-        ? <CoachingButton label="Xem yêu cầu lịch hẹn" secondary onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem yêu cầu lịch hẹn" variant="secondary" onPress={() => router.push(`/appointments/requests/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'APPOINTMENT' && item.relatedEntityId
-        ? <CoachingButton label="Xem lịch hẹn" secondary onPress={() => router.push(`/appointments/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem lịch hẹn" variant="secondary" onPress={() => router.push(`/appointments/${item.relatedEntityId}` as never)} /> : null}
       {role === 'TRAINER' && item.relatedEntityType === 'PLANNED_WORKOUT' && item.relatedEntityId
-        ? <CoachingButton label="Mở không gian Học viên để xem buổi tập đã hủy" secondary onPress={() => router.push('/coaching' as never)} /> : null}
+        ? <AppButton label="Mở không gian Học viên để xem buổi tập đã hủy" variant="secondary" onPress={() => router.push('/coaching' as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'PLANNED_WORKOUT' && item.relatedEntityId
-        ? <CoachingButton label="Xem buổi tập đã lên lịch" secondary onPress={() => router.push(`/workouts/schedule/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem buổi tập đã lên lịch" variant="secondary" onPress={() => router.push(`/workouts/schedule/${item.relatedEntityId}` as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_SCHEDULE_PROPOSAL' && item.relatedEntityId
-        ? <CoachingButton label="Xem đề xuất lịch tập" secondary onPress={() => router.push(`/workout-schedule-proposals/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem đề xuất lịch tập" variant="secondary" onPress={() => router.push(`/workout-schedule-proposals/${item.relatedEntityId}` as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'WORKOUT_CHANGE_PROPOSAL' && item.relatedEntityId
-        ? <CoachingButton label="Xem đề xuất đổi lịch tập" secondary onPress={() => router.push(`/workout-change-proposals/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem đề xuất đổi lịch tập" variant="secondary" onPress={() => router.push(`/workout-change-proposals/${item.relatedEntityId}` as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'NUTRITION_STRATEGY_PROPOSAL'
-        ? <CoachingButton label="Xem đề xuất dinh dưỡng" secondary onPress={() => router.push('/nutrition/strategy' as never)} /> : null}
+        ? <AppButton label="Xem đề xuất dinh dưỡng" variant="secondary" onPress={() => router.push('/nutrition/strategy' as never)} /> : null}
       {role === 'STUDENT' && item.relatedEntityType === 'FITNESS_GOAL_PROPOSAL' && item.relatedEntityId
-        ? <CoachingButton label="Xem đề xuất mục tiêu" secondary onPress={() => router.push(`/goal-proposals/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem đề xuất mục tiêu" variant="secondary" onPress={() => router.push(`/goal-proposals/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'COACHING_REQUEST' && item.relatedEntityId
-        ? <CoachingButton label="Xem yêu cầu huấn luyện" secondary onPress={() => router.push(`/coaching/${item.relatedEntityId}` as never)} /> : null}
+        ? <AppButton label="Xem yêu cầu huấn luyện" variant="secondary" onPress={() => router.push(`/coaching/${item.relatedEntityId}` as never)} /> : null}
       {item.relatedEntityType === 'COACHING_RESUME_REQUEST'
-        ? <CoachingButton label="Xem quan hệ huấn luyện" secondary onPress={() => router.push('/coaching' as never)} /> : null}
+        ? <AppButton label="Xem quan hệ huấn luyện" variant="secondary" onPress={() => router.push('/coaching' as never)} /> : null}
       {['WORKOUT_ATTENTION_SIGNAL', 'REVIEW_ATTENTION_SIGNAL', 'COACHING_REVIEW_TASK']
         .includes(item.relatedEntityType ?? '')
-        ? <CoachingButton label={role === 'STUDENT' ? 'Xem tín hiệu và đánh giá' : 'Mở học viên để xem tín hiệu và đánh giá'}
-          secondary onPress={() => router.push(role === 'STUDENT' ? '/attention' as never : '/coaching' as never)} /> : null}
-      {!item.readAt ? <CoachingButton label="Đánh dấu thông báo đã đọc" secondary onPress={() => read.mutate(item.id)} /> : null}
-    </CoachingCard>)}
-    {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary onPress={() => query.fetchNextPage()} /> : null}
+        ? <AppButton label={role === 'STUDENT' ? 'Xem tín hiệu và đánh giá' : 'Mở học viên để xem tín hiệu và đánh giá'}
+          variant="secondary" onPress={() => router.push(role === 'STUDENT' ? '/attention' as never : '/coaching' as never)} /> : null}
+      {!item.readAt ? <AppButton icon="check" label="Đánh dấu thông báo đã đọc" variant="ghost" onPress={() => read.mutate(item.id)} /> : null}
+    </AppCard>)}
+    {query.hasNextPage && !query.isError ? <AppButton label="Tải thêm" variant="secondary" onPress={() => query.fetchNextPage()} /> : null}
   </ScrollView></SafeAreaView>;
 }

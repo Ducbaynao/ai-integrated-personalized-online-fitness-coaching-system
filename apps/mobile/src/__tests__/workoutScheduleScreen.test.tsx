@@ -132,7 +132,7 @@ describe('Student Planned Workout calendar', () => {
   it('handles loading, empty, server error and pagination without showing phantom actions', () => {
     schedule([], { data: undefined, isPending: true });
     let view = render();
-    expect(view.tree.root.findAllByProps({ busy: true }).length).toBeGreaterThan(0);
+    expect(view.tree.root.findAll(node => node.props.accessibilityRole === 'progressbar' && node.props['aria-busy'] === true).length).toBeGreaterThan(0);
     renderer.act(() => view.tree.unmount());
     schedule([]);
     view = render();

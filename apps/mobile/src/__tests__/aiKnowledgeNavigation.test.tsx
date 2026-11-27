@@ -98,7 +98,7 @@ describe('AI Knowledge Navigation Entries', () => {
       tree = renderer.create(<TrainerHomeScreen />);
     });
 
-    const button = tree.root.findByProps({ testID: 'trainer-view-ai-knowledge-button' });
+    const button = tree.root.findByProps({ testID: 'trainer-view-ai-knowledge-button' }).findByProps({ accessibilityRole: 'button' });
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Tra cứu kiến thức thể hình AI');
 

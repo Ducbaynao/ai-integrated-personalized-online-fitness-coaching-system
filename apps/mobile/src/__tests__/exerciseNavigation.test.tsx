@@ -42,7 +42,7 @@ describe('exercise catalog navigation access', () => {
     });
     let tree: renderer.ReactTestRenderer;
     renderer.act(() => { tree = renderer.create(<TrainerHomeScreen />); });
-    const entry = tree!.root.findByProps({ testID: 'trainer-view-exercise-library-button' });
+    const entry = tree!.root.findByProps({ testID: 'trainer-view-exercise-library-button' }).findByProps({ accessibilityRole: 'button' });
     expect(entry.props.accessibilityRole).toBe('button');
     expect(entry.props.accessibilityLabel).toBe('Mở thư viện bài tập');
     renderer.act(() => entry.props.onPress());

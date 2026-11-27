@@ -10,13 +10,13 @@ Mọi component hỗ trợ nội dung dài, localization, dynamic type và trạ
 - Size: `medium` 48 px, `large` 54 px.
 - State: default, pressed, focused, loading, disabled.
 - Destructive action phải ghi rõ đối tượng bị ảnh hưởng; không dùng icon đơn độc.
-- Implementation `AppButton` tại `apps/mobile/src/design-system/components`: icon trang trí tùy chọn, nhãn tự xuống dòng, loading giữ nhãn + spinner và chặn thao tác cùng disabled/busy semantics; focus bàn phím có viền. Hiện áp dụng cho Student Home, chưa thay các button nghiệp vụ khác.
+- Implementation `AppButton` tại `apps/mobile/src/design-system/components`: icon trang trí tùy chọn, nhãn tự xuống dòng, loading giữ nhãn + spinner và chặn thao tác cùng disabled/busy semantics; focus bàn phím có viền. Áp dụng cho Student/Trainer Home và các bề mặt entry/list/overview đã ghi trong handoff light UI. Legacy wrapper ngoài phạm vi vẫn giữ nguyên. `onPress` luôn được gọi không có đối số để native press event không trở thành domain/retry intent; disabled/loading chặn dispatch. `accessibilityHint`, style và tone danger cho secondary được hỗ trợ.
 
 ## AppCard, AppIcon & NavigationAction
 
-- `AppCard`: surface theo theme, border nhẹ, radius 16, padding 16 và gap 12; không thêm dữ liệu hay semantics tương tác.
+- `AppCard`: surface theo theme, border nhẹ, radius 16, padding 16 và gap 12; không phải press target. Có optional title/icon/message và state loading/empty/error/info; loading dùng progressbar + busy, error dùng alert. Retry dùng AppButton và không truyền press event. Có thể override isDark từ context màn hình và style trình bày; mặc định cũ vẫn tương thích.
 - `AppIcon`: dùng `expo-symbols` hiện có (Material Symbols trên Android/web, SF Symbols trên iOS), mặc định 24 px/regular; icon chỉ trang trí, nhãn được cung cấp bởi action cha.
-- `NavigationAction`: icon + nhãn + chevron cho hàng, hoặc icon + nhãn trong tile co giãn; touch target tối thiểu 44 px, hỗ trợ xuống dòng và pressed state. Không cắt nhãn tiếng Việt.
+- `NavigationAction`: icon + nhãn + chevron cho hàng, hoặc icon + nhãn trong tile co giãn; touch target tối thiểu 44 px, hỗ trợ xuống dòng và pressed state. Không cắt nhãn tiếng Việt. Optional description tự xuống dòng; action cha là press target duy nhất và callback nhận không đối số.
 - ST-01 dùng CTA kế hoạch chính, nhóm tập luyện/theo dõi/coaching-AI, rồi account/capability/logout. Đây là thiết kế bổ sung cho Home hiện có, chưa triển khai các summary dữ liệu trong đặc tả mục tiêu ST-01.
 
 ## AppTextField

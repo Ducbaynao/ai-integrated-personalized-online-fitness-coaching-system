@@ -1,3 +1,7 @@
+import { NavigationAction } from '@/design-system/components/NavigationAction';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, Text, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -8,9 +12,9 @@ import { workoutExecutionApi } from '@/services/workoutExecutionApi';
 import { workoutExecutionQueryKeys } from '@/features/workout-execution/workoutExecutionQueries';
 import { workoutExecutionErrorMessage } from '@/features/workout-execution/workoutExecutionMessages';
 import { useWorkoutSchedule, workoutScheduleQueryKeys } from './workoutScheduleQueries';
-import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
+import { workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
-import { spacing } from '@/design-system/tokens/spacing';
+import { layout, spacing } from '@/design-system/tokens/spacing';
 import { ApiError } from '@/types/auth';
 import type { PlannedWorkoutOccurrence, SkipPlannedWorkoutResponse } from '@/types/workoutSchedule';
 import type { WorkoutExecutionDetail } from '@/types/workoutExecution';
@@ -107,44 +111,46 @@ export function StudentWorkoutScheduleScreen() {
     send({ action, occurrenceId: item.occurrenceId, expectedOccurrenceVersion: item.occurrenceVersion, commandKey });
   };
 
-  if (!allowed) return <WorkoutState title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem lịch tập của bạn." />;
+  if (!allowed) return <AppCard state="info" icon="shield" title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem lịch tập của bạn." />;
 
-  return <ScrollView testID="student-workout-schedule-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
-    <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Lịch tập dự kiến</Text>
-    <WorkoutButton label="Quay lại kế hoạch" secondary onPress={() => router.back()} />
-    <WorkoutButton testID="open-student-change-proposals" label="Xem đề xuất đổi hoặc hủy lịch" secondary onPress={() => router.push('/workout-change-proposals' as never)} />
-    <WorkoutButton testID="open-student-recurrence" label="Xem lịch tập lặp và kết quả từng kỳ" secondary onPress={() => router.push('/planned-workout-series' as never)} />
-    <WorkoutCard>
+  return <ScrollView testID="student-workout-schedule-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="calendar" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Lịch tập dự kiến</Text></View>
+    <AppButton icon="back" label="Quay lại kế hoạch" variant="ghost" onPress={() => router.back()} />
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+<NavigationAction testID="open-student-change-proposals" onPress={() => router.push('/workout-change-proposals' as never)} title="Xem đề xuất đổi hoặc hủy lịch" accessibilityLabel="Xem đề xuất đổi hoặc hủy lịch" icon="calendar" tile />
+    <NavigationAction testID="open-student-recurrence" onPress={() => router.push('/planned-workout-series' as never)} title="Xem lịch tập lặp và kết quả từng kỳ" accessibilityLabel="Xem lịch tập lặp và kết quả từng kỳ" icon="history" tile />
+</View>
+    <AppCard>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Cửa sổ 30 ngày</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{formatScheduleTime(range.from, null, user?.timezone)} → {formatScheduleTime(range.until, null, user?.timezone)}</Text>
       <View style={styles.row}>
-        <WorkoutButton label="30 ngày trước" secondary onPress={() => { setOffset(offset - 1); setActionError(null); }} />
-        <WorkoutButton label="30 ngày sau" secondary onPress={() => { setOffset(offset + 1); setActionError(null); }} />
+        <AppButton icon="back" label="30 ngày trước" variant="secondary" onPress={() => { setOffset(offset - 1); setActionError(null); }} />
+        <AppButton icon="arrow" label="30 ngày sau" variant="secondary" onPress={() => { setOffset(offset + 1); setActionError(null); }} />
       </View>
-    </WorkoutCard>
-    {query.isPending ? <WorkoutState busy title="Đang tải lịch tập" message="Vui lòng chờ trong giây lát." /> : null}
-    {query.isError ? <WorkoutState testID="schedule-error" title="Không thể tải lịch tập" message={scheduleErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
-    {!query.isPending && !query.isError && items.length === 0 ? <WorkoutState testID="schedule-empty" title="Chưa có buổi tập trong khoảng này" message="Thử xem khoảng thời gian khác hoặc quay lại kế hoạch tập luyện." /> : null}
-    {actionError ? <WorkoutState testID="schedule-action-error" title="Chưa thể cập nhật buổi tập" message={actionError} onRetry={failedCommand ? () => send(failedCommand) : undefined} /> : null}
-    {items.map((item) => <WorkoutCard key={item.occurrenceId} testID={`schedule-occurrence-${item.occurrenceId}`}>
+    </AppCard>
+    {query.isPending ? <AppCard state="loading" title="Đang tải lịch tập" message="Vui lòng chờ trong giây lát." /> : null}
+    {query.isError ? <AppCard state="error" testID="schedule-error" title="Không thể tải lịch tập" message={scheduleErrorMessage(query.error)} onRetry={() => query.refetch()} /> : null}
+    {!query.isPending && !query.isError && items.length === 0 ? <AppCard state="empty" testID="schedule-empty" title="Chưa có buổi tập trong khoảng này" message="Thử xem khoảng thời gian khác hoặc quay lại kế hoạch tập luyện." /> : null}
+    {actionError ? <AppCard state="error" testID="schedule-action-error" title="Chưa thể cập nhật buổi tập" message={actionError} onRetry={failedCommand ? () => send(failedCommand) : undefined} /> : null}
+    {items.map((item) => <AppCard key={item.occurrenceId} testID={`schedule-occurrence-${item.occurrenceId}`}>
       <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>{item.sessionSummary?.name || 'Buổi tập theo lịch'}</Text>
       <Text style={[styles.label, { color: theme.textPrimary }]}>{plannedWorkoutStatusLabels[item.status]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Dự kiến: {formatScheduleTime(item.plannedStartAt, item.timezone, user?.timezone)}</Text>
       {item.plannedEndAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Kết thúc dự kiến: {formatScheduleTime(item.plannedEndAt, item.timezone, user?.timezone)}</Text> : null}
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.planSummary?.planName || 'Không có tên kế hoạch trong bản ghi cũ'}{item.sessionSummary ? ` · Tuần ${item.sessionSummary.weekNumber}, ngày ${item.sessionSummary.dayNumber}` : ' · Không có tóm tắt buổi tập'}</Text>
       <View style={styles.row}>
-        <WorkoutButton testID={`schedule-detail-${item.occurrenceId}`} label="Xem chi tiết lịch tập" secondary onPress={() => router.push(`/workouts/schedule/${item.occurrenceId}` as never)} />
-        {item.availableActions.includes('START') ? <WorkoutButton testID={`schedule-start-${item.occurrenceId}`} label="Bắt đầu tập" busy={mutation.isPending} disabled={mutation.isPending} onPress={() => begin(item, 'START')} /> : null}
-        {item.availableActions.includes('SKIP') ? <WorkoutButton testID={`schedule-skip-${item.occurrenceId}`} label="Bỏ qua buổi này" secondary busy={mutation.isPending} disabled={mutation.isPending} onPress={() => { setConfirmSkip(item); setActionError(null); }} /> : null}
+        <AppButton icon="calendar" testID={`schedule-detail-${item.occurrenceId}`} label="Xem chi tiết lịch tập" variant="secondary" onPress={() => router.push(`/workouts/schedule/${item.occurrenceId}` as never)} />
+        {item.availableActions.includes('START') ? <AppButton icon="play" testID={`schedule-start-${item.occurrenceId}`} label="Bắt đầu tập" loading={mutation.isPending} disabled={mutation.isPending} onPress={() => begin(item, 'START')} /> : null}
+        {item.availableActions.includes('SKIP') ? <AppButton testID={`schedule-skip-${item.occurrenceId}`} label="Bỏ qua buổi này" variant="secondary" loading={mutation.isPending} disabled={mutation.isPending} onPress={() => { setConfirmSkip(item); setActionError(null); }} /> : null}
       </View>
       {confirmSkip?.occurrenceId === item.occurrenceId ? <View testID="schedule-skip-confirmation" style={{ gap: spacing.sm }}>
         <Text accessibilityRole="alert" style={[styles.body, { color: theme.textPrimary }]}>Xác nhận bỏ qua buổi tập dự kiến này? Bạn vẫn có thể xem lịch sử sau đó.</Text>
         <View style={styles.row}>
-          <WorkoutButton label="Không bỏ qua" secondary disabled={mutation.isPending} onPress={() => setConfirmSkip(null)} />
-          <WorkoutButton testID="schedule-confirm-skip" label="Xác nhận bỏ qua" danger busy={mutation.isPending} disabled={mutation.isPending} onPress={() => begin(item, 'SKIP')} />
+          <AppButton label="Không bỏ qua" variant="secondary" disabled={mutation.isPending} onPress={() => setConfirmSkip(null)} />
+          <AppButton icon="check" testID="schedule-confirm-skip" label="Xác nhận bỏ qua" variant="danger" loading={mutation.isPending} disabled={mutation.isPending} onPress={() => begin(item, 'SKIP')} />
         </View>
       </View> : null}
-    </WorkoutCard>)}
-    {query.hasNextPage ? <WorkoutButton testID="schedule-load-more" label={query.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm buổi tập'} secondary busy={query.isFetchingNextPage} disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
+    </AppCard>)}
+    {query.hasNextPage ? <AppButton testID="schedule-load-more" label={query.isFetchingNextPage ? 'Đang tải thêm' : 'Tải thêm buổi tập'} variant="secondary" loading={query.isFetchingNextPage} disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
   </ScrollView>;
 }

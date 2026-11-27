@@ -1,3 +1,6 @@
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -677,39 +680,21 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
         return <GoalProposalsTab isDark={isDark} />;
       }
       return (
-        <View
+        <AppCard title="Chưa có mục tiêu thể chất đang hoạt động" state="empty" icon="goal"
           testID="no-current-goal-card"
           style={[
             styles.emptyCard,
             { backgroundColor: themeColors.surface, borderColor: themeColors.border },
           ]}>
-          <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
-            Chưa có mục tiêu thể chất đang hoạt động
-          </Text>
+
           <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
             Bạn hiện chưa có mục tiêu thể chất đang hoạt động hoặc tạm dừng. Khi bạn hoặc huấn luyện viên tạo mục tiêu, mục tiêu sẽ xuất hiện tại đây.
           </Text>
 
-          <Pressable
-            testID="create-first-goal-button"
-            accessibilityRole="button"
-            accessibilityLabel="Tạo mục tiêu thể chất mới"
-            style={[styles.primaryActionButton, { backgroundColor: themeColors.primary, marginBottom: spacing.sm }]}
-            onPress={() => setGoalFormModalState('create', true)}>
-            <Text style={styles.primaryActionText}>Tạo mục tiêu thể chất</Text>
-          </Pressable>
+          <AppButton testID="create-first-goal-button" accessibilityRole="button" accessibilityLabel="Tạo mục tiêu thể chất mới" onPress={() => setGoalFormModalState('create', true)} label="Tạo mục tiêu thể chất" icon="plus" variant="primary" />
 
-          <Pressable
-            testID="view-proposals-empty-button"
-            accessibilityRole="button"
-            accessibilityLabel="Xem đề xuất đang chờ"
-            style={[styles.secondaryActionButton, { borderColor: themeColors.border }]}
-            onPress={() => setActiveTab('proposals')}>
-            <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-              Xem đề xuất mục tiêu
-            </Text>
-          </Pressable>
-        </View>
+          <AppButton testID="view-proposals-empty-button" accessibilityRole="button" accessibilityLabel="Xem đề xuất đang chờ" onPress={() => setActiveTab('proposals')} label="Xem đề xuất mục tiêu" icon="info" variant="secondary" />
+        </AppCard>
       );
     }
 
@@ -734,28 +719,21 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
     <SafeAreaView style={[styles.container, { backgroundColor: themeColors.canvas }]}>
       {/* Top Header */}
       <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
-        <Pressable
-          testID="goal-screen-back-button"
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          style={styles.backButton}
-          onPress={() => {
+        <AppButton testID="goal-screen-back-button" accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => {
             if (router.canGoBack()) {
               router.back();
             } else {
               router.replace('/' as any);
             }
-          }}>
-          <Text style={[styles.backButtonText, { color: themeColors.primary }]}>← Quay lại</Text>
-        </Pressable>
-        <Text style={[styles.screenTitle, { color: themeColors.textPrimary }]}>
+          }} label="Quay lại" icon="back" variant="ghost" />
+        <AppIcon name="goal" color={themeColors.primary} /><Text accessibilityRole="header" style={[styles.screenTitle, { color: themeColors.textPrimary, flex: 1 }]}>
           Mục tiêu thể chất
         </Text>
-        <View style={styles.headerSpacer} />
+
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -768,26 +746,18 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
 
         {/* Error State */}
         {!isLoading && error && (
-          <View
+          <AppCard title="Không thể tải mục tiêu" state="error" icon="goal"
             testID="goal-error-card"
             style={[
               styles.errorCard,
               { backgroundColor: themeColors.surface, borderColor: themeColors.border },
             ]}>
-            <Text style={[styles.errorTitle, { color: themeColors.dangerText }]}>
-              Không thể tải mục tiêu
-            </Text>
+
             <Text style={[styles.errorSubtitle, { color: themeColors.textSecondary }]}>
               {error}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Thử tải lại mục tiêu"
-              style={[styles.primaryActionButton, { backgroundColor: themeColors.primary }]}
-              onPress={() => loadGoal({ showLoading: true })}>
-              <Text style={styles.primaryActionText}>Thử lại</Text>
-            </Pressable>
-          </View>
+            <AppButton accessibilityRole="button" accessibilityLabel="Thử tải lại mục tiêu" onPress={() => loadGoal({ showLoading: true })} label="Thử lại" icon="refresh" variant="secondary" />
+          </AppCard>
         )}
 
         {/* Loaded Content */}
@@ -821,17 +791,10 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                     {conflictBanner}
                   </Text>
                 </View>
-                <Pressable
-                  testID="reload-goal-conflict-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Tải lại mục tiêu"
-                  style={[styles.retryActionButton, { backgroundColor: themeColors.primary }]}
-                  onPress={() => {
+                <AppButton testID="reload-goal-conflict-button" accessibilityRole="button" accessibilityLabel="Tải lại mục tiêu" onPress={() => {
                     setConflictBanner(null);
                     loadGoal({ showLoading: true });
-                  }}>
-                  <Text style={styles.retryActionText}>Tải lại</Text>
-                </Pressable>
+                  }} label="Tải lại" icon="refresh" variant="secondary" />
               </View>
             )}
 
@@ -839,79 +802,18 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
             {isGoalMatchingRoute && goal && !isReconcilingThisRoute && (
               <View style={styles.actionRow}>
                 {isGoalActionAllowed('pause', goal.status) && (
-                  <Pressable
-                    testID="pause-goal-button"
-                    accessibilityRole="button"
-                    accessibilityLabel="Tạm dừng mục tiêu"
-                    style={({ pressed }) => [
-                      styles.pauseActionButton,
-                      {
-                        borderColor: themeColors.warningText,
-                        backgroundColor: pressed
-                          ? themeColors.warningSurface
-                          : themeColors.surface,
-                      },
-                    ]}
-                    onPress={handleOpenPause}>
-                    <Text style={[styles.pauseActionText, { color: themeColors.warningText }]}>
-                      ⏸ Tạm dừng mục tiêu
-                    </Text>
-                  </Pressable>
+                  <AppButton testID="pause-goal-button" accessibilityRole="button" accessibilityLabel="Tạm dừng mục tiêu" onPress={handleOpenPause} label="Tạm dừng mục tiêu" icon="pause" variant="secondary" />
                 )}
 
                 {isGoalActionAllowed('resume', goal.status) && (
-                  <Pressable
-                    testID="resume-goal-button"
-                    accessibilityRole="button"
-                    accessibilityLabel="Tiếp tục mục tiêu"
-                    style={({ pressed }) => [
-                      styles.resumeActionButton,
-                      {
-                        backgroundColor: pressed
-                          ? themeColors.primaryPressed
-                          : themeColors.primary,
-                      },
-                    ]}
-                    onPress={handleOpenResume}>
-                    <Text style={styles.resumeActionText}>▶ Tiếp tục mục tiêu</Text>
-                  </Pressable>
+                  <AppButton testID="resume-goal-button" accessibilityRole="button" accessibilityLabel="Tiếp tục mục tiêu" onPress={handleOpenResume} label="Tiếp tục mục tiêu" icon="play" variant="primary" />
                 )}
 
                 {goal.status === 'ACTIVE' && (
                   <>
-                    <Pressable
-                      testID="adjust-goal-version-button"
-                      accessibilityRole="button"
-                      accessibilityLabel="Điều chỉnh mục tiêu"
-                      style={({ pressed }) => [
-                        styles.secondaryActionButton,
-                        {
-                          borderColor: themeColors.border,
-                          backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
-                        },
-                      ]}
-                      onPress={() => setGoalFormModalState('version', true)}>
-                      <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-                        ✎ Điều chỉnh mục tiêu
-                      </Text>
-                    </Pressable>
+                    <AppButton testID="adjust-goal-version-button" accessibilityRole="button" accessibilityLabel="Điều chỉnh mục tiêu" onPress={() => setGoalFormModalState('version', true)} label="Điều chỉnh mục tiêu" icon="edit" variant="secondary" />
 
-                    <Pressable
-                      testID="transition-goal-button"
-                      accessibilityRole="button"
-                      accessibilityLabel="Hành trình chuyển tiếp"
-                      style={({ pressed }) => [
-                        styles.secondaryActionButton,
-                        {
-                          borderColor: themeColors.border,
-                          backgroundColor: pressed ? themeColors.surfaceSubtle : themeColors.surface,
-                        },
-                      ]}
-                      onPress={() => setGoalFormModalState('transition', true)}>
-                      <Text style={[styles.secondaryActionText, { color: themeColors.textPrimary }]}>
-                        ↻ Chuyển đổi
-                      </Text>
-                    </Pressable>
+                    <AppButton testID="transition-goal-button" accessibilityRole="button" accessibilityLabel="Hành trình chuyển tiếp" onPress={() => setGoalFormModalState('transition', true)} label="Chuyển đổi" icon="history" variant="secondary" />
                   </>
                 )}
               </View>
@@ -947,14 +849,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                       Vui lòng thử cập nhật lại trạng thái mục tiêu của bạn trước khi thực hiện thay đổi.
                     </Text>
                   </View>
-                  <Pressable
-                    testID="retry-reconciliation-button"
-                    accessibilityRole="button"
-                    accessibilityLabel="Thử đồng bộ lại trạng thái mục tiêu"
-                    style={[styles.retryActionButton, { backgroundColor: themeColors.primary }]}
-                    onPress={handleRetryReconciliation}>
-                    <Text style={styles.retryActionText}>Thử lại đồng bộ hóa</Text>
-                  </Pressable>
+                  <AppButton testID="retry-reconciliation-button" accessibilityRole="button" accessibilityLabel="Thử đồng bộ lại trạng thái mục tiêu" onPress={handleRetryReconciliation} label="Thử lại đồng bộ hóa" icon="refresh" variant="secondary" />
                 </View>
             )}
 

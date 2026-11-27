@@ -1,3 +1,8 @@
+import { NavigationAction } from '@/design-system/components/NavigationAction';
+import { layout, spacing } from '@/design-system/tokens/spacing';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
@@ -343,19 +348,21 @@ export function NutritionScreen() {
   if (activeCapability !== 'STUDENT') {
     return (
       <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
-        <WorkoutState title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />
+        <AppCard state="info" icon="shield" title="Chỉ dành cho học viên" message="Chuyển sang vai trò học viên để ghi dinh dưỡng." />
       </SafeAreaView>
     );
   }
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
       <ScrollView testID="nutrition-student-screen" style={styles.screen}
-        contentContainerStyle={styles.content}>
-    <Text style={[styles.title, { color: theme.textPrimary }]}>Nhật ký dinh dưỡng</Text>
-    <WorkoutButton label="Mục tiêu dinh dưỡng và đề xuất" secondary onPress={() => router.push('/nutrition/strategy' as never)} />
-    <WorkoutButton testID="entry-food-text-analysis" label="Ước tính từ mô tả bữa ăn (AI)" secondary onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: resolvedDayReady ? { day, timezone: activeDayTimezone, mealType } : { mealType } } as never)} />
+        contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="nutrition" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>Nhật ký dinh dưỡng</Text></View>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+<NavigationAction onPress={() => router.push('/nutrition/strategy' as never)} title="Mục tiêu dinh dưỡng và đề xuất" accessibilityLabel="Mục tiêu dinh dưỡng và đề xuất" icon="goal" tile />
+    <NavigationAction testID="entry-food-text-analysis" onPress={() => router.push({ pathname: '/nutrition/food-analysis', params: resolvedDayReady ? { day, timezone: activeDayTimezone, mealType } : { mealType } } as never)} title="Ước tính từ mô tả bữa ăn (AI)" accessibilityLabel="Ước tính từ mô tả bữa ăn (AI)" icon="summary" tile />
+</View>
     <Text style={[styles.body, { color: theme.textSecondary }]}>Dữ liệu bạn tự khai báo. Chưa biết không có nghĩa là 0.</Text>
-    <WorkoutCard>
+    <AppCard>
       <DateInputField
         testID="nutrition-day-input"
         label="Ngày ghi"
@@ -391,46 +398,46 @@ export function NutritionScreen() {
           setPending((prev) => (prev && (prev.kind === 'food' || prev.kind === 'foodUpdate') ? prev : null));
         }}
       />
-      <WorkoutButton label={validContext ? 'Đã xác nhận ngày và múi giờ' : 'Xác nhận ngày và múi giờ'}
+      <AppButton label={validContext ? 'Đã xác nhận ngày và múi giờ' : 'Xác nhận ngày và múi giờ'}
         disabled={!validDayInput || !strategyResolved}
         onPress={() => runInScope(opScope, true, () => setConfirmedScope({ actor, day, timezone }))} />
-    </WorkoutCard>
+    </AppCard>
     {message ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.textPrimary }]}>{message}</Text> : null}
-    {pending && !busy && (pending.kind === 'food' || pending.kind === 'foodUpdate' || resolvedDayReady) ? <WorkoutButton label="Thử lại cùng lệnh" onPress={() => send(pending)} /> : null}
-    {validContext && dayQuery.isPending ? <WorkoutState title="Đang tải nhật ký" message="Vui lòng chờ." busy /> : null}
+    {pending && !busy && (pending.kind === 'food' || pending.kind === 'foodUpdate' || resolvedDayReady) ? <AppButton label="Thử lại cùng lệnh" onPress={() => send(pending)} /> : null}
+    {validContext && dayQuery.isPending ? <AppCard title="Đang tải nhật ký" message="Vui lòng chờ." state="loading" /> : null}
     {validContext && dayTimezoneConflict ? (
-      <WorkoutState
+      <AppCard state="empty"
         title="Ngày này dùng khung giờ khác"
         message="Ngày bạn chọn đã được ghi nhận theo một khung giờ khác. Hãy chọn lại đúng khung giờ trong danh sách thân thiện ở trên rồi xác nhận lại; hệ thống không tự đổi ngày hoặc thử hàng loạt."
       />
     ) : null}
-    {validContext && dayQuery.isError && !dayTimezoneConflict ? <WorkoutState title="Không tải được nhật ký" message="Kiểm tra kết nối hoặc khung giờ." onRetry={() => dayQuery.refetch()} /> : null}
+    {validContext && dayQuery.isError && !dayTimezoneConflict ? <AppCard state="error" title="Không tải được nhật ký" message="Kiểm tra kết nối hoặc khung giờ." onRetry={() => dayQuery.refetch()} /> : null}
     {resolvedDayReady && dayQuery.data ? <>
-      <WorkoutCard>
+      <AppCard>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>Ngày {day} · {dayQuery.data.completeness === 'COMPLETE' ? 'Đã xác nhận' : dayQuery.data.completeness === 'PARTIAL' ? 'Đang ghi' : 'Chưa ghi'}</Text>
         {dayQuery.data.noIntakeConfirmed ? <Text style={styles.body}>Đã xác nhận không ăn uống trong ngày.</Text> : null}
         {dayQuery.data.nutrients.map((nutrient) => <Text key={nutrient.code} style={[styles.body, { color: theme.textPrimary }]}>
           {nutrientLabel(nutrient.code)}: {nutrientText(nutrient.total, nutrient.knownSubtotal)}
         </Text>)}
-      </WorkoutCard>
-      {dayQuery.data.items.length === 0 ? <WorkoutState title="Chưa có món trong ngày" message="Ngày chưa ghi không được tính là 0 kcal." /> : null}
-      {dayQuery.data.items.map((item) => <WorkoutCard key={item.id}>
+      </AppCard>
+      {dayQuery.data.items.length === 0 ? <AppCard state="empty" title="Chưa có món trong ngày" message="Ngày chưa ghi không được tính là 0 kcal." /> : null}
+      {dayQuery.data.items.map((item) => <AppCard key={item.id}>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.name}</Text>
         {item.kind === 'CATALOG_QUANTIFIED' ? <Text style={[styles.body, { color: theme.textSecondary }]}>
           Nguồn danh mục đã duyệt · {item.servings} {item.quantityBasis === 'GRAM' ? 'g' : item.quantityBasis === 'MILLILITRE' ? 'ml' : item.servingLabel ?? 'khẩu phần'} · bản sửa đổi đã chốt trong lịch sử
         </Text> : null}
         <Text style={[styles.body, { color: theme.textSecondary }]}>{item.kind === 'DESCRIPTION_ONLY' ? 'Chưa định lượng' : `${item.servings ?? '?'} ${item.servingLabel ?? 'khẩu phần'}`}</Text>
-        <WorkoutButton label={`Sửa ${item.name}`} secondary onPress={() => runInScope(opScope, true, () => {
+        <AppButton label={`Sửa ${item.name}`} variant="secondary" onPress={() => runInScope(opScope, true, () => {
           setEditing(item); setConfirmRemove(false); setFoodId(item.privateFoodId ?? ''); setDescription(item.kind === 'DESCRIPTION_ONLY' ? item.name : '');
           setServings(item.servings === null ? '1' : String(item.servings));
         })} />
-      </WorkoutCard>)}
+      </AppCard>)}
       {dayQuery.data.completeness !== 'COMPLETE' ? <>
-        {!confirmDay ? <WorkoutButton label="Xác nhận hoàn tất ngày" disabled={busy || !resolvedDayReady} onPress={() => runInScope(opScope, true, () => setConfirmDay(true))} /> :
-          <WorkoutCard><Text style={[styles.body, { color: theme.textPrimary }]}>
+        {!confirmDay ? <AppButton label="Xác nhận hoàn tất ngày" disabled={busy || !resolvedDayReady} onPress={() => runInScope(opScope, true, () => setConfirmDay(true))} /> :
+          <AppCard><Text style={[styles.body, { color: theme.textPrimary }]}>
             {dayQuery.data.items.length === 0 ? 'Xác nhận không ăn uống trong ngày này?' : 'Xác nhận đã ghi xong ngày này?'}
-          </Text><WorkoutButton label="Xác nhận" disabled={busy || !resolvedDayReady} onPress={() => confirm(dayQuery.data)} />
-            <WorkoutButton label="Quay lại" secondary onPress={() => runInScope(opScope, true, () => setConfirmDay(false))} /></WorkoutCard>}
+          </Text><AppButton label="Xác nhận" disabled={busy || !resolvedDayReady} onPress={() => confirm(dayQuery.data)} />
+            <AppButton icon="back" label="Quay lại" variant="ghost" onPress={() => runInScope(opScope, true, () => setConfirmDay(false))} /></AppCard>}
       </> : null}
     </> : null}
     <WorkoutCard>
