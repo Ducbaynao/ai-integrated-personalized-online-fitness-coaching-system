@@ -24,6 +24,6 @@ Reference: tái sử dụng context đã xem thực ở #185: Figma Workout plan
 
 Self-review: AST comparison xác nhận logic function của 10 file màn hình và 164 callback onPress/onRetry/onRefresh/onChange/onSubmit/onClose/onApplied giữ nguyên. Shared dispatch wrapper là thay đổi có chủ đích để cách ly event. Không sửa services, auth/guards, route/deep-link, Backend, OpenAPI, Flyway hay AI schema. QR Dev-A giữ nguyên.
 
-Validation và kết quả cuối được ghi trong PR; các log FAIL và caller-review JSON được giữ tại thư mục evidence cục bộ của task, không nhân bản log dài vào repo. Các test cũ giữ assertions; selector loading/Trainer navigation được đổi sang control/state thực, test Nutrition đợi query context sẵn sàng rồi bấm native event thay vì kích hoạt nút còn disabled.
+Validation và kết quả cuối được ghi trong PR; các log FAIL và caller-review JSON được giữ tại thư mục evidence cục bộ của task, không nhân bản log dài vào repo. Các test cũ giữ assertions; selector loading/Trainer navigation được đổi sang control/state thực, helper Nutrition R3/R4 nhận cả AppButton và WorkoutButton cho phần legacy còn giữ. Test Nutrition đợi query context sẵn sàng rồi bấm native event thay vì kích hoạt nút còn disabled.
 
 Giới hạn: chưa QC Android/thiết bị thật/backend runtime hoặc dynamic type; chưa polish dark. Đây là checkpoint code cho entry/list/overview, không phải hoàn tất mọi light/dark/detail/modal hay release acceptance.

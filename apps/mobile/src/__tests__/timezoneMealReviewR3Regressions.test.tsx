@@ -6,6 +6,7 @@ import { ApiError } from '@/types/auth';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
 import { WorkoutButton } from '@/features/workout-plan/components/WorkoutUi';
+import { AppButton } from '@/design-system/components/AppButton';
 import { BACKEND_TIMEZONE_CATALOG_SOURCE, BACKEND_ZONE_IDS } from '@/features/shared/backendTimezoneCatalog';
 import {
   formatTimezoneDisplay,
@@ -74,7 +75,7 @@ async function rerender(tree: renderer.ReactTestRenderer, node: React.ReactEleme
   await flush();
 }
 function button(tree: renderer.ReactTestRenderer, label: string) {
-  const found = tree.root.findAll((node) => node.type === WorkoutButton && node.props.label === label);
+  const found = tree.root.findAll((node) => (node.type === WorkoutButton || node.type === AppButton) && node.props.label === label);
   if (!found.length) throw new Error(`button not found: ${label}`);
   return found[0];
 }
