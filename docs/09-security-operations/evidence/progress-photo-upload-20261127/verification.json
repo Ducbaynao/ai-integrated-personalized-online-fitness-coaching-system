@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-27",
+  "scope": "Phase 1 M5 / ST-09 progress photo upload readiness",
+  "layers": {
+    "originalComponentRegression": { "failed": 4, "passed": 4 },
+    "mobileFocusedJest": { "suites": 5, "passed": 44, "scannerAndStorage": "mocked" },
+    "mobileTypecheck": "PASS",
+    "changedMobileFilesEslint": "PASS",
+    "backendFocusedIntegration": {
+      "passed": 6,
+      "database": "isolated Testcontainers PostgreSQL",
+      "scannerAndStorage": "mocked",
+      "cases": [
+        "uploadProgressPhoto_validPng_success",
+        "uploadProgressPhoto_unsupportedType_rejected",
+        "progressPhotos_scannerAndStorageFailures_failClosed",
+        "getPhotoFile_sharingWindowAndPrivacyRules",
+        "progressPhotos_permissionRevocation_deniesDownloadImmediately",
+        "progressPhotos_softDelete_cannotBeListedOrDownloaded"
+      ]
+    },
+    "realScannerS3HttpQaDb": "PASS; see live-http.json and failures-retry.json",
+    "browser": "NOT COMPLETED: initial ERR_CONNECTION_REFUSED before Metro readiness, then Browser Use URL policy blocked generated data:text/html error page; no alternative control tool used",
+    "android": "NOT RUN"
+  },
+  "review": {
+    "sameChatSelfReview": "PASS",
+    "backendAuthorizationOrMediaLifecycleChanged": false,
+    "privateEvidence": "No raw files, credentials, tokens, object keys or sensitive URLs included"
+  },
+  "limits": [
+    "Browser file selection/upload, gallery and console/network inspection unverified",
+    "Trainer sharing windows/revocation verified with backend integration mocks, not a live Trainer login",
+    "Existing upload contract does not guarantee deduplication after an ambiguous lost success response",
+    "Live backend uses existing 5049b16 QA jar whose relevant backend source matches cc8d1e9 task base",
+    "No claim of whole-app, Android, device or release completion"
+  ]
+}

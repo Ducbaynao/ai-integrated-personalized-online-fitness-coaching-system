@@ -1,0 +1,67 @@
+{
+  "results": [
+    {
+      "case": "clean jpg",
+      "status": 201,
+      "errorCode": null,
+      "requestId": "f17bb5b0-5d0f-4fde-a307-c789eb09542e"
+    },
+    {
+      "case": "owner read jpg",
+      "status": 200,
+      "errorCode": null,
+      "requestId": "3863d42a-207d-462b-8a2f-a20225e60a05"
+    },
+    {
+      "case": "other student denied jpg",
+      "status": 403,
+      "errorCode": "MEASUREMENT_ACCESS_DENIED",
+      "requestId": "a8871f5a-ff4f-46c9-929a-7a9e18e7e41b"
+    },
+    {
+      "case": "clean png",
+      "status": 201,
+      "errorCode": null,
+      "requestId": "e3192335-ba78-4b3f-9092-912ae0dcbc68"
+    },
+    {
+      "case": "owner read png",
+      "status": 200,
+      "errorCode": null,
+      "requestId": "e8b6c98b-da60-44d2-b2ed-d73ef420d40a"
+    },
+    {
+      "case": "other student denied png",
+      "status": 403,
+      "errorCode": "MEASUREMENT_ACCESS_DENIED",
+      "requestId": "0a2c00b7-9011-49b4-972d-0d1de10c2872"
+    },
+    {
+      "case": "invalid.txt",
+      "status": 400,
+      "errorCode": "VALIDATION_FAILED",
+      "requestId": "9f7bfc4b-533e-485f-a882-6ae9d6ff4ddd"
+    },
+    {
+      "case": "large.jpg",
+      "status": 400,
+      "errorCode": "VALIDATION_FAILED",
+      "requestId": "552e07c8-9902-4e5e-8ac4-1a13096fe0ae"
+    },
+    {
+      "case": "blocked.jpg",
+      "status": 400,
+      "errorCode": "VALIDATION_FAILED",
+      "requestId": "1088a1f4-2887-4ac8-b54b-cc90d0bfc15e"
+    }
+  ],
+  "assertions": {
+    "realScanner": true,
+    "realStorage": true,
+    "dbNewRows": 2,
+    "cleanPrivateMetadata": true,
+    "checksumsAndBytesMatch": true,
+    "anonymousS3Denied": true,
+    "noRowsForRejectedFiles": true
+  }
+}

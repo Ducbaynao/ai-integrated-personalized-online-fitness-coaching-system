@@ -5,6 +5,7 @@ import { API_BASE_URL } from '@/config/env';
 
 jest.mock('@/services/apiClient', () => ({
   request: jest.fn(),
+  getAuthSessionBinding: () => ({ authEpoch: 7, capabilityEpoch: 3 }),
 }));
 
 describe('measurementApi and progressDashboardApi', () => {
@@ -150,6 +151,10 @@ describe('measurementApi and progressDashboardApi', () => {
         expect(request).toHaveBeenCalledWith('/measurements/progress-photos', {
           method: 'POST',
           requiresAuth: true,
+          expectedAuthEpoch: 7,
+          expectedCapabilityEpoch: 3,
+          shouldContinue: undefined,
+          retryOn401: false,
           body: expect.any(FormData),
         });
         expect(res.id).toBe('p-1');

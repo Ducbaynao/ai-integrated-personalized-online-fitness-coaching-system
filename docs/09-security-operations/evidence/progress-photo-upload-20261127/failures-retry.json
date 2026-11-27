@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "case": "SCANNER_UNAVAILABLE",
+      "status": 503,
+      "errorCode": "SCANNER_UNAVAILABLE",
+      "requestId": "8c4f8e8a-746f-4f3b-ba4e-1fcf66d1ebfd"
+    },
+    {
+      "case": "SCANNER_UNAVAILABLE explicit retry",
+      "status": 201,
+      "errorCode": null,
+      "requestId": "53f47a85-f7d1-4df2-b0a6-99af6aded696"
+    },
+    {
+      "case": "STORAGE_UNAVAILABLE",
+      "status": 503,
+      "errorCode": "STORAGE_UNAVAILABLE",
+      "requestId": "a9a03e73-7888-40d6-af88-d4e53621cdc7"
+    },
+    {
+      "case": "STORAGE_UNAVAILABLE explicit retry",
+      "status": 201,
+      "errorCode": null,
+      "requestId": "64a66114-7c41-4cc4-a3a9-49123d4d5ec6"
+    }
+  ],
+  "noRowsForFailures": true,
+  "oneRowPerExplicitRetry": true
+}

@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '@/config/env';
-import { request } from '@/services/apiClient';
+import { getAuthSessionBinding, request } from '@/services/apiClient';
 import {
   CorrectMeasurementRequest,
   Measurement,
@@ -113,7 +113,8 @@ export const measurementApi = {
   /**
    * Upload a new progress photo with antivirus scan and validation.
    */
-  async uploadProgressPhoto(params: UploadProgressPhotoParams): Promise<ProgressPhoto> {
+  async uploadProgressPhoto(params: UploadProgressPhotoParams, shouldContinue?: () => boolean): Promise<ProgressPhoto> {
+    const binding = getAuthSessionBinding();
     const formData = new FormData();
     // Expo SDK 57 fetch serializes Blob bytes, not React Native's legacy URI object.
     const localResponse = await fetch(params.fileUri);
@@ -131,6 +132,10 @@ export const measurementApi = {
     return request<ProgressPhoto>('/measurements/progress-photos', {
       method: 'POST',
       requiresAuth: true,
+      expectedAuthEpoch: binding.authEpoch,
+      expectedCapabilityEpoch: binding.capabilityEpoch,
+      shouldContinue,
+      retryOn401: false,
       body: formData,
     });
   },

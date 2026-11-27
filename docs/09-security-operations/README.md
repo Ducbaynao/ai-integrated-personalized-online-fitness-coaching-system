@@ -35,3 +35,6 @@ Spring Boot and FastAPI may be containerized. Mobile is distributed through plat
 
 See [governance and audit](governance-and-audit.md).
 
+For isolated media dependencies, configuration and verification evidence, see
+[Progress photo QA readiness](progress-photo-qa-readiness.md).
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -16,6 +16,8 @@ import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { PHOTO_VIEW_OPTIONS } from '@/localization/progressLabels';
+import { progressPhotoUploadErrorMessage } from '@/localization/progressPhotoErrors';
+import { getAuthSessionBinding } from '@/services/apiClient';
 import { PhotoViewType, UploadProgressPhotoParams } from '@/types/measurement';
 
 interface UploadProgressPhotoModalProps {
@@ -39,13 +41,26 @@ export function UploadProgressPhotoModal({
   const [weightAtTime, setWeightAtTime] = useState('');
   const [notes, setNotes] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const mounted = useRef(false);
+  const busy = useRef(false);
+  const [isSending, setIsSending] = useState(false);
+  const [uploadFailed, setUploadFailed] = useState(false);
+  const binding = getAuthSessionBinding();
+  const isCurrent = () => {
+    const current = getAuthSessionBinding();
+    return mounted.current && current.authEpoch === binding.authEpoch && current.capabilityEpoch === binding.capabilityEpoch;
+  };
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const themeColors = getSemanticColors(isDark);
 
   const viewTypeOptions: { type: PhotoViewType; label: string }[] = PHOTO_VIEW_OPTIONS;
 
   const handlePickPhoto = async () => {
-    if (isPicking || isSubmitting) return;
+    if (isPicking || isSubmitting || busy.current) return;
     setIsPicking(true);
     setValidationError(null);
     try {
@@ -54,6 +69,7 @@ export function UploadProgressPhotoModal({
         copyToCacheDirectory: true,
         multiple: false,
       });
+      if (!isCurrent()) return;
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
       if (asset.size !== undefined && asset.size > 10 * 1024 * 1024) {
@@ -66,15 +82,16 @@ export function UploadProgressPhotoModal({
         return;
       }
       setPhoto({ uri: asset.uri, name: asset.name, mimeType });
+      setUploadFailed(false);
     } catch {
-      setValidationError('Không thể đọc ảnh. Vui lòng chọn lại ảnh từ thiết bị.');
+      if (isCurrent()) setValidationError('Không thể đọc ảnh. Vui lòng chọn lại ảnh từ thiết bị.');
     } finally {
-      setIsPicking(false);
+      if (isCurrent()) setIsPicking(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting || isPicking) return;
+    if (isSubmitting || isPicking || busy.current) return;
     setValidationError(null);
 
     if (!photo) {
@@ -92,6 +109,9 @@ export function UploadProgressPhotoModal({
       weightNum = parsed;
     }
 
+    busy.current = true;
+    setIsSending(true);
+    setUploadFailed(false);
     try {
       await onSubmit({
         fileUri: photo.uri,
@@ -103,18 +123,24 @@ export function UploadProgressPhotoModal({
         takenAt: new Date().toISOString(),
         notes: notes.trim() || undefined,
       });
-
+      if (!isCurrent()) return;
       setPhoto(null);
       setWeightAtTime('');
       setNotes('');
       onClose();
-    } catch (err: any) {
-      setValidationError(err?.message || 'Không thể tải ảnh lên');
+    } catch (err: unknown) {
+      if (isCurrent()) {
+        setUploadFailed(true);
+        setValidationError(progressPhotoUploadErrorMessage(err));
+      }
+    } finally {
+      busy.current = false;
+      if (isCurrent()) setIsSending(false);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { if (!isSubmitting && !busy.current && !isPicking) onClose(); }}>
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <Text style={[styles.title, { color: themeColors.textPrimary }]}>Tải ảnh tiến độ</Text>
@@ -154,7 +180,7 @@ export function UploadProgressPhotoModal({
                 testID="btn-select-photo"
                 accessibilityRole="button"
                 accessibilityLabel="Chọn ảnh từ thiết bị"
-                disabled={isSubmitting || isPicking}
+                disabled={isSubmitting || isPicking || isSending}
                 onPress={handlePickPhoto}
                 style={[styles.input, { borderColor: themeColors.border }]}>
                 <Text style={{ color: themeColors.primary }}>
@@ -203,7 +229,7 @@ export function UploadProgressPhotoModal({
             </View>
 
             {validationError && (
-              <Text testID="upload-error-text" style={[styles.errorText, { color: themeColors.dangerText }]}>
+              <Text testID="upload-error-text" accessibilityRole="alert" style={[styles.errorText, { color: themeColors.dangerText }]}>
                 {validationError}
               </Text>
             )}
@@ -213,7 +239,7 @@ export function UploadProgressPhotoModal({
             <Pressable
               testID="btn-cancel-upload"
               onPress={onClose}
-              disabled={isSubmitting || isPicking}
+              disabled={isSubmitting || isPicking || isSending}
               style={[styles.btn, styles.btnCancel, { borderColor: themeColors.border }]}>
               <Text style={[styles.btnText, { color: themeColors.textPrimary }]}>Hủy</Text>
             </Pressable>
@@ -221,12 +247,12 @@ export function UploadProgressPhotoModal({
             <Pressable
               testID="btn-submit-upload"
               onPress={handleSubmit}
-              disabled={isSubmitting || isPicking}
+              disabled={isSubmitting || isPicking || isSending}
               style={[styles.btn, styles.btnSubmit, { backgroundColor: themeColors.primary }]}>
-              {isSubmitting ? (
+              {isSubmitting || isSending ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={[styles.btnText, { color: '#FFFFFF' }]}>Tải ảnh lên</Text>
+                <Text style={[styles.btnText, { color: '#FFFFFF' }]}>{uploadFailed ? 'Thử tải lại' : 'Tải ảnh lên'}</Text>
               )}
             </Pressable>
           </View>
