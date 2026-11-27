@@ -1,7 +1,9 @@
 import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { AccessibilityInfo } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { WorkoutExecutionDetail } from '@/types/workoutExecution';
 import { ApiError } from '@/types/auth';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
@@ -10,6 +12,7 @@ import {
 } from '@/features/workout-execution/WorkoutExecutionScreen';
 import { WorkoutHistoryScreen } from '@/features/workout-execution/WorkoutHistoryScreen';
 import {
+  workoutExecutionQueryKeys,
   useCurrentWorkoutExecution,
   useWorkoutExecutionDetail,
   useWorkoutExecutionHistory,
@@ -65,6 +68,7 @@ jest.mock('@/services/workoutExecutionApi', () => ({
 
 const user = {
   id: 'student-1',
+  status: 'ACTIVE',
   timezone: 'Asia/Ho_Chi_Minh',
   capabilities: { hasStudentProfile: true, hasTrainerProfile: false },
 };
@@ -275,6 +279,23 @@ describe('B05 Workout Execution screens', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('keeps editing an already completed set available while the execution is IN_PROGRESS', async () => {
+    const logged = { ...detail, exercises: [{ ...detail.exercises[0], sets: [{ ...set,
+      completionStatus: 'COMPLETED' as const, repetitions: 8, rpe: 7, note: 'Đã ghi',
+    }] }] };
+    (useCurrentWorkoutExecution as jest.Mock).mockReturnValue({ data: logged, isPending: false, isError: false, refetch: jest.fn() });
+    (workoutExecutionApi.upsertSet as jest.Mock).mockResolvedValue(logged);
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Số lần' }).props.onChangeText('9'));
+    await renderer.act(async () => {
+      tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(workoutExecutionApi.upsertSet).toHaveBeenCalledWith(detail.execution.executionId, set.clientSetId, 7,
+      expect.objectContaining({ completionStatus: 'COMPLETED', repetitions: 9, rpe: 7, note: 'Đã ghi', loadValue: null }));
+    renderer.act(() => tree.unmount());
+  });
+
   it('blocks unknown-unit measurement edits while preserving IDs and existing values', async () => {
     const unknownSet = {
       ...set,
@@ -422,12 +443,16 @@ describe('B05 Workout Execution screens', () => {
     renderer.act(() => tree.unmount());
   });
 
-  it('renders terminal history detail as read-only and preserves planned/performed timestamps', () => {
+  it.each([
+    ['COMPLETED', 'Đã hoàn thành'],
+    ['PARTIALLY_COMPLETED', 'Hoàn thành một phần'],
+    ['ABORTED', 'Đã hủy'],
+  ] as const)('renders %s detail as read-only and preserves planned/performed timestamps', (status, statusLabel) => {
     const terminal = {
       ...detail,
       execution: {
         ...detail.execution,
-        status: 'PARTIALLY_COMPLETED' as const,
+        status,
         performedEndedAt: '2026-10-09T02:00:00Z',
       },
     };
@@ -439,12 +464,211 @@ describe('B05 Workout Execution screens', () => {
       refetch: jest.fn(),
     });
     const tree = render(<WorkoutExecutionDetailScreen executionId={detail.execution.executionId} />);
-    expect(JSON.stringify(tree.toJSON())).toContain('Hoàn thành một phần');
+    expect(tree.root.findAllByProps({ testID: `save-workout-set-${set.clientSetId}` })).toHaveLength(0);
+    expect(JSON.stringify(tree.toJSON())).toContain('Buổi tập đã kết thúc');
+    expect(JSON.stringify(tree.toJSON())).toContain(statusLabel);
     expect(JSON.stringify(tree.toJSON())).toContain('Bắt đầu thực tế');
     expect(JSON.stringify(tree.toJSON())).toContain('Thời gian dự kiến');
     expect(JSON.stringify(tree.toJSON())).toContain('mức tải 60 kg');
-    expect(tree.root.findByProps({ accessibilityLabel: 'Mức tải, lb' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Mức tải, lb' })).toHaveLength(0);
+    expect(JSON.stringify(tree.toJSON())).toContain('Số lần: Chưa ghi');
+    expect(JSON.stringify(tree.toJSON())).toContain('Nghỉ sau hiệp: 90 giây');
     expect(tree.root.findAllByProps({ testID: 'complete-workout-button' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const rerenderCurrent = (tree: renderer.ReactTestRenderer, next: WorkoutExecutionDetail) => {
+    (useCurrentWorkoutExecution as jest.Mock).mockReturnValue({
+      data: next, isPending: false, isError: false, refetch: jest.fn(),
+    });
+    renderer.act(() => tree.update(<QueryClientProvider client={clients[clients.length - 1]}><CurrentWorkoutExecutionScreen /></QueryClientProvider>));
+  };
+
+  it.each(['COMPLETED', 'PARTIALLY_COMPLETED', 'ABORTED'] as const)('blocks old save/add/finish callbacks after %s arrives', async (status) => {
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress;
+    const add = tree.root.findByProps({ accessibilityLabel: 'Thêm hiệp' }).props.onPress;
+    const substitute = tree.root.findByProps({ accessibilityLabel: 'Thay bài tập' }).props.onPress;
+    const finish = tree.root.findByProps({ testID: 'complete-workout-button' }).props.onPress;
+    renderer.act(() => finish());
+    const confirm = tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress;
+    rerenderCurrent(tree, { ...detail, execution: { ...detail.execution, status, version: 8 } });
+    await renderer.act(async () => { save(); add(); substitute(); finish(); confirm(); await tick(); });
+    expect(workoutExecutionApi.upsertSet).not.toHaveBeenCalled();
+    expect(workoutExecutionApi.substitute).not.toHaveBeenCalled();
+    expect(workoutExecutionApi.complete).not.toHaveBeenCalled();
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Thêm hiệp' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: `save-workout-set-${set.clientSetId}` })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each(['capability', 'profile', 'account', 'owner', 'version', 'suspended'])('blocks an old save after %s changes', async (change) => {
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress;
+    if (change === 'capability') (useAuth as jest.Mock).mockReturnValue({ user, activeCapability: 'TRAINER' });
+    if (change === 'profile') (useAuth as jest.Mock).mockReturnValue({ user: { ...user, capabilities: { hasStudentProfile: false } }, activeCapability: 'STUDENT' });
+    if (change === 'suspended') (useAuth as jest.Mock).mockReturnValue({ user: { ...user, status: 'SUSPENDED' }, activeCapability: 'STUDENT' });
+    if (change === 'account') (useAuth as jest.Mock).mockReturnValue({ user: { ...user, id: 'student-2' }, activeCapability: 'STUDENT' });
+    rerenderCurrent(tree, { ...detail, execution: { ...detail.execution,
+      studentId: change === 'owner' ? 'student-2' : 'student-1', version: change === 'version' ? 8 : 7 } });
+    await renderer.act(async () => { save(); await tick(); });
+    expect(workoutExecutionApi.upsertSet).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('serializes set writes and disables all set fields while a request is pending', async () => {
+    let resolve!: (value: unknown) => void;
+    (workoutExecutionApi.upsertSet as jest.Mock).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress;
+    await renderer.act(async () => { save(); save(); await tick(); });
+    expect(workoutExecutionApi.upsertSet).toHaveBeenCalledTimes(1);
+    expect(tree.root.findByProps({ accessibilityLabel: 'Số lần' }).props.editable).toBe(false);
+    expect(tree.root.findByProps({ testID: 'complete-workout-button' }).props.disabled).toBe(true);
+    await renderer.act(async () => { resolve(detail); await tick(); });
+    renderer.act(() => tree.unmount());
+  });
+
+  it('does not reopen terminal data or announce a save when an older set response arrives', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    let resolve!: (value: unknown) => void;
+    (workoutExecutionApi.upsertSet as jest.Mock).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const client = clients[clients.length - 1];
+    client.setQueryDefaults(workoutExecutionQueryKeys.detail(user.id, detail.execution.executionId), { gcTime: Infinity });
+    await renderer.act(async () => { tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress(); await tick(); });
+    const ended: WorkoutExecutionDetail = { ...detail, execution: { ...detail.execution, status: 'COMPLETED', version: 9 } };
+    client.setQueryData(workoutExecutionQueryKeys.detail(user.id, detail.execution.executionId), ended);
+    rerenderCurrent(tree, ended);
+    await renderer.act(async () => { resolve({ ...detail, execution: { ...detail.execution, version: 8 } }); await tick(); });
+    expect(client.getQueryData(workoutExecutionQueryKeys.detail(user.id, detail.execution.executionId))).toEqual(ended);
+    expect(announce).not.toHaveBeenCalled();
+    announce.mockRestore();
+    expect(client.getQueryData(workoutExecutionQueryKeys.current(user.id))).toBeUndefined();
+    expect(tree.root.findAllByProps({ testID: `save-workout-set-${set.clientSetId}` })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('ignores a pending response after the Student capability is removed', async () => {
+    let resolve!: (value: unknown) => void;
+    (workoutExecutionApi.upsertSet as jest.Mock).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const client = clients[clients.length - 1];
+    client.setQueryDefaults(workoutExecutionQueryKeys.detail(user.id, detail.execution.executionId), { gcTime: Infinity });
+    await renderer.act(async () => { tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress(); await tick(); });
+    (useAuth as jest.Mock).mockReturnValue({ user, activeCapability: 'TRAINER' });
+    rerenderCurrent(tree, detail);
+    await renderer.act(async () => { resolve(detail); await tick(); });
+    expect(client.getQueryData(workoutExecutionQueryKeys.current(user.id))).toBeUndefined();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('retries an uncertain set write with the identical client identity, body and expected version', async () => {
+    (workoutExecutionApi.upsertSet as jest.Mock).mockRejectedValue(new ApiError(0, 'network'));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const save = () => tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress();
+    await renderer.act(async () => { save(); await tick(); });
+    const first = (workoutExecutionApi.upsertSet as jest.Mock).mock.calls[0];
+    await renderer.act(async () => { save(); await tick(); });
+    expect(workoutExecutionApi.upsertSet).toHaveBeenCalledTimes(2);
+    expect((workoutExecutionApi.upsertSet as jest.Mock).mock.calls[1]).toEqual(first);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('retries terminal intent with its original command key, body and version after a refresh', async () => {
+    (workoutExecutionApi.complete as jest.Mock).mockRejectedValue(new ApiError(0, 'network'));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    renderer.act(() => tree.root.findByProps({ testID: 'complete-workout-button' }).props.onPress());
+    const confirm = () => tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress();
+    await renderer.act(async () => { confirm(); await tick(); });
+    const first = (workoutExecutionApi.complete as jest.Mock).mock.calls[0];
+    rerenderCurrent(tree, { ...detail, execution: { ...detail.execution, version: 8 } });
+    await renderer.act(async () => { confirm(); await tick(); });
+    expect(workoutExecutionApi.complete).toHaveBeenCalledTimes(2);
+    expect((workoutExecutionApi.complete as jest.Mock).mock.calls[1]).toEqual(first);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('preserves recorded zero, missing values, set units and unavailable units in terminal results', () => {
+    const result = { ...detail, execution: { ...detail.execution, status: 'ABORTED' as const }, exercises: [{
+      ...detail.exercises[0], sets: [{ ...set, completionStatus: 'FAILED' as const, repetitions: 0,
+        loadValue: 0, distanceValue: 250, distanceUnitId: 92, distanceUnit: null, rpe: 8, rir: 0, tempo: '3010', note: 'Giữ nguyên', completedAt: TIME_BOUNDARY }],
+    }] };
+    (useWorkoutExecutionDetail as jest.Mock).mockReturnValue({ data: result, isPending: false, isError: false, refetch: jest.fn() });
+    const tree = render(<WorkoutExecutionDetailScreen executionId={detail.execution.executionId} />);
+    const json = JSON.stringify(tree.toJSON());
+    ['Số lần: 0', 'Mức tải: 0 lb', 'Quãng đường: 250 · đơn vị không xác định', 'Thời lượng: Chưa ghi', 'RPE: 8', 'RIR: 0', '3010', 'Giữ nguyên', 'Không hoàn thành'].forEach((text) => expect(json).toContain(text));
+    expect(tree.root.findAllByProps({ accessibilityRole: 'radio' })).toHaveLength(0);
+    renderer.act(() => tree.unmount());
+  });
+
+  it('does not infer actual measurement units from the prescription when the set unit is missing', () => {
+    const result = { ...detail, execution: { ...detail.execution, status: 'COMPLETED' as const }, exercises: [{
+      ...detail.exercises[0], sets: [{ ...set, loadValue: 75, loadUnitId: null, loadUnit: null, distanceValue: 250, distanceUnitId: null, distanceUnit: null }],
+    }] };
+    (useWorkoutExecutionDetail as jest.Mock).mockReturnValue({ data: result, isPending: false, isError: false, refetch: jest.fn() });
+    const tree = render(<WorkoutExecutionDetailScreen executionId={detail.execution.executionId} />);
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('Mức tải: 75 · đơn vị không xác định');
+    expect(json).toContain('Quãng đường: 250 · đơn vị không xác định');
+    expect(json).not.toContain('Mức tải: 75 kg');
+    renderer.act(() => tree.unmount());
+  });
+
+  it('blocks a retained substitution callback after terminal data arrives', async () => {
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Thay bài tập' }).props.onPress());
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Chọn bài thay thế thử nghiệm' }).props.onPress());
+    const substitute = tree.root.findByProps({ accessibilityLabel: 'Goblet · Mặc định' }).props.onPress;
+    rerenderCurrent(tree, { ...detail, execution: { ...detail.execution, status: 'COMPLETED', version: 8 } });
+    await renderer.act(async () => { substitute(); await tick(); });
+    expect(workoutExecutionApi.substitute).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('ignores a late terminal response after switching accounts', async () => {
+    let resolve!: (value: unknown) => void;
+    (workoutExecutionApi.complete as jest.Mock).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    renderer.act(() => tree.root.findByProps({ testID: 'complete-workout-button' }).props.onPress());
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress(); await tick(); });
+    (useAuth as jest.Mock).mockReturnValue({ user: { ...user, id: 'student-2' }, activeCapability: 'STUDENT' });
+    rerenderCurrent(tree, { ...detail, execution: { ...detail.execution, studentId: 'student-2', executionId: 'other-execution' } });
+    await renderer.act(async () => { resolve({ ...detail, execution: { ...detail.execution, status: 'COMPLETED', version: 8 } }); await tick(); });
+    expect(mockReplace).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+  });
+
+  it('does not replace a newer current workout with a delayed response for the previous workout', async () => {
+    let resolve!: (value: unknown) => void;
+    (workoutExecutionApi.upsertSet as jest.Mock).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const tree = render(<WorkoutExecutionDetailScreen executionId={detail.execution.executionId} />);
+    const client = clients[clients.length - 1];
+    client.setQueryDefaults(workoutExecutionQueryKeys.current(user.id), { gcTime: Infinity });
+    await renderer.act(async () => { tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).props.onPress(); await tick(); });
+    const next = { ...detail, execution: { ...detail.execution, executionId: 'next-workout', version: 1 } };
+    client.setQueryData(workoutExecutionQueryKeys.current(user.id), next);
+    await renderer.act(async () => { resolve({ ...detail, execution: { ...detail.execution, version: 8 } }); await tick(); });
+    expect(client.getQueryData(workoutExecutionQueryKeys.current(user.id))).toEqual(next);
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each(['capability', 'suspended'])('does not navigate or announce if %s changes while success invalidation is pending', async (change) => {
+    (workoutExecutionApi.complete as jest.Mock).mockResolvedValue({ ...detail, execution: { ...detail.execution, status: 'COMPLETED', version: 8 } });
+    const tree = render(<CurrentWorkoutExecutionScreen />);
+    const client = clients[clients.length - 1];
+    let resolve!: () => void;
+    jest.spyOn(client, 'invalidateQueries').mockReturnValue(new Promise<void>((done) => { resolve = done; }));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    renderer.act(() => tree.root.findByProps({ testID: 'complete-workout-button' }).props.onPress());
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress(); await tick(); });
+    (useAuth as jest.Mock).mockReturnValue(change === 'suspended' ? { user: { ...user, status: 'SUSPENDED' }, activeCapability: 'STUDENT' } : { user, activeCapability: 'TRAINER' });
+    rerenderCurrent(tree, detail);
+    await renderer.act(async () => { resolve(); await tick(); });
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(announce).not.toHaveBeenCalled();
+    announce.mockRestore();
     renderer.act(() => tree.unmount());
   });
 

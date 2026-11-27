@@ -3,7 +3,7 @@ import { AppCard } from '@/design-system/components/AppCard';
 import { AppIcon } from '@/design-system/components/AppIcon';
 import { formatInstantVietnam } from '@/localization/instantDisplay';
 import { formatRecordedScheduleTime } from '@/features/workout-schedule/scheduleDisplay';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
@@ -162,12 +162,13 @@ interface SetEditorProps {
   exercise: WorkoutExerciseExecution;
   set: WorkoutSetExecution;
   busy: boolean;
+  canSave: () => boolean;
   error: string | null;
   onSave: (clientSetId: string, input: UpsertWorkoutSetInput) => void;
   onRemove?: () => void;
 }
 
-function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorProps) {
+function SetEditor({ exercise, set, busy, canSave, error, onSave, onRemove }: SetEditorProps) {
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const [status, setStatus] = useState(set.completionStatus);
   const [repetitions, setRepetitions] = useState(set.repetitions?.toString() ?? '');
@@ -198,6 +199,7 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
     distanceUnit.id !== null || set.distanceValue !== null || exercise.distanceValue !== null;
 
   const save = () => {
+    if (busy || !canSave()) return;
     const parsedRepetitions = optionalNumber(repetitions);
     const parsedLoad = canEditLoad ? optionalNumber(load) : set.loadValue;
     const parsedDuration = optionalNumber(duration);
@@ -274,7 +276,7 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
         })}
       </View>
       <View style={local.fieldGrid}>
-        <LabeledInput label="Số lần" value={repetitions} onChangeText={setRepetitions} keyboardType="numeric" />
+        <LabeledInput label="Số lần" value={repetitions} onChangeText={setRepetitions} keyboardType="numeric" disabled={busy} />
         {showsLoad ? (
           <LabeledInput
             label="Mức tải"
@@ -282,11 +284,11 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
             onChangeText={setLoad}
             keyboardType="decimal-pad"
             unitLabel={loadUnit.label}
-            disabled={!canEditLoad}
+            disabled={busy || !canEditLoad}
             helperText={loadUnit.unavailableMessage}
           />
         ) : null}
-        <LabeledInput label="Thời lượng (giây)" value={duration} onChangeText={setDuration} keyboardType="numeric" />
+        <LabeledInput label="Thời lượng (giây)" value={duration} onChangeText={setDuration} keyboardType="numeric" disabled={busy} />
         {showsDistance ? (
           <LabeledInput
             label="Quãng đường"
@@ -294,13 +296,13 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
             onChangeText={setDistance}
             keyboardType="decimal-pad"
             unitLabel={distanceUnit.label}
-            disabled={!canEditDistance}
+            disabled={busy || !canEditDistance}
             helperText={distanceUnit.unavailableMessage}
           />
         ) : null}
-        <LabeledInput label="RPE (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
+        <LabeledInput label="RPE (1–10)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" disabled={busy} />
       </View>
-      <LabeledInput label="Ghi chú hiệp" value={note} onChangeText={setNote} multiline />
+      <LabeledInput label="Ghi chú hiệp" value={note} onChangeText={setNote} multiline disabled={busy} />
       {validation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{validation}</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{error}</Text> : null}
       <AppButton
@@ -317,6 +319,33 @@ function SetEditor({ exercise, set, busy, error, onSave, onRemove }: SetEditorPr
           onPress={onRemove} variant="secondary" tone="danger" icon="trash"
         />
       ) : null}
+    </View>
+  );
+}
+
+function SetResult({ set }: { set: WorkoutSetExecution }) {
+  const theme = getSemanticColors(useColorScheme() === 'dark');
+  const recorded = (value: number | string | null, suffix = '') =>
+    value === null || value === '' ? 'Chưa ghi' : `${value}${suffix}`;
+  const rows = [
+    `Số lần: ${recorded(set.repetitions)}`,
+    `Mức tải: ${set.loadValue === null ? 'Chưa ghi' : measurementText(set.loadValue, set.loadUnitId, set.loadUnit)}`,
+    `Thời lượng: ${recorded(set.durationSeconds, ' giây')}`,
+    `Quãng đường: ${set.distanceValue === null ? 'Chưa ghi' : measurementText(set.distanceValue, set.distanceUnitId, set.distanceUnit)}`,
+    `RPE: ${recorded(set.rpe)}`,
+    `RIR: ${recorded(set.rir)}`,
+    `Nhịp thực hiện: ${recorded(set.tempo)}`,
+    `Nghỉ sau hiệp: ${recorded(set.restAfterSeconds, ' giây')}`,
+    `Ghi chú hiệp: ${recorded(set.note)}`,
+  ];
+  return (
+    <View testID={`workout-set-${set.clientSetId}`} style={[local.setCard, { borderColor: theme.border, backgroundColor: theme.surfaceSubtle }]}>
+      <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>
+        Hiệp {set.setNumber} · {workoutSetTypeLabels[set.setType]}
+      </Text>
+      <Text style={[styles.label, { color: theme.textPrimary }]}>{workoutSetStatusLabels[set.completionStatus]}</Text>
+      {rows.map((row) => <Text key={row} style={[styles.body, { color: theme.textSecondary }]}>{row}</Text>)}
+      {set.completedAt ? <Text style={[styles.body, { color: theme.textSecondary }]}>Hoàn thành lúc: {formatInstantVietnam(set.completedAt) ?? 'Chưa rõ thời điểm'}</Text> : null}
     </View>
   );
 }
@@ -420,11 +449,11 @@ export function CurrentWorkoutExecutionScreen() {
   const { user, activeCapability } = useAuth();
   const router = useRouter();
   const studentId = user?.id ?? '';
-  const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
+  const allowed = user?.status === 'ACTIVE' && activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
   const query = useCurrentWorkoutExecution(studentId, allowed);
 
   if (!allowed) {
-    return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để ghi buổi tập của bạn." state="info" />;
+    return <AppCard title="Không có quyền truy cập buổi tập" message="Buổi tập chỉ dành cho tài khoản đang hoạt động với hồ sơ Học viên. Hãy kiểm tra tài khoản và hồ sơ hiện tại." state="info" />;
   }
   if (query.isPending) return <AppCard title="Đang tải buổi tập" message="Vui lòng chờ trong giây lát." state="loading" />;
   if (query.isError && isCurrentExecutionMissing(query.error)) {
@@ -441,19 +470,25 @@ export function CurrentWorkoutExecutionScreen() {
   if (query.isError || !query.data) {
     return <AppCard testID="current-workout-error" title="Không thể tải buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} state="error" />;
   }
-  return <WorkoutExecutionContent detail={query.data} currentRoute onRefresh={() => query.refetch()} />;
+  if (query.data.execution.studentId !== studentId) {
+    return <AppCard title="Không thể mở buổi tập" message="Hãy tải lại buổi tập trong hồ sơ Học viên của bạn." state="info" />;
+  }
+  return <WorkoutExecutionContent key={`${studentId}-${query.data.execution.executionId}`} detail={query.data} currentRoute onRefresh={() => query.refetch()} />;
 }
 
 export function WorkoutExecutionDetailScreen({ executionId }: { executionId: string }) {
   const { user, activeCapability } = useAuth();
   const studentId = user?.id ?? '';
-  const allowed = activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
+  const allowed = user?.status === 'ACTIVE' && activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile);
   const query = useWorkoutExecutionDetail(studentId, executionId, allowed);
 
-  if (!allowed) return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để xem buổi tập của bạn." state="info" />;
+  if (!allowed) return <AppCard title="Không có quyền truy cập buổi tập" message="Buổi tập chỉ dành cho tài khoản đang hoạt động với hồ sơ Học viên. Hãy kiểm tra tài khoản và hồ sơ hiện tại." state="info" />;
   if (query.isPending) return <AppCard title="Đang tải chi tiết" message="Vui lòng chờ trong giây lát." state="loading" />;
   if (query.isError || !query.data) return <AppCard testID="workout-detail-error" title="Không thể mở buổi tập" message={workoutExecutionErrorMessage(query.error)} onRetry={() => query.refetch()} state="error" />;
-  return <WorkoutExecutionContent detail={query.data} onRefresh={() => query.refetch()} />;
+  if (query.data.execution.studentId !== studentId) {
+    return <AppCard title="Không thể mở buổi tập" message="Hãy tải lại buổi tập trong hồ sơ Học viên của bạn." state="info" />;
+  }
+  return <WorkoutExecutionContent key={`${studentId}-${query.data.execution.executionId}`} detail={query.data} onRefresh={() => query.refetch()} />;
 }
 
 function WorkoutExecutionContent({
@@ -465,12 +500,11 @@ function WorkoutExecutionContent({
   currentRoute?: boolean;
   onRefresh: () => Promise<unknown>;
 }) {
-  const { user } = useAuth();
+  const { user, activeCapability } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
-  const [setBusy, setSetBusy] = useState<string | null>(null);
   const [setError, setSetError] = useState<Record<string, string>>({});
   const [extraSets, setExtraSets] = useState<
     Record<string, { exerciseExecutionId: string; set: WorkoutSetExecution }>
@@ -486,8 +520,47 @@ function WorkoutExecutionContent({
   const terminalKey = useRef<string | null>(null);
   const exerciseDetail = useExerciseDetail(selectedExercise?.id);
   const inProgress = detail.execution.status === 'IN_PROGRESS';
+  const writable = inProgress && user?.status === 'ACTIVE' && activeCapability === 'STUDENT' &&
+    Boolean(user?.capabilities?.hasStudentProfile) && studentId === detail.execution.studentId;
+  const live = useRef({ detail, writable, studentId, mounted: true });
+  useLayoutEffect(() => {
+    live.current = { detail, writable, studentId, mounted: true };
+    return () => { live.current.mounted = false; };
+  }, [detail, writable, studentId]);
+  const requestPending = useRef(false);
+  // Check the latest rendered authority/lifecycle, even for callbacks retained by an old editor.
+  const canWrite = () => {
+    const cached = client.getQueryData<WorkoutExecutionDetail>(workoutExecutionQueryKeys.detail(studentId, detail.execution.executionId));
+    const current = client.getQueryData<WorkoutExecutionDetail>(workoutExecutionQueryKeys.current(studentId));
+    const known = [cached, current].filter((item): item is WorkoutExecutionDetail =>
+      Boolean(item && item.execution.executionId === detail.execution.executionId));
+    return live.current.mounted && live.current.writable &&
+      live.current.studentId === studentId &&
+      live.current.detail.execution.executionId === detail.execution.executionId &&
+      live.current.detail.execution.version === detail.execution.version && !requestPending.current &&
+      known.every((item) => item.execution.status === 'IN_PROGRESS' && item.execution.version <= detail.execution.version);
+  };
+  const sameScope = () => live.current.mounted && live.current.studentId === studentId &&
+    live.current.detail.execution.executionId === detail.execution.executionId;
 
   const storeUpdated = async (updated: WorkoutExecutionDetail) => {
+    if (!sameScope()) return false;
+    const cached = client.getQueryData<WorkoutExecutionDetail>(
+      workoutExecutionQueryKeys.detail(studentId, updated.execution.executionId)
+    );
+    const current = client.getQueryData<WorkoutExecutionDetail>(workoutExecutionQueryKeys.current(studentId));
+    if (current && current.execution.executionId !== updated.execution.executionId &&
+      updated.execution.status === 'IN_PROGRESS') {
+      await onRefresh();
+      return false;
+    }
+    const known = [live.current.detail, cached, current].filter((item): item is WorkoutExecutionDetail =>
+      Boolean(item && item.execution.executionId === updated.execution.executionId));
+    if (known.some((item) => item.execution.version > updated.execution.version ||
+      (item.execution.status !== 'IN_PROGRESS' && updated.execution.status === 'IN_PROGRESS'))) {
+      await onRefresh();
+      return false;
+    }
     client.setQueryData(
       workoutExecutionQueryKeys.detail(studentId, updated.execution.executionId),
       updated
@@ -495,93 +568,109 @@ function WorkoutExecutionContent({
     if (updated.execution.status === 'IN_PROGRESS') {
       client.setQueryData(workoutExecutionQueryKeys.current(studentId), updated);
     } else {
-      client.removeQueries({ queryKey: workoutExecutionQueryKeys.current(studentId), exact: true });
+      if (!current || current.execution.executionId === updated.execution.executionId) {
+        client.removeQueries({ queryKey: workoutExecutionQueryKeys.current(studentId), exact: true });
+      }
     }
     await client.invalidateQueries({ queryKey: workoutExecutionQueryKeys.history(studentId) });
+    return sameScope();
   };
 
   const setMutation = useMutation({
-    mutationFn: ({ clientSetId, input }: { clientSetId: string; input: UpsertWorkoutSetInput }) =>
+    mutationFn: ({ clientSetId, input, version }: { clientSetId: string; input: UpsertWorkoutSetInput; version: number }) =>
       workoutExecutionApi.upsertSet(
         detail.execution.executionId,
         clientSetId,
-        detail.execution.version,
+        version,
         input
       ),
     onMutate: ({ clientSetId }) => {
-      setSetBusy(clientSetId);
       setSetError((current) => ({ ...current, [clientSetId]: '' }));
     },
     onSuccess: async (updated, variables) => {
+      if (!await storeUpdated(updated)) return;
       setExtraSets((current) => {
         const next = { ...current };
         delete next[variables.clientSetId];
         return next;
       });
-      await storeUpdated(updated);
       AccessibilityInfo.announceForAccessibility('Đã lưu hiệp tập.');
     },
     onError: async (error, variables) => {
+      if (!sameScope()) return;
       setSetError((current) => ({
         ...current,
         [variables.clientSetId]: workoutExecutionErrorMessage(error),
       }));
       if (isWorkoutExecutionStale(error)) await onRefresh();
     },
-    onSettled: () => setSetBusy(null),
+    onSettled: () => { requestPending.current = false; },
   });
 
   const substitutionMutation = useMutation({
-    mutationFn: (variationId: string) => {
-      if (!substitutionTarget) throw new Error('Chưa có chỉ tiêu bài tập');
+    mutationFn: ({ variationId, exerciseId, version, reason }: { variationId: string; exerciseId: string; version: number; reason: string | null }) => {
       return workoutExecutionApi.substitute(
         detail.execution.executionId,
-        substitutionTarget.exerciseExecutionId,
-        detail.execution.version,
+        exerciseId,
+        version,
         {
           actualExerciseVariationId: variationId,
-          substitutionReason: substitutionReason.trim() || null,
+          substitutionReason: reason,
         }
       );
     },
     onSuccess: async (updated) => {
+      if (!await storeUpdated(updated)) return;
       setSubstitutionTarget(null);
       setPickerSelection(null);
       setSelectedExercise(null);
       setSubstitutionReason('');
       substitutionMutation.reset();
-      await storeUpdated(updated);
       AccessibilityInfo.announceForAccessibility('Đã thay bài tập cho buổi tập này.');
     },
     onError: async (error) => {
-      if (isWorkoutExecutionStale(error)) await onRefresh();
+      if (sameScope() && isWorkoutExecutionStale(error)) await onRefresh();
     },
+    onSettled: () => { requestPending.current = false; },
   });
 
   const terminalMutation = useMutation({
-    mutationFn: ({ action, input, key }: { action: 'complete' | 'abort'; input: FinishWorkoutExecutionInput; key: string }) =>
+    mutationFn: ({ action, input, key, version }: { action: 'complete' | 'abort'; input: FinishWorkoutExecutionInput; key: string; version: number }) =>
       action === 'complete'
-        ? workoutExecutionApi.complete(detail.execution.executionId, detail.execution.version, input, key)
-        : workoutExecutionApi.abort(detail.execution.executionId, detail.execution.version, input, key),
+        ? workoutExecutionApi.complete(detail.execution.executionId, version, input, key)
+        : workoutExecutionApi.abort(detail.execution.executionId, version, input, key),
     onSuccess: async (updated) => {
+      if (!await storeUpdated(updated)) return;
       setTerminal(null);
       terminalKey.current = null;
-      await storeUpdated(updated);
       AccessibilityInfo.announceForAccessibility(
         `Buổi tập ở trạng thái ${workoutExecutionStatusLabels[updated.execution.status]}.`
       );
       if (currentRoute) router.replace(`/workouts/${updated.execution.executionId}` as never);
     },
     onError: async (error) => {
+      if (!sameScope()) return;
       if (isWorkoutExecutionStale(error)) {
         terminalKey.current = null;
         setTerminal(null);
         await onRefresh();
       }
     },
+    onSettled: () => { requestPending.current = false; },
   });
 
+  const busy = setMutation.isPending || substitutionMutation.isPending || terminalMutation.isPending;
+  const saveSet = (clientSetId: string, input: UpsertWorkoutSetInput) => {
+    if (!canWrite()) return;
+    requestPending.current = true;
+    const previous = setMutation.variables;
+    const retrying = setMutation.isError && !isWorkoutExecutionStale(setMutation.error) &&
+      previous?.clientSetId === clientSetId && JSON.stringify(previous.input) === JSON.stringify(input);
+    setMutation.mutate(retrying ? previous : { clientSetId, input, version: detail.execution.version });
+  };
+
   const addSet = (exercise: WorkoutExerciseExecution) => {
+    if (!canWrite()) return;
     const clientSetId = createCommandKey();
     const numbers = [
       ...exercise.sets.map((item) => item.setNumber),
@@ -620,6 +709,7 @@ function WorkoutExecutionContent({
   };
 
   const openTerminal = (action: 'complete' | 'abort') => {
+    if (!canWrite()) return;
     terminalMutation.reset();
     terminalKey.current = createCommandKey();
     setOverallRpe(detail.execution.overallRpe?.toString() ?? '');
@@ -629,7 +719,7 @@ function WorkoutExecutionContent({
   };
 
   const submitTerminal = () => {
-    if (!terminal) return;
+    if (!terminal || !canWrite()) return;
     const parsedRpe = optionalNumber(overallRpe);
     if (parsedRpe === undefined || (parsedRpe !== null && (parsedRpe < 1 || parsedRpe > 10))) {
       setTerminalValidation('RPE toàn buổi phải từ 1 đến 10 hoặc để trống.');
@@ -637,9 +727,11 @@ function WorkoutExecutionContent({
     }
     const key = terminalKey.current ?? createCommandKey();
     terminalKey.current = key;
+    requestPending.current = true;
     terminalMutation.mutate({
       action: terminal,
       key,
+      version: terminalMutation.variables?.key === key ? terminalMutation.variables.version : detail.execution.version,
       input: { overallRpe: parsedRpe, sessionNote: sessionNote.trim() || null },
     });
   };
@@ -684,6 +776,8 @@ function WorkoutExecutionContent({
         {detail.execution.sessionNote ? (
           <Text style={[styles.body, { color: theme.textPrimary }]}>{detail.execution.sessionNote}</Text>
         ) : null}
+        {!inProgress ? <Text style={[styles.body, { color: theme.textSecondary }]}>Buổi tập đã kết thúc. Chỉ có thể xem các hiệp đã ghi.</Text> : null}
+        {inProgress && !writable ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bạn chỉ có quyền xem buổi tập này.</Text> : null}
         {inProgress ? <ElapsedTime startedAt={detail.execution.performedStartedAt} /> : null}
         {detail.execution.performedEndedAt ? (
           <Text style={[styles.body, { color: theme.textSecondary }]}>
@@ -696,7 +790,7 @@ function WorkoutExecutionContent({
         <AppCard title="Không có chi tiết bài tập" message="Bản ghi này không chứa dữ liệu bài tập có thể hiển thị." state="empty" />
       ) : null}
       {detail.exercises.map((exercise, index) => {
-        const added = Object.values(extraSets)
+        const added = (writable ? Object.values(extraSets) : [])
           .filter((item) => item.exerciseExecutionId === exercise.exerciseExecutionId)
           .map((item) => item.set);
         return (
@@ -707,15 +801,17 @@ function WorkoutExecutionContent({
             <Text style={[styles.body, { color: theme.textSecondary }]}>{targetText(exercise)}</Text>
             {exercise.instructions ? <Text style={[styles.body, { color: theme.textPrimary }]}>{exercise.instructions}</Text> : null}
             {exercise.substitutionReason ? <Text style={[styles.body, { color: theme.warningText }]}>Lý do thay bài: {exercise.substitutionReason}</Text> : null}
-            {[...exercise.sets, ...added].map((set) => (
+            {[...exercise.sets, ...added].map((set) => writable ? (
               <SetEditor
                 key={`${set.clientSetId}-${detail.execution.version}`}
                 exercise={exercise}
                 set={set}
-                busy={setBusy === set.clientSetId}
+                busy={busy}
+                canSave={canWrite}
                 error={setError[set.clientSetId] || null}
-                onSave={(clientSetId, input) => setMutation.mutate({ clientSetId, input })}
+                onSave={saveSet}
                 onRemove={extraSets[set.clientSetId] ? () => {
+                  if (!canWrite()) return;
                   setExtraSets((current) => {
                     const next = { ...current };
                     delete next[set.clientSetId];
@@ -723,14 +819,15 @@ function WorkoutExecutionContent({
                   });
                 } : undefined}
               />
-            ))}
-            {inProgress ? (
+            ) : <SetResult key={set.clientSetId} set={set} />)}
+            {writable ? (
               <View style={styles.row}>
-                <AppButton label="Thêm hiệp" disabled={setMutation.isPending} onPress={() => addSet(exercise)} variant="secondary" icon="plus" />
+                <AppButton label="Thêm hiệp" disabled={busy} onPress={() => addSet(exercise)} variant="secondary" icon="plus" />
                 <AppButton
                   label="Thay bài tập"
-                  disabled={substitutionMutation.isPending || setMutation.isPending}
+                  disabled={busy}
                   onPress={() => {
+                    if (!canWrite()) return;
                     substitutionMutation.reset();
                     setSubstitutionTarget(exercise);
                     setPickerSelection(null);
@@ -744,21 +841,21 @@ function WorkoutExecutionContent({
         );
       })}
 
-      {inProgress ? (
+      {writable ? (
         <AppCard>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>Kết thúc buổi tập</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
             Hệ thống sẽ xác định kết quả hoàn thành hoặc hoàn thành một phần từ các hiệp đã ghi.
           </Text>
           <View style={styles.row}>
-            <AppButton testID="complete-workout-button" label="Hoàn thành buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('complete')} icon="check" />
-            <AppButton testID="abort-workout-button" label="Hủy buổi tập" disabled={setMutation.isPending} onPress={() => openTerminal('abort')} variant="secondary" tone="danger" />
+            <AppButton testID="complete-workout-button" label="Hoàn thành buổi tập" disabled={busy} onPress={() => openTerminal('complete')} icon="check" />
+            <AppButton testID="abort-workout-button" label="Hủy buổi tập" disabled={busy} onPress={() => openTerminal('abort')} variant="secondary" tone="danger" />
           </View>
         </AppCard>
       ) : null}
 
       <Modal
-        visible={substitutionTarget !== null}
+        visible={writable && substitutionTarget !== null}
         animationType="slide"
         accessibilityViewIsModal
         onRequestClose={() => !substitutionMutation.isPending && setSubstitutionTarget(null)}>
@@ -783,7 +880,7 @@ function WorkoutExecutionContent({
             <ScrollView contentContainerStyle={[styles.content, local.content]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
               <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>Chọn biến thể</Text>
               <Text style={[styles.body, { color: theme.textSecondary }]}>{selectedExercise.name}</Text>
-              <LabeledInput label="Lý do thay bài (không bắt buộc)" value={substitutionReason} onChangeText={(value) => { setSubstitutionReason(value); }} multiline />
+              <LabeledInput label="Lý do thay bài (không bắt buộc)" disabled={busy} value={substitutionReason} onChangeText={(value) => { setSubstitutionReason(value); }} multiline />
               {exerciseDetail.isPending ? <AppCard title="Đang tải biến thể" message="Vui lòng chờ trong giây lát." state="loading" /> : null}
               {exerciseDetail.isError ? <AppCard title="Không thể tải biến thể" message="Hãy thử lại." onRetry={() => exerciseDetail.refetch()} state="error" /> : null}
               {exerciseDetail.data?.variations.map((variation) => (
@@ -792,7 +889,12 @@ function WorkoutExecutionContent({
                   label={`${variation.name}${variation.defaultVariation ? ' · Mặc định' : ''}`}
                   loading={substitutionMutation.isPending}
                   disabled={substitutionMutation.isPending}
-                  onPress={() => substitutionMutation.mutate(variation.id)} variant="secondary"
+                  onPress={() => {
+                    if (!canWrite() || !substitutionTarget) return;
+                    requestPending.current = true;
+                    substitutionMutation.mutate({ variationId: variation.id, exerciseId: substitutionTarget.exerciseExecutionId,
+                      version: detail.execution.version, reason: substitutionReason.trim() || null });
+                  }} variant="secondary"
                 />
               ))}
               {substitutionMutation.isError ? <AppCard title="Chưa thể thay bài tập" message={workoutExecutionErrorMessage(substitutionMutation.error)} state="error" /> : null}
@@ -803,15 +905,15 @@ function WorkoutExecutionContent({
         </SafeAreaView>
       </Modal>
 
-      <Modal visible={terminal !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={() => !terminalMutation.isPending && setTerminal(null)}>
+      <Modal visible={writable && terminal !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={() => !terminalMutation.isPending && setTerminal(null)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}><KeyboardAvoidingView style={[local.backdrop, { backgroundColor: theme.canvas }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView style={local.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           <AppCard testID="workout-terminal-confirmation">
             <Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>
               {terminal === 'complete' ? 'Xác nhận hoàn thành' : 'Xác nhận hủy buổi tập'}
             </Text>
-            <LabeledInput label="RPE toàn buổi (1–10, không bắt buộc)" value={overallRpe} onChangeText={(value) => { terminalKey.current = null; setOverallRpe(value); }} keyboardType="decimal-pad" />
-            <LabeledInput label="Ghi chú buổi tập" value={sessionNote} onChangeText={(value) => { terminalKey.current = null; setSessionNote(value); }} multiline />
+            <LabeledInput label="RPE toàn buổi (1–10, không bắt buộc)" disabled={busy} value={overallRpe} onChangeText={(value) => { terminalKey.current = null; setOverallRpe(value); }} keyboardType="decimal-pad" />
+            <LabeledInput label="Ghi chú buổi tập" disabled={busy} value={sessionNote} onChangeText={(value) => { terminalKey.current = null; setSessionNote(value); }} multiline />
             {terminalValidation ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>{terminalValidation}</Text> : null}
             {terminalMutation.isError ? <AppCard title="Chưa thể kết thúc buổi tập" message={workoutExecutionErrorMessage(terminalMutation.error)} state="error" /> : null}
             <View style={styles.row}>
