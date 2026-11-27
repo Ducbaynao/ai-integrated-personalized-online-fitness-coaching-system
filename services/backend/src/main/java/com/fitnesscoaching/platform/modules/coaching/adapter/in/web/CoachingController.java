@@ -49,6 +49,7 @@ public class CoachingController {
     }
 
     public record InitiateRequest(@NotNull UUID counterpartyId, @NotNull UUID commandKey) {}
+    public record SelfDirectedRequest(@NotNull UUID commandKey) {}
     public record ActionRequest(@NotNull @Min(0) Long expectedVersion, @NotNull UUID commandKey,
                                 @Size(max = 500) String reason) {}
     public record ResumeActionRequest(@NotNull @Min(0) Long expectedRelationshipVersion,
@@ -234,6 +235,13 @@ public class CoachingController {
                                       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         UUID actor = actor(jwt);
         return new PageDto<>(lifecycle.periods(actor, page, size).stream().map(PeriodDto::from).toList(), page, size);
+    }
+
+    @PostMapping("/periods/self-directed")
+    public OutcomeDto startSelfDirected(@AuthenticationPrincipal Jwt jwt,
+                                        @Valid @RequestBody SelfDirectedRequest body) {
+        UUID actor = actor(jwt);
+        return outcomeDto(lifecycle.startSelfDirected(actor, body.commandKey()), actor);
     }
 
     @PostMapping("/relationships/requests")

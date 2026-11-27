@@ -10,7 +10,7 @@ const messages: Record<string, string> = {
   WORKOUT_PLAN_VERSION_NOT_FOUND: 'Phiên bản không tồn tại hoặc bạn không còn quyền xem.',
   PLANNED_WORKOUT_NOT_FOUND: 'Buổi tập dự kiến không tồn tại hoặc không còn khả dụng.',
   WORKOUT_PLAN_ACCESS_DENIED: 'Bạn không có quyền thực hiện thao tác này trong kỳ huấn luyện hiện tại.',
-  COACHING_PERIOD_REQUIRED: 'Chưa có kỳ huấn luyện hiện tại phù hợp cho thao tác này.',
+  COACHING_PERIOD_REQUIRED: 'Cần chọn Tự tập hoặc kiểm tra kết nối với huấn luyện viên trước khi tiếp tục.',
   WORKOUT_PLAN_LIFECYCLE_CONFLICT: 'Trạng thái kế hoạch đã thay đổi hoặc không cho phép thao tác này.',
   ACTIVE_WORKOUT_PLAN_ALREADY_EXISTS: 'Bạn đã có một kế hoạch đang áp dụng. Hãy chuyển trạng thái kế hoạch đó trước.',
   WORKOUT_PLAN_VERSION_CONFLICT: 'Kế hoạch đã được cập nhật ở nơi khác. Hãy xem lại dữ liệu mới nhất trước khi thử lại.',

@@ -13,6 +13,17 @@ Lựa chọn onboarding không phải quyền vĩnh viễn. Student có thể Be
 
 ## 2. Self Directed bắt đầu plan
 
+Trước khi mở form tạo plan ở ST-05 hoặc route `/workout-plans/new`, Mobile đọc current
+Coaching context. Chưa từng chọn chế độ hoặc period cũ đã kết thúc: giải thích quyền Tự tập
+và đường kết nối PT. Student chọn `Chọn Tự tập`, xem tác động rồi `Xác nhận Tự tập` mới gửi
+command thiết lập; chỉ mở form sau khi GET context lại thành công và có SELF_DIRECTED hiệu lực.
+GET và nút Lưu không tự tạo/chuyển period. Period tương lai, quan hệ chưa có context phù hợp
+hoặc HUMAN_COACH dẫn tới mục Huấn luyện; không tự đổi chế độ. Loading, lỗi mạng và lỗi quyền
+được hiển thị riêng và chặn tạo plan. Khi context mất sau lúc nhập, giữ form trong bộ nhớ
+của màn hình ở cùng phiên, cho thiết lập tại chỗ hoặc mở Huấn luyện bằng stack push rồi quay
+lại `Kiểm tra lại chế độ`. Không persist draft vào localStorage. Đổi account/capability xóa
+phiên chỉnh sửa; response cũ không mở form, lưu hoặc điều hướng phiên mới.
+
 1. Student xem Current Goal.
 2. Chọn tự tạo plan, dùng template hoặc yêu cầu AI Workout Plan Proposal.
 3. AI proposal hiển thị dữ liệu đã dùng và thiếu.

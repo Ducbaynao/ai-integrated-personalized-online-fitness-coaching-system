@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CoachingLifecycleUseCase {
+    Outcome startSelfDirected(UUID actor, UUID commandKey);
     Outcome initiate(UUID actor, UUID studentId, UUID trainerId, UUID commandKey);
     Outcome relationshipAction(UUID actor, UUID relationshipId, String action, long expectedVersion,
                                String reason, UUID commandKey);

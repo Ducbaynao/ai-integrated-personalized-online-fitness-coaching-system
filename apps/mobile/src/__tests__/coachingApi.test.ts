@@ -6,6 +6,20 @@ jest.mock('@/services/apiClient', () => ({ request: jest.fn() }));
 describe('coachingApi', () => {
   beforeEach(() => { jest.clearAllMocks(); (request as jest.Mock).mockResolvedValue({}); });
 
+  it('reads context without mutation and binds explicit self-directed setup to the originating session', async () => {
+    const shouldContinue = () => true;
+    const scope = { authEpoch: 2, capabilityEpoch: 3, shouldContinue };
+    const expectedScope = { expectedAuthEpoch: 2, expectedCapabilityEpoch: 3, shouldContinue };
+    await coachingApi.getCurrentContext(scope);
+    await coachingApi.getPeriods(0, 1, scope);
+    await coachingApi.startSelfDirected('same-key', scope);
+    await coachingApi.startSelfDirected('same-key', scope);
+    expect(request).toHaveBeenNthCalledWith(1, '/coaching/relationships/me/current', { method: 'GET', ...expectedScope });
+    expect(request).toHaveBeenNthCalledWith(2, '/coaching/periods/me?page=0&size=1', { method: 'GET', ...expectedScope });
+    expect(request).toHaveBeenNthCalledWith(3, '/coaching/periods/self-directed', { method: 'POST', body: { commandKey: 'same-key' }, ...expectedScope });
+    expect((request as jest.Mock).mock.calls[2]).toEqual((request as jest.Mock).mock.calls[3]);
+  });
+
   it('uses privacy-safe discovery and self-scoped collection endpoints', async () => {
     await coachingApi.getTrainers('  An  ', 2, 20);
     await coachingApi.lookupStudent(' student@example.com ');

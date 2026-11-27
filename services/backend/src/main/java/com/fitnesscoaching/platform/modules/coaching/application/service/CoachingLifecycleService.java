@@ -57,6 +57,41 @@ public class CoachingLifecycleService implements CoachingLifecycleUseCase {
     }
 
     @Override @Transactional
+    public Outcome startSelfDirected(UUID actor, UUID key) {
+        requireKey(key);
+        verifyStudent(actor);
+        // Same assignment boundary as initial/resume acceptance; this command never
+        // closes a period or transitions an existing relationship.
+        store.lockStudent(actor);
+        verifyStudent(actor);
+        String command = "START_SELF_DIRECTED";
+        String fingerprint = hash(command + ":" + actor);
+        Receipt prior = store.receipt(actor, key).orElse(null);
+        if (prior != null) {
+            if (!command.equals(prior.commandName()) || !fingerprint.equals(prior.payloadHash())) {
+                throw failure(HttpStatus.CONFLICT, "COACHING_IDEMPOTENCY_CONFLICT");
+            }
+            // A retry proves the prior effect, never restores its former authority.
+            Instant at = store.transitionTime();
+            return new Outcome(store.currentRelationship(actor).orElse(null), null,
+                    store.effectivePeriod(actor, at).orElse(null));
+        }
+        Instant at = store.transitionTime();
+        if (store.currentRelationship(actor).isPresent() || store.effectivePeriod(actor, at).isPresent()
+                || store.periods(actor, 1, 0).stream().anyMatch(period -> period.startedAt().isAfter(at))) {
+            throw failure(HttpStatus.CONFLICT, "COACHING_PERIOD_CONFLICT");
+        }
+        Period period = store.openPeriod(actor, "SELF_DIRECTED", null, null, actor, at);
+        audit.recordAudit(AuditRecord.builder().actorUserId(actor).actorRole("STUDENT")
+                .action("COACHING_START_SELF_DIRECTED").targetType("COACHING_PERIOD").targetId(period.id())
+                .beforeDataJson("{}").afterDataJson("{\"mode\":\"SELF_DIRECTED\"}")
+                .metadataJson("{}").occurredAt(at).build());
+        // Uses the existing actor/key receipt store; no relationship receipt semantics change.
+        store.saveReceipt(actor, key, command, fingerprint, "{}");
+        return new Outcome(null, null, period);
+    }
+
+    @Override @Transactional
     public Outcome initiate(UUID actor, UUID studentId, UUID trainerId, UUID key) {
         requireKey(key);
         if (studentId == null || trainerId == null || studentId.equals(trainerId)) {

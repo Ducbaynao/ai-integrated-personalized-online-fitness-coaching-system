@@ -61,6 +61,13 @@ Màn hình chi tiết và so sánh đề xuất Fitness Goal (`/(app)/goal-propo
 
 ## ST-05 Plan and Calendar
 
+Plan hub hiển thị trạng thái current Coaching context trước CTA tạo plan. Thiếu period:
+chọn Tự tập với xác nhận riêng hoặc mở Huấn luyện để kết nối PT. HUMAN_COACH giải thích PT
+quyết định giáo án theo quyền hợp lệ; period tương lai/đã kết thúc và quan hệ thiếu context
+có hướng dẫn khác nhau. Loading/lỗi mạng/quyền không được suy thành Tự tập. Direct create
+route cũng kiểm tra trước form; lỗi context lúc lưu giữ draft trong bộ nhớ của cùng phiên,
+khóa Lưu và cho thiết lập/đọc lại context. Không thay đổi lifecycle các plan đã có.
+
 Calendar marker tách appointment, planned workout, completed, missed và rescheduled. Day detail hiển thị hai lifecycle riêng. Filter theo planned/completed/missed.
 
 Từ ST-06 của plan ACTIVE, Student mở `/(app)/workout-plans/[planId]/schedule` để chọn nhiều session thuộc phiên bản đã xuất bản hiện hành. Form yêu cầu tuần anchor thứ Hai, IANA timezone, local start/end và offset UTC rõ ràng cho từng mốc; `COACH_REQUIRED` cần gắn Appointment `CONFIRMED` thật bao trọn buổi, đúng Student/Trainer/Coaching Period. Thiếu supervision metadata không chọn được. Kiểm tra sơ bộ cửa sổ 90 ngày trên Mobile dựa vào từng instant bắt đầu so với đồng hồ thiết bị, không dựa vào week anchor; PostgreSQL time lúc xác nhận là authority cuối cùng. Preview toàn batch trước POST `/planned-workout-batches`; lỗi item hiển thị theo buổi, 409 yêu cầu tải lại/xem trước lại, lỗi mạng chưa rõ kết quả chỉ retry cùng body/commandKey. Xác nhận thành công mở calendar GET để đọc occurrence ID/version thật. Đây là lịch Planned Workout, không phải Appointment hay Actual Workout.
