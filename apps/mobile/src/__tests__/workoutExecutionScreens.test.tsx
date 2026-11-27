@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -470,4 +471,22 @@ describe('B05 Workout Execution screens', () => {
     expect(refetch).toHaveBeenCalled();
     renderer.act(() => tree.unmount());
   });
+  it.each([TIME_BOUNDARY, null, '', 'bad', '2026-11-27', '2026-11-27T08:00:00'])('time display: performed instants use Vietnam, frozen planned instants retain unknown context for %s', async (instant) => {
+    const execution = { ...detail.execution, status: 'COMPLETED', performedStartedAt: instant, performedEndedAt: instant, plannedStartAt: instant };
+    (useAuth as jest.Mock).mockReturnValue({ user: { ...user, timezone: 'America/New_York' }, activeCapability: 'STUDENT' });
+    (useWorkoutExecutionDetail as jest.Mock).mockReturnValue({ data: { ...detail, execution }, isPending: false, isError: false });
+    (useWorkoutExecutionHistory as jest.Mock).mockReturnValue({ data: { pages: [{ items: [execution] }] }, isPending: false, isError: false });
+    const expected = instant === TIME_BOUNDARY ? [`Bắt đầu thực tế: ${VIETNAM_MOMENT}`, 'Thời gian dự kiến: 17:00 26 thg 11, 2026', 'UTC', 'múi giờ của bản ghi cũ chưa xác định'] : ['Chưa có dữ liệu'];
+    await expectTimeDisplay(() => render(<WorkoutExecutionDetailScreen executionId={execution.executionId} />), instant && instant !== TIME_BOUNDARY ? ['Bắt đầu thực tế: Chưa rõ thời điểm', 'Thời gian dự kiến: Chưa rõ thời điểm'] : expected);
+    await expectTimeDisplay(() => render(<WorkoutHistoryScreen />), instant && instant !== TIME_BOUNDARY ? ['Bắt đầu thực tế: Chưa rõ thời điểm', 'Thời gian dự kiến: Chưa rõ thời điểm'] : expected);
+  });
+  it.each([
+    ['2026-03-08T06:59:00Z', '13:59 8 thg 3, 2026', '06:59 8 thg 3, 2026'],
+    ['2026-03-08T07:00:00Z', '14:00 8 thg 3, 2026', '07:00 8 thg 3, 2026'],
+  ])('time display: account DST does not reinterpret frozen planned history at %s', async (instant, actual, planned) => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { ...user, timezone: 'America/New_York' }, activeCapability: 'STUDENT' });
+    (useWorkoutExecutionHistory as jest.Mock).mockReturnValue({ data: { pages: [{ items: [{ ...detail.execution, performedStartedAt: instant, plannedStartAt: instant }] }] }, isPending: false, isError: false });
+    await expectTimeDisplay(() => render(<WorkoutHistoryScreen />), [`Bắt đầu thực tế: ${actual}`, `Thời gian dự kiến: ${planned} · Giờ chuẩn quốc tế (UTC) (UTC+00:00)`, 'múi giờ của bản ghi cũ chưa xác định']);
+  });
+
 });

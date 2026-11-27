@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_DAY } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { GoalHistoryTab } from '@/features/goal/components/GoalHistoryTab';
@@ -298,5 +299,15 @@ describe('GoalHistoryTab', () => {
     // Stale slow request should NOT overwrite
     expect(root.findByProps({ testID: 'version-card-1' })).toBeDefined();
     expect(root.findAllByProps({ testID: 'version-card-99' }).length).toBe(0);
+  });
+  it.each(['versions', 'transitions'])('time display: %s use Vietnam', async (tab) => {
+    (fitnessGoalApi.getGoalVersions as jest.Mock).mockResolvedValue({ items: [{ ...mockVersion1, effectiveFrom: TIME_BOUNDARY, effectiveUntil: TIME_BOUNDARY }], totalPages: 1 });
+    (fitnessGoalApi.getGoalTransitions as jest.Mock).mockResolvedValue([{ ...mockTransition, transitionedAt: TIME_BOUNDARY }]);
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<GoalHistoryTab goalId={goalId} isDark={false} />); });
+      if (tab === 'transitions') renderer.act(() => tree.root.findByProps({ testID: 'subtab-transitions-button' }).props.onPress());
+      return tree;
+    }, [VIETNAM_DAY]);
   });
 });

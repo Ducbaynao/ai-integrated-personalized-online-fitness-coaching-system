@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useRef, useState } from 'react';
 import { Modal, ScrollView, Text, View, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -48,8 +49,8 @@ function PermissionRow({ item, relationshipId, editable }: { item: PermissionSum
   return <CoachingCard testID={`permission-${item.dataScope}`}>
     <Text style={[styles.h2, { color: theme.textPrimary }]}>{dataScopeLabels[item.dataScope]}</Text>
     <Text accessibilityRole="text" style={[styles.label, { color: theme.textPrimary }]}>{permissionStateLabels[item.state]}{item.accessLevel ? ` · ${accessLevelLabels[item.accessLevel]}` : ''}</Text>
-    {item.historyFrom || item.historyUntil ? <Text style={[styles.body, { color: theme.textSecondary }]}>Phạm vi lịch sử: {item.historyFrom ? new Date(item.historyFrom).toLocaleString('vi-VN') : 'từ đầu'} – {item.historyUntil ? new Date(item.historyUntil).toLocaleString('vi-VN') : 'hiện tại'}</Text> : null}
-    {item.validUntil ? <Text style={[styles.body, { color: theme.textSecondary }]}>Có hiệu lực đến {new Date(item.validUntil).toLocaleString('vi-VN')}</Text> : null}
+    {item.historyFrom || item.historyUntil ? <Text style={[styles.body, { color: theme.textSecondary }]}>Phạm vi lịch sử: {item.historyFrom ? (formatInstantVietnam(item.historyFrom) ?? 'Chưa rõ thời điểm') : 'từ đầu'} – {item.historyUntil ? (formatInstantVietnam(item.historyUntil) ?? 'Chưa rõ thời điểm') : 'hiện tại'}</Text> : null}
+    {item.validUntil ? <Text style={[styles.body, { color: theme.textSecondary }]}>Có hiệu lực đến {(formatInstantVietnam(item.validUntil) ?? 'Chưa rõ thời điểm')}</Text> : null}
     {editable ? <>
       <View style={styles.row}>{(['ALLOW', 'DENY'] as SharingDecision[]).map((value) => <CoachingButton key={value} label={value === 'ALLOW' ? 'Cho phép' : 'Không chia sẻ'} secondary={decision !== value} disabled={busy} onPress={() => { saveKey.current = null; setDecision(value); }} />)}</View>
       <View style={styles.row}>{accessLevels.map((value) => <CoachingButton key={value} label={accessLevelLabels[value]} secondary={level !== value} disabled={busy} onPress={() => { saveKey.current = null; setLevel(value); }} />)}</View>

@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -103,7 +104,7 @@ export function CorrectMeasurementModal({
                 </Text>
               </Text>
               <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
-                Thời điểm đo: {new Date(measurement.measuredAt).toLocaleString('vi-VN')}
+                Thời điểm đo: {(formatInstantVietnam(measurement.measuredAt) ?? 'Chưa rõ thời điểm')}
               </Text>
             </View>
 

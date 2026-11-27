@@ -1,3 +1,4 @@
+import { formatInstantDateVietnam } from '@/localization/instantDisplay';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -310,7 +311,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
 
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaText, { color: themeColors.textSecondary }]}>
-                    Đề xuất {new Date(proposal.createdAt).toLocaleDateString('vi-VN')}
+                    Đề xuất {(formatInstantDateVietnam(proposal.createdAt) ?? 'Chưa rõ thời điểm')}
                   </Text>
                   <Text style={[styles.arrowText, { color: themeColors.primary }]}>
                     Xem lại →

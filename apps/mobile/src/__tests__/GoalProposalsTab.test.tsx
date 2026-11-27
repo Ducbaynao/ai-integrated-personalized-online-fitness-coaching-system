@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_DAY } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { GoalProposalsTab } from '@/features/goal/components/GoalProposalsTab';
@@ -298,5 +299,13 @@ describe('GoalProposalsTab', () => {
     // The fast pending item MUST still be displayed; slow stale response was dropped!
     expect(root.findByProps({ testID: 'proposal-item-prop-fast-pending' })).toBeDefined();
     expect(root.findAllByProps({ testID: 'proposal-item-prop-slow-all' }).length).toBe(0);
+  });
+  it('time display: proposal creation day is Vietnam regardless of device', async () => {
+    (fitnessGoalApi.getMyGoalProposals as jest.Mock).mockResolvedValue({ items: [{ ...mockPendingProposal, createdAt: TIME_BOUNDARY }], totalPages: 1 });
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<GoalProposalsTab goalId={goalId} isDark={false} />); });
+      return tree;
+    }, [VIETNAM_DAY]);
   });
 });

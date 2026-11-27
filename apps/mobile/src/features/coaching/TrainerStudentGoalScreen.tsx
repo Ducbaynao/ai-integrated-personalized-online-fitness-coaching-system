@@ -1,3 +1,4 @@
+import { formatInstantDateVietnam } from '@/localization/instantDisplay';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -327,7 +328,7 @@ export function TrainerStudentGoalScreen({ relationshipId }: { relationshipId: s
                     )}
 
                     <Text style={[styles.captionText, { color: theme.textSecondary, marginTop: spacing.xs }]}>
-                      Gửi ngày: {new Date(prop.createdAt).toLocaleDateString('vi-VN')}
+                      Gửi ngày: {(formatInstantDateVietnam(prop.createdAt) ?? 'Chưa rõ thời điểm')}
                     </Text>
                   </View>
                 ))

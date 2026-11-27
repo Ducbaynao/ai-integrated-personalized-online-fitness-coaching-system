@@ -1,3 +1,4 @@
+import { formatInstantDateVietnam } from '@/localization/instantDisplay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -1049,7 +1050,7 @@ export function TrainerProfileScreen() {
               </Text>
               {application?.submittedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
-                  Đã gửi: {new Date(application.submittedAt).toLocaleDateString('vi-VN')}
+                  Đã gửi: {(formatInstantDateVietnam(application.submittedAt) ?? 'Chưa rõ thời điểm')}
                 </Text>
               )}
               <Pressable
@@ -1270,7 +1271,7 @@ export function TrainerProfileScreen() {
               )}
               {profile?.verifiedAt && (
                 <Text style={[styles.timestampText, { color: themeColors.textSecondary }]}>
-                  Xác minh ngày: {new Date(profile.verifiedAt).toLocaleDateString('vi-VN')}
+                  Xác minh ngày: {(formatInstantDateVietnam(profile.verifiedAt) ?? 'Chưa rõ thời điểm')}
                 </Text>
               )}
             </View>

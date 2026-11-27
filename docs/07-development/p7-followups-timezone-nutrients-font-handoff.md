@@ -113,3 +113,7 @@ d32e5cb9a4a42637671786654c5cb69f570ea149d107c2a736effe6e80ba9a35  apps/mobile/sr
 - **Hoàn tất code follow-up** cho ba mục: timezone Chat/Attention, nhãn nutrient lạ, weight/italic của font.
 - **Còn mở (không thuộc patch):** (a) 22 vị trí `toLocale*String` theo múi giờ thiết bị ở 16 file ngoài Chat/Attention (§2A); (b) quyết định có đưa chữ hệ thống (§2C) về Be Vietnam Pro hay không — thuộc P7-004 (Figma); (c) summary nutrient không có `name` nên mã lạ chỉ có nhãn chung; (d) QA visual/Android/Web/bàn phím, đặc biệt render italic và bold thật của Be Vietnam Pro, vẫn `NOT RUN`.
 - **Git:** kết quả commit/PR/CI/merge được báo ngoài tài liệu; không tạo commit chỉ để ghi trạng thái CI.
+
+## 8. Tiếp nối inventory thời gian ngoài Chat/Attention
+
+Inventory lịch sử §2A/§7 đã được đối chiếu với `main@d9fde89e` trong [P7 time display consistency](p7-time-display-consistency-handoff.md). Handoff mới ghi riêng disposition cho 22 lời gọi Date và một lời gọi Number (23 lời gọi trên 21 dòng, 16 file), caller của helper và các quy ước giữ nguyên. Evidence/checks của #183 ở trên vẫn là lịch sử, không bị chạy lại để xác nhận #183.

@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -195,5 +196,15 @@ describe('B04 Student Workout Plan screens', () => {
     expect(workoutPlanApi.successor).toHaveBeenCalledWith('plan-1', 'version-1', 'Strength Base - tự tập', expect.any(String));
     expect(mockReplace).toHaveBeenCalledWith('/workout-plans/successor-1');
     renderer.act(() => tree.unmount());
+  });
+  it.each([TIME_BOUNDARY, null, '', 'bad', '2026-11-27', '2026-11-27T08:00:00'])('time display: plan activation instants are stable for %s', async (effectiveFrom) => {
+    const currentVersion = { ...version, effectiveFrom };
+    (useCurrentWorkoutPlan as jest.Mock).mockReturnValue({ data: { plan, currentVersion }, isPending: false, isError: false });
+    (useWorkoutPlan as jest.Mock).mockReturnValue({ data: { plan, currentVersion }, isPending: false, isError: false });
+    (useWorkoutPlanVersions as jest.Mock).mockReturnValue({ data: { pages: [{ items: [currentVersion] }] }, isPending: false, isError: false });
+    const expected = effectiveFrom === TIME_BOUNDARY ? VIETNAM_MOMENT : effectiveFrom ? 'Chưa rõ thời điểm' : '—';
+    await expectTimeDisplay(() => render(<StudentWorkoutPlansScreen />), effectiveFrom ? [expected] : []);
+    await expectTimeDisplay(() => render(<WorkoutPlanDetailScreen planId="plan-1" />), [effectiveFrom ? expected : 'Chưa rõ thời điểm']);
+    await expectTimeDisplay(() => render(<WorkoutPlanHistoryScreen planId="plan-1" />), [expected]);
   });
 });

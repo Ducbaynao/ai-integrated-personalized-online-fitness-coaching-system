@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -124,7 +125,7 @@ function StudentWorkoutPlanDetailScreen({ planId }: { planId: string }) {
       <Text style={[styles.label, { color: theme.textPrimary }]}>{workoutStatusLabels[plan.status]} · {workoutOwnerLabels[plan.decisionOwnerType]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.description || 'Không có mô tả'}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản aggregate {plan.aggregateVersion} · {plan.readContext === 'CURRENT' ? 'Hiện tại' : 'Lịch sử'}</Text>
-      {currentVersion ? <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản nội dung {currentVersion.versionNumber} · hiệu lực {new Date(currentVersion.effectiveFrom).toLocaleString('vi-VN')}</Text> : <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có phiên bản được kích hoạt.</Text>}
+      {currentVersion ? <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản nội dung {currentVersion.versionNumber} · hiệu lực {(formatInstantVietnam(currentVersion.effectiveFrom) ?? 'Chưa rõ thời điểm')}</Text> : <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có phiên bản được kích hoạt.</Text>}
       {plan.basedOnPlanId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Kế nhiệm từ kế hoạch {plan.basedOnPlanId}</Text> : null}
       {!mutableContext ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Đây là bản ghi lịch sử chỉ để xem.</Text> : null}
     </WorkoutCard>

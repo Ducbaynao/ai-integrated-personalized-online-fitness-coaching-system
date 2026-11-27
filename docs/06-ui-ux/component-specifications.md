@@ -113,11 +113,12 @@ Hiển thị target, action, impact, required reason, permission, step-up requir
 
 ## Hiển thị thời điểm không phụ thuộc múi giờ thiết bị
 
-- **Mốc thông thường** (thời gian tin nhắn, thông báo trong ứng dụng, "cập nhật lúc", thời điểm phát hiện/sự kiện của Attention) là `Instant` không kèm bối cảnh: hiển thị theo `Asia/Ho_Chi_Minh` bằng `formatInstantVietnam` / `formatInstantDateVietnam` (`src/localization/instantDisplay.ts`), không đọc múi giờ máy hay điện thoại.
+- **Mốc thông thường** (thời gian tin nhắn, thông báo trong ứng dụng, "cập nhật lúc", thời điểm phát hiện/sự kiện của Attention, tạo đề xuất, tạm dừng/cập nhật Goal, hiệu lực phiên bản Goal/Plan, đo cơ thể, nộp/xác minh hồ sơ Trainer, ranh giới chia sẻ và bắt đầu/kết thúc tập thực tế) là `Instant` thông thường: hiển thị theo `Asia/Ho_Chi_Minh` bằng `formatInstantVietnam` / `formatInstantDateVietnam` (`src/localization/instantDisplay.ts`), không đọc múi giờ máy hay điện thoại.
 - **Mốc thuộc bản ghi đã lưu** (lịch tập, lịch hẹn gửi trong Chat, bằng chứng 100 ngày, khoảng dự kiến của Attention) giữ múi giờ/ngữ cảnh của bản ghi và hiển thị nhãn múi giờ (kèm offset theo đúng thời điểm, nên DST được phản ánh): dùng `formatRecordedScheduleTime` (bản ghi không có múi giờ hiện UTC kèm ghi chú chưa xác định, không đoán). Ngày đã lưu (`previousLocalDate`, `dueDate`) không bị đổi thành instant.
 - **Mốc không có bối cảnh** như `takenAt` của ảnh tiến độ hoặc `completedAt` của lần xử lý AI vẫn hiện UTC có nhãn (`formatContextFreeInstant`).
 - Thiếu giá trị, chỉ có ngày, không có offset/`Z` hoặc không parse được thì hiện "Chưa rõ thời điểm" (hoặc nhãn chưa rõ riêng của màn), không đoán giờ và không hiện "Invalid Date".
-- Các màn ngoài Chat/Attention chưa được chuyển sang quy ước này được liệt kê trong handoff `p7-followups-timezone-nutrients-font-handoff.md`.
+- Snapshot Workout Execution không trả timezone đã lưu của Planned Workout: giờ dự kiến trong lịch sử/chi tiết dùng `formatRecordedScheduleTime(instant, null)` để hiện UTC kèm ghi chú múi giờ bản ghi chưa xác định. Không lấy timezone tài khoản hiện tại hoặc đọc lịch đang sống để diễn giải lại snapshot. Giờ tập thực tế dùng quy ước mốc thông thường; duration/timer vẫn là khoảng thời gian.
+- Đối chiếu đầy đủ inventory ngoài Chat/Attention, gồm vị trí giữ nguyên, tại [handoff time display consistency](../07-development/p7-time-display-consistency-handoff.md).
 
 ## Friendly Timezone Defaults & `TimezoneContextPicker` (`timezoneUtils`)
 

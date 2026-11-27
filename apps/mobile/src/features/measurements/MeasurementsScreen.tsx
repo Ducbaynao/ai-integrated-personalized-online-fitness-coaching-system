@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -186,7 +187,7 @@ export function MeasurementsScreen({ studentId, readOnly = false }: Measurements
 
         <View style={styles.metaRow}>
           <Text style={[styles.metaText, { color: themeColors.textSecondary }]}>
-            {new Date(item.measuredAt).toLocaleDateString('vi-VN')} {new Date(item.measuredAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            {formatInstantVietnam(item.measuredAt) ?? 'Chưa rõ thời điểm'}
           </Text>
           {item.notes ? (
             <Text style={[styles.notesText, { color: themeColors.textSecondary }]} numberOfLines={1}>

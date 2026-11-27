@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_DAY } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { StyleSheet } from 'react-native';
@@ -884,5 +885,14 @@ describe('TrainerProfileScreen Component', () => {
     expect(
       root.findAll((n) => typeof n.props.children === 'string' && n.props.children === 'initial bio'),
     ).toHaveLength(0);
+  });
+  it.each(['PENDING', 'VERIFIED'])('time display: application submission and verification day are Vietnam (%s)', async (verificationStatus) => {
+    (trainerProfileApi.getMyTrainerProfile as jest.Mock).mockResolvedValue({ ...mockProfile, verificationStatus, verifiedAt: TIME_BOUNDARY });
+    (trainerApplicationApi.getCurrentApplication as jest.Mock).mockResolvedValue({ id: 'app-1', status: 'APPROVED', submittedAt: TIME_BOUNDARY, documents: [] });
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<TrainerProfileScreen />); });
+      return tree;
+    }, [`${verificationStatus === 'PENDING' ? 'Đã gửi:' : 'Xác minh ngày:'} ${VIETNAM_DAY}`]);
   });
 });
