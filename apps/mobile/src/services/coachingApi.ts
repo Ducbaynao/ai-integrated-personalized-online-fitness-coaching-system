@@ -1,6 +1,7 @@
-import { request } from '@/services/apiClient';
+import { AuthSessionBinding, request } from '@/services/apiClient';
 import {
   CoachingOutcome,
+  CoachingPeriod,
   CoachingQrIdentity,
   CoachingQrProfilePreview,
   CoachingQrRole,
@@ -19,6 +20,11 @@ import {
 } from '@/types/coaching';
 
 export const COACHING_PAGE_SIZE = 20;
+export interface CoachingRequestScope extends AuthSessionBinding { shouldContinue: () => boolean }
+const requestScope = (scope?: CoachingRequestScope) => scope ? {
+  expectedAuthEpoch: scope.authEpoch, expectedCapabilityEpoch: scope.capabilityEpoch,
+  shouldContinue: scope.shouldContinue,
+} : {};
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function normalizeCoachingId(value: unknown): string | null {
@@ -42,6 +48,15 @@ function pageQuery(page: number, size: number): string {
 }
 
 export const coachingApi = {
+  getCurrentContext(scope?: CoachingRequestScope) {
+    return request<CoachingOutcome>('/coaching/relationships/me/current', { method: 'GET', ...requestScope(scope) });
+  },
+  getPeriods(page = 0, size = COACHING_PAGE_SIZE, scope?: CoachingRequestScope) {
+    return request<Page<CoachingPeriod>>(`/coaching/periods/me?${pageQuery(page, size)}`, { method: 'GET', ...requestScope(scope) });
+  },
+  startSelfDirected(commandKey: string, scope?: CoachingRequestScope) {
+    return request<CoachingOutcome>('/coaching/periods/self-directed', { method: 'POST', body: { commandKey }, ...requestScope(scope) });
+  },
   getTrainers(query = '', page = 0, size = COACHING_PAGE_SIZE) {
     const params = new URLSearchParams({ query: query.trim(), page: String(page), size: String(size) });
     return request<Page<TrainerDirectoryItem>>(`/coaching/trainers?${params}`, { method: 'GET' });

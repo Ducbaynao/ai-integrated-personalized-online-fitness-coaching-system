@@ -1320,6 +1320,33 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/CoachingForbidden' }
+  /coaching/periods/self-directed:
+    post:
+      tags: [Coaching Lifecycle]
+      operationId: startSelfDirectedCoachingPeriod
+      summary: Student explicitly starts self-directed authority without an existing assignment
+      description: >-
+        Requires an active Student capability. Under the Student assignment lock, rejects
+        an effective or future period or an ACTIVE/PAUSED relationship with COACHING_PERIOD_CONFLICT.
+        Creates one period at database time with audit and an actor-scoped command receipt.
+        Never closes periods, changes relationships, or resets fitness history. Exact retries
+        do not repeat effects and return current context, which may differ from the original period.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [commandKey]
+              properties:
+                commandKey: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/CoachingOutcome' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CoachingForbidden' }
+        '409': { $ref: '#/components/responses/CoachingConflict' }
   /coaching/relationships/requests:
     post:
       tags: [Coaching Lifecycle]

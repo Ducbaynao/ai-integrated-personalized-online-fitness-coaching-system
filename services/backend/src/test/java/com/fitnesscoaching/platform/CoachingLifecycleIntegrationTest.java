@@ -107,6 +107,76 @@ class CoachingLifecycleIntegrationTest {
         return id;
     }
 
+    @Test
+    void selfDirectedSetupRejectsTrainerCapabilityFuturePeriodsAndExistingRelationships() throws Exception {
+        UUID trainer = person("TRAINER");
+        mvc.perform(post("/api/v1/coaching/periods/self-directed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"commandKey\":\"" + UUID.randomUUID() + "\"}")
+                        .with(jwt().jwt(j -> j.subject(trainer.toString()))))
+                .andExpect(status().isForbidden());
+        UUID futureStudent = person("STUDENT");
+        jdbc.update("""
+                INSERT INTO fitness.coaching_periods(student_id,mode,started_at,created_by)
+                VALUES (?,'SELF_DIRECTED',clock_timestamp()+interval '1 day',?)
+                """, futureStudent, futureStudent);
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(futureStudent, UUID.randomUUID()))
+                .isInstanceOf(CoachingFailure.class).hasMessageContaining("COACHING_PERIOD_CONFLICT");
+        UUID humanStudent = person("STUDENT");
+        Outcome human = accepted(humanStudent, trainer);
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(humanStudent, UUID.randomUUID()))
+                .isInstanceOf(CoachingFailure.class).hasMessageContaining("COACHING_PERIOD_CONFLICT");
+        assertThat(lifecycle.current(humanStudent).currentPeriod().id()).isEqualTo(human.currentPeriod().id());
+        mvc.perform(post("/api/v1/workout-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"" + humanStudent + "\",\"name\":\"Unauthorized\",\"sessions\":[],\"commandKey\":\"" + UUID.randomUUID() + "\"}")
+                        .with(jwt().jwt(j -> j.subject(humanStudent.toString()))))
+                .andExpect(status().isForbidden());
+        lifecycle.relationshipAction(humanStudent, human.relationship().id(), "PAUSE", 1, null, UUID.randomUUID());
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(humanStudent, UUID.randomUUID()))
+                .isInstanceOf(CoachingFailure.class).hasMessageContaining("COACHING_PERIOD_CONFLICT");
+    }
+
+    @Test
+    void selfDirectedSetupAfterExpiredHistoryPreservesHistoryAndReplaysCurrentAuthority() {
+        UUID student = person("STUDENT"), trainer = person("TRAINER"), key = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.coaching_periods(student_id,mode,started_at,ended_at,created_by)
+                VALUES (?,'SELF_DIRECTED',clock_timestamp()-interval '2 days',clock_timestamp()-interval '1 day',?)
+                """, student, student);
+        Outcome self = lifecycle.startSelfDirected(student, key);
+        assertThat(self.currentPeriod().mode()).isEqualTo("SELF_DIRECTED");
+        Outcome human = accepted(student, trainer);
+        assertThat(lifecycle.startSelfDirected(student, key).currentPeriod().id()).isEqualTo(human.currentPeriod().id());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_periods WHERE student_id=?", Integer.class, student)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.audit_logs WHERE target_id=? AND action='COACHING_START_SELF_DIRECTED'", Integer.class, self.currentPeriod().id())).isEqualTo(1);
+        jdbc.update("UPDATE fitness.user_roles SET revoked_at=clock_timestamp() WHERE user_id=?", student);
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(student, key))
+                .isInstanceOf(com.fitnesscoaching.platform.common.exception.StudentCapabilityUnavailableException.class);
+    }
+
+    @Test
+    void concurrentSelfDirectedSetupsHaveOneWinnerAndAuditFailureRollsBackEverything() throws Exception {
+        UUID student = person("STUDENT");
+        CyclicBarrier start = new CyclicBarrier(2);
+        AtomicInteger successes = new AtomicInteger(), conflicts = new AtomicInteger();
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Callable<Void> attempt = () -> {
+                start.await(10, TimeUnit.SECONDS);
+                try { lifecycle.startSelfDirected(student, UUID.randomUUID()); successes.incrementAndGet(); }
+                catch (CoachingFailure failure) { assertThat(failure.code()).isEqualTo("COACHING_PERIOD_CONFLICT"); conflicts.incrementAndGet(); }
+                return null;
+            };
+            var one = pool.submit(attempt); var two = pool.submit(attempt);
+            one.get(20, TimeUnit.SECONDS); two.get(20, TimeUnit.SECONDS);
+        }
+        assertThat(successes.get()).isEqualTo(1); assertThat(conflicts.get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_command_receipts WHERE actor_id=?", Integer.class, student)).isEqualTo(1);
+        UUID rollbackStudent = person("STUDENT");
+        doThrow(new IllegalStateException("audit unavailable")).when(audit).recordAudit(any());
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(rollbackStudent, UUID.randomUUID())).isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_periods WHERE student_id=?", Integer.class, rollbackStudent)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_command_receipts WHERE actor_id=?", Integer.class, rollbackStudent)).isZero();
+    }
+
     private UUID dualRolePerson() {
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -128,6 +198,30 @@ class CoachingLifecycleIntegrationTest {
     private Outcome accepted(UUID student, UUID trainer) {
         Outcome pending = lifecycle.initiate(student, student, trainer, UUID.randomUUID());
         return lifecycle.relationshipAction(trainer, pending.relationship().id(), "ACCEPT", 0, null, UUID.randomUUID());
+    }
+
+    @Test
+    void explicitSelfDirectedSetupIsRequiredBeforeCreatingAPlan() throws Exception {
+        UUID student = person("STUDENT");
+        String planBody = """
+                {"studentId":"%s","name":"My plan","sessions":[],"commandKey":"%s"}
+                """.formatted(student, UUID.randomUUID());
+        mvc.perform(get("/api/v1/coaching/relationships/me/current")
+                        .with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.currentPeriod").isEmpty());
+        mvc.perform(post("/api/v1/workout-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content(planBody).with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.errorCode").value("COACHING_PERIOD_REQUIRED"));
+        String setupBody = "{\"commandKey\":\"" + UUID.randomUUID() + "\"}";
+        for (int retry = 0; retry < 2; retry++) {
+            mvc.perform(post("/api/v1/coaching/periods/self-directed").contentType(MediaType.APPLICATION_JSON)
+                            .content(setupBody).with(jwt().jwt(j -> j.subject(student.toString()))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.currentPeriod.mode").value("SELF_DIRECTED"));
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.coaching_periods WHERE student_id=?", Integer.class, student)).isEqualTo(1);
+        mvc.perform(post("/api/v1/workout-plans").contentType(MediaType.APPLICATION_JSON)
+                        .content(planBody).with(jwt().jwt(j -> j.subject(student.toString()))))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -1045,6 +1139,8 @@ class CoachingLifecycleIntegrationTest {
                   (id,student_id,trainer_id,status,requested_by,accepted_at,started_at)
                 VALUES (?,?,?,'ACTIVE',?,now(),now())
                 """, relId, student, trainer, student);
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(student, UUID.randomUUID()))
+                .isInstanceOf(CoachingFailure.class).hasMessageContaining("COACHING_PERIOD_CONFLICT");
         Outcome paused = lifecycle.relationshipAction(student, relId, "PAUSE", 0, null, UUID.randomUUID());
         assertThat(paused.currentPeriod().mode()).isEqualTo("SELF_DIRECTED");
         assertThat(lifecycle.periods(student, 0, 10)).hasSize(1);
@@ -1054,6 +1150,8 @@ class CoachingLifecycleIntegrationTest {
                   (id,student_id,trainer_id,status,requested_by,accepted_at,started_at)
                 VALUES (?,?,?,'PAUSED',?,now(),now())
                 """, pausedRelId, anotherStudent, trainer, anotherStudent);
+        assertThatThrownBy(() -> lifecycle.startSelfDirected(anotherStudent, UUID.randomUUID()))
+                .isInstanceOf(CoachingFailure.class).hasMessageContaining("COACHING_PERIOD_CONFLICT");
         Outcome ended = lifecycle.relationshipAction(anotherStudent, pausedRelId,
                 "END", 0, "legacy close", UUID.randomUUID());
         assertThat(ended.currentPeriod().mode()).isEqualTo("SELF_DIRECTED");

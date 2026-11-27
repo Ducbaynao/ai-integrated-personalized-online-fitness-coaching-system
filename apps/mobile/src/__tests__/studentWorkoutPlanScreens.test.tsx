@@ -15,6 +15,7 @@ import { useExerciseDetail } from '@/features/exercise/exerciseQueries';
 const mockPush = jest.fn(); const mockReplace = jest.fn(); const mockBack = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: mockReplace, back: mockBack }) }));
 jest.mock('@/features/auth/AuthContext', () => ({ useAuth: jest.fn() }));
+jest.mock('@/features/workout-plan/useWorkoutPlanContext', () => ({ useWorkoutPlanContext: () => ({ ready: true, opened: true, status: 'ready', refresh: jest.fn().mockResolvedValue(true) }) }));
 jest.mock('@/features/workout-plan/workoutPlanQueries', () => {
   const actual = jest.requireActual('@/features/workout-plan/workoutPlanQueries');
   return { ...actual, useCurrentWorkoutPlan: jest.fn(), useWorkoutPlans: jest.fn(), useWorkoutPlan: jest.fn(), useWorkoutPlanVersion: jest.fn(), useWorkoutPlanVersions: jest.fn() };

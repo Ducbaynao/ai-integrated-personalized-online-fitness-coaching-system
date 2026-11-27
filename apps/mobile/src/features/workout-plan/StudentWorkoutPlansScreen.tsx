@@ -8,12 +8,15 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from './components/WorkoutUi';
 import { useCurrentWorkoutPlan, useWorkoutPlans, useWorkoutPlanVersion } from './workoutPlanQueries';
 import { isCurrentPlanMissing, workoutOwnerLabels, workoutPlanErrorMessage, workoutStatusLabels } from './workoutPlanMessages';
+import { useWorkoutPlanContext } from './useWorkoutPlanContext';
+import { WorkoutPlanContextNotice } from './components/WorkoutPlanContextNotice';
 
 export function StudentWorkoutPlansScreen() {
   const { user, activeCapability } = useAuth();
   const router = useRouter();
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const studentId = user?.id ?? '';
+  const context = useWorkoutPlanContext(studentId, activeCapability === 'STUDENT' && Boolean(user?.capabilities?.hasStudentProfile));
   const [isAiProposalVisible, setIsAiProposalVisible] = useState(false);
   const currentQuery = useCurrentWorkoutPlan(studentId);
   const listQuery = useWorkoutPlans(studentId);
@@ -52,7 +55,8 @@ export function StudentWorkoutPlansScreen() {
     </WorkoutCard>
 
     <WorkoutButton testID="ai-workout-proposal-button" label="Đề xuất giáo án 1 tuần (AI)" secondary onPress={() => setIsAiProposalVisible(true)} hint="AI hỗ trợ thiết kế giáo án phù hợp mục tiêu" />
-    <WorkoutButton testID="create-workout-plan-button" label="Tạo kế hoạch mới" onPress={() => router.push('/workout-plans/new' as never)} hint="Hệ thống sẽ kiểm tra chế độ tự tập khi lưu" />
+    <WorkoutPlanContextNotice key={context.scope} context={context} />
+    <WorkoutButton testID="create-workout-plan-button" label="Tạo kế hoạch mới" disabled={!context.ready} onPress={() => { if (context.ready) router.push('/workout-plans/new' as never); }} hint="Cần chế độ Tự tập đang có hiệu lực" />
 
     <WorkoutCard testID="workout-plan-list">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Kế hoạch khác và lịch sử</Text>

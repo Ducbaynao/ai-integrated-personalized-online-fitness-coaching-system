@@ -1,5 +1,23 @@
 # B03 Coaching Relationship and Coaching Period
 
+## Explicit self-directed setup (2026-11-27)
+
+Plan-creation investigation found no standalone self-directed setup command: profile
+onboarding does not create authority, while B03 only opened self-directed periods when
+pausing/ending human coaching. This is a delivery gap alongside the missing UX step;
+a zero-period QA account alone does not establish a period-query defect.
+
+`POST /coaching/periods/self-directed` now supports explicit Student confirmation using
+the existing lifecycle service, Student assignment lock, period writer, actor-scoped
+receipts and transactional audit. It permits an active Student with no effective/future
+period and no ACTIVE/PAUSED relationship, including expired prior history. It opens at
+database time without backdating, closing periods, transitioning relationships or changing
+Goals/plans/workouts/history. A new conflicting intent returns `409 COACHING_PERIOD_CONFLICT`;
+an exact retry repeats no effects and returns current context rather than restoring prior
+authority. Existing relationship-command payload/version/retry semantics and Workout's
+missing-context rejection (`403 COACHING_PERIOD_REQUIRED`) remain unchanged. No migration
+is required. See [the fix report](workout-plan-context-ux.md) for evidence and runtime limits.
+
 > **Phase 2 extension (D08, approved 2026-11-25):** [F12 / P2-A-QR — Dev A](phase-2-dev-a-coaching-qr.md) replaces name/email selection UI with real QR camera/image decode → minimal profile → B03 invitation → counterparty acceptance. Implementation is PLANNED. The checkpoints below describe historical/existing contracts; their read-only/no-migration scope does not prohibit reviewed new QR backend/schema work under F12. Existing discovery endpoints are not claimed removed. F12 preserves B03 eligibility/availability, receipts, periods, sharing and history; QR grants no relationship or data authority. This bounded assignment does not transfer all B03/B08 ownership to Dev A.
 
 ## 1. Checkpoint and objective

@@ -16,6 +16,8 @@ import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { typography } from '@/design-system/tokens/typography';
 import { createCommandKey } from '@/services/coachingApi';
+import { getAuthSessionBinding } from '@/services/apiClient';
+import { ApiError } from '@/types/auth';
 import { workoutPlanApi } from '@/services/workoutPlanApi';
 import { ExerciseSummary } from '@/types/exercise';
 import { WorkoutExerciseState, WorkoutPlanSummary, WorkoutPlanVersionDetail, WorkoutPrescriptionInput, WorkoutSessionInput } from '@/types/workoutPlan';
@@ -23,6 +25,8 @@ import { workoutStyles as styles } from './components/WorkoutUi';
 import { removeStudentWorkoutPlanCache } from './workoutPlanCache';
 import { isWorkoutAuthorityLoss, isWorkoutStaleConflict, workoutPlanErrorMessage } from './workoutPlanMessages';
 import { useWorkoutPlan, useWorkoutPlanVersion, workoutPlanQueryKeys } from './workoutPlanQueries';
+import { useWorkoutPlanContext, WorkoutPlanContext } from './useWorkoutPlanContext';
+import { WorkoutPlanContextNotice } from './components/WorkoutPlanContextNotice';
 
 type Mode = 'create' | 'draft' | 'publish';
 type Actor = 'STUDENT' | 'TRAINER';
@@ -53,12 +57,21 @@ function StudentWorkoutPlanBuilder({ mode, planId = '', versionId = '' }: Builde
   const effectiveVersionId = versionId || planQuery.data?.currentVersion?.id || '';
   const versionQuery = useWorkoutPlanVersion(studentId, planId, effectiveVersionId, mode !== 'create');
   if (activeCapability !== 'STUDENT' || !user?.capabilities?.hasStudentProfile) return <AppCard title="Chỉ dành cho Học viên" message="Hãy chuyển sang hồ sơ Học viên để chỉnh sửa kế hoạch." state="info" />;
-  if (mode === 'create') return <WorkoutPlanEditor mode={mode} actor="STUDENT" studentId={studentId} />;
+  if (mode === 'create') {
+    const binding = getAuthSessionBinding();
+    return <StudentCreatePlan key={`${studentId}:${binding.authEpoch}:${binding.capabilityEpoch}`} studentId={studentId} />;
+  }
   if (planQuery.isPending || versionQuery.isPending) return <AppCard title="Đang tải trình chỉnh sửa" message="Vui lòng chờ trong giây lát." state="loading" />;
   if (planQuery.isError || versionQuery.isError || !plan || !versionQuery.data) return <AppCard title="Không thể mở trình chỉnh sửa" message={workoutPlanErrorMessage(planQuery.error ?? versionQuery.error)} onRetry={() => { planQuery.refetch(); versionQuery.refetch(); }} state="error" />;
   const allowed = plan.decisionOwnerType === 'STUDENT' && plan.decisionOwnerId === studentId && plan.readContext === 'CURRENT' && (mode === 'draft' ? plan.status === 'DRAFT' : ['ACTIVE', 'PAUSED'].includes(plan.status));
   if (!allowed) return <AppCard testID="builder-denied" title="Không thể chỉnh sửa trực tiếp" message="Kế hoạch không thuộc quyền quyết định hiện tại của bạn. Kế hoạch do huấn luyện viên tạo cần quy trình kế nhiệm riêng." state="error" />;
   return <WorkoutPlanEditor key={`STUDENT-${mode}-${effectiveVersionId}-${plan.aggregateVersion}`} mode={mode} actor="STUDENT" studentId={studentId} plan={plan} version={versionQuery.data} />;
+}
+
+function StudentCreatePlan({ studentId }: { studentId: string }) {
+  const context = useWorkoutPlanContext(studentId, true);
+  if (!context.opened) return <SafeAreaView style={styles.screen}><ScrollView contentContainerStyle={styles.content}><WorkoutPlanContextNotice context={context} /></ScrollView></SafeAreaView>;
+  return <WorkoutPlanEditor mode="create" actor="STUDENT" studentId={studentId} context={context} />;
 }
 
 function TrainerWorkoutPlanBuilder({ mode, relationshipId, studentId, planId = '', versionId = '' }: BuilderProps & { relationshipId: string; studentId: string }) {
@@ -95,12 +108,19 @@ function TrainerWorkoutPlanBuilder({ mode, relationshipId, studentId, planId = '
   return <WorkoutPlanEditor key={`TRAINER-${mode}-${effectiveVersionId}-${plan?.aggregateVersion ?? 0}`} mode={mode} actor="TRAINER" relationshipId={relationshipId} studentId={studentId} plan={plan} version={versionQuery.data} />;
 }
 
-function WorkoutPlanEditor({ mode, actor, studentId, relationshipId, plan, version }: { mode: Mode; actor: Actor; studentId: string; relationshipId?: string; plan?: WorkoutPlanSummary; version?: WorkoutPlanVersionDetail }) {
+function WorkoutPlanEditor({ mode, actor, studentId, relationshipId, plan, version, context }: { mode: Mode; actor: Actor; studentId: string; relationshipId?: string; plan?: WorkoutPlanSummary; version?: WorkoutPlanVersionDetail; context?: WorkoutPlanContext }) {
   const router = useRouter(); const client = useQueryClient(); const theme = getSemanticColors(useColorScheme() === 'dark');
   const [name, setName] = useState(plan?.name ?? ''); const [description, setDescription] = useState(plan?.description ?? '');
   const [reason, setReason] = useState(''); const [summary, setSummary] = useState(''); const [sessions, setSessions] = useState<EditorSession[]>(() => mapVersion(version));
   const [pickerSession, setPickerSession] = useState<number | null>(null); const [selectedExercise, setSelectedExercise] = useState<ExerciseSummary | null>(null); const [variationExercise, setVariationExercise] = useState<ExerciseSummary | null>(null);
   const exerciseDetail = useExerciseDetail(variationExercise?.id); const commandKey = useRef<string | null>(null);
+  const mounted = useRef(true);
+  const binding = useRef(getAuthSessionBinding());
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const isCurrentEditor = () => {
+    const current = getAuthSessionBinding();
+    return mounted.current && binding.current.authEpoch === current.authEpoch && binding.current.capabilityEpoch === current.capabilityEpoch;
+  };
   const dirty = () => { commandKey.current = null; };
   const updateSession = (index: number, patch: Partial<EditorSession>) => { dirty(); setSessions((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item)); };
   const updatePrescription = (sessionIndex: number, itemIndex: number, patch: Partial<EditorPrescription>) => { dirty(); setSessions((items) => items.map((session, i) => i !== sessionIndex ? session : { ...session, prescriptions: session.prescriptions.map((item, j) => j === itemIndex ? { ...item, ...patch } : item) })); };
@@ -123,6 +143,9 @@ function WorkoutPlanEditor({ mode, actor, studentId, relationshipId, plan, versi
   }, [mode, name, reason, sessions]);
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!isCurrentEditor()) throw new Error('Phiên chỉnh sửa đã thay đổi.');
+      if (context && !await context.refresh()) throw new Error('Hãy kiểm tra chế độ tập trước khi lưu.');
+      if (!isCurrentEditor()) throw new Error('Phiên chỉnh sửa đã thay đổi.');
       const key = commandKey.current ?? createCommandKey(); commandKey.current = key;
       const content = { name: name.trim(), description: description.trim() || null, sessions: toInput(sessions) };
       if (mode === 'create') return workoutPlanApi.create(studentId, content, key);
@@ -130,12 +153,18 @@ function WorkoutPlanEditor({ mode, actor, studentId, relationshipId, plan, versi
       return mode === 'draft' ? workoutPlanApi.updateDraft(plan.id, plan.aggregateVersion, content, key) : workoutPlanApi.publish(plan.id, plan.aggregateVersion, { reason: reason.trim(), summary: summary.trim() || null, sessions: content.sessions }, key);
     },
     onSuccess: async (result) => {
+      if (!isCurrentEditor()) return;
       commandKey.current = null;
       await client.invalidateQueries({ queryKey: workoutPlanQueryKeys.student(studentId) });
+      if (!isCurrentEditor()) return;
       AccessibilityInfo.announceForAccessibility(mode === 'publish' ? 'Phiên bản chiến lược mới đã được phát hành.' : 'Bản nháp đã được lưu.');
       router.replace(actor === 'TRAINER' ? `/students/${studentId}/workout-plans/${result.planId}?relationshipId=${relationshipId}` as never : `/workout-plans/${result.planId}` as never);
     },
     onError: async (error) => {
+      if (!isCurrentEditor()) return;
+      if (context && error instanceof ApiError && ['COACHING_PERIOD_REQUIRED', 'WORKOUT_PLAN_ACCESS_DENIED'].includes(error.errorResponse?.errorCode ?? '')) {
+        await context.refresh();
+      }
       if (actor === 'TRAINER' && isWorkoutAuthorityLoss(error)) {
         removeStudentWorkoutPlanCache(client, studentId);
         router.replace('/coaching' as never);
@@ -151,13 +180,14 @@ function WorkoutPlanEditor({ mode, actor, studentId, relationshipId, plan, versi
   return <SafeAreaView style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="workout-plan-builder-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
     <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="workout" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>{mode === 'create' ? actor === 'TRAINER' ? 'Tạo kế hoạch cho Học viên' : 'Tạo kế hoạch tự tập' : mode === 'draft' ? 'Chỉnh sửa bản nháp' : 'Tạo phiên bản chiến lược mới'}</Text></View>
     {mode === 'publish' ? <AppCard title="Thay đổi chiến lược" message="Các buổi tập đã được tạo trước đó sẽ không tự động bị thay đổi. Phiên bản cũ vẫn là lịch sử bất biến." state="info" /> : null}
+    {context ? <WorkoutPlanContextNotice context={context} hasDraft /> : null}
     <AppCard title="Thông tin kế hoạch" icon="workout"><Field inputTestID={actor === 'TRAINER' ? 'plan-name-input' : undefined} label="Tên kế hoạch" value={name} maxLength={200} onChange={(value) => { dirty(); setName(value); }} /><Field label="Mô tả kế hoạch" value={description} multiline onChange={(value) => { dirty(); setDescription(value); }} />{mode === 'publish' ? <><Field label="Lý do thay đổi" value={reason} maxLength={100} onChange={(value) => { dirty(); setReason(value); }} /><Field label="Tóm tắt thay đổi" value={summary} multiline onChange={(value) => { dirty(); setSummary(value); }} /></> : null}</AppCard>
     {sessions.map((session, sessionIndex) => <AppCard key={session.localId} testID={`builder-session-${sessionIndex}`}><View style={styles.row}><AppIcon name="calendar" color={theme.primary} /><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Buổi {sessionIndex + 1}</Text></View><Field label={`Tên buổi ${sessionIndex + 1}`} value={session.name} maxLength={180} onChange={(value) => updateSession(sessionIndex, { name: value })} /><View style={styles.row}><NumberField label="Tuần" value={session.weekNumber} min={1} onChange={(value) => updateSession(sessionIndex, { weekNumber: value ?? 1 })} /><NumberField label="Ngày" value={session.dayNumber} min={1} onChange={(value) => updateSession(sessionIndex, { dayNumber: value ?? 1 })} /><NumberField label="Phút" value={session.estimatedDurationMinutes} min={1} onChange={(value) => updateSession(sessionIndex, { estimatedDurationMinutes: value })} /></View><Field label="Trọng tâm" value={session.focus ?? ''} maxLength={160} onChange={(value) => updateSession(sessionIndex, { focus: value })} /><Field label="Ghi chú buổi tập" value={session.notes ?? ''} multiline onChange={(value) => updateSession(sessionIndex, { notes: value })} />
       {session.prescriptions.map((item, itemIndex) => <View key={`${item.exerciseVariationId}-${itemIndex}`} style={[local.prescription, { borderColor: theme.border, backgroundColor: theme.surfaceSubtle }]}><Text style={[styles.label, { color: theme.textPrimary }]}>{itemIndex + 1}. {item.exerciseName ?? 'Bài tập'}{item.variationName ? ` · ${item.variationName}` : ''}</Text>{item.exerciseState && item.exerciseState !== 'ACTIVE' ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Bài tập trong lịch sử này {item.exerciseState === 'ARCHIVED' ? 'đã lưu trữ' : 'không còn khả dụng'}; hãy xóa và chọn bài tập đang hoạt động khác trước khi lưu.</Text> : null}<View style={styles.row}><NumberField label="Hiệp" value={item.targetSets} min={1} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { targetSets: value })} /><NumberField label="Số lần lặp từ" value={item.targetRepsMin} min={0} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { targetRepsMin: value })} /><NumberField label="Số lần lặp đến" value={item.targetRepsMax} min={0} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { targetRepsMax: value })} /><DecimalField label="Mức tạ" value={item.targetLoad} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { targetLoad: value })} /><NumberField label="Nghỉ giây" value={item.restSeconds} min={0} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { restSeconds: value })} /><NumberField label="Thời lượng giây" value={item.durationSeconds} min={0} onChange={(value) => updatePrescription(sessionIndex, itemIndex, { durationSeconds: value })} /></View><Field label={`Hướng dẫn bài tập ${itemIndex + 1}`} value={item.instructions ?? ''} multiline onChange={(value) => updatePrescription(sessionIndex, itemIndex, { instructions: value })} /><View style={styles.row}><AppButton label="Đưa lên" disabled={itemIndex === 0} onPress={() => updateSession(sessionIndex, { prescriptions: move(session.prescriptions, itemIndex, itemIndex - 1) })} variant="ghost" icon="up" /><AppButton label="Đưa xuống" disabled={itemIndex === session.prescriptions.length - 1} onPress={() => updateSession(sessionIndex, { prescriptions: move(session.prescriptions, itemIndex, itemIndex + 1) })} variant="ghost" icon="down" /><AppButton label="Xóa bài tập" onPress={() => updateSession(sessionIndex, { prescriptions: session.prescriptions.filter((_, i) => i !== itemIndex) })} variant="secondary" tone="danger" icon="trash" /></View></View>)}
       <AppButton label="Thêm bài tập" onPress={() => { setPickerSession(sessionIndex); setSelectedExercise(null); }} variant="secondary" icon="plus" /><View style={styles.row}><AppButton label="Đưa buổi lên" disabled={sessionIndex === 0} onPress={() => { dirty(); setSessions((items) => move(items, sessionIndex, sessionIndex - 1)); }} variant="ghost" icon="up" /><AppButton label="Đưa buổi xuống" disabled={sessionIndex === sessions.length - 1} onPress={() => { dirty(); setSessions((items) => move(items, sessionIndex, sessionIndex + 1)); }} variant="ghost" icon="down" /><AppButton label="Xóa buổi" onPress={() => { dirty(); setSessions((items) => items.filter((_, i) => i !== sessionIndex)); }} variant="secondary" tone="danger" icon="trash" /></View></AppCard>)}
     <AppButton testID="add-session-button" label="Thêm buổi tập" onPress={() => { dirty(); setSessions((items) => [...items, newSession(items.length)]); }} variant="secondary" icon="plus" />
     {!valid ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.dangerText }]}>Kiểm tra tên, bài tập đang khả dụng và các giá trị. Số hiệp phải lớn hơn 0; số lần lặp, mức tạ, nghỉ và thời lượng có thể bằng 0 nhưng không được âm; số lần lặp tối đa không nhỏ hơn số lần lặp tối thiểu.{mode === 'publish' ? ' Phiên bản mới cần lý do và ít nhất một buổi.' : ''}</Text> : null}
-    {mutation.isError ? <AppCard testID="builder-error" title="Chưa thể lưu kế hoạch" message={workoutPlanErrorMessage(mutation.error)} state="error" /> : null}<View style={styles.row}><AppButton label="Hủy" disabled={mutation.isPending} onPress={discard} variant="secondary" /><AppButton testID={actor === 'TRAINER' ? 'save-plan-button' : 'save-workout-plan-button'} label={mutation.isPending ? 'Đang lưu' : mode === 'publish' ? 'Phát hành phiên bản' : 'Lưu bản nháp'} loading={mutation.isPending} disabled={!valid || mutation.isPending} onPress={() => mutation.mutate()} icon="check" /></View>
+    {mutation.isError ? <AppCard testID="builder-error" title="Chưa thể lưu kế hoạch" message={workoutPlanErrorMessage(mutation.error)} state="error" /> : null}<View style={styles.row}><AppButton label="Hủy" disabled={mutation.isPending} onPress={discard} variant="secondary" /><AppButton testID={actor === 'TRAINER' ? 'save-plan-button' : 'save-workout-plan-button'} label={mutation.isPending ? 'Đang lưu' : mode === 'publish' ? 'Phát hành phiên bản' : 'Lưu bản nháp'} loading={mutation.isPending} disabled={!valid || mutation.isPending || Boolean(context && !context.ready)} onPress={() => { if (!context || context.ready) mutation.mutate(); }} icon="check" /></View>
     <Modal visible={pickerSession !== null && !variationExercise} animationType="slide" accessibilityViewIsModal onRequestClose={() => { setPickerSession(null); setSelectedExercise(null); }}><ExercisePicker selectedExercise={selectedExercise} onSelectionChange={setSelectedExercise} onConfirm={setVariationExercise} onCancel={() => { setPickerSession(null); setSelectedExercise(null); }} /></Modal>
     <Modal visible={variationExercise !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={() => setVariationExercise(null)}><SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}><KeyboardAvoidingView style={[local.backdrop, { backgroundColor: theme.canvas }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView style={local.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><AppCard testID="variation-picker"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Chọn biến thể của {variationExercise?.name}</Text>{exerciseDetail.isPending ? <AppCard title="Đang tải biến thể" message="Vui lòng chờ trong giây lát." state="loading" /> : null}{exerciseDetail.isError ? <AppCard title="Không thể tải biến thể" message="Hãy thử lại." onRetry={() => exerciseDetail.refetch()} state="error" /> : null}{exerciseDetail.data?.variations.map((variation) => <NavigationAction key={variation.id} title={variation.name} icon="exercise" description={variation.defaultVariation ? 'Biến thể mặc định' : undefined} accessibilityLabel={`Chọn biến thể ${variation.name}`} onPress={() => addVariation(variation.id, variation.name)} />)}<AppButton label="Quay lại chọn bài tập" onPress={() => setVariationExercise(null)} variant="secondary" icon="back" /></AppCard></ScrollView></KeyboardAvoidingView></SafeAreaView></Modal>
   </ScrollView></SafeAreaView>;
