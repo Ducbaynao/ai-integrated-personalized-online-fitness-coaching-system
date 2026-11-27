@@ -149,20 +149,21 @@ describe('ExercisePicker', () => {
     const onCancel = jest.fn();
     const { root } = renderPicker({ selectedExercise: exercise, onConfirm, onCancel });
 
-    renderer.act(() => root.findByProps({ testID: 'confirm-exercise-picker' }).props.onPress());
-    renderer.act(() => root.findByProps({ testID: 'cancel-exercise-picker' }).props.onPress());
+    renderer.act(() => root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }));
+    renderer.act(() => root.findByProps({ testID: 'cancel-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }));
 
     expect(onConfirm).toHaveBeenCalledWith(exercise);
     expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledWith();
   });
 
   it('disables and guards confirm when no exercise is selected', () => {
     const onConfirm = jest.fn();
     const { root } = renderPicker({ onConfirm });
-    const confirm = root.findByProps({ testID: 'confirm-exercise-picker' });
+    const confirm = root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' });
 
     expect(confirm.props.disabled).toBe(true);
-    expect(confirm.props.accessibilityState).toEqual({ disabled: true });
+    expect(confirm.props.accessibilityState).toEqual({ disabled: true, busy: false });
     renderer.act(() => confirm.props.onPress());
     expect(onConfirm).not.toHaveBeenCalled();
   });
@@ -177,7 +178,7 @@ describe('ExercisePicker', () => {
       excludedExerciseIds: [exercise.id],
     });
     const row = root.findByProps({ testID: 'exercise-row-exercise-1' });
-    const confirm = root.findByProps({ testID: 'confirm-exercise-picker' });
+    const confirm = root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' });
 
     expect(row.props.disabled).toBe(true);
     expect(row.props.accessibilityState).toEqual({ checked: true, disabled: true });
@@ -203,7 +204,7 @@ describe('ExercisePicker', () => {
     renderer.act(() => tree!.root.findByType(TextInput).props.onChangeText('Bench Press'));
 
     expect(tree!.root.findByProps({ testID: 'exercise-picker-selection-summary' }).props.children).toBe('Back Squat');
-    expect(tree!.root.findByProps({ testID: 'confirm-exercise-picker' }).props.disabled).toBe(false);
+    expect(tree!.root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.disabled).toBe(false);
   });
 
   it('retains a valid selection when an applied filter hides it', () => {
@@ -223,14 +224,14 @@ describe('ExercisePicker', () => {
     renderer.act(() => tree!.root.findByProps({ testID: 'apply-exercise-filters' }).props.onPress());
 
     expect(tree!.root.findByProps({ testID: 'exercise-picker-selection-summary' }).props.children).toBe('Back Squat');
-    expect(tree!.root.findByProps({ testID: 'confirm-exercise-picker' }).props.disabled).toBe(false);
+    expect(tree!.root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.disabled).toBe(false);
   });
 
   it('renders loading, empty, no-result and retry states through shared catalog content', () => {
     (useExerciseCatalog as jest.Mock).mockReturnValue(catalogState({ data: undefined, isPending: true }));
     let rendered = renderPicker({ selectedExercise: exercise });
     expect(rendered.root.findByProps({ testID: 'exercise-catalog-loading' })).toBeDefined();
-    expect(rendered.root.findByProps({ testID: 'confirm-exercise-picker' }).props.disabled).toBe(true);
+    expect(rendered.root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.disabled).toBe(true);
 
     renderer.act(() => rendered.tree.unmount());
     mountedTrees.splice(mountedTrees.indexOf(rendered.tree), 1);
@@ -285,13 +286,13 @@ describe('ExercisePicker', () => {
       onCancel: jest.fn(),
     };
     const rendered = renderPicker(initialProps);
-    expect(rendered.root.findByProps({ testID: 'confirm-exercise-picker' }).props.disabled).toBe(false);
+    expect(rendered.root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.disabled).toBe(false);
 
     renderer.act(() => {
       rendered.tree.update(<ExercisePicker {...initialProps} excludedExerciseIds={[exercise.id]} />);
     });
 
-    const confirm = rendered.root.findByProps({ testID: 'confirm-exercise-picker' });
+    const confirm = rendered.root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' });
     expect(confirm.props.disabled).toBe(true);
     expect(rendered.root.findByProps({ testID: 'exercise-picker-selection-summary' }).props.children).toBe(
       'Bài tập này đã được thêm'
@@ -308,8 +309,8 @@ describe('ExercisePicker', () => {
     expect(text).toContain('Xác nhận');
     expect(text).toContain('Hủy');
     expect(text).toContain('Back Squat');
-    expect(root.findByProps({ testID: 'cancel-exercise-picker' }).props.accessibilityLabel).toBe('Hủy chọn bài tập');
-    expect(root.findByProps({ testID: 'confirm-exercise-picker' }).props.accessibilityLabel).toBe(
+    expect(root.findByProps({ testID: 'cancel-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.accessibilityLabel).toBe('Hủy chọn bài tập');
+    expect(root.findByProps({ testID: 'confirm-exercise-picker' }).findByProps({ accessibilityRole: 'button' }).props.accessibilityLabel).toBe(
       'Xác nhận bài tập đã chọn'
     );
   });

@@ -243,9 +243,9 @@ describe('B05 Workout Execution screens', () => {
       tree.root.findByProps({ accessibilityLabel: 'Mức tải, lb' }).props.onChangeText('42.5');
       tree.root.findByProps({ accessibilityLabel: 'Quãng đường, m' }).props.onChangeText('100');
     });
-    const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` });
+    const save = tree.root.findByProps({ testID: `save-workout-set-${set.clientSetId}` }).findByProps({ accessibilityRole: 'button' });
     await renderer.act(async () => {
-      save.props.onPress();
+      save.props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(workoutExecutionApi.upsertSet).toHaveBeenCalledWith(
@@ -380,7 +380,7 @@ describe('B05 Workout Execution screens', () => {
     const tree = render(<CurrentWorkoutExecutionScreen />);
     renderer.act(() => tree.root.findByProps({ testID: 'complete-workout-button' }).props.onPress());
     await renderer.act(async () => {
-      tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress();
+      tree.root.findByProps({ testID: 'confirm-workout-terminal' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(workoutExecutionApi.complete).toHaveBeenCalledWith(
@@ -390,6 +390,10 @@ describe('B05 Workout Execution screens', () => {
       expect.any(String)
     );
     expect(tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.disabled).toBe(true);
+    const pendingConfirm = tree.root.findByProps({ testID: 'confirm-workout-terminal' }).findByProps({ accessibilityRole: 'button' });
+    expect(pendingConfirm.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    renderer.act(() => pendingConfirm.props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }));
+    expect(workoutExecutionApi.complete).toHaveBeenCalledTimes(1);
     await renderer.act(async () => {
       finish({ ...detail, execution: { ...detail.execution, status: 'COMPLETED', version: 8 } });
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -406,7 +410,7 @@ describe('B05 Workout Execution screens', () => {
     const tree = render(<CurrentWorkoutExecutionScreen />);
     renderer.act(() => tree.root.findByProps({ testID: 'abort-workout-button' }).props.onPress());
     await renderer.act(async () => {
-      tree.root.findByProps({ testID: 'confirm-workout-terminal' }).props.onPress();
+      tree.root.findByProps({ testID: 'confirm-workout-terminal' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(workoutExecutionApi.abort).toHaveBeenCalledWith(

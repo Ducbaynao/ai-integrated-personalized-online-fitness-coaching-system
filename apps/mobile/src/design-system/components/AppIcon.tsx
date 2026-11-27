@@ -4,6 +4,8 @@ import { SymbolView } from 'expo-symbols';
 import { iconSize } from '../tokens/spacing';
 
 const symbols = {
+  up: { ios: 'arrow.up', android: 'arrow_upward', web: 'arrow_upward' },
+  down: { ios: 'arrow.down', android: 'arrow_downward', web: 'arrow_downward' },
   trash: { ios: 'trash', android: 'delete', web: 'delete' },
   calendar: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
   back: { ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' },

@@ -148,10 +148,16 @@ describe('B04 Student Workout Plan screens', () => {
   it('creates a complete draft snapshot and preserves one command while pending', async () => {
     let finish!: (value: unknown) => void; const pending = new Promise((resolve) => { finish = resolve; }); (workoutPlanApi.create as jest.Mock).mockReturnValue(pending);
     const tree = render(<WorkoutPlanBuilderScreen mode="create" />);
+    const disabledSave = tree.root.findByProps({ testID: 'save-workout-plan-button' }).findByProps({ accessibilityRole: 'button' });
+    expect(disabledSave.props.disabled).toBe(true);
+    renderer.act(() => disabledSave.props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }));
+    expect(workoutPlanApi.create).not.toHaveBeenCalled();
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Tên kế hoạch' }).props.onChangeText('My Plan'));
-    await renderer.act(async () => { tree.root.findByProps({ testID: 'save-workout-plan-button' }).props.onPress(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'save-workout-plan-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }); await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(tree.root.findByProps({ testID: 'save-workout-plan-button' }).props.disabled).toBe(true);
     expect(workoutPlanApi.create).toHaveBeenCalledWith('student-1', { name: 'My Plan', description: null, sessions: [] }, expect.any(String));
+    renderer.act(() => tree.root.findByProps({ testID: 'save-workout-plan-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }));
+    expect(workoutPlanApi.create).toHaveBeenCalledTimes(1);
     await renderer.act(async () => { finish({ planId: 'new-plan' }); await pending; }); expect(mockReplace).toHaveBeenCalledWith('/workout-plans/new-plan'); renderer.act(() => tree.unmount());
   });
 
@@ -168,7 +174,7 @@ describe('B04 Student Workout Plan screens', () => {
     (workoutPlanApi.publish as jest.Mock).mockResolvedValue({ planId: 'plan-1' });
     const tree = render(<WorkoutPlanBuilderScreen mode="publish" planId="plan-1" versionId="version-1" />);
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Lý do thay đổi' }).props.onChangeText('Tăng tiến tập luyện'));
-    await renderer.act(async () => { tree.root.findByProps({ testID: 'save-workout-plan-button' }).props.onPress(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'save-workout-plan-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123, pageX: 20, pageY: 20 } }); await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(workoutPlanApi.publish).toHaveBeenCalledWith('plan-1', 2, expect.objectContaining({ reason: 'Tăng tiến tập luyện', sessions: [expect.objectContaining({ name: 'Upper A', prescriptions: [expect.objectContaining({ exerciseVariationId: 'variation-1' })] })] }), expect.any(String));
     renderer.act(() => tree.unmount());
   });

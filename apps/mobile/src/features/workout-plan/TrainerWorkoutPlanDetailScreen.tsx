@@ -1,15 +1,19 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Modal, ScrollView, Text, View, useColorScheme } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, AccessibilityInfo, Modal, ScrollView, Text, View, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
-import { spacing } from '@/design-system/tokens/spacing';
+import { layout, spacing } from '@/design-system/tokens/spacing';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useSharingSummary } from '@/features/coaching/coachingQueries';
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutPlanApi } from '@/services/workoutPlanApi';
 import { WorkoutPlanStatus } from '@/types/workoutPlan';
-import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from './components/WorkoutUi';
+import { workoutStyles as styles } from './components/WorkoutUi';
 import { WorkoutPlanVersionContent } from './components/WorkoutPlanVersionContent';
 import { AiWorkoutAdjustmentModal, ExercisePrescriptionOption } from './components/AiWorkoutAdjustmentModal';
 import { removeStudentWorkoutPlanCache } from './workoutPlanCache';
@@ -104,38 +108,38 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
   const openCommand = (target: WorkoutPlanStatus | 'ACTIVATE') => { commandKey.current = createCommandKey(); setPendingTarget(target); };
   const closeCommand = () => { if (!mutation.isPending) { setPendingTarget(null); commandKey.current = null; } };
 
-  if (activeCapability !== 'TRAINER') return <WorkoutState title="Chỉ dành cho Huấn luyện viên" message="Hãy chuyển sang hồ sơ Huấn luyện viên để mở kế hoạch." />;
-  if (sharingQuery.isPending) return <WorkoutState busy title="Đang kiểm tra quyền" message="Vui lòng chờ trong giây lát." />;
-  if (sharingQuery.isError) return <WorkoutState title="Không thể xác minh quyền" message={workoutPlanErrorMessage(sharingQuery.error)} onRetry={() => sharingQuery.refetch()} />;
-  if (!canReadAny) return <WorkoutState testID="plan-detail-denied" title="Không có quyền xem kế hoạch" message="Cần quyền Xem cho kế hoạch hiện tại hoặc lịch sử kế hoạch." />;
-  if (detailQuery.isPending) return <WorkoutState busy title="Đang tải kế hoạch" message="Vui lòng chờ trong giây lát." />;
-  if (detailQuery.isError || !plan || plan.studentId !== studentId) return <WorkoutState testID="plan-detail-error" title="Không thể mở kế hoạch" message={workoutPlanErrorMessage(detailQuery.error)} onRetry={() => detailQuery.refetch()} />;
+  if (activeCapability !== 'TRAINER') return <AppCard title="Chỉ dành cho Huấn luyện viên" message="Hãy chuyển sang hồ sơ Huấn luyện viên để mở kế hoạch." state="info" />;
+  if (sharingQuery.isPending) return <AppCard title="Đang kiểm tra quyền" message="Vui lòng chờ trong giây lát." state="loading" />;
+  if (sharingQuery.isError) return <AppCard title="Không thể xác minh quyền" message={workoutPlanErrorMessage(sharingQuery.error)} onRetry={() => sharingQuery.refetch()} state="error" />;
+  if (!canReadAny) return <AppCard testID="plan-detail-denied" title="Không có quyền xem kế hoạch" message="Cần quyền Xem cho kế hoạch hiện tại hoặc lịch sử kế hoạch." state="info" />;
+  if (detailQuery.isPending) return <AppCard title="Đang tải kế hoạch" message="Vui lòng chờ trong giây lát." state="loading" />;
+  if (detailQuery.isError || !plan || plan.studentId !== studentId) return <AppCard testID="plan-detail-error" title="Không thể mở kế hoạch" message={workoutPlanErrorMessage(detailQuery.error)} onRetry={() => detailQuery.refetch()} state="error" />;
 
-  return <ScrollView testID="workout-plan-detail-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={styles.content}>
-    <Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary }]}>{plan.name}</Text>
-    <WorkoutCard>
+  return <SafeAreaView style={[styles.screen, { backgroundColor: theme.canvas }]}><ScrollView testID="workout-plan-detail-screen" style={[styles.screen, { backgroundColor: theme.canvas }]} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]} automaticallyAdjustKeyboardInsets>
+    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}><AppIcon name="workout" color={theme.primary} /><Text accessibilityRole="header" style={[styles.title, { color: theme.textPrimary, flex: 1 }]}>{plan.name}</Text></View>
+    <AppCard>
       <Text style={[styles.label, { color: theme.textPrimary }]}>{workoutStatusLabels[plan.status]} · {workoutOwnerLabels[plan.decisionOwnerType]}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{plan.description || 'Không có mô tả'}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản aggregate {plan.aggregateVersion} · {plan.readContext === 'HISTORICAL' ? 'Lịch sử' : 'Hiện tại'}</Text>
       {plan.readContext === 'HISTORICAL' || plan.status === 'ARCHIVED' ? <Text accessibilityRole="alert" style={[styles.body, { color: theme.warningText }]}>Bản ghi này chỉ để xem và không thể chỉnh sửa.</Text> : null}
-    </WorkoutCard>
-    {canManage && plan.status === 'DRAFT' ? <View style={styles.row}><WorkoutButton testID="edit-draft-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=draft` as never)} /><WorkoutButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} /></View> : null}
-    {canManage && ['ACTIVE', 'PAUSED'].includes(plan.status) && detailQuery.data.currentVersion ? <WorkoutButton testID="publish-version-button" label="Tạo phiên bản chiến lược mới" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=publish&versionId=${detailQuery.data.currentVersion?.id}` as never)} /> : null}
-    {canManage && detailQuery.data.currentVersion ? <WorkoutButton testID="trainer-ai-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" secondary onPress={() => setIsAdjustmentModalVisible(true)} /> : null}
-    {canManage ? <View style={styles.row}>{transitions[plan.status].map((target) => <WorkoutButton key={target} label={actionLabels[target] ?? workoutStatusLabels[target]} danger={target === 'ARCHIVED'} secondary onPress={() => openCommand(target)} />)}</View> : null}
-    {!canManage && plan.readContext === 'CURRENT' ? <WorkoutState testID="plan-read-only" title="Chỉ xem" message="CONTRIBUTE không phải quyền tác giả. Cần quyền Quản lý và quyền quyết định hiện tại để sửa kế hoạch." /> : null}
-    {mutation.isError ? <WorkoutState testID="plan-command-error" title="Chưa thể cập nhật kế hoạch" message={workoutPlanErrorMessage(mutation.error)} /> : null}
+    </AppCard>
+    {canManage && plan.status === 'DRAFT' ? <View style={styles.row}><AppButton testID="edit-draft-button" label="Chỉnh sửa bản nháp" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=draft` as never)} icon="edit" variant="secondary" /><AppButton testID="activate-plan-button" label="Kích hoạt" onPress={() => openCommand('ACTIVATE')} icon="check" /></View> : null}
+    {canManage && ['ACTIVE', 'PAUSED'].includes(plan.status) && detailQuery.data.currentVersion ? <AppButton testID="publish-version-button" label="Tạo phiên bản chiến lược mới" onPress={() => router.push(`/students/${studentId}/workout-plans/${planId}/builder?relationshipId=${relationshipId}&mode=publish&versionId=${detailQuery.data.currentVersion?.id}` as never)} icon="history" variant="secondary" /> : null}
+    {canManage && detailQuery.data.currentVersion ? <AppButton testID="trainer-ai-adjustment-button" label="Đề xuất điều chỉnh bài tập (AI)" onPress={() => setIsAdjustmentModalVisible(true)} variant="secondary" icon="knowledge" /> : null}
+    {canManage ? <View style={styles.row}>{transitions[plan.status].map((target) => <AppButton key={target} label={actionLabels[target] ?? workoutStatusLabels[target]} onPress={() => openCommand(target)} variant="secondary" tone={target === 'ARCHIVED' ? 'danger' : 'brand'} />)}</View> : null}
+    {!canManage && plan.readContext === 'CURRENT' ? <AppCard testID="plan-read-only" title="Chỉ xem" message="CONTRIBUTE không phải quyền tác giả. Cần quyền Quản lý và quyền quyết định hiện tại để sửa kế hoạch." state="info" /> : null}
+    {mutation.isError ? <AppCard testID="plan-command-error" title="Chưa thể cập nhật kế hoạch" message={workoutPlanErrorMessage(mutation.error)} state="error" /> : null}
 
-    {canViewHistory ? <WorkoutCard testID="plan-version-history">
+    {canViewHistory ? <AppCard testID="plan-version-history">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Lịch sử phiên bản</Text>
-      {versionsQuery.isPending ? <WorkoutState busy title="Đang tải lịch sử" message="Vui lòng chờ trong giây lát." /> : null}
-      {versionsQuery.isError ? <WorkoutState title="Không thể tải lịch sử" message={workoutPlanErrorMessage(versionsQuery.error)} onRetry={() => versionsQuery.refetch()} /> : null}
+      {versionsQuery.isPending ? <AppCard title="Đang tải lịch sử" message="Vui lòng chờ trong giây lát." state="loading" /> : null}
+      {versionsQuery.isError ? <AppCard title="Không thể tải lịch sử" message={workoutPlanErrorMessage(versionsQuery.error)} onRetry={() => versionsQuery.refetch()} state="error" /> : null}
       {!versionsQuery.isPending && !versionsQuery.isError && versions.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Bản nháp chưa có phiên bản được phát hành.</Text> : null}
-      {versions.map((version) => <WorkoutButton key={version.id} label={`Phiên bản ${version.versionNumber}${version.current ? ' · hiện tại' : ''}`} secondary disabled={version.id === selectedId} onPress={() => setSelectedVersionId(version.id)} />)}
-      {versionsQuery.hasNextPage ? <WorkoutButton label="Tải thêm phiên bản" secondary busy={versionsQuery.isFetchingNextPage} disabled={versionsQuery.isFetchingNextPage} onPress={() => versionsQuery.fetchNextPage()} /> : null}
-    </WorkoutCard> : null}
+      {versions.map((version) => <AppButton key={version.id} label={`Phiên bản ${version.versionNumber}${version.current ? ' · hiện tại' : ''}`} disabled={version.id === selectedId} onPress={() => setSelectedVersionId(version.id)} variant="secondary" />)}
+      {versionsQuery.hasNextPage ? <AppButton label="Tải thêm phiên bản" loading={versionsQuery.isFetchingNextPage} disabled={versionsQuery.isFetchingNextPage} onPress={() => versionsQuery.fetchNextPage()} variant="secondary" icon="history" /> : null}
+    </AppCard> : null}
     {selectedId ? <WorkoutPlanVersionContent testID="selected-version-detail" title={canViewHistory ? 'Nội dung phiên bản đã chọn' : 'Nội dung phiên bản hiện tại'} detail={versionQuery.data} isPending={versionQuery.isPending} isError={versionQuery.isError} error={versionQuery.error} onRetry={() => versionQuery.refetch()} /> : null}
-    <WorkoutButton label="Quay lại chương trình" secondary onPress={() => router.back()} />
+    <AppButton label="Quay lại chương trình" onPress={() => router.back()} variant="secondary" icon="back" />
 
     <AiWorkoutAdjustmentModal
       visible={isAdjustmentModalVisible}
@@ -166,7 +170,12 @@ export function TrainerWorkoutPlanDetailScreen({ studentId, planId, relationship
     />
 
     <Modal visible={pendingTarget !== null} transparent animationType="fade" accessibilityViewIsModal onRequestClose={closeCommand}>
-      <View style={{ flex: 1, backgroundColor: '#00000066', justifyContent: 'center', padding: spacing.lg }}><WorkoutCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thay đổi</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingTarget === 'ACTIVATE' ? 'Kích hoạt sẽ khóa phiên bản đầu tiên. Kế hoạch đang áp dụng khác của Học viên có thể gây xung đột.' : 'Hệ thống sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.'}</Text><View style={styles.row}><WorkoutButton label="Quay lại" secondary disabled={mutation.isPending} onPress={closeCommand} /><WorkoutButton testID="confirm-plan-command" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} busy={mutation.isPending} disabled={mutation.isPending} danger={pendingTarget === 'ARCHIVED'} onPress={() => pendingTarget && mutation.mutate(pendingTarget)} /></View></WorkoutCard></View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.canvas }}><KeyboardAvoidingView style={[detailStyles.backdrop, { backgroundColor: theme.canvas }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView style={detailStyles.modalScroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><AppCard testID="plan-command-confirmation"><Text accessibilityRole="header" style={[styles.h2, { color: theme.textPrimary }]}>Xác nhận thay đổi</Text><Text style={[styles.body, { color: theme.textSecondary }]}>{pendingTarget === 'ACTIVATE' ? 'Kích hoạt sẽ khóa phiên bản đầu tiên. Kế hoạch đang áp dụng khác của Học viên có thể gây xung đột.' : 'Hệ thống sẽ kiểm tra lại quyền, trạng thái và phiên bản mới nhất trước khi cập nhật.'}</Text><View style={styles.row}><AppButton label="Quay lại" disabled={mutation.isPending} onPress={closeCommand} variant="secondary" icon="back" /><AppButton testID="confirm-plan-command" label={mutation.isPending ? 'Đang xử lý' : 'Xác nhận'} loading={mutation.isPending} disabled={mutation.isPending} onPress={() => pendingTarget && mutation.mutate(pendingTarget)} variant={pendingTarget === 'ARCHIVED' ? 'danger' : 'primary'} icon="check" /></View></AppCard></ScrollView></KeyboardAvoidingView></SafeAreaView>
     </Modal>
-  </ScrollView>;
+  </ScrollView></SafeAreaView>;
 }
+
+const detailStyles = StyleSheet.create({
+  backdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  modalScroll: { flexGrow: 0, width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' },
+});
