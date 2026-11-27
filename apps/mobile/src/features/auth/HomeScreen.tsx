@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/AuthContext';
 import { CapabilitySwitcher } from '@/components/CapabilitySwitcher';
-import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
-import { layout, spacing } from '@/design-system/tokens/spacing';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
+import { NavigationAction } from '@/design-system/components/NavigationAction';
+import { colors, getSemanticColors } from '@/design-system/tokens/colors';
+import { layout, spacing, iconSize } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
 import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { DEFAULT_APP_TIMEZONE, formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
@@ -35,6 +31,8 @@ export function HomeScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const isDark = useColorScheme() === 'dark';
+  const theme = getSemanticColors(isDark);
+  const secondaryText = isDark ? theme.textSecondary : colors.neutral[700];
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -47,13 +45,6 @@ export function HomeScreen() {
     }
   };
 
-  const themeColors = getSemanticColors(isDark);
-  const bg = themeColors.canvas;
-  const cardBg = themeColors.surface;
-  const textColor = themeColors.textPrimary;
-  const subtextColor = themeColors.textSecondary;
-  const borderColor = themeColors.border;
-
   const isDualRole =
     Boolean(user?.capabilities?.hasStudentProfile) &&
     Boolean(user?.capabilities?.hasTrainerProfile);
@@ -62,315 +53,138 @@ export function HomeScreen() {
     Boolean(user?.capabilities?.hasStudentProfile) &&
     !user?.capabilities?.hasTrainerProfile;
 
+  const heading = (title: string) => (
+    <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
+  );
+
+  const detail = (label: string, value: React.ReactNode) => (
+    <View style={styles.detailRow}>
+      <Text style={[styles.label, { color: secondaryText }]}>{label}</Text>
+      <View style={styles.detailValue}>{typeof value === 'string'
+        ? <Text style={[styles.value, { color: theme.textPrimary }]}>{value}</Text> : value}</View>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.canvas }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Capability Switcher for Dual-Role */}
-        {isDualRole && <CapabilitySwitcher />}
-
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={[styles.greeting, { color: textColor }]}>
-            Chào {user?.displayName || 'bạn'}!
-          </Text>
-          <Text style={[styles.subtitle, { color: subtextColor }]}>
-            Không gian tập luyện cá nhân của bạn
-          </Text>
-        </View>
-
-        {/* Account Details Card */}
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Thông tin tài khoản</Text>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Email</Text>
-            <Text style={[styles.value, { color: textColor }]}>{user?.email ?? 'Chưa có'}</Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Trạng thái</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {user?.status
-                  ? ACCOUNT_STATUS_LABELS[user.status] ?? user.status
-                  : 'Không xác định'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Vai trò</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.roles?.length
-                ? user.roles.map((role) => ROLE_LABELS[role] ?? role).join(', ')
-                : 'Chưa có'}
+        <View style={styles.content}>
+          {isDualRole && <CapabilitySwitcher />}
+          <View style={styles.header}>
+            <Text accessibilityRole="header" style={[styles.greeting, { color: theme.textPrimary }]}>
+              Chào {user?.displayName || 'bạn'}!
             </Text>
-          </View>
-
-          {user?.timezone && user.timezone !== DEFAULT_APP_TIMEZONE ? (
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: subtextColor }]}>Múi giờ tài khoản</Text>
-              <Text style={[styles.value, { color: textColor }]}>
-                {formatTimezoneDisplay(user.timezone)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Capabilities Card */}
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Hồ sơ và quyền sử dụng</Text>
-
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Hồ sơ học viên</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.hasStudentProfile ? 'Đã kích hoạt' : 'Chưa tạo'}
-            </Text>
+            <Text style={[styles.subtitle, { color: secondaryText }]}>Không gian tập luyện cá nhân của bạn</Text>
           </View>
 
           {user?.capabilities?.hasStudentProfile && (
             <>
-              <Pressable
-                testID="view-student-profile-button"
-                accessibilityRole="button"
-                accessibilityLabel="Xem và chỉnh sửa hồ sơ học viên"
-                style={[styles.profileButton, { borderColor }]}
-                onPress={() => router.push('/profile')}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                  Xem và chỉnh sửa hồ sơ →
-                </Text>
-              </Pressable>
+              <AppCard>
+                <View style={styles.heroHeading}>
+                  <View style={[styles.heroIcon, { backgroundColor: theme.brandSoft }]}>
+                    <AppIcon name="workout" color={colors.brand[700]} size={iconSize.large} />
+                  </View>
+                  <View style={styles.heroText}>
+                    {heading('Kế hoạch tập luyện')}
+                    <Text style={[styles.subtitle, { color: secondaryText }]}>Xem và quản lý kế hoạch của bạn.</Text>
+                  </View>
+                </View>
+                <AppButton testID="view-workout-plans-button" label="Mở kế hoạch tập luyện" icon="arrow"
+                  onPress={() => router.push('/workout-plans' as any)} />
+                <View style={styles.tileGrid}>
+                  <NavigationAction testID="view-fitness-goals-button" title="Mục tiêu thể chất" icon="goal" tile
+                    accessibilityLabel="Quản lý mục tiêu thể chất" onPress={() => router.push('/goals' as any)} />
+                  <NavigationAction testID="view-exercise-library-button" title="Thư viện bài tập" icon="exercise" tile
+                    accessibilityLabel="Mở thư viện bài tập" onPress={() => router.push('/exercises' as any)} />
+                </View>
+              </AppCard>
 
-              <Pressable
-                testID="view-fitness-goals-button"
-                accessibilityRole="button"
-                accessibilityLabel="Quản lý mục tiêu thể chất"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/goals' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                  Quản lý mục tiêu thể chất →
-                </Text>
-              </Pressable>
+              <View style={styles.section}>
+                {heading('Theo dõi mỗi ngày')}
+                <NavigationAction testID="view-nutrition-button" title="Nhật ký dinh dưỡng" icon="nutrition"
+                  accessibilityLabel="Mở nhật ký dinh dưỡng" onPress={() => router.push('/nutrition' as any)} />
+                <View style={styles.tileGrid}>
+                  <NavigationAction testID="view-progress-dashboard-button" title="Bảng điều khiển tiến độ" icon="progress" tile
+                    accessibilityLabel="Xem bảng điều khiển tiến độ" onPress={() => router.push('/progress' as any)} />
+                  <NavigationAction testID="view-measurements-button" title="Nhật ký số đo cơ thể" icon="measurement" tile
+                    accessibilityLabel="Xem nhật ký số đo cơ thể" onPress={() => router.push('/measurements' as any)} />
+                </View>
+              </View>
 
-              <Pressable
-                testID="view-exercise-library-button"
-                accessibilityRole="button"
-                accessibilityLabel="Mở thư viện bài tập"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/exercises' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Thư viện bài tập →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-workout-plans-button"
-                accessibilityRole="button"
-                accessibilityLabel="Mở kế hoạch tập luyện"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/workout-plans' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Kế hoạch tập luyện →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-nutrition-button"
-                accessibilityRole="button"
-                accessibilityLabel="Mở nhật ký dinh dưỡng"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/nutrition' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Nhật ký dinh dưỡng →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-coaching-button"
-                accessibilityRole="button"
-                accessibilityLabel="Quản lý quan hệ huấn luyện"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/coaching' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Quan hệ huấn luyện →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-progress-dashboard-button"
-                accessibilityRole="button"
-                accessibilityLabel="Xem bảng điều khiển tiến độ"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/progress' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Bảng điều khiển tiến độ →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-measurements-button"
-                accessibilityRole="button"
-                accessibilityLabel="Xem nhật ký số đo cơ thể"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/measurements' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Nhật ký số đo cơ thể →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-ai-knowledge-button"
-                accessibilityRole="button"
-                accessibilityLabel="Tra cứu kiến thức thể hình AI"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/ai-knowledge' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Kiến thức thể hình (AI) →</Text>
-              </Pressable>
-
-              <Pressable
-                testID="view-progress-summary-button"
-                accessibilityRole="button"
-                accessibilityLabel="Xem tóm tắt tiến độ AI"
-                style={[styles.profileButton, { borderColor, marginTop: spacing.xs }]}
-                onPress={() => router.push('/progress-summary' as any)}>
-                <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>Tóm tắt tiến độ (AI) →</Text>
-              </Pressable>
+              <View style={styles.section}>
+                {heading('Đồng hành tập luyện')}
+                <NavigationAction testID="view-coaching-button" title="Quan hệ huấn luyện" icon="coaching"
+                  accessibilityLabel="Quản lý quan hệ huấn luyện" onPress={() => router.push('/coaching' as any)} />
+                <AppCard>
+                  {heading('Trợ lý AI')}
+                  <Text style={[styles.subtitle, { color: secondaryText }]}>Tra cứu kiến thức và xem tóm tắt tiến độ.</Text>
+                  <NavigationAction testID="view-ai-knowledge-button" title="Kiến thức thể hình (AI)" icon="knowledge"
+                    accessibilityLabel="Tra cứu kiến thức thể hình AI" onPress={() => router.push('/ai-knowledge' as any)} />
+                  <NavigationAction testID="view-progress-summary-button" title="Tóm tắt tiến độ (AI)" icon="summary"
+                    accessibilityLabel="Xem tóm tắt tiến độ AI" onPress={() => router.push('/progress-summary' as any)} />
+                </AppCard>
+              </View>
             </>
           )}
 
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Hồ sơ huấn luyện viên</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.hasTrainerProfile ? 'Đã kích hoạt' : 'Chưa tạo'}
-            </Text>
-          </View>
+          <AppCard>
+            {heading('Thông tin tài khoản')}
+            {detail('Email', user?.email ?? 'Chưa có')}
+            {detail('Trạng thái', <View style={[styles.badge, { backgroundColor: theme.brandSoft }]}>
+              <Text style={styles.badgeText}>{user?.status ? ACCOUNT_STATUS_LABELS[user.status] ?? user.status : 'Không xác định'}</Text>
+            </View>)}
+            {detail('Vai trò', user?.roles?.length ? user.roles.map((role) => ROLE_LABELS[role] ?? role).join(', ') : 'Chưa có')}
+            {user?.timezone && user.timezone !== DEFAULT_APP_TIMEZONE
+              ? detail('Múi giờ tài khoản', formatTimezoneDisplay(user.timezone)) : null}
+            {user?.capabilities?.hasStudentProfile && (
+              <AppButton testID="view-student-profile-button" label="Xem và chỉnh sửa hồ sơ" icon="profile" variant="secondary"
+                accessibilityLabel="Xem và chỉnh sửa hồ sơ học viên" onPress={() => router.push('/profile')} />
+            )}
+          </AppCard>
 
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: subtextColor }]}>Quyền huấn luyện</Text>
-            <Text style={[styles.value, { color: textColor }]}>
-              {user?.capabilities?.canCoach ? 'Đã được cấp' : 'Chưa được cấp'}
-            </Text>
-          </View>
-        </View>
+          <AppCard>
+            {heading('Hồ sơ và quyền sử dụng')}
+            {detail('Hồ sơ học viên', user?.capabilities?.hasStudentProfile ? 'Đã kích hoạt' : 'Chưa tạo')}
+            {detail('Hồ sơ huấn luyện viên', user?.capabilities?.hasTrainerProfile ? 'Đã kích hoạt' : 'Chưa tạo')}
+            {detail('Quyền huấn luyện', user?.capabilities?.canCoach ? 'Đã được cấp' : 'Chưa được cấp')}
+          </AppCard>
 
-        {/* Cross-activation Card (Student -> Trainer) */}
-        {canCrossActivateTrainer && (
-          <View
-            testID="student-cross-activate-card"
-            style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>
-              Trở thành huấn luyện viên
-            </Text>
-            <Text style={[styles.cardDescription, { color: subtextColor }]}>
-              Kích hoạt Hồ sơ huấn luyện viên trên chính tài khoản này để chuẩn bị cho quy trình xác minh.
-            </Text>
-            <Pressable
-              testID="student-cross-activate-trainer-button"
-              accessibilityRole="button"
-              accessibilityLabel="Tạo hồ sơ huấn luyện viên"
-              onPress={() => router.push('/(onboarding)/trainer')}
-              style={[styles.profileButton, { borderColor: themeColors.primary }]}>
-              <Text style={[styles.profileButtonText, { color: themeColors.primary }]}>
-                Tạo hồ sơ huấn luyện viên →
+          {canCrossActivateTrainer && (
+            <AppCard testID="student-cross-activate-card">
+              {heading('Trở thành huấn luyện viên')}
+              <Text style={[styles.subtitle, { color: secondaryText }]}>
+                Kích hoạt Hồ sơ huấn luyện viên trên chính tài khoản này để chuẩn bị cho quy trình xác minh.
               </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Logout Action */}
-        <Pressable
-          testID="logout-button"
-          accessibilityRole="button"
-          accessibilityLabel="Đăng xuất"
-          accessibilityState={{ disabled: isLoggingOut, busy: isLoggingOut }}
-          style={({ pressed }) => [
-            styles.logoutButton,
-            {
-              backgroundColor: isLoggingOut
-                ? themeColors.dangerSurface
-                : pressed
-                ? themeColors.dangerPressed
-                : themeColors.dangerText,
-            },
-          ]}
-          onPress={handleLogout}
-          disabled={isLoggingOut}>
-          {isLoggingOut ? (
-            <ActivityIndicator color={themeColors.textOnPrimary} />
-          ) : (
-            <Text style={styles.logoutButtonText}>Đăng xuất</Text>
+              <AppButton testID="student-cross-activate-trainer-button" label="Tạo hồ sơ huấn luyện viên" icon="coaching"
+                variant="secondary" onPress={() => router.push('/(onboarding)/trainer')} />
+            </AppCard>
           )}
-        </Pressable>
+
+          <AppButton testID="logout-button" label="Đăng xuất" icon="logout" variant="danger"
+            loading={isLoggingOut} onPress={handleLogout} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: layout.mobileScreenPadding,
-    gap: spacing.lg,
-  },
-  header: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  greeting: {
-    ...typography.h1,
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    marginTop: spacing.xxs,
-  },
-  card: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  sectionTitle: {
-    ...typography.h3,
-    marginBottom: spacing.xs,
-  },
-  cardDescription: {
-    ...typography.bodySmall,
-    lineHeight: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    ...typography.bodySmall,
-  },
-  value: {
-    ...typography.label,
-  },
-  badge: {
-    backgroundColor: colors.brand[50],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.full,
-  },
-  badgeText: {
-    ...typography.caption,
-    color: colors.brand[700],
-    fontFamily: fontFamily.semiBold,
-  },
-  profileButton: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  profileButtonText: {
-    ...typography.label,
-  },
-  logoutButton: {
-    minHeight: layout.minimumTouchTarget,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.xxl,
-  },
-  logoutButtonText: {
-    ...typography.label,
-    color: semanticColors.textOnPrimary,
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: layout.mobileScreenPadding, paddingBottom: spacing.xxl, alignItems: 'center' },
+  content: { width: '100%', maxWidth: layout.mobileContentMaxWidth, gap: layout.sectionGap },
+  header: { marginTop: spacing.sm, gap: spacing.xs },
+  greeting: typography.h1,
+  subtitle: typography.bodySmall,
+  sectionTitle: typography.h3,
+  section: { gap: spacing.md },
+  heroHeading: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  heroIcon: { width: layout.featureIconContainer, height: layout.featureIconContainer, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  heroText: { flex: 1, gap: spacing.xs },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  detailRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm },
+  label: { ...typography.bodySmall, flexBasis: '40%', flexGrow: 1 },
+  detailValue: { flexBasis: '55%', flexGrow: 1, minWidth: 0, alignItems: 'flex-end' },
+  value: { ...typography.label, textAlign: 'right', flexShrink: 1, maxWidth: '100%' },
+  badge: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.full, maxWidth: '100%' },
+  badgeText: { ...typography.caption, color: colors.brand[700], fontFamily: fontFamily.semiBold },
 });

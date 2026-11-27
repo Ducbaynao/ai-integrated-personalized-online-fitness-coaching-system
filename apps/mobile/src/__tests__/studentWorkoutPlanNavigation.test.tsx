@@ -11,7 +11,7 @@ describe('Student Workout Plan navigation', () => {
   it('provides an accessible Student Home entry', () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'student-1', displayName: 'An', roles: ['STUDENT'], capabilities: { hasStudentProfile: true, hasTrainerProfile: false, canCoach: false }, settings: {} }, logout: jest.fn() });
     let tree!: renderer.ReactTestRenderer; renderer.act(() => { tree = renderer.create(<HomeScreen />); });
-    const entry = tree.root.findByProps({ testID: 'view-workout-plans-button' });
+    const entry = tree.root.findByProps({ testID: 'view-workout-plans-button' }).findByProps({ accessibilityRole: 'button' });
     expect(entry.props.accessibilityRole).toBe('button');
     expect(entry.props.accessibilityLabel).toBe('Mở kế hoạch tập luyện');
     renderer.act(() => entry.props.onPress());
