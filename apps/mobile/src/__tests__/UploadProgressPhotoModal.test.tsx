@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { Text } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
 import { ApiError } from '@/types/auth';
@@ -86,7 +87,7 @@ describe('UploadProgressPhotoModal', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
     expect(tree.root.findByProps({ testID: 'btn-submit-upload' }).props.disabled).toBe(false);
-    expect(tree.root.findAll(node => node.type === 'Text' && node.props.children === 'Thử tải lại')).not.toHaveLength(0);
+    expect(tree.root.findAllByType(Text).some(node => node.props.children === 'Thử tải lại')).toBe(true);
     await renderer.act(async () => { await tree.root.findByProps({ testID: 'btn-submit-upload' }).props.onPress(); });
     expect(onSubmit).toHaveBeenCalledTimes(2);
     expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ fileUri: asset.uri, viewType: 'BACK', weightAtTime: 70, notes: 'fixture note' }));
