@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GoalTarget } from '@/types/goal';
 import { metricLabel, unitTypeLabel, withUnit } from '@/localization/progressLabels';
 
@@ -114,7 +114,7 @@ export function GoalTargetsTab({ targets, isDark }: GoalTargetsTabProps) {
               <Text
                 style={[
                   styles.metaValue,
-                  { color: themeColors.primary, fontWeight: '700' },
+                  { color: themeColors.primary, fontFamily: fontFamily.bold },
                 ]}>
                 {formatTargetValue(target)}
               </Text>
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   },
   unitText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   grid: {
     flexDirection: 'row',
@@ -208,11 +208,11 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   notes: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
     marginTop: spacing.xxs,
   },
   emptyCard: {

@@ -13,7 +13,7 @@ import { apiErrorMessage } from '@/localization/displayLabels';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GOAL_TYPE_OPTIONS } from '@/features/goal/goalTypeOptions';
 
 /** Map goal mutation rejections into safe, actionable Vietnamese inline feedback for modal forms. */
@@ -373,7 +373,7 @@ export function CreateGoalModal({
                           styles.typeChipText,
                           {
                             color: isSelected ? '#ffffff' : themeColors.textPrimary,
-                            fontWeight: isSelected ? '700' : '400',
+                            fontFamily: isSelected ? fontFamily.bold : fontFamily.regular,
                           },
                         ]}>
                         {opt.label}

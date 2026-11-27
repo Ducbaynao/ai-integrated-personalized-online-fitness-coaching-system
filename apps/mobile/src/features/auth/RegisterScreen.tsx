@@ -18,7 +18,7 @@ import { getAuthErrorMessage, localizeFieldErrors } from '@/features/auth/authMe
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export function RegisterScreen() {
   const router = useRouter();
@@ -322,6 +322,6 @@ const styles = StyleSheet.create({
   },
   linkTextBold: {
     color: colors.brand[600],
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

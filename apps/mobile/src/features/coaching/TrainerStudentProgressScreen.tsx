@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { ProgressDashboardScreen } from '@/features/progress/ProgressDashboardScreen';
 import { useRelationshipDetail } from './coachingQueries';
 
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     textAlign: 'center',
   },
 });

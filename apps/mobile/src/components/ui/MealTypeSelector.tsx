@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export type MealTypeValue = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'OTHER';
 
@@ -111,7 +111,7 @@ export function MealTypeSelector({
                   styles.optionLabel,
                   {
                     color: isSelected ? theme.primary : theme.textPrimary,
-                    fontWeight: isSelected ? '700' : '600',
+                    fontFamily: isSelected ? fontFamily.bold : fontFamily.semiBold,
                   },
                 ]}
               >

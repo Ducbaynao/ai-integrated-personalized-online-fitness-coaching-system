@@ -28,7 +28,7 @@ import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 const GENDER_OPTIONS: { label: string; value: Gender }[] = [
   { label: genderLabels.MALE, value: 'MALE' },
@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
   badgeText: {
     ...typography.caption,
     color: colors.brand[700],
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   editButton: {
     borderWidth: 1,
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
   errorBannerText: {
     ...typography.bodySmall,
     color: semanticColors.dangerText,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   successBanner: {
     backgroundColor: colors.brand[50],
@@ -882,6 +882,6 @@ const styles = StyleSheet.create({
   successBannerText: {
     ...typography.bodySmall,
     color: colors.brand[700],
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

@@ -12,7 +12,7 @@ import {
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GOAL_TYPE_OPTIONS } from '@/features/goal/goalTypeOptions';
 import {
   resolveGoalModalErrorMessage,
@@ -270,7 +270,7 @@ export function CreateGoalTransitionModal({
                           styles.typeChipText,
                           {
                             color: isSelected ? '#ffffff' : themeColors.textPrimary,
-                            fontWeight: isSelected ? '700' : '400',
+                            fontFamily: isSelected ? fontFamily.bold : fontFamily.regular,
                           },
                         ]}>
                         {opt.label}

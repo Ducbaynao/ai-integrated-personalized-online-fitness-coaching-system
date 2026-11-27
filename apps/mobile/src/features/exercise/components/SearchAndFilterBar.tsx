@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SemanticColorScheme } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 interface ActiveFilterChip {
   key: string;
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { ...typography.caption, fontWeight: '700' },
+  countText: { ...typography.caption, fontFamily: fontFamily.bold },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     minHeight: layout.minimumTouchTarget,
@@ -145,5 +145,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
   },
-  chipText: { ...typography.caption, fontWeight: '600' },
+  chipText: { ...typography.caption, fontFamily: fontFamily.semiBold },
 });

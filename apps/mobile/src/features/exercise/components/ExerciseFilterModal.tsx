@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import {
   EXERCISE_FILTER_MAX_VALUES_PER_DIMENSION,
   ExerciseCatalogFilters,
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.h3 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   option: { minHeight: layout.minimumTouchTarget, borderWidth: 1, borderRadius: radius.full, justifyContent: 'center', paddingHorizontal: spacing.md },
-  optionText: { ...typography.bodySmall, fontWeight: '600' },
+  optionText: { ...typography.bodySmall, fontFamily: fontFamily.semiBold },
   limitMessage: { ...typography.bodySmall },
   messageBlock: { padding: spacing.lg, alignItems: 'center', gap: spacing.sm },
   message: { ...typography.bodySmall, textAlign: 'center', padding: spacing.lg },

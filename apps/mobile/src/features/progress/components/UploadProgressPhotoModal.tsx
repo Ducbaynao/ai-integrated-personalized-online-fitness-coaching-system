@@ -14,7 +14,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { PHOTO_VIEW_OPTIONS } from '@/localization/progressLabels';
 import { PhotoViewType, UploadProgressPhotoParams } from '@/types/measurement';
 
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h2,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     marginBottom: spacing.md,
   },
   scroll: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginBottom: spacing.xs,
   },
   viewTypeGrid: {
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   viewTypeText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   inputGroup: {
     marginBottom: spacing.md,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginTop: spacing.xs,
   },
   buttonRow: {
@@ -333,6 +333,6 @@ const styles = StyleSheet.create({
   btnSubmit: {},
   btnText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

@@ -1,6 +1,11 @@
 /**
  * App font families. Each value is the name a font file is registered under in
- * `appFontAssets` (see `src/design-system/fonts.ts`), one file per weight.
+ * `appFontAssets` (see `src/design-system/fonts.ts`), one file per weight/style.
+ *
+ * Request a weight or italic by choosing the matching family here, NOT with `fontWeight` or
+ * `fontStyle: 'italic'` on top of a regular family: the platform would then synthesise bold/oblique from
+ * the regular file instead of using the real Be Vietnam Pro face. Only the faces the app actually uses
+ * are registered (regular, medium, semi-bold, bold, plus regular/medium italic).
  *
  * Be Vietnam Pro replaces DM Sans (P7-012): DM Sans ships only latin/latin-ext and
  * has no glyphs for ơ, ư or the Latin Extended Additional tone-mark letters.
@@ -10,6 +15,8 @@ export const fontFamily = {
   medium: 'BeVietnamPro_500Medium',
   semiBold: 'BeVietnamPro_600SemiBold',
   bold: 'BeVietnamPro_700Bold',
+  regularItalic: 'BeVietnamPro_400Regular_Italic',
+  mediumItalic: 'BeVietnamPro_500Medium_Italic',
 } as const;
 
 export const typography = {

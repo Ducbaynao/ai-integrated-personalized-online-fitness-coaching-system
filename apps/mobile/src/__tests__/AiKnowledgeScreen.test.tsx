@@ -6,6 +6,7 @@ import { coachingApi } from '@/services/coachingApi';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ApiError } from '@/types/auth';
 import { F01KnowledgeQueryResponse, AiRunResponse } from '@/types/aiKnowledge';
+import { syntheticFaceOffenders } from '@/test-utils/textFaces';
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
@@ -135,6 +136,7 @@ describe('AiKnowledgeScreen', () => {
 
     const exampleChip = tree.root.findByProps({ testID: 'ai-knowledge-example-0' });
     expect(exampleChip).toBeDefined();
+    expect(syntheticFaceOffenders(tree)).toEqual([]);
   });
 
   it('navigates back when back button is pressed', () => {

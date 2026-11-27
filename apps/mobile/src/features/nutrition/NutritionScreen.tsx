@@ -22,6 +22,7 @@ import {
   type StrategyGoalTimezoneLike,
 } from '@/features/shared/timezoneUtils';
 import { WorkoutButton, WorkoutCard, WorkoutState, workoutStyles as styles } from '@/features/workout-plan/components/WorkoutUi';
+import { nutrientCodeLabel } from '@/localization/nutritionLabels';
 import { nutritionApi, type CatalogItemBody, type CorrectionBody, type FoodBody, type ItemBody, type NutritionDay, type NutritionItem, type PrivateFood } from './nutritionApi';
 
 type Pending = { kind: 'food'; body: FoodBody } | { kind: 'foodUpdate'; id: string; body: FoodBody } |
@@ -45,9 +46,9 @@ export function nutrientText(total: number | null, subtotal: number | null): str
   return subtotal === null ? 'Chưa xác định' : `Chưa xác định (phần đã biết: ${subtotal})`;
 }
 
+/** Day-summary nutrient label: agreed system wording, neutral "other nutrient" for an unrecognised code. */
 export function nutrientLabel(code: string): string {
-  return ({ B07_ENERGY_KCAL: 'Năng lượng (kcal)', B07_PROTEIN_G: 'Protein (g)',
-    B07_CARBOHYDRATE_G: 'Carb (g)', B07_FAT_G: 'Chất béo (g)' } as Record<string, string>)[code] ?? code;
+  return nutrientCodeLabel(code);
 }
 
 export function NutritionScreen() {

@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
 import { apiErrorMessage, goalStatusLabels } from '@/localization/displayLabels';
 import { formatContextFreeInstant } from '@/localization/instantDisplay';
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   activeScopeTab: {},
   scopeTabText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   scrollContent: {
     padding: spacing.md,
@@ -495,11 +495,11 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...typography.h3,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   linkText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   badge: {
     paddingHorizontal: spacing.sm,
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   dateRangeText: {
     ...typography.body,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginBottom: 2,
   },
   targetItem: {
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   emptySubText: {
     ...typography.body,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   deltasTable: {
     marginTop: spacing.xs,
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   },
   metricCodeText: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   baselineLatestText: {
     ...typography.bodySmall,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   },
   deltaValueText: {
     ...typography.h3,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   trendChip: {
     paddingHorizontal: spacing.sm,
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   },
   trendText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     ...typography.h2,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   statLabel: {
     ...typography.caption,
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
   continuityRationale: {
     ...typography.bodySmall,
     marginTop: spacing.xs,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   photosScroll: {
     flexDirection: 'row',
@@ -627,11 +627,11 @@ const styles = StyleSheet.create({
   },
   photoViewTypeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   photoWeightText: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginTop: 2,
   },
   photoDateText: {
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   btnAiSummaryText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   centerContainer: {
     flex: 1,
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
@@ -693,6 +693,6 @@ const styles = StyleSheet.create({
   btnRetryText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
 });

@@ -9,7 +9,7 @@ import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
 import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
 import { pushApi, pushCategories, PushCategory, PushPreferenceInput, reminderApi, ReminderCategory } from '@/services/pushApi';
@@ -424,6 +424,6 @@ const localStyles = StyleSheet.create({
   },
   categoryChipLabel: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

@@ -18,7 +18,7 @@ import { coachingApi } from '@/services/coachingApi';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import {
   aiKnowledgeApi,
   countCodePoints,
@@ -1055,11 +1055,11 @@ const styles = StyleSheet.create({
   },
   loadMoreButtonText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   subLabel: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   studentChipsRow: {
     flexDirection: 'row',
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   },
   studentChipText: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   studentLockedBadge: {
     borderWidth: 1,
@@ -1084,18 +1084,18 @@ const styles = StyleSheet.create({
   },
   studentLockedText: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   noStudentsText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
   },
   personalScopeNote: {
     marginTop: spacing.xxs,
   },
   personalScopeNoteText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
     lineHeight: 16,
   },
   textInput: {
@@ -1139,7 +1139,7 @@ const styles = StyleSheet.create({
   },
   examplesLabel: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   exampleChip: {
     borderWidth: 1,
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
   },
   retryQuestionPreview: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
     textAlign: 'center',
   },
   errorButtonsRow: {
@@ -1196,7 +1196,7 @@ const styles = StyleSheet.create({
   },
   refreshStudentsErrorButtonText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   resultContainer: {
     gap: spacing.lg,
@@ -1209,7 +1209,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     letterSpacing: 0.5,
   },
   asOfRow: {
@@ -1218,11 +1218,11 @@ const styles = StyleSheet.create({
   },
   asOfText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
   },
   missingDataTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   missingDataHint: {
     ...typography.caption,
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
   },
   answeredQuestionText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
   },
   answerText: {
     ...typography.body,
@@ -1259,14 +1259,14 @@ const styles = StyleSheet.create({
   },
   citationTagText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   citationSource: {
     ...typography.caption,
   },
   citationHeading: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   citationPageRange: {
     ...typography.caption,
@@ -1279,7 +1279,7 @@ const styles = StyleSheet.create({
   },
   excerptText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
     lineHeight: 18,
   },
   bulletItem: {
@@ -1298,7 +1298,7 @@ const styles = StyleSheet.create({
   },
   disclaimerText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
     textAlign: 'center',
     lineHeight: 16,
   },

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GoalLifecycleStatus, ProposalStatus } from '@/types/goal';
 import { goalProposalStatusLabels, goalStatusLabels } from '@/localization/displayLabels';
 
@@ -96,6 +96,6 @@ const styles = StyleSheet.create({
   },
   text: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
 });

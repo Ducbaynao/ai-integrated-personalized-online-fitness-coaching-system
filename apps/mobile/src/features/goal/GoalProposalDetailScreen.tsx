@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { FitnessGoal, FitnessGoalVersion, GoalProposal, ProposalDecision } from '@/types/goal';
 import { apiErrorMessage, goalProposalStatusLabels } from '@/localization/displayLabels';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
@@ -445,7 +445,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                       proposal.proposedTitle !== (baseVersion?.title || currentGoal?.title)
                         ? themeColors.primary
                         : themeColors.textPrimary,
-                    fontWeight: proposal.proposedTitle ? '700' : '400',
+                    fontFamily: proposal.proposedTitle ? fontFamily.bold : fontFamily.regular,
                   },
                 ]}>
                 {proposal.proposedTitle || baseVersion?.title || currentGoal?.title || 'Không đổi'}
@@ -477,10 +477,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                       proposal.proposedDurationDays || proposal.proposedTargetDate
                         ? themeColors.primary
                         : themeColors.textPrimary,
-                    fontWeight:
-                      proposal.proposedDurationDays || proposal.proposedTargetDate
-                        ? '700'
-                        : '400',
+                    fontFamily: proposal.proposedDurationDays || proposal.proposedTargetDate ? fontFamily.bold : fontFamily.regular,
                   },
                 ]}>
                 {proposal.proposedDurationDays
@@ -603,7 +600,7 @@ export function GoalProposalDetailScreen({ proposalId }: GoalProposalDetailScree
                     <Text
                       style={[
                         styles.metaVal,
-                        { color: themeColors.primary, fontWeight: '700' },
+                        { color: themeColors.primary, fontFamily: fontFamily.bold },
                       ]}>
                       {tgt.targetValue !== null && tgt.targetValue !== undefined
                         ? withUnit(tgt.targetValue, tgt.unitCode, { metricCode: tgt.metricCode, symbol: tgt.unitSymbol })
@@ -820,7 +817,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   screenTitle: {
     ...typography.h3,
@@ -856,18 +853,18 @@ const styles = StyleSheet.create({
   },
   bannerTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   sourceBadge: {
     ...typography.caption,
   },
   reasonText: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   decisionNoteText: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
     marginTop: spacing.xxs,
   },
   card: {
@@ -900,14 +897,14 @@ const styles = StyleSheet.create({
   },
   columnLabel: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   columnValue: {
     ...typography.bodySmall,
   },
   emptySectionText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   itemCard: {
     borderRadius: radius.md,
@@ -922,7 +919,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     ...typography.bodySmall,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   priorityBadge: {
     paddingHorizontal: spacing.xs,
@@ -931,7 +928,7 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   itemNotes: {
     ...typography.caption,
@@ -965,7 +962,7 @@ const styles = StyleSheet.create({
   acceptButtonText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   rejectButton: {
     minHeight: layout.minimumTouchTarget,
@@ -976,7 +973,7 @@ const styles = StyleSheet.create({
   },
   rejectButtonText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   primaryButton: {
     minHeight: layout.minimumTouchTarget,
@@ -988,7 +985,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   modalOverlay: {
     flex: 1,
@@ -1019,11 +1016,11 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   charCount: {
     ...typography.caption,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   noteInput: {
     borderWidth: 1,
@@ -1064,7 +1061,7 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   errorActionRow: {
     flexDirection: 'row',
@@ -1081,6 +1078,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

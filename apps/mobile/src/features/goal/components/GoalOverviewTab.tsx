@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { FitnessGoal } from '@/types/goal';
 import { GoalStatusBadge } from '@/features/goal/components/GoalStatusBadge';
 
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   bannerTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   bannerBody: {
     ...typography.bodySmall,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   bannerReason: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
     marginTop: spacing.xxs,
   },
   card: {
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   objectiveItem: {
     paddingVertical: spacing.xs,
@@ -268,13 +268,13 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   objectiveNotes: {
     ...typography.bodySmall,
   },
   emptyText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
 });

@@ -13,6 +13,7 @@ import { ApiError } from '@/types/auth';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { TimezoneContextPicker } from '@/components/ui/TimezoneContextPicker';
 import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
+import { formatInstantVietnam, parseExactInstant } from '@/localization/instantDisplay';
 
 type Pending =
   | { kind: 'timezone'; timezone: string; key: string }
@@ -37,7 +38,10 @@ function message(error: unknown) {
   if (error instanceof ApiError && error.status === 0) return 'Mất kết nối. Có thể thử lại cùng lệnh.';
   return 'Không thể tải hoặc lưu dữ liệu. Vui lòng thử lại.';
 }
+/** Shown instead of a guessed time when a timestamp is missing, date-only, offset-less or unparsable. */
+const UNKNOWN_TIME_LABEL = 'Chưa rõ thời điểm';
 function localDate(value: string, zone: string) {
+  if (parseExactInstant(value) === null) return UNKNOWN_TIME_LABEL;
   return `${moment.tz(value, zone).format('DD/MM/YYYY HH:mm')} · ${formatTimezoneDisplay(zone, 'Chưa có múi giờ', value)}`;
 }
 
@@ -244,7 +248,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
         {signalRows.map(signal => <CoachingCard key={signal.id} testID={`attention-${signal.id}`}>
           <Text style={[styles.h2, { color: theme.textPrimary }]}>{signalTitle[signal.rule]}</Text>
           <Text style={[styles.label, { color: theme.textPrimary }]}>Quy tắc hệ thống · {signal.severity === 'MEDIUM' ? 'Ưu tiên vừa' : 'Ưu tiên thấp'} · {signalStatus[signal.status]}</Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>Phát hiện {new Date(signal.detectedAt).toLocaleString('vi-VN')}</Text>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>Phát hiện {formatInstantVietnam(signal.detectedAt) ?? UNKNOWN_TIME_LABEL}</Text>
           {signal.plannedStartAt && signal.plannedEndAt
             ? <Text style={[styles.body, { color: theme.textSecondary }]}>Khoảng dự kiến: {localDate(signal.plannedStartAt, 'Etc/UTC')} – {localDate(signal.plannedEndAt, 'Etc/UTC')}</Text> : null}
           {signal.reviewTaskId ? <Text style={[styles.body, { color: theme.textSecondary }]}>Nguồn: nhiệm vụ đánh giá</Text> : null}
@@ -258,7 +262,7 @@ export function AttentionReviewScreen({ relationshipId }: { relationshipId?: str
             {history.isPending ? <CoachingState busy title="Đang tải lịch sử" message="Vui lòng chờ." /> : null}
             {history.isError ? <CoachingState title="Không thể tải lịch sử" message={message(history.error)} onRetry={() => history.refetch()} /> : null}
             {history.data?.map((event, index) => <Text key={`${event.occurredAt}-${index}`} style={[styles.body, { color: theme.textSecondary }]}>
-              {event.eventType} · {new Date(event.occurredAt).toLocaleString('vi-VN')} · {event.resultingSeverity}
+              {event.eventType} · {formatInstantVietnam(event.occurredAt) ?? UNKNOWN_TIME_LABEL} · {event.resultingSeverity}
               {event.reason ? ` · ${event.reason}` : ''}
             </Text>)}
           </View> : null}

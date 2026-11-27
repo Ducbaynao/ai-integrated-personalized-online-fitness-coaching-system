@@ -34,7 +34,7 @@ import { validateTrainerProfileForm } from './trainerValidation';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export function TrainerProfileScreen() {
   const router = useRouter();
@@ -1559,7 +1559,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   saveButton: {
     borderRadius: radius.md,
@@ -1618,7 +1618,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   authorityCard: {
     borderRadius: radius.lg,
@@ -1762,7 +1762,7 @@ const styles = StyleSheet.create({
   },
   uploadedDocName: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   uploadedDocStatus: {
     ...typography.caption,

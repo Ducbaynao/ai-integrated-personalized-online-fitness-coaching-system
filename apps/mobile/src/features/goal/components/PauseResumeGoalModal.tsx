@@ -11,7 +11,7 @@ import {
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 interface PauseResumeGoalModalProps {
   visible: boolean;
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   goalName: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   instruction: {
     ...typography.bodySmall,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   reasonValue: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   buttonRow: {
     flexDirection: 'row',

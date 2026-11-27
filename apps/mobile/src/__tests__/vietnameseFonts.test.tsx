@@ -164,11 +164,13 @@ const SAMPLE_TEXT = [
   'Ưu tiên sức khỏe — kỹ thuật đúng, nghỉ ngơi đủ',
 ];
 
-const EXPECTED_WEIGHT: Record<keyof typeof fontFamily, number> = {
-  regular: 400,
-  medium: 500,
-  semiBold: 600,
-  bold: 700,
+const EXPECTED_FACE: Record<keyof typeof fontFamily, { weight: number; italic: boolean }> = {
+  regular: { weight: 400, italic: false },
+  medium: { weight: 500, italic: false },
+  semiBold: { weight: 600, italic: false },
+  bold: { weight: 700, italic: false },
+  regularItalic: { weight: 400, italic: true },
+  mediumItalic: { weight: 500, italic: true },
 };
 
 const assets = appFontAssets as unknown as Record<string, string>;
@@ -181,8 +183,11 @@ function missingCodePoints(text: string, font: ParsedFont): string[] {
 
 describe('P7-012 app font covers Vietnamese for every token family', () => {
   it('uses each token family in typography and registers it with a real TTF', () => {
+    // The text styles only use the four upright faces; the italic faces are requested by callers.
     const usedFamilies = new Set(Object.values(typography).map((style) => style.fontFamily));
-    expect([...usedFamilies].sort()).toEqual(Object.values(fontFamily).sort());
+    expect([...usedFamilies].sort()).toEqual(
+      [fontFamily.regular, fontFamily.medium, fontFamily.semiBold, fontFamily.bold].sort(),
+    );
     expect(Object.keys(assets).sort()).toEqual(Object.values(fontFamily).sort());
     for (const family of Object.values(fontFamily)) {
       expect(typeof assets[family]).toBe('string');
@@ -195,9 +200,11 @@ describe('P7-012 app font covers Vietnamese for every token family', () => {
     (tokenKey, family) => {
       const font = parseFont(assets[family]);
 
-      it('maps to an upright file of the matching weight, not a synthesized variant', () => {
-        expect(font.weightClass).toBe(EXPECTED_WEIGHT[tokenKey]);
-        expect(font.isItalic).toBe(false);
+      it('maps to a file of the matching weight and slant, not a synthesized variant', () => {
+        expect(font.weightClass).toBe(EXPECTED_FACE[tokenKey].weight);
+        expect(font.isItalic).toBe(EXPECTED_FACE[tokenKey].italic);
+        // The registered name and the real file agree (Be Vietnam Pro, matching style name).
+        expect(assets[family]).toMatch(EXPECTED_FACE[tokenKey].italic ? /_Italic\.ttf$/ : /[^c]\.ttf$/);
       });
 
       it('contains all 144 precomposed Vietnamese vowels with tones plus đ/Đ', () => {

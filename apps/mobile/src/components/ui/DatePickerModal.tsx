@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import {
   daysInMonth,
   formatDateOnly,
@@ -488,7 +488,7 @@ export function DatePickerModal({
                                 styles.dayCellText,
                                 {
                                   color: selected ? theme.textOnPrimary : theme.textPrimary,
-                                  fontWeight: selected ? '700' : '400',
+                                  fontFamily: selected ? fontFamily.bold : fontFamily.regular,
                                 },
                               ]}>
                               {day}
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
   },
   weekHeaderText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   daysRowsWrap: {
     gap: spacing.xs,
