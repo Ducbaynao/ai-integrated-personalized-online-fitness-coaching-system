@@ -40,11 +40,16 @@ jest.mock('@/services/aiWorkoutAdjustmentApi', () => {
   };
 });
 
+// The preset's Modal mock lazily imports its real native dependency graph.
+// Resolve it during suite setup so cold transforms do not consume a test's 5s budget.
+jest.requireMock('react-native/Libraries/Modal/Modal');
+
 describe('AiWorkoutAdjustmentModal', () => {
-  const flushPromises = async () => {
-    await renderer.act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
+  const mountedTrees = new Set<renderer.ReactTestRenderer>();
+  const createRenderer = (element: React.ReactElement) => {
+    const tree = renderer.create(element);
+    mountedTrees.add(tree);
+    return tree;
   };
 
   const mockPrescriptions = [
@@ -309,14 +314,27 @@ describe('AiWorkoutAdjustmentModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Clear both queued responses and default implementations from previous cases.
+    for (const mock of Object.values(aiWorkoutAdjustmentApi)) jest.mocked(mock).mockReset();
+    for (const mock of Object.values(exerciseApi)) jest.mocked(mock).mockReset();
+  });
+
+  afterEach(async () => {
+    try {
+      await renderer.act(async () => {
+        for (const tree of mountedTrees) tree.unmount();
+      });
+    } finally {
+      mountedTrees.clear();
+    }
   });
 
   it('renders form initially and generates occurrence adjustment proposal', async () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockSubstitutionProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -333,16 +351,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     expect(requestForm).toBeDefined();
 
     const reasonInput = tree.root.findByProps({ testID: 'adjustment-reason-input' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       reasonInput.props.onChangeText('Máy squat bận');
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     expect(aiWorkoutAdjustmentApi.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -366,8 +382,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockSubstitutionProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -378,11 +394,9 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const diffCard = tree.root.findByProps({ testID: 'adjustment-diff-substitution' });
     expect(diffCard).toBeDefined();
@@ -392,8 +406,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockLoadProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -404,16 +418,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const loadTypeBtn = tree.root.findByProps({ testID: 'adjustment-change-type-load' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       loadTypeBtn.props.onPress();
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const diffCard = tree.root.findByProps({ testID: 'adjustment-diff-load' });
     expect(diffCard).toBeDefined();
@@ -423,8 +435,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockBodyweightLoadProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -435,16 +447,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const loadTypeBtn = tree.root.findByProps({ testID: 'adjustment-change-type-load' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       loadTypeBtn.props.onPress();
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const diffCard = tree.root.findByProps({ testID: 'adjustment-diff-load' });
     expect(diffCard).toBeDefined();
@@ -454,8 +464,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(mockVolumeProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -466,16 +476,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const volumeTypeBtn = tree.root.findByProps({ testID: 'adjustment-change-type-volume' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       volumeTypeBtn.props.onPress();
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const diffCard = tree.root.findByProps({ testID: 'adjustment-diff-volume' });
     expect(diffCard).toBeDefined();
@@ -496,8 +504,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     const onAppliedMock = jest.fn();
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -509,23 +517,19 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
 
-    await flushPromises();
-
     const noteInput = tree.root.findByProps({ testID: 'adjustment-decision-note-input' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       noteInput.props.onChangeText('Duyệt thay bài tập');
     });
 
     const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       acceptBtn.props.onPress();
     });
-
-    await flushPromises();
 
     expect(aiWorkoutAdjustmentApi.accept).toHaveBeenCalledWith(
       'rec-sub-1',
@@ -555,8 +559,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -567,28 +571,24 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
 
-    await flushPromises();
-
     const startRejectBtn = tree.root.findByProps({ testID: 'adjustment-start-reject-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       startRejectBtn.props.onPress();
     });
 
     const reasonInput = tree.root.findByProps({ testID: 'adjustment-reject-reason-input' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       reasonInput.props.onChangeText('Tôi muốn tập bài khác');
     });
 
     const confirmRejectBtn = tree.root.findByProps({ testID: 'adjustment-reject-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       confirmRejectBtn.props.onPress();
     });
-
-    await flushPromises();
 
     expect(aiWorkoutAdjustmentApi.reject).toHaveBeenCalledWith('rec-sub-1', {
       reason: 'Tôi muốn tập bài khác',
@@ -605,8 +605,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -618,11 +618,9 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const banner = tree.root.findByProps({ testID: 'adjustment-authority-banner' });
     expect(banner).toBeDefined();
@@ -637,8 +635,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -650,11 +648,9 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
     expect(acceptBtn).toBeDefined();
@@ -673,8 +669,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.accept as jest.Mock).mockRejectedValueOnce(conflictError);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -685,18 +681,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
 
-    await flushPromises();
-
     const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       acceptBtn.props.onPress();
     });
-
-    await flushPromises();
 
     const guidance = tree.root.findByProps({ testID: 'adjustment-conflict-guidance' });
     expect(guidance).toBeDefined();
@@ -719,8 +711,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.accept as jest.Mock).mockRejectedValueOnce(snapshotError);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -729,14 +721,12 @@ describe('AiWorkoutAdjustmentModal', () => {
         />
       );
     });
-    renderer.act(() => {
+    await renderer.act(async () => {
       tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
     });
-    await flushPromises();
-    renderer.act(() => {
+    await renderer.act(async () => {
       tree.root.findByProps({ testID: 'adjustment-accept-button' }).props.onPress();
     });
-    await flushPromises();
 
     const flat = (c: any): string =>
       Array.isArray(c) ? c.map(flat).join('') : typeof c === 'string' || typeof c === 'number' ? String(c) : '';
@@ -774,8 +764,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(templateProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -787,11 +777,9 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-
-    await flushPromises();
 
     expect(aiWorkoutAdjustmentApi.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -814,8 +802,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockReturnValueOnce(generatePromise);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -826,12 +814,12 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
 
     // Student ID changes while request is in flight
-    renderer.act(() => {
+    await renderer.act(async () => {
       tree.update(
         <AiWorkoutAdjustmentModal
           visible={true}
@@ -845,7 +833,6 @@ describe('AiWorkoutAdjustmentModal', () => {
     // Old response resolves
     await renderer.act(async () => {
       resolveGenerate(mockSubstitutionProposal);
-      await flushPromises();
     });
 
     // The stale proposal should NOT be displayed in the session of stu-2
@@ -864,8 +851,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     const onAppliedMock = jest.fn();
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -877,18 +864,17 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-    await flushPromises();
 
     const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       acceptBtn.props.onPress();
     });
 
     // Close the modal while accept is in flight
-    renderer.act(() => {
+    await renderer.act(async () => {
       tree.update(
         <AiWorkoutAdjustmentModal
           visible={false}
@@ -911,7 +897,6 @@ describe('AiWorkoutAdjustmentModal', () => {
         appliedAt: '2026-11-03T12:05:00Z',
         replayed: false,
       });
-      await flushPromises();
     });
 
     // Stale callback must NOT be invoked
@@ -946,8 +931,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -969,16 +954,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-    await flushPromises();
 
     const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       acceptBtn.props.onPress();
     });
-    await flushPromises();
 
     // Must pass expectedTargetVersion: 3 (plan aggregate version), NEVER 7 (occurrence version)
     expect(aiWorkoutAdjustmentApi.accept).toHaveBeenCalledWith(
@@ -1021,8 +1004,8 @@ describe('AiWorkoutAdjustmentModal', () => {
     (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(unknownLoadWithUnitProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -1033,15 +1016,14 @@ describe('AiWorkoutAdjustmentModal', () => {
     });
 
     const loadTypeBtn = tree.root.findByProps({ testID: 'adjustment-change-type-load' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       loadTypeBtn.props.onPress();
     });
 
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-    await flushPromises();
 
     const diffCard = tree.root.findByProps({ testID: 'adjustment-diff-load' });
     const textNodes = diffCard.findAllByType(Text).map((t: any) => t.props.children);
@@ -1062,8 +1044,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       .mockResolvedValueOnce(mockSubstitutionProposal);
 
     let tree!: renderer.ReactTestRenderer;
-    renderer.act(() => {
-      tree = renderer.create(
+    await renderer.act(async () => {
+      tree = createRenderer(
         <AiWorkoutAdjustmentModal
           visible={true}
           studentId="stu-1"
@@ -1076,7 +1058,7 @@ describe('AiWorkoutAdjustmentModal', () => {
     const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
 
     // Double tap
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
       generateBtn.props.onPress();
     });
@@ -1089,14 +1071,12 @@ describe('AiWorkoutAdjustmentModal', () => {
     // Fail the first call
     await renderer.act(async () => {
       rejectGen(new Error('Network error'));
-      await flushPromises();
     });
 
     // Retry generate button
-    renderer.act(() => {
+    await renderer.act(async () => {
       generateBtn.props.onPress();
     });
-    await flushPromises();
 
     expect(aiWorkoutAdjustmentApi.generate).toHaveBeenCalledTimes(2);
     const retryCallKey = (aiWorkoutAdjustmentApi.generate as jest.Mock).mock.calls[1][0].commandKey;
@@ -1163,8 +1143,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.accept as jest.Mock).mockResolvedValueOnce(acceptResponse);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1177,10 +1157,9 @@ describe('AiWorkoutAdjustmentModal', () => {
 
       // Generate proposal
       const generateBtn = tree.root.findByProps({ testID: 'adjustment-generate-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         generateBtn.props.onPress();
       });
-      await flushPromises();
 
       // Proposal loaded in revision 1
       const revBadge = tree.root.findByProps({ testID: 'adjustment-revision-badge' });
@@ -1189,28 +1168,26 @@ describe('AiWorkoutAdjustmentModal', () => {
 
       // Click Edit Draft
       const editBtn = tree.root.findByProps({ testID: 'adjustment-start-edit-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         editBtn.props.onPress();
       });
-      await flushPromises();
 
       // Edit form is open
       const titleInput = tree.root.findByProps({ testID: 'adjustment-edit-title-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         titleInput.props.onChangeText('Thay Squat bằng Lunges (Đã sửa)');
       });
 
       const replacementInput = tree.root.findByProps({ testID: 'adjustment-edit-replacement-name-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         replacementInput.props.onChangeText('Dumbbell Walking Lunge');
       });
 
       // Save Draft
       const saveBtn = tree.root.findByProps({ testID: 'adjustment-save-draft-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         saveBtn.props.onPress();
       });
-      await flushPromises();
 
       // updateDraft was called with expectedRevision: 1
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith('rec-trainer-1', {
@@ -1243,10 +1220,9 @@ describe('AiWorkoutAdjustmentModal', () => {
 
       // Accept the proposal -> MUST send expectedRevision: 2 (the updated revision!)
       const acceptBtn = tree.root.findByProps({ testID: 'adjustment-accept-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         acceptBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.accept).toHaveBeenCalledWith('rec-trainer-1', expect.objectContaining({
         expectedRevision: 2,
@@ -1271,8 +1247,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.shareDraft as jest.Mock).mockResolvedValueOnce(shareResponse);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1284,20 +1260,18 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Initially private
       expect(tree.root.findByProps({ testID: 'adjustment-private-badge' })).toBeDefined();
 
       // Click Share with Student
       const shareBtn = tree.root.findByProps({ testID: 'adjustment-share-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         shareBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.shareDraft).toHaveBeenCalledWith('rec-share-1', {
         expectedRevision: 1,
@@ -1323,15 +1297,13 @@ describe('AiWorkoutAdjustmentModal', () => {
       };
       (aiWorkoutAdjustmentApi.updateDraft as jest.Mock).mockResolvedValueOnce(updateResponse);
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Now revision is 2, but sharedRevision is still 1 -> Unshared changes warning must appear!
       const unsharedWarning = tree.root.findByProps({ testID: 'adjustment-unshared-warning' });
@@ -1349,10 +1321,9 @@ describe('AiWorkoutAdjustmentModal', () => {
       };
       (aiWorkoutAdjustmentApi.shareDraft as jest.Mock).mockResolvedValueOnce(reShareResponse);
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         reshareBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.shareDraft).toHaveBeenCalledWith('rec-share-1', {
         expectedRevision: 2,
@@ -1395,8 +1366,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.getRecommendation as jest.Mock).mockResolvedValueOnce(sharedSnapshotProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1407,7 +1378,6 @@ describe('AiWorkoutAdjustmentModal', () => {
           />
         );
       });
-      await flushPromises();
 
       // Automatically fetched recommendation detail
       expect(aiWorkoutAdjustmentApi.getRecommendation).toHaveBeenCalledWith('rec-shared-99');
@@ -1434,8 +1404,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(selfDirectedProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1447,10 +1417,9 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Student in SELF_DIRECTED CAN edit and CAN accept/reject
       expect(tree.root.findByProps({ testID: 'adjustment-start-edit-button' })).toBeDefined();
@@ -1477,8 +1446,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.getRecommendation as jest.Mock).mockRejectedValueOnce(forbiddenError);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1491,15 +1460,14 @@ describe('AiWorkoutAdjustmentModal', () => {
 
       // Enter ID in lookup input
       const lookupInput = tree.root.findByProps({ testID: 'adjustment-lookup-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         lookupInput.props.onChangeText('rec-private-trainer-draft');
       });
 
       const lookupBtn = tree.root.findByProps({ testID: 'adjustment-lookup-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         lookupBtn.props.onPress();
       });
-      await flushPromises();
 
       // Displays unshared explanation
       const errMsg = tree.root.findByProps({ testID: 'adjustment-error-message' });
@@ -1530,8 +1498,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.updateDraft as jest.Mock).mockRejectedValueOnce(conflictError);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1542,20 +1510,17 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Shows conflict guidance
       const conflictGuidance = tree.root.findByProps({ testID: 'adjustment-conflict-guidance' });
@@ -1568,10 +1533,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         ...trainerProposal,
         revision: 2,
       });
-      renderer.act(() => {
+      await renderer.act(async () => {
         reloadBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.getRecommendation).toHaveBeenCalledWith('rec-conflict-1');
     });
@@ -1613,8 +1577,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1626,30 +1590,27 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Open Edit Form
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Click Open Catalog Picker
       const openPickerBtn = tree.root.findByProps({ testID: 'adjustment-open-catalog-picker-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         openPickerBtn.props.onPress();
       });
-      await flushPromises();
 
       // Catalog picker modal is open
       expect(tree.root.findByProps({ testID: 'adjustment-catalog-picker-modal' })).toBeDefined();
 
       // Search catalog
       const searchInput = tree.root.findByProps({ testID: 'adjustment-catalog-search-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         searchInput.props.onChangeText('Bulgarian');
       });
       (exerciseApi.getCatalog as jest.Mock).mockResolvedValueOnce({
@@ -1667,28 +1628,25 @@ describe('AiWorkoutAdjustmentModal', () => {
         size: 15,
       });
       const searchBtn = tree.root.findByProps({ testID: 'adjustment-catalog-search-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         searchBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(exerciseApi.getCatalog).toHaveBeenCalledWith({ query: 'Bulgarian', size: 15 });
 
       // Click Exercise
       const exerciseItem = tree.root.findByProps({ testID: 'catalog-exercise-ex-split-squat-id' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         exerciseItem.props.onPress();
       });
-      await flushPromises();
 
       expect(exerciseApi.getDetail).toHaveBeenCalledWith('ex-split-squat-id');
 
       // Click Variation
       const variationItem = tree.root.findByProps({ testID: 'catalog-variation-88888888-8888-4888-8888-888888888888' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         variationItem.props.onPress();
       });
-      await flushPromises();
 
       // Form updated with selected variation info
       const idInput = tree.root.findByProps({ testID: 'adjustment-edit-replacement-id-input' });
@@ -1710,10 +1668,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         originalPayload: trainerProposal.structuredPayload,
         diff: null,
       });
-      renderer.act(() => {
+      await renderer.act(async () => {
         saveBtn.props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
         'rec-cat-picker-1',
@@ -1743,8 +1700,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1755,26 +1712,23 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter same variation ID as before ('11111111-1111-4111-8111-111111111111')
       const idInput = tree.root.findByProps({ testID: 'adjustment-edit-replacement-id-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         idInput.props.onChangeText('11111111-1111-4111-8111-111111111111');
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // updateDraft was NOT called
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
@@ -1793,8 +1747,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1805,41 +1759,38 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter decimals in integer fields
       const setsInput = tree.root.findByProps({ testID: 'adjustment-edit-sets-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         setsInput.props.onChangeText('3.5');
       });
 
       const repsMinInput = tree.root.findByProps({ testID: 'adjustment-edit-reps-min-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMinInput.props.onChangeText('8.2');
       });
 
       const repsMaxInput = tree.root.findByProps({ testID: 'adjustment-edit-reps-max-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMaxInput.props.onChangeText('10.8');
       });
 
       const durationInput = tree.root.findByProps({ testID: 'adjustment-edit-duration-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         durationInput.props.onChangeText('45.5');
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
 
@@ -1859,8 +1810,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1871,30 +1822,27 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // First test invalid range: repsMax < repsMin
       const repsMinInput = tree.root.findByProps({ testID: 'adjustment-edit-reps-min-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMinInput.props.onChangeText('12');
       });
       const repsMaxInput = tree.root.findByProps({ testID: 'adjustment-edit-reps-max-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMaxInput.props.onChangeText('10');
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
       let allTexts = tree.root.findAllByType(Text).map((t: any) => t.props.children).flat(Infinity).join('');
@@ -1905,13 +1853,13 @@ describe('AiWorkoutAdjustmentModal', () => {
       // Update to sets: 5, repsMin: 10, repsMax: 14
       // Deltas should be deltaSets: 2, deltaRepsMin: 2, deltaRepsMax: 4
       const setsInput = tree.root.findByProps({ testID: 'adjustment-edit-sets-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         setsInput.props.onChangeText('5');
       });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMinInput.props.onChangeText('10');
       });
-      renderer.act(() => {
+      await renderer.act(async () => {
         repsMaxInput.props.onChangeText('14');
       });
 
@@ -1928,10 +1876,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
         'rec-vol-delta-1',
@@ -1963,8 +1910,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -1975,24 +1922,22 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Before targetLoad: 80 KG
       // Change to 85 KG with KG unit
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('85');
       });
       const unitInput = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput.props.onChangeText('KG');
       });
 
@@ -2009,10 +1954,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
         'rec-load-sync-1',
@@ -2044,8 +1988,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2056,27 +2000,24 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Before targetLoad: 80 KG
       // Input 80 KG (same as before)
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('80');
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
 
@@ -2103,8 +2044,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2114,14 +2055,13 @@ describe('AiWorkoutAdjustmentModal', () => {
           />
         );
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.getRecommendation).toHaveBeenCalledWith('rec-A');
       let allTexts = tree.root.findAllByType(Text).map((t: any) => t.props.children).flat(Infinity).join('');
       expect(allTexts).toContain('Đề xuất A');
 
       // Now switch initialRecommendationId to rec-B
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.update(
           <AiWorkoutAdjustmentModal
             visible={true}
@@ -2132,7 +2072,6 @@ describe('AiWorkoutAdjustmentModal', () => {
           />
         );
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.getRecommendation).toHaveBeenCalledWith('rec-B');
       allTexts = tree.root.findAllByType(Text).map((t: any) => t.props.children).flat(Infinity).join('');
@@ -2148,8 +2087,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2161,16 +2100,14 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Open Edit
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Create an unresolved promise for updateDraft to simulate in-flight request
       let resolveUpdate!: (val: any) => void;
@@ -2181,7 +2118,7 @@ describe('AiWorkoutAdjustmentModal', () => {
 
       // Press save draft -> request begins
       const saveBtn = tree.root.findByProps({ testID: 'adjustment-save-draft-button' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         saveBtn.props.onPress();
       });
 
@@ -2189,13 +2126,13 @@ describe('AiWorkoutAdjustmentModal', () => {
       expect(saveBtn.props.disabled).toBe(true);
 
       // Duplicate press does not call updateDraft again
-      renderer.act(() => {
+      await renderer.act(async () => {
         saveBtn.props.onPress();
       });
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledTimes(1);
 
       // Resolve the hanging promise
-      renderer.act(() => {
+      await renderer.act(async () => {
         resolveUpdate({
           recommendationId: 'rec-inflight-1',
           revision: 2,
@@ -2209,7 +2146,6 @@ describe('AiWorkoutAdjustmentModal', () => {
           diff: null,
         });
       });
-      await flushPromises();
 
       // Once resolved, buttons become active again
       expect(tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.disabled).toBe(false);
@@ -2246,8 +2182,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(customUnitProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2258,19 +2194,17 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter 110 LB
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('110');
       });
 
@@ -2287,10 +2221,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Verified loadUnitId is preserved as 77 (NOT hardcoded to 1 or 2!)
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
@@ -2322,8 +2255,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(trainerProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2334,23 +2267,21 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter 85 and unit LBS (alias)
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('85');
       });
       const unitInput = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput.props.onChangeText('LBS');
       });
 
@@ -2367,10 +2298,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Verified loadUnit is normalized to 'LB'
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
@@ -2398,8 +2328,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(bwProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2410,26 +2340,23 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // User tries to enter 50 KG when baseline load is null (unknown/bodyweight)
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('50');
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
       let allTexts = tree.root.findAllByType(Text).map((t: any) => t.props.children).flat(Infinity).join('');
@@ -2464,8 +2391,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       };
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(zeroBaselineProposal);
 
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2475,18 +2402,16 @@ describe('AiWorkoutAdjustmentModal', () => {
           />
         );
       });
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       const loadInputZero = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInputZero.props.onChangeText('15');
       });
 
@@ -2503,10 +2428,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
         'rec-zero-base-1',
@@ -2561,8 +2485,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(lbBaselineProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2573,23 +2497,21 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter 50 with unit KG
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('50');
       });
       const unitInput = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput.props.onChangeText('KG');
       });
 
@@ -2606,10 +2528,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Delta: 50 - 45.36 = +4.64 KG. Direction: INCREASE!
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
@@ -2662,8 +2583,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       };
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(kgBaselineProposal);
 
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2674,23 +2595,21 @@ describe('AiWorkoutAdjustmentModal', () => {
         );
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Enter 100 with unit LB
       const loadInput2 = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput2.props.onChangeText('100');
       });
       const unitInput2 = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput2.props.onChangeText('LB');
       });
 
@@ -2707,10 +2626,9 @@ describe('AiWorkoutAdjustmentModal', () => {
         diff: null,
       });
 
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Delta: 100 - 110.23 = -10.23 LB. Direction: DECREASE!
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
@@ -2773,8 +2691,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(kgLoadProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2787,28 +2705,25 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate & open proposal
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Start edit
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Change load unit to an unknown / unresolvable unit 'POOD'
       const unitInput = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput.props.onChangeText('POOD');
       });
 
       // Save draft should be blocked
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // updateDraft should NOT be called
       expect(aiWorkoutAdjustmentApi.updateDraft).not.toHaveBeenCalled();
@@ -2860,8 +2775,8 @@ describe('AiWorkoutAdjustmentModal', () => {
       (aiWorkoutAdjustmentApi.generate as jest.Mock).mockResolvedValueOnce(kgLoadProposal);
 
       let tree!: renderer.ReactTestRenderer;
-      renderer.act(() => {
-        tree = renderer.create(
+      await renderer.act(async () => {
+        tree = createRenderer(
           <AiWorkoutAdjustmentModal
             visible={true}
             studentId="stu-1"
@@ -2891,24 +2806,22 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Generate & open proposal
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-generate-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Start edit
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-start-edit-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Change target load to 180 and unit to LB (alias LBS should normalize to LB and resolve ID 41, NOT 77)
       const loadInput = tree.root.findByProps({ testID: 'adjustment-edit-target-load-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         loadInput.props.onChangeText('180');
       });
       const unitInput = tree.root.findByProps({ testID: 'adjustment-edit-load-unit-input' });
-      renderer.act(() => {
+      await renderer.act(async () => {
         unitInput.props.onChangeText('LBS');
       });
 
@@ -2926,10 +2839,9 @@ describe('AiWorkoutAdjustmentModal', () => {
       });
 
       // Save draft
-      renderer.act(() => {
+      await renderer.act(async () => {
         tree.root.findByProps({ testID: 'adjustment-save-draft-button' }).props.onPress();
       });
-      await flushPromises();
 
       // Expect updateDraft called with loadUnit: 'LB' and loadUnitId: 41 (NOT 77)
       expect(aiWorkoutAdjustmentApi.updateDraft).toHaveBeenCalledWith(
