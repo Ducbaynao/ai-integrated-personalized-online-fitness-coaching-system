@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { File, Paths } from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -14,6 +12,7 @@ import { encodeQrMatrixToPngBytes } from './coachingQrCodec';
 import { coachingQueryKeys, useMyCoachingQr } from './coachingQueries';
 import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from './components/CoachingUi';
 import { CoachingQrMatrixView } from './components/CoachingQrMatrixView';
+import { useCoachingQrImageExport } from './useCoachingQrImageExport';
 
 function roleLabel(role: CoachingQrRole): string {
   return role === 'TRAINER' ? 'Huấn luyện viên' : 'Học viên';
@@ -30,10 +29,7 @@ export function MyCoachingQrScreen() {
   const { user, activeCapability } = useAuth();
   const theme = getSemanticColors(useColorScheme() === 'dark');
   const queryClient = useQueryClient();
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
-    writeOnly: true,
-    granularPermissions: ['photo'],
-  });
+  const { saveImage: saveQrImage, canOpenSettings } = useCoachingQrImageExport();
 
   const hasStudent = Boolean(user?.capabilities?.hasStudentProfile);
   const hasTrainer = Boolean(user?.capabilities?.hasTrainerProfile);
@@ -144,29 +140,27 @@ export function MyCoachingQrScreen() {
     const qrUriToSave = qrQuery.data.qrUri;
     setSaveFeedback(null);
     setSavingImage(true);
-    let tempFile: File | null = null;
     try {
-      let granted = mediaPermission?.granted ?? false;
-      if (!granted) {
-        const res = await requestMediaPermission();
-        granted = res.granted;
-      }
+      const pngBytes = encodeQrMatrixToPngBytes(qrUriToSave);
+      const result = await saveQrImage(
+        pngBytes,
+        `coaching-qr-${selectedRole.toLowerCase()}-${Date.now()}.png`,
+        () => mountedRef.current && userIdRef.current === startedUserId
+      );
       if (!mountedRef.current || userIdRef.current !== startedUserId) return;
-      if (!granted) {
+      if (result === 'cancelled') return;
+      if (result === 'permission-denied') {
         setSaveFeedback({
           contextKey: startedContextKey,
           message: 'Chưa có quyền lưu ảnh vào thư viện. Vui lòng cấp quyền trong Cài đặt.',
         });
         return;
       }
-      const pngBytes = encodeQrMatrixToPngBytes(qrUriToSave);
-      tempFile = new File(Paths.cache, `coaching-qr-${selectedRole.toLowerCase()}-${Date.now()}.png`);
-      tempFile.write(pngBytes);
-      await MediaLibrary.Asset.create(tempFile.uri);
-      if (!mountedRef.current || userIdRef.current !== startedUserId) return;
       setSaveFeedback({
         contextKey: startedContextKey,
-        message: 'Đã lưu ảnh mã QR vào thư viện ảnh của bạn.',
+        message: Platform.OS === 'web'
+          ? 'Đã yêu cầu trình duyệt tải ảnh mã QR.'
+          : 'Đã lưu ảnh mã QR vào thư viện ảnh của bạn.',
       });
     } catch {
       if (mountedRef.current && userIdRef.current === startedUserId) {
@@ -176,11 +170,6 @@ export function MyCoachingQrScreen() {
         });
       }
     } finally {
-      try {
-        tempFile?.delete();
-      } catch {
-        // Best-effort temp cleanup
-      }
       if (mountedRef.current) {
         setSavingImage(false);
       }
@@ -299,7 +288,7 @@ export function MyCoachingQrScreen() {
             {activeSaveFeedback ? (
               <CoachingCard testID="save-qr-feedback">
                 <Text style={[styles.body, { color: theme.textPrimary }]}>{activeSaveFeedback}</Text>
-                {mediaPermission?.granted === false && mediaPermission?.canAskAgain === false ? (
+                {canOpenSettings ? (
                   <CoachingButton label="Mở cài đặt" secondary onPress={() => Linking.openSettings()} />
                 ) : null}
               </CoachingCard>
