@@ -24,12 +24,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -147,9 +149,10 @@ class AuthApplicationServiceUnitTest {
         verify(verificationEmailPort).sendVerificationEmail(eq("user.test@example.com"), anyString());
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("Email delivery exception increments failure metric without throwing")
-    void registerEmailDeliveryFailureIncrementsCounter() {
+    void registerEmailDeliveryFailureIncrementsCounter(boolean transactionActive) {
         RegisterUserCommand command = new RegisterUserCommand(
                 "delivery.fail@example.com",
                 "SecureP@ss123",
@@ -179,11 +182,26 @@ class AuthApplicationServiceUnitTest {
         doThrow(new RuntimeException("Simulated SMTP timeout"))
                 .when(verificationEmailPort).sendVerificationEmail(anyString(), anyString());
 
-        RegisterUserResult result = authService.register(command);
-        assertThat(result).isNotNull();
-
-        double count = meterRegistry.counter("auth.email.verification.delivery.failures").count();
-        assertThat(count).isEqualTo(1.0);
+        if (transactionActive) {
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+        }
+        try {
+            RegisterUserResult result = authService.register(command);
+            assertThat(result.status()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
+            if (transactionActive) {
+                verify(verificationEmailPort, never()).sendVerificationEmail(anyString(), anyString());
+                assertThat(meterRegistry.counter("auth.email.verification.delivery.failures").count()).isZero();
+                TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
+            }
+            assertThat(meterRegistry.counter("auth.email.verification.delivery.failures").count()).isEqualTo(1.0);
+            verify(verificationEmailPort).sendVerificationEmail(eq("delivery.fail@example.com"), anyString());
+        } finally {
+            if (transactionActive) {
+                TransactionSynchronizationManager.clearSynchronization();
+                TransactionSynchronizationManager.setActualTransactionActive(false);
+            }
+        }
     }
 
     @Test
