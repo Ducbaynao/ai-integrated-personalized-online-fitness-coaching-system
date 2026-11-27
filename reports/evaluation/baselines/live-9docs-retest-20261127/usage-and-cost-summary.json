@@ -1,0 +1,25 @@
+{
+  "budget_cap_usd": 0.5,
+  "prior_estimated_total_usd": 0.007994,
+  "retest_llm_runs_count": 1,
+  "retest_llm_prompt_tokens": 2378,
+  "retest_llm_completion_tokens": 318,
+  "retest_llm_total_tokens": 2696,
+  "retest_llm_measured_cost_usd": 0.000548,
+  "retest_embedding_estimated_tokens_upper_bound": 16000,
+  "retest_embedding_estimated_cost_usd": 0.00032,
+  "cumulative_measured_llm_cost_usd": 0.008141,
+  "cumulative_estimated_total_cost_usd": 0.008861,
+  "within_budget": true,
+  "runs": [
+    {
+      "id": "493aae13-dbb5-457d-bf6c-9bc2b7062e08",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "REJECTED_BY_VALIDATOR",
+      "input_token_count": 2378,
+      "output_token_count": 318,
+      "latency_ms": 5758,
+      "error_code": null
+    }
+  ]
+}

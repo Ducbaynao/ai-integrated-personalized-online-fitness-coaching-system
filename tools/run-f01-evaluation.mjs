@@ -69,6 +69,7 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
     caseIdFilter: null,
     limit: null,
     concurrency: 1,
+    smokeGate: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -111,6 +112,7 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
     else if (a === '--limit' && argv[i + 1]) args.limit = Number(argv[++i]);
     else if (a.startsWith('--concurrency=')) args.concurrency = Number(a.split('=')[1]);
     else if (a === '--concurrency' && argv[i + 1]) args.concurrency = Number(argv[++i]);
+    else if (a === '--smoke-gate') args.smokeGate = true;
   }
 
   // Strict mode validation
@@ -722,6 +724,15 @@ export async function runEvaluation(options = {}) {
     results.push(caseResult);
     resultsJsonlStream.write(JSON.stringify(caseResult) + '\n');
 
+    if (args.smokeGate && (
+      caseResult.infrastructure_error ||
+      caseResult.public_scoring?.execution_failure ||
+      caseResult.public_scoring?.schema_valid === false
+    )) {
+      console.error(`\n[SMOKE GATE ABORT] Case ${caseKey} failed; stopping batch before remaining cases.`);
+      break;
+    }
+
     if ((idx + 1) % 10 === 0 || idx + 1 === casesToRun.length) {
       process.stdout.write(`Evaluated ${idx + 1}/${casesToRun.length} cases...\r`);
     }
@@ -783,6 +794,12 @@ export async function runEvaluation(options = {}) {
   console.log(`- Detailed JSONL:   ${path.join(runDir, 'results.jsonl')}`);
   console.log(`- Summary JSON:     ${path.join(runDir, 'summary.json')}`);
   console.log(`- Markdown Report:  ${path.join(runDir, 'report.md')}`);
+
+  if (args.smokeGate && (summary.counts.infrastructure_errors > 0 || summary.counts.execution_failures > 0 || summary.counts.schema_violations > 0)) {
+    throw new Error(
+      `Smoke gate failed: infra=${summary.counts.infrastructure_errors}, exec_failures=${summary.counts.execution_failures}, schema_violations=${summary.counts.schema_violations}`
+    );
+  }
 
   return {
     runDir,

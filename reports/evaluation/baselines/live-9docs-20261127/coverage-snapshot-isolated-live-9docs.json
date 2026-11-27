@@ -1,0 +1,128 @@
+{
+  "snapshot_id": "snap-ag02-isolated-live-20261127",
+  "verified_at": "2026-11-26T20:34:30Z",
+  "environment": "isolated_dev_benchmark_who_niddk_9docs_live",
+  "tier": "VERIFIED",
+  "source": "ISOLATED_POSTGRESQL_OPENAI_OUTBOX",
+  "provenance": {
+    "host": "127.0.0.1:15433",
+    "database": "digital_fitness",
+    "schema": "fitness",
+    "model_space": "openai/text-embedding-3-small/1536",
+    "embedding_dimension": 1536,
+    "scope_note": "WHO-PA-SB-2020 (5 docs) + NIDDK-WEIGHT-FACTORS-2023 (4 docs) subset only; HELD_AS_DRAFT and staging DRAFT packages excluded",
+    "total_active_documents": 9,
+    "total_chunks": 29,
+    "total_vectors": 29
+  },
+  "active_documents": [
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "1c62e071-50d8-4514-b774-1aa8001ccdcd",
+      "content_hash": "49a628a6f06a20c0f85599542e8a4592ec3087a7d44fb64bb940d93de760cd90",
+      "chunk_count": 1,
+      "vector_count": 1,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "738ac80c-bbfb-483b-8795-748b6a7693cd",
+      "content_hash": "cd5f102f182bfd2eea2a7ebf4f6b9aa91e6ecc894c8f9197756d2f9a4aa7c3d5",
+      "chunk_count": 1,
+      "vector_count": 1,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "6c1df5d2-5f5e-4cb8-ac34-a3747e8f4fc5",
+      "content_hash": "cee3300127db2e339b2ceccf0e73a6c4e81172cb2db02942e332af3d0c9669ec",
+      "chunk_count": 1,
+      "vector_count": 1,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "f830bc1d-bf2a-42c9-8f98-2f57d42bd757",
+      "content_hash": "87e4a99998a3fcea44d96bcda218b27214cba3dabc18e008fb1cd8bc618ef82f",
+      "chunk_count": 1,
+      "vector_count": 1,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "1c7a266b-e96b-4cf2-af70-418e547f355e",
+      "content_hash": "5d191d97fbbc258aa38396cc23557fadc906c4958db106e2b40f956156339840",
+      "chunk_count": 5,
+      "vector_count": 5,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "d66a95bb-6853-4986-af4e-e4ac46fd627e",
+      "content_hash": "47393a0e6335c702fe4c69bb2c45b7a848bab39a265a1532d7a2e4a389a2ad51",
+      "chunk_count": 5,
+      "vector_count": 5,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "4108525d-c152-412d-ab19-b3ebb7197a0f",
+      "content_hash": "d56ad3c4473e8648e2b158c20e9cfa311a9fd37f282a0b517f1a9494c2099ebc",
+      "chunk_count": 4,
+      "vector_count": 4,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-05",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "abab1ee5-09dc-4341-a6e2-386409052820",
+      "content_hash": "db6f9dc1140fd582487422cc23596224bfda2e711ff009335a7da07227b6fbe5",
+      "chunk_count": 6,
+      "vector_count": 6,
+      "job_status": "SUCCEEDED"
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-06",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "2580cb87-42e9-4428-9159-1318a3a91f1b",
+      "content_hash": "630802d505124da0fa395cc939977ed4278ee2297dfcac9cdde7fce6eb49fdd0",
+      "chunk_count": 5,
+      "vector_count": 5,
+      "job_status": "SUCCEEDED"
+    }
+  ]
+}

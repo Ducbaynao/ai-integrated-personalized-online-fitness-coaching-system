@@ -1,0 +1,887 @@
+{
+  "generated_at": "2026-11-26T19:50:48.453297+00:00",
+  "git": {
+    "git_sha": "57e27f8f40ed385c931979e5b35cff660b9f9fa8",
+    "working_tree_clean": false
+  },
+  "dataset_path": "data/evaluation/ag02-dev-benchmark.json",
+  "dataset_sha256": "407a6a6b421fabe25c1f40d0d703cb021a3d4f3f5d296224161dc862d84fd20d",
+  "coverage_snapshot_path": "reports/evaluation/baselines/sim-9docs-20261127/coverage-snapshot-isolated-sim-9docs.json",
+  "coverage_snapshot_sha256": "421f9ef1949835a37637fe21295f1b95480615db88a763d750d542f852de7c20",
+  "top_k": 5,
+  "rag_context_max_chars": 8000,
+  "result": {
+    "config_name": "hybrid",
+    "status": "COMPLETED",
+    "evaluable_cases": 7,
+    "document_hit_at_k": 0.7143,
+    "document_recall_at_k": 0.5714,
+    "mean_reciprocal_rank_at_k": 0.4095,
+    "cases": [
+      {
+        "case_key": "WHO-PA-SB-2020:E01",
+        "coverage_status": "FULL_COVERAGE",
+        "evaluable": true,
+        "hit": 1,
+        "recall": 1.0,
+        "first_rank": 5,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.4589221340739109
+          },
+          {
+            "chunkId": "b70a284e-e6fd-3808-998a-6237d375bbb4",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.3544707298278833
+          },
+          {
+            "chunkId": "18637ad7-d80d-3702-a143-788f176b055f",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.30899409162928637
+          },
+          {
+            "chunkId": "0b11fa57-3912-32f8-bc19-347ba90ff6b4",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.2970339478830135
+          },
+          {
+            "chunkId": "7e419cb6-011b-3b47-8e69-d98fdcb14942",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.2877936787728268
+          }
+        ]
+      },
+      {
+        "case_key": "WHO-PA-SB-2020:E02",
+        "coverage_status": "FULL_COVERAGE",
+        "evaluable": true,
+        "hit": 1,
+        "recall": 1.0,
+        "first_rank": 1,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.35448238931859466
+          },
+          {
+            "chunkId": "7d0f6e3b-2430-39fe-a2eb-3d9a437b56c0",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.3458898950317635
+          },
+          {
+            "chunkId": "a9a7e143-6485-3b0b-ac6d-523ada4fb4b5",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.34334897150829147
+          },
+          {
+            "chunkId": "10380aa1-3714-37f4-b29f-c3ca08668198",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.18478163914844847
+          },
+          {
+            "chunkId": "8f92ca4d-a7a4-3852-b63e-4efcad76ead3",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.18195976453659823
+          }
+        ]
+      },
+      {
+        "case_key": "ISSN-PROTEIN-EXERCISE-2017:E01",
+        "coverage_status": "NO_COVERAGE",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "b55f2e3e-958e-3f59-9826-2775c85b2092",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.23696733149594063
+          },
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.22700492224111934
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.2219783200012636
+          },
+          {
+            "chunkId": "10380aa1-3714-37f4-b29f-c3ca08668198",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.21038145926164686
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.20033414656905568
+          }
+        ]
+      },
+      {
+        "case_key": "NIDDK-WEIGHT-FACTORS-2023:E01",
+        "coverage_status": "FULL_COVERAGE",
+        "evaluable": true,
+        "hit": 1,
+        "recall": 1.0,
+        "first_rank": 1,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.4091707766056061
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.2731803059577942
+          },
+          {
+            "chunkId": "10380aa1-3714-37f4-b29f-c3ca08668198",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.23170723239097368
+          },
+          {
+            "chunkId": "b55f2e3e-958e-3f59-9826-2775c85b2092",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.22191847693434263
+          },
+          {
+            "chunkId": "1dcb920c-d874-3eba-80a3-bccbd44b9dc7",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.20886618389294487
+          }
+        ]
+      },
+      {
+        "case_key": "NIH-ODS-EXERCISE-SUPPLEMENTS:E01",
+        "coverage_status": "NO_COVERAGE",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "10380aa1-3714-37f4-b29f-c3ca08668198",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.26949692913944845
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.22988709122279105
+          },
+          {
+            "chunkId": "18637ad7-d80d-3702-a143-788f176b055f",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.21820747473329627
+          },
+          {
+            "chunkId": "a9a7e143-6485-3b0b-ac6d-523ada4fb4b5",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.21669535140367802
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.20693669749815669
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:VI-NO-DIACRITICS-01",
+        "coverage_status": "FULL_COVERAGE",
+        "evaluable": true,
+        "hit": 0,
+        "recall": 0.0,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "cd62720b-6ed1-334a-8e76-a3abff1e9d2c",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.24817197046614226
+          },
+          {
+            "chunkId": "b9bddfd9-bf24-361a-a316-bbd1526e7862",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.2475421580622026
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.2190838521445947
+          },
+          {
+            "chunkId": "1443be82-442b-36f3-a0c0-929b718e2a90",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.21684962511062622
+          },
+          {
+            "chunkId": "d41d1ac4-6433-3a47-b7e1-13c722b8bbc3",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.21659496426582336
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:VI-NO-DIACRITICS-02",
+        "coverage_status": "NO_COVERAGE",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.1338156272823927
+          },
+          {
+            "chunkId": "ceb3960a-a7ae-32e6-9b16-d7a8c0c4133e",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.13030686324362084
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.12911205714273133
+          },
+          {
+            "chunkId": "cd62720b-6ed1-334a-8e76-a3abff1e9d2c",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.12609774599711687
+          },
+          {
+            "chunkId": "b9bddfd9-bf24-361a-a316-bbd1526e7862",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.1251228377003366
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:EN-01",
+        "coverage_status": "FULL_COVERAGE",
+        "evaluable": true,
+        "hit": 0,
+        "recall": 0.0,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "1443be82-442b-36f3-a0c0-929b718e2a90",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.2521325945854187
+          },
+          {
+            "chunkId": "b9bddfd9-bf24-361a-a316-bbd1526e7862",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.2399534297044974
+          },
+          {
+            "chunkId": "10380aa1-3714-37f4-b29f-c3ca08668198",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.22947338468153822
+          },
+          {
+            "chunkId": "cd62720b-6ed1-334a-8e76-a3abff1e9d2c",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.22921121368274688
+          },
+          {
+            "chunkId": "0e7a6708-3ef2-327c-ab2d-1cfc2f560c2c",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.21976766350654953
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:EN-02",
+        "coverage_status": "PARTIAL_COVERAGE",
+        "evaluable": true,
+        "hit": 1,
+        "recall": 0.5,
+        "first_rank": 3,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "d41d1ac4-6433-3a47-b7e1-13c722b8bbc3",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.18600915926722172
+          },
+          {
+            "chunkId": "2b56eaa6-e807-3995-aae1-6c0a2ddc5095",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.18287916336544097
+          },
+          {
+            "chunkId": "c1cfff2a-632d-343c-a48c-9e710d9dab58",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.18277306053317344
+          },
+          {
+            "chunkId": "cd62720b-6ed1-334a-8e76-a3abff1e9d2c",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.17886848638637687
+          },
+          {
+            "chunkId": "b9bddfd9-bf24-361a-a316-bbd1526e7862",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.1657221914182152
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:MIXED-01",
+        "coverage_status": "PARTIAL_COVERAGE",
+        "evaluable": true,
+        "hit": 1,
+        "recall": 0.5,
+        "first_rank": 3,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.30573175021788535
+          },
+          {
+            "chunkId": "18637ad7-d80d-3702-a143-788f176b055f",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.26307977341765154
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.26032192167742696
+          },
+          {
+            "chunkId": "a9a7e143-6485-3b0b-ac6d-523ada4fb4b5",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.23319964505426638
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.22869773763696088
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:MIXED-02",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.35142561469812694
+          },
+          {
+            "chunkId": "18637ad7-d80d-3702-a143-788f176b055f",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.3355524543915661
+          },
+          {
+            "chunkId": "b55f2e3e-958e-3f59-9826-2775c85b2092",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.3309962946770373
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.31946641206741333
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.31137783263259644
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:EMPTY-01",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.2498111575954467
+          },
+          {
+            "chunkId": "b55f2e3e-958e-3f59-9826-2775c85b2092",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.2351977080106752
+          },
+          {
+            "chunkId": "8f92ca4d-a7a4-3852-b63e-4efcad76ead3",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.22551910579204715
+          },
+          {
+            "chunkId": "d41d1ac4-6433-3a47-b7e1-13c722b8bbc3",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.22304417353605233
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.2206441234006603
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:EMPTY-02",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "a9a7e143-6485-3b0b-ac6d-523ada4fb4b5",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.36260413566293503
+          },
+          {
+            "chunkId": "a7d2e0ff-0c66-33f3-bdf5-e8c1434ab841",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.3340922495860247
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.31698367944311157
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.3086142080107088
+          },
+          {
+            "chunkId": "1dcb920c-d874-3eba-80a3-bccbd44b9dc7",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.29302773239961
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:POLICY-01",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.265522615046657
+          },
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.249273143687044
+          },
+          {
+            "chunkId": "8f92ca4d-a7a4-3852-b63e-4efcad76ead3",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.21496133938086093
+          },
+          {
+            "chunkId": "a9a7e143-6485-3b0b-ac6d-523ada4fb4b5",
+            "documentCode": "WHO-PA-SB-2020-VI-06",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.21469107489154948
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.2126511994794369
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:PERM-CROSS-USER-01",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.29177337884902954
+          },
+          {
+            "chunkId": "18637ad7-d80d-3702-a143-788f176b055f",
+            "documentCode": "WHO-PA-SB-2020-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.2537729001831275
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.24212718731543992
+          },
+          {
+            "chunkId": "ceb3960a-a7ae-32e6-9b16-d7a8c0c4133e",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.23738419708829528
+          },
+          {
+            "chunkId": "69407708-fc02-3ab2-8084-3220d0c2c642",
+            "documentCode": "WHO-PA-SB-2020-VI-05",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.2373088620944903
+          }
+        ]
+      },
+      {
+        "case_key": "AG02-DEV:PERM-REVOKED-02",
+        "coverage_status": "NOT_APPLICABLE_NO_DOCS",
+        "evaluable": false,
+        "hit": null,
+        "recall": null,
+        "first_rank": null,
+        "candidate_count": 5,
+        "returned_count": 5,
+        "mmr_applied": false,
+        "rerank_applied": false,
+        "stage_ranks": [
+          {
+            "chunkId": "3d29826b-0dac-38fe-a843-7d6bfe4d5616",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 1,
+            "finalRank": 1,
+            "cosineSimilarity": 0.24665699899196625
+          },
+          {
+            "chunkId": "a7d2e0ff-0c66-33f3-bdf5-e8c1434ab841",
+            "documentCode": "WHO-PA-SB-2020-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 2,
+            "finalRank": 2,
+            "cosineSimilarity": 0.244180499813618
+          },
+          {
+            "chunkId": "c0bb10df-894c-3cd3-8f17-b7795504bc13",
+            "documentCode": "WHO-PA-SB-2020-VI-01",
+            "version": "1.1.0",
+            "retrievalRank": 3,
+            "finalRank": 3,
+            "cosineSimilarity": 0.24112821343923263
+          },
+          {
+            "chunkId": "ceb3960a-a7ae-32e6-9b16-d7a8c0c4133e",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            "version": "1.1.0",
+            "retrievalRank": 4,
+            "finalRank": 4,
+            "cosineSimilarity": 0.2349213325789834
+          },
+          {
+            "chunkId": "2b138fce-8bcb-3b15-8f23-9e7373d6a0f9",
+            "documentCode": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            "version": "1.1.0",
+            "retrievalRank": 5,
+            "finalRank": 5,
+            "cosineSimilarity": 0.20688104629516602
+          }
+        ]
+      }
+    ]
+  }
+}

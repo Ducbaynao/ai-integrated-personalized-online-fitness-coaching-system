@@ -87,9 +87,12 @@ class AiWorkoutRescheduleIntegrationTest {
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("ai.service.mode", () -> "simulated");
+        registry.add("ai.agent.proposals-enabled", () -> "true");
     }
 
     @Autowired private AiWorkoutRescheduleUseCase rescheduleService;
+    @Autowired private com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService agentGateway;
+    @Autowired private com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase agentRuns;
     @Autowired private AiRecommendationRepository recommendationRepository;
     @Autowired private WorkoutScheduleBatchUseCase batches;
     @Autowired private JdbcTemplate jdbc;
@@ -191,6 +194,33 @@ class AiWorkoutRescheduleIntegrationTest {
                 LocalDateTime.ofInstant(start, ZoneOffset.ofHours(7)).toString(),
                 end == null ? null : LocalDateTime.ofInstant(end, ZoneOffset.ofHours(7)).toString());
         return id;
+    }
+
+    @Test
+    void agentGatewayCreatesPendingF05WithoutMovingOccurrence() {
+        TestFixture fixture = createFixture(false);
+        UUID occurrence = missedOccurrence(fixture);
+        var originalStart = jdbc.queryForObject("SELECT planned_start_at FROM fitness.planned_workouts WHERE id = ?",
+                java.sql.Timestamp.class, occurrence);
+        var run = agentRuns.createF01Run(fixture.studentId(),
+                new com.fitnesscoaching.platform.modules.ai.application.port.in.CreateF01AiRunCommand(
+                        "Reschedule my missed workout", "vi", null, UUID.randomUUID(), fixture.studentId(), false));
+        var args = Map.<String, Object>of("occurrenceId", occurrence.toString(), "reason", "Missed workout");
+        var result = agentGateway.prepareReschedule(
+                new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                        run.id(), fixture.studentId(), "STUDENT", fixture.studentId(), args));
+        assertThat(result.status()).isEqualTo("OK");
+        assertThat(result.proposalDraft().status()).isEqualTo("PENDING");
+        assertThat(recommendationRepository.findById(result.proposalDraft().recommendationId()).orElseThrow().status())
+                .isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(jdbc.queryForObject("SELECT planned_start_at FROM fitness.planned_workouts WHERE id = ?",
+                java.sql.Timestamp.class, occurrence)).isEqualTo(originalStart);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?",
+                Integer.class, result.proposalDraft().recommendationId())).isZero();
+        assertThatThrownBy(() -> agentGateway.prepareReschedule(
+                new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                        run.id(), fixture.studentId(), "STUDENT", UUID.randomUUID(), args)))
+                .isInstanceOf(AiRunAccessDeniedException.class);
     }
 
     @Test

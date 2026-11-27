@@ -8,11 +8,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
@@ -32,9 +37,14 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
     // Deterministic cosine similarity relevance cutoff: non-positively aligned neighbors (similarity <= 0.0) are discarded
     public static final double DEFAULT_MIN_SIMILARITY_THRESHOLD = 0.0;
+    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+    private static final Pattern LEXICAL_TOKEN_PATTERN = Pattern.compile("[\\p{Alnum}]+");
+    private static final int MAX_LEXICAL_TOKENS = 24;
 
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingModelPort embeddingModelPort;
+    @org.springframework.beans.factory.annotation.Value("${ai.retrieval.hybrid-enabled:false}")
+    private boolean hybridEnabled;
     private final org.springframework.transaction.support.TransactionTemplate notSupportedTxTemplate;
     private final org.springframework.transaction.support.TransactionTemplate readOnlyTxTemplate;
 
@@ -83,6 +93,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
         }
 
         int effectiveLimit = Math.min(Math.max(limit, 1), 50);
+        int candidateLimit = hybridEnabled ? Math.max(effectiveLimit, 30) : effectiveLimit;
 
         // Boundary: Remote embedding generation executed OUTSIDE database transaction.
         // Suspends any caller transaction using PROPAGATION_NOT_SUPPORTED.
@@ -104,7 +115,72 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
 
         String inSql = String.join(",", Collections.nCopies(querySourceIds.size(), "?"));
 
-        String sql = """
+        String denseSql = buildRetrievalSql(inSql, false);
+        List<Object> denseParams = new ArrayList<>();
+        denseParams.add(vectorParam);
+        denseParams.addAll(querySourceIds);
+        denseParams.add(embeddingModelPort.modelVersionId());
+        denseParams.add(vectorParam);
+        denseParams.add(DEFAULT_MIN_SIMILARITY_THRESHOLD);
+        denseParams.add(embeddingModelPort.modelVersionId());
+        denseParams.add(embeddingModelPort.modelVersionId());
+        denseParams.add(vectorParam);
+        denseParams.add(candidateLimit);
+
+        return readOnlyTxTemplate.execute(status -> {
+            List<RetrievedKnowledgeChunk> dense = executeRetrievalQuery(denseSql, denseParams);
+            if (!hybridEnabled) {
+                return dense;
+            }
+            String foldedTsQuery = buildFoldedLexicalTsQuery(effectiveQuery);
+            if (foldedTsQuery.isEmpty()) {
+                return dense;
+            }
+            // Both branches share exactly the same source/version/readiness/model eligibility.
+            // Lexical evidence need not have positive cosine similarity to the query.
+            String lexicalSql = buildRetrievalSql(inSql, true);
+            List<Object> lexicalParams = new ArrayList<>();
+            lexicalParams.add(vectorParam);
+            lexicalParams.addAll(querySourceIds);
+            lexicalParams.add(embeddingModelPort.modelVersionId());
+            lexicalParams.add(foldedTsQuery);
+            lexicalParams.add(embeddingModelPort.modelVersionId());
+            lexicalParams.add(embeddingModelPort.modelVersionId());
+            lexicalParams.add(foldedTsQuery);
+            lexicalParams.add(candidateLimit);
+            List<RetrievedKnowledgeChunk> lexical = executeRetrievalQuery(lexicalSql, lexicalParams);
+            return ReciprocalRankFusion.fuse(dense, lexical, effectiveLimit);
+        });
+    }
+
+    static String buildFoldedLexicalTsQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return "";
+        }
+        String nfd = Normalizer.normalize(query, Normalizer.Form.NFD);
+        String stripped = COMBINING_MARKS.matcher(nfd).replaceAll("")
+                .replace('đ', 'd')
+                .replace('Đ', 'd')
+                .toLowerCase(Locale.ROOT);
+        Matcher matcher = LEXICAL_TOKEN_PATTERN.matcher(stripped);
+        Set<String> tokens = new LinkedHashSet<>();
+        while (matcher.find() && tokens.size() < MAX_LEXICAL_TOKENS) {
+            String tok = matcher.group();
+            if (tok.length() >= 2) {
+                tokens.add(tok);
+            }
+        }
+        return String.join(" | ", tokens);
+    }
+
+    private String buildRetrievalSql(String inSql, boolean lexicalBranch) {
+        String branchPredicate = lexicalBranch
+                ? "AND c.search_vector_folded @@ to_tsquery('simple'::regconfig, ?)"
+                : "AND (1.0 - (e.embedding <=> ?::vector)) > ?";
+        String orderByClause = lexicalBranch
+                ? "ORDER BY ts_rank_cd(c.search_vector_folded, to_tsquery('simple'::regconfig, ?)) DESC, c.id ASC"
+                : "ORDER BY e.embedding <=> ?::vector ASC, c.id ASC";
+        return """
                 SELECT
                     c.id AS chunk_id,
                     c.chunk_index,
@@ -126,7 +202,7 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                   AND d.deleted_at IS NULL
                   AND d.source_id IN (%s)
                   AND e.embedding_model_version_id = ?
-                  AND (1.0 - (e.embedding <=> ?::vector)) > ?
+                  %s
                   AND EXISTS (
                       SELECT 1 FROM fitness.knowledge_processing_runs pr
                       WHERE pr.knowledge_version_id = v.id
@@ -134,22 +210,9 @@ public class KnowledgeRetrievalService implements KnowledgeRetrievalUseCase {
                         AND (pr.model_version_id = ? OR (pr.statistics->>'embedding_model_version_id')::uuid = ?)
                         AND (pr.statistics->>'index_ready')::boolean = true
                   )
-                ORDER BY e.embedding <=> ?::vector ASC
+                %s
                 LIMIT ?
-                """.formatted(inSql);
-
-        List<Object> params = new ArrayList<>();
-        params.add(vectorParam);
-        params.addAll(querySourceIds);
-        params.add(embeddingModelPort.modelVersionId());
-        params.add(vectorParam);
-        params.add(DEFAULT_MIN_SIMILARITY_THRESHOLD);
-        params.add(embeddingModelPort.modelVersionId());
-        params.add(embeddingModelPort.modelVersionId());
-        params.add(vectorParam);
-        params.add(effectiveLimit);
-
-        return readOnlyTxTemplate.execute(status -> executeRetrievalQuery(sql, params));
+                """.formatted(inSql, branchPredicate, orderByClause);
     }
 
     private List<RetrievedKnowledgeChunk> executeRetrievalQuery(String sql, List<Object> params) {

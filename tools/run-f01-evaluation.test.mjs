@@ -912,3 +912,167 @@ test('partial coverage cases are evaluable with full expected documents in recal
   assert.equal(mrrMetric.value, 1.0); // (1/1 + 1/1) / 2 = 1.0
 });
 
+test('public-f01 correct_abstention_rate excludes ANSWER_EXPECTED cases and citation_document_match_rate excludes NO_COVERAGE cases', () => {
+  const covFullVerified = { status: 'FULL_COVERAGE', snapshot_tier: 'VERIFIED' };
+  const covNoCovVerified = { status: 'NO_COVERAGE', snapshot_tier: 'VERIFIED' };
+  const covNoDocs = { status: 'NOT_APPLICABLE_NO_DOCS', snapshot_tier: 'VERIFIED' };
+
+  const validCitation = {
+    documentId: 'WHO-PA-SB-2020-VI-05',
+    version: '1.1.0',
+    sourceId: 'WHO-PA-SB-2020',
+    locator: { sourcePath: 'derivatives/who-2020/05-adults-activity.vi.md', heading: 'H1', sectionIndex: 1 },
+    quoteOrExcerpt: '150-300 phut',
+  };
+
+  const answerResp = {
+    runId: '11111111-1111-4111-8111-111111111111',
+    runStatus: 'SUCCEEDED',
+    resultType: 'INFORMATION',
+    reasonCode: 'NONE',
+    answer: '150-300 phut van dong cuong do vua moi tuan.',
+    citations: [validCitation],
+    limitations: ['General info'],
+    missingData: [],
+    asOf: '2026-11-27T00:00:00Z',
+  };
+
+  const abstainedResp = {
+    runId: '22222222-2222-4222-8222-222222222222',
+    runStatus: 'SUCCEEDED',
+    resultType: 'INSUFFICIENT_DATA',
+    reasonCode: 'NO_RELEVANT_EVIDENCE',
+    limitations: ['Insufficient evidence'],
+    missingData: ['No matching active knowledge chunk found'],
+    asOf: '2026-11-27T00:00:00Z',
+  };
+
+  const directCase = {
+    case_key: 'WHO:E01',
+    source_id: 'WHO-PA-SB-2020',
+    case_type: 'DIRECT_KNOWLEDGE',
+    annotated_action: 'ANSWER_EXPECTED',
+    expected_documents: [{ document_id: 'WHO-PA-SB-2020-VI-05', target_version: '1.1.0' }],
+  };
+  const missingCovCase = {
+    case_key: 'ISSN:E01',
+    source_id: 'ISSN-PROTEIN-EXERCISE-2017',
+    case_type: 'DIRECT_KNOWLEDGE',
+    annotated_action: 'ANSWER_EXPECTED',
+    expected_documents: [{ document_id: 'ISSN-PROTEIN-EXERCISE-2017-VI-03', target_version: '1.0.0' }],
+  };
+  const abstentionCase = {
+    case_key: 'POL:01',
+    source_id: 'WHO-PA-SB-2020',
+    case_type: 'POLICY_GUARDRAIL',
+    annotated_action: 'ABSTENTION_EXPECTED',
+    expected_documents: [],
+  };
+
+  const s1 = scorePublicF01Case(answerResp, directCase, covFullVerified);
+  const s2 = scorePublicF01Case(answerResp, missingCovCase, covNoCovVerified);
+  const s3 = scorePublicF01Case(abstainedResp, abstentionCase, covNoDocs);
+
+  assert.equal(s1.correct_refusal, null);
+  assert.equal(s2.correct_refusal, null);
+  assert.equal(s3.correct_refusal, true);
+
+  const summary = aggregateMetrics([
+    { source_id: 'WHO-PA-SB-2020', case_type: 'DIRECT_KNOWLEDGE', coverage_evidence: covFullVerified, public_scoring: s1 },
+    { source_id: 'ISSN-PROTEIN-EXERCISE-2017', case_type: 'DIRECT_KNOWLEDGE', coverage_evidence: covNoCovVerified, public_scoring: s2 },
+    { source_id: 'WHO-PA-SB-2020', case_type: 'POLICY_GUARDRAIL', coverage_evidence: covNoDocs, public_scoring: s3 },
+  ], 5, 'public-f01');
+
+  assert.equal(summary.metrics.correct_abstention_rate.denominator, 1);
+  assert.equal(summary.metrics.correct_abstention_rate.correct_abstentions, 1);
+  assert.equal(summary.metrics.correct_abstention_rate.value, 1.0);
+
+  assert.equal(summary.metrics.citation_document_match_rate.denominator, 1);
+  assert.equal(summary.metrics.citation_document_match_rate.hits, 1);
+  assert.equal(summary.metrics.citation_document_match_rate.value, 1.0);
+
+  // schema_validity_rate=3/3, citation_presence_rate=2/3 (s1, s2 have citations; s3 has 0 citations), citation_validity_when_present=2/2
+  assert.equal(summary.metrics.schema_validity_rate.denominator, 3);
+  assert.equal(summary.metrics.schema_validity_rate.value, 1.0);
+  assert.equal(summary.metrics.citation_presence_rate.denominator, 3);
+  assert.equal(summary.metrics.citation_presence_rate.responses_with_citations, 2);
+  assert.equal(summary.metrics.citation_validity_when_present.denominator, 2);
+  assert.equal(summary.metrics.citation_validity_when_present.value, 1.0);
+});
+
+test('ABSTENTION_EXPECTED with REJECTED_BY_VALIDATOR BLOCKED RULE_BLOCKED is valid guardrail behavior, not execution failure', () => {
+  const blockedResp = {
+    runId: '11111111-1111-4111-8111-111111111111',
+    correlationId: '22222222-2222-4222-8222-222222222222',
+    runStatus: 'REJECTED_BY_VALIDATOR',
+    resultType: 'BLOCKED',
+    reasonCode: 'RULE_BLOCKED',
+    citations: [],
+    limitations: ['Yêu cầu không phù hợp với chính sách bảo mật và an toàn của hệ thống.'],
+    missingData: [],
+    asOf: '2026-11-26T20:35:00Z',
+    error: { code: 'POLICY_GUARDRAIL_TRIGGERED', message: 'Blocked by guardrail.' },
+  };
+  const policyCase = {
+    case_key: 'AG02-DEV:POLICY-01',
+    source_id: 'WHO-PA-SB-2020',
+    case_type: 'POLICY_GUARDRAIL',
+    annotated_action: 'ABSTENTION_EXPECTED',
+    expected_documents: [],
+  };
+  const covNoDocs = { status: 'NOT_APPLICABLE_NO_DOCS', snapshot_tier: 'VERIFIED' };
+  const scored = scorePublicF01Case(blockedResp, policyCase, covNoDocs);
+
+  assert.equal(scored.execution_failure, false);
+  assert.equal(scored.correct_refusal, true);
+  assert.equal(scored.false_refusal, false);
+
+  const summary = aggregateMetrics([
+    { source_id: 'WHO-PA-SB-2020', case_type: 'POLICY_GUARDRAIL', coverage_evidence: covNoDocs, public_scoring: scored },
+  ], 5, 'public-f01');
+  assert.equal(summary.counts.execution_failures, 0);
+  assert.equal(summary.metrics.correct_abstention_rate.value, 1.0);
+  assert.equal(summary.metrics.correct_abstention_rate.denominator, 1);
+});
+
+test('--smoke-gate aborts batch after first case fails and still writes partial results', async () => {
+  let requestsReceived = 0;
+  const server = http.createServer((req, res) => {
+    requestsReceived++;
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      runId: 'run-smoke-fail',
+      runStatus: 'REJECTED_BY_VALIDATOR',
+      reasonCode: 'VALIDATION_FAILED',
+      error: { code: 'UNVERIFIED_CITATION', message: 'Hallucinated citation' },
+    }));
+  });
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const tmpOut = path.join(repoRoot, 'reports', 'evaluation', 'runs', `test-smoke-gate-${Date.now()}`);
+
+  try {
+    await assert.rejects(
+      runEvaluation({
+        mode: 'public-f01',
+        publicEndpoint: `http://127.0.0.1:${port}/api/v1/ai/knowledge/query`,
+        authToken: 'test-token',
+        manifestPath: path.join(repoRoot, 'data', 'evaluation', 'ag02-dev-benchmark.json'),
+        outputDir: tmpOut,
+        limit: 3,
+        smokeGate: true,
+      }),
+      /Smoke gate failed/
+    );
+    assert.equal(requestsReceived, 1, 'Smoke gate must stop after first failed case without running remaining 2 cases');
+    const runDirs = fs.readdirSync(tmpOut);
+    assert.equal(runDirs.length, 1);
+    const jsonlLines = fs.readFileSync(path.join(tmpOut, runDirs[0], 'results.jsonl'), 'utf8').trim().split('\n');
+    assert.equal(jsonlLines.length, 1);
+  } finally {
+    server.close();
+    fs.rmSync(tmpOut, { recursive: true, force: true });
+  }
+});
+

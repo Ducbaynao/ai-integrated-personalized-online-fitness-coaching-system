@@ -1,0 +1,3263 @@
+{
+  "WHO-PA-SB-2020:E01": {
+    "expected_docs": [
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-01",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-06",
+        3
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        0
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-06",
+        0
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 11,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 10,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ]
+        ],
+        "vi05_1_lex_rank": 4,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 7,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "WHO-PA-SB-2020:E02": {
+    "expected_docs": [
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-02",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-03",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        3
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 2,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 2,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 2,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 2,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "NIDDK-WEIGHT-FACTORS-2023:E01": {
+    "expected_docs": [
+      "NIDDK-WEIGHT-FACTORS-2023-VI-01"
+    ],
+    "dense_top5": [
+      [
+        "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+        0
+      ],
+      [
+        "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+        0
+      ],
+      [
+        "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+        0
+      ],
+      [
+        "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+        0
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 13,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 13,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 9,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 17,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 14,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 20,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "AG02-DEV:VI-NO-DIACRITICS-01": {
+    "expected_docs": [
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-01",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-01",
+        0
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        0
+      ],
+      [
+        "WHO-PA-SB-2020-VI-01",
+        3
+      ],
+      [
+        "WHO-PA-SB-2020-VI-06",
+        0
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 10,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 6,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 8,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "AG02-DEV:EN-01": {
+    "expected_docs": [
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-01",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-02",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        0
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ]
+        ],
+        "vi05_1_lex_rank": 13,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 12,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 10,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 17,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 12,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 17,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "AG02-DEV:EN-02": {
+    "expected_docs": [
+      "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 14,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": false
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ]
+        ],
+        "vi05_1_lex_rank": 13,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            4
+          ]
+        ],
+        "vi05_1_lex_rank": 14,
+        "vi05_1_fused_rank": null,
+        "doc_hit_lex5": false,
+        "doc_hit_fused5": false
+      }
+    }
+  },
+  "AG02-DEV:MIXED-01": {
+    "expected_docs": [
+      "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+      "WHO-PA-SB-2020-VI-05"
+    ],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ],
+      [
+        "WHO-PA-SB-2020-VI-01",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-01",
+        2
+      ],
+      [
+        "WHO-PA-SB-2020-VI-02",
+        1
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 9,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 9,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 3,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 3,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 1,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 10,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": true,
+        "doc_hit_fused5": true
+      }
+    }
+  },
+  "AG02-DEV:MIXED-02": {
+    "expected_docs": [],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-06",
+        3
+      ],
+      [
+        "WHO-PA-SB-2020-VI-03",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ],
+      [
+        "WHO-PA-SB-2020-VI-03",
+        2
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 26,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 26,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 26,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            3
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 24,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 22,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-06",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 25,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      }
+    }
+  },
+  "AG02-DEV:EMPTY-01": {
+    "expected_docs": [],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-02",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        2
+      ],
+      [
+        "WHO-PA-SB-2020-VI-02",
+        2
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 11,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 11,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 2,
+        "vi05_1_fused_rank": 1,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 15,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 14,
+        "vi05_1_fused_rank": 2,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 14,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      }
+    }
+  },
+  "AG02-DEV:EMPTY-02": {
+    "expected_docs": [],
+    "dense_top5": [
+      [
+        "WHO-PA-SB-2020-VI-05",
+        4
+      ],
+      [
+        "WHO-PA-SB-2020-VI-06",
+        2
+      ],
+      [
+        "WHO-PA-SB-2020-VI-03",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-05",
+        1
+      ],
+      [
+        "WHO-PA-SB-2020-VI-01",
+        1
+      ]
+    ],
+    "variants": {
+      "V0_cd_norm0": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+            0
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 18,
+        "vi05_1_fused_rank": 3,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V1_cd_norm1": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 21,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V2_cd_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 16,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V3_rank_norm1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ]
+        ],
+        "vi05_1_lex_rank": 19,
+        "vi05_1_fused_rank": 4,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V4_rank_norm8": {
+        "lex_top5": [
+          [
+            "WHO-PA-SB-2020-VI-05",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            3
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 16,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      },
+      "V5_cov_plus_rank1": {
+        "lex_top5": [
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-02",
+            1
+          ],
+          [
+            "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+            0
+          ],
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ]
+        ],
+        "fused_top5": [
+          [
+            "WHO-PA-SB-2020-VI-01",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            4
+          ],
+          [
+            "WHO-PA-SB-2020-VI-03",
+            1
+          ],
+          [
+            "WHO-PA-SB-2020-VI-06",
+            2
+          ],
+          [
+            "WHO-PA-SB-2020-VI-05",
+            1
+          ]
+        ],
+        "vi05_1_lex_rank": 22,
+        "vi05_1_fused_rank": 5,
+        "doc_hit_lex5": null,
+        "doc_hit_fused5": null
+      }
+    }
+  }
+}

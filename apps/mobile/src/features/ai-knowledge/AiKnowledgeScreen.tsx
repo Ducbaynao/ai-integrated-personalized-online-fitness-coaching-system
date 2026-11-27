@@ -377,6 +377,16 @@ export function AiKnowledgeScreen({
               Tra cứu nguyên tắc vận động và khoa học thể hình dựa trên tài liệu đã kiểm định (WHO, ISSN).
               Câu trả lời chỉ mang tính chất tham khảo (INFORMATION), không thay thế tư vấn y khoa hay tự động áp dụng kế hoạch tập.
             </Text>
+            <Pressable
+              testID="ai-knowledge-open-conversation-button"
+              accessibilityRole="button"
+              accessibilityLabel="Mở hội thoại AI nhiều lượt"
+              onPress={() => router.push('/(app)/ai-knowledge/conversation' as never)}
+              style={[styles.backButton, { borderColor: theme.primary, marginTop: 4 }]}>
+              <Text style={[styles.backButtonText, { color: theme.primary }]}>
+                Hội thoại AI nhiều lượt →
+              </Text>
+            </Pressable>
           </View>
 
           {/* Context Selector Card */}

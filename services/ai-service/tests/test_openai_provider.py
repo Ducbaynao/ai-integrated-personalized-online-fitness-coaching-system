@@ -171,6 +171,7 @@ async def test_openai_successful_information_generation(monkeypatch):
         # Verify DEC-A13-02 mandatory constraints on the request
         assert req_body["model"] == "gpt-4o-mini-2024-07-18"
         assert req_body["store"] is False
+        assert req_body["max_completion_tokens"] == settings.openai_max_completion_tokens
         assert req_body["response_format"]["type"] == "json_schema"
         assert req_body["response_format"]["json_schema"]["strict"] is True
 
@@ -1204,3 +1205,234 @@ async def test_openai_provider_policy_guardrail_allows_valid_educational_queries
     # Both retrieval and generation MUST be invoked for legitimate educational questions
     assert retriever.retrieve_call_count == len(valid_educational_questions)
     assert call_count == len(valid_educational_questions)
+
+
+@pytest.mark.anyio
+async def test_live_regression_hallucinated_citation_vi04_rejected_and_prompt_grounded(monkeypatch):
+    """Regression fixture from live smoke WHO-PA-SB-2020:E01:
+    Model citing WHO-PA-SB-2020-VI-04 (not in retrieved chunks) MUST be rejected with UNVERIFIED_CITATION,
+    and prompt must instruct copying documentId verbatim from CHUNK headers and keeping output concise."""
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+    captured_messages = []
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8"))
+        captured_messages.append(body["messages"])
+        assert body["max_completion_tokens"] == 800
+        return httpx.Response(
+            200,
+            json=make_openai_response(
+                {
+                    "status": "ANSWERED",
+                    "answer": "WHO 2020 khuyến nghị 150-300 phút vận động vừa mỗi tuần.",
+                    "citations": [
+                        {
+                            "documentId": "WHO-PA-SB-2020-VI-04",
+                            "version": "1.1.0",
+                            "sourceId": "WHO-PA-SB-2020",
+                            "locator": {
+                                "sourcePath": "derivatives/who-2020/05-adults-activity.vi.md",
+                                "heading": "Khuyến nghị",
+                                "sectionIndex": 1,
+                            },
+                            "quoteOrExcerpt": "Khuyến nghị leucine tối thiểu",
+                        }
+                    ],
+                    "limitations": ["Chỉ áp dụng cho người trưởng thành khỏe mạnh."],
+                    "missingData": [],
+                    "refusalReason": "",
+                }
+            ),
+        )
+
+    who_chunk = RetrievedChunkDto(
+        chunkId="who-chunk-1",
+        documentCode="WHO-PA-SB-2020-VI-05",
+        version="1.1.0",
+        sourceId="WHO-PA-SB-2020",
+        sourcePath="derivatives/who-2020/05-adults-activity.vi.md",
+        heading="Khuyến nghị được chuẩn hóa",
+        sectionIndex=1,
+        snippet="150–300 phút aerobic cường độ vừa",
+        content="Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh.",
+        similarityScore=0.45,
+    )
+    provider = OpenAiKnowledgeProvider(
+        retriever=MockRetriever(chunks=[who_chunk]),
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(mock_handler)),
+    )
+    env = SAMPLE_ENVELOPE.model_copy(
+        update={
+            "question": "WHO 2020 khuyến nghị người 30 tuổi vận động bao nhiêu mỗi tuần?",
+            "knowledgeScope": KnowledgeScopeContext(status="ACTIVE", allowedSourceIds=["WHO-PA-SB-2020"]),
+        }
+    )
+    res = await provider.query(env)
+    assert res.runStatus == "REJECTED_BY_VALIDATOR"
+    assert res.reasonCode == "VALIDATION_FAILED"
+    assert res.error is not None and res.error.code == "UNVERIFIED_CITATION"
+    sys_prompt = captured_messages[0][0]["content"]
+    user_prompt = captured_messages[0][1]["content"]
+    assert "<evidence_chunk>" in sys_prompt
+    assert "220" in sys_prompt
+    assert '<evidence_chunk index="1">' in user_prompt
+    assert "</evidence_chunk>" in user_prompt
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "doc_id,ver,path,sec_idx,quote,expected_status,expected_err",
+    [
+        # Cross-chunk mismatch from live retest: metadata VI-05#0 + quote from VI-01 -> MUST be rejected (never auto-repaired)
+        (
+            "WHO-PA-SB-2020-VI-05",
+            "1.1.0",
+            "derivatives/who-2020/05-adults-activity.vi.md",
+            0,
+            "WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần suất, cường độ vận động",
+            "REJECTED_BY_VALIDATOR",
+            "UNVERIFIED_CITATION",
+        ),
+        # Wrong version on VI-01#1 -> MUST be rejected
+        (
+            "WHO-PA-SB-2020-VI-01",
+            "1.0.0",
+            "derivatives/who-2020/01-scope.vi.md",
+            1,
+            "WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần suất, cường độ vận động",
+            "REJECTED_BY_VALIDATOR",
+            "UNVERIFIED_CITATION",
+        ),
+        # Wrong sectionIndex on VI-01 -> MUST be rejected
+        (
+            "WHO-PA-SB-2020-VI-01",
+            "1.1.0",
+            "derivatives/who-2020/01-scope.vi.md",
+            0,
+            "WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần suất, cường độ vận động",
+            "REJECTED_BY_VALIDATOR",
+            "UNVERIFIED_CITATION",
+        ),
+        # Same-chunk valid metadata + exact verbatim quote from VI-01#1 -> MUST succeed
+        (
+            "WHO-PA-SB-2020-VI-01",
+            "1.1.0",
+            "derivatives/who-2020/01-scope.vi.md",
+            1,
+            "WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần suất, cường độ vận động",
+            "SUCCEEDED",
+            None,
+        ),
+    ],
+)
+async def test_live_regression_cross_chunk_and_same_chunk_citation_grounding(
+    monkeypatch,
+    doc_id: str,
+    ver: str,
+    path: str,
+    sec_idx: int,
+    quote: str,
+    expected_status: str,
+    expected_err: str | None,
+):
+    """Reproduce live retest cross-chunk mismatch (VI-05#0 metadata + VI-01 quote) and verify
+    strict per-chunk grounding without auto-repairing metadata or relaxing the validator."""
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+    chunk_vi01 = RetrievedChunkDto(
+        chunkId="c-vi01",
+        documentCode="WHO-PA-SB-2020-VI-01",
+        version="1.1.0",
+        sourceId="WHO-PA-SB-2020",
+        sourcePath="derivatives/who-2020/01-scope.vi.md",
+        heading="Nội dung",
+        sectionIndex=1,
+        snippet="WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng",
+        content="WHO 2020 đưa ra khuyến nghị sức khỏe cộng đồng về lượng, tần suất, cường độ vận động và việc hạn chế hành vi ít vận động.",
+        similarityScore=0.5582,
+    )
+    chunk_vi05 = RetrievedChunkDto(
+        chunkId="c-vi05",
+        documentCode="WHO-PA-SB-2020-VI-05",
+        version="1.1.0",
+        sourceId="WHO-PA-SB-2020",
+        sourcePath="derivatives/who-2020/05-adults-activity.vi.md",
+        heading="",
+        sectionIndex=0,
+        snippet="# Vận động và tăng cường cơ ở tuổi 18–64",
+        content="# Vận động và tăng cường cơ ở tuổi 18–64\n\nDocument ID: WHO-PA-SB-2020-VI-05 · Version: 1.1.0",
+        similarityScore=0.4584,
+    )
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8"))
+        user_msg = body["messages"][1]["content"]
+        assert '<evidence_chunk index="1">\n<metadata>' in user_msg
+        assert '<evidence_chunk index="2">\n<metadata>' in user_msg
+        assert "</metadata>\n<content>" in user_msg
+        return httpx.Response(
+            200,
+            json=make_openai_response(
+                {
+                    "status": "ANSWERED",
+                    "answer": "WHO 2020 đưa ra khuyến nghị về lượng, tần suất và cường độ vận động.",
+                    "citations": [
+                        {
+                            "documentId": doc_id,
+                            "version": ver,
+                            "sourceId": "WHO-PA-SB-2020",
+                            "locator": {"sourcePath": path, "heading": "", "sectionIndex": sec_idx},
+                            "quoteOrExcerpt": quote,
+                        }
+                    ],
+                    "limitations": ["Chỉ áp dụng cho người trưởng thành khỏe mạnh."],
+                    "missingData": [],
+                    "refusalReason": "",
+                }
+            ),
+        )
+
+    provider = OpenAiKnowledgeProvider(
+        retriever=MockRetriever(chunks=[chunk_vi01, chunk_vi05]),
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(mock_handler)),
+    )
+    env = SAMPLE_ENVELOPE.model_copy(
+        update={
+            "question": "WHO 2020 khuyến nghị người 30 tuổi vận động bao nhiêu mỗi tuần?",
+            "knowledgeScope": KnowledgeScopeContext(status="ACTIVE", allowedSourceIds=["WHO-PA-SB-2020"]),
+        }
+    )
+    res = await provider.query(env)
+    assert res.runStatus == expected_status
+    if expected_err:
+        assert res.error is not None and res.error.code == expected_err
+    else:
+        assert res.resultType == "INFORMATION"
+        assert len(res.citations) == 1
+        assert res.citations[0].documentId == "WHO-PA-SB-2020-VI-01"
+
+
+@pytest.mark.anyio
+async def test_live_regression_incomplete_output_length_800_never_succeeds(monkeypatch):
+    """Regression fixture from live NIDDK-WEIGHT-FACTORS-2023:E01 & AG02-DEV:EN-01:
+    finish_reason='length' at 800 tokens MUST fail with INCOMPLETE_OUTPUT and never be converted to SUCCEEDED."""
+    monkeypatch.setattr(settings, "openai_api_key", "sk-mock-test-key")
+
+    async def mock_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"role": "assistant", "content": '{"status":"ANSWERED","answer":"truncated'}, "finish_reason": "length"}],
+                "usage": {"prompt_tokens": 2733, "completion_tokens": 800, "total_tokens": 3533},
+            },
+        )
+
+    provider = OpenAiKnowledgeProvider(
+        retriever=MockRetriever(chunks=[SAMPLE_CHUNK]),
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(mock_handler)),
+    )
+    res = await provider.query(SAMPLE_ENVELOPE)
+    assert res.runStatus == "FAILED"
+    assert res.reasonCode == "PROCESSING_ERROR"
+    assert res.error is not None and res.error.code == "INCOMPLETE_OUTPUT"
+    assert not res.citations
+    assert res.usage is not None and res.usage.completionTokens == 800

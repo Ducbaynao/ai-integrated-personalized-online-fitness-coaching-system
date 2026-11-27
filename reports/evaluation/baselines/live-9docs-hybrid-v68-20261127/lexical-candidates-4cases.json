@@ -1,0 +1,222 @@
+{
+  "WHO-PA-SB-2020:E01": {
+    "tsquery": "who | 2020 | khuyen | nghi | nguoi | 30 | tuoi | van | dong | bao | nhieu | moi | tuan",
+    "lexical_top10": [
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 2,
+        "lex_rank": 10.4
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 1,
+        "lex_rank": 10.2
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 1,
+        "lex_rank": 10.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 4,
+        "lex_rank": 9.0
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+        "chunk_index": 0,
+        "lex_rank": 9.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 1,
+        "lex_rank": 8.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 3,
+        "lex_rank": 7.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 1,
+        "lex_rank": 7.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 0,
+        "lex_rank": 6.2
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 2,
+        "lex_rank": 6.2
+      }
+    ]
+  },
+  "AG02-DEV:VI-NO-DIACRITICS-01": {
+    "tsquery": "who | 2020 | khuyen | nghi | nguoi | truong | thanh | tap | van | dong | bao | nhieu | phut | moi | tuan",
+    "lexical_top10": [
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 2,
+        "lex_rank": 11.6
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 4,
+        "lex_rank": 10.4
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 1,
+        "lex_rank": 10.4
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 1,
+        "lex_rank": 10.0
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+        "chunk_index": 0,
+        "lex_rank": 9.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 1,
+        "lex_rank": 9.2
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-06",
+        "chunk_index": 3,
+        "lex_rank": 7.6
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 1,
+        "lex_rank": 6.8
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+        "chunk_index": 0,
+        "lex_rank": 6.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-03",
+        "chunk_index": 1,
+        "lex_rank": 5.6
+      }
+    ]
+  },
+  "AG02-DEV:MIXED-01": {
+    "tsquery": "tap | resistance | training | may | ngay | moi | tuan | va | an | bao | nhieu | whey | protein | la | hop | ly | theo | khuyen | nghi",
+    "lexical_top10": [
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 4,
+        "lex_rank": 10.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 2,
+        "lex_rank": 9.4
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+        "chunk_index": 0,
+        "lex_rank": 9.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 1,
+        "lex_rank": 7.4
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-03",
+        "chunk_index": 1,
+        "lex_rank": 6.4
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+        "chunk_index": 0,
+        "lex_rank": 6.4
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+        "chunk_index": 0,
+        "lex_rank": 6.2
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 1,
+        "lex_rank": 5.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 1,
+        "lex_rank": 5.0
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 4,
+        "lex_rank": 4.4
+      }
+    ]
+  },
+  "AG02-DEV:EMPTY-01": {
+    "tsquery": "lich | tap | chi | tiet | 12 | tuan | cho | giai | ironman | 70 | kem | thuc | don | tung | bua | cua | ung | dung | la | gi",
+    "lexical_top10": [
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+        "chunk_index": 0,
+        "lex_rank": 7.2
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+        "chunk_index": 0,
+        "lex_rank": 6.8
+      },
+      {
+        "document_code": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+        "chunk_index": 0,
+        "lex_rank": 5.6
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 4,
+        "lex_rank": 5.4
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-05",
+        "chunk_index": 4,
+        "lex_rank": 5.2
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 1,
+        "lex_rank": 4.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 2,
+        "lex_rank": 4.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 2,
+        "lex_rank": 4.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-01",
+        "chunk_index": 1,
+        "lex_rank": 4.8
+      },
+      {
+        "document_code": "WHO-PA-SB-2020-VI-02",
+        "chunk_index": 4,
+        "lex_rank": 4.4
+      }
+    ]
+  }
+}

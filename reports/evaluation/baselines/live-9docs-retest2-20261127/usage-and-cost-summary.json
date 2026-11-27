@@ -1,0 +1,61 @@
+{
+  "budget_cap_usd": 0.5,
+  "prior_cumulative_estimated_usd": 0.008861,
+  "retest2_llm_runs_count": 5,
+  "retest2_llm_prompt_tokens": 13574,
+  "retest2_llm_completion_tokens": 1332,
+  "retest2_llm_total_tokens": 14906,
+  "retest2_llm_measured_cost_usd": 0.002835,
+  "retest2_embedding_estimated_tokens_upper_bound": 16000,
+  "retest2_embedding_estimated_cost_usd": 0.00032,
+  "cumulative_measured_llm_cost_usd": 0.010976,
+  "cumulative_estimated_total_cost_usd": 0.012016,
+  "within_budget": true,
+  "runs": [
+    {
+      "id": "03c62f40-87e9-4a67-a7db-0c104949f415",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2489,
+      "output_token_count": 339,
+      "latency_ms": 5193,
+      "error_code": null
+    },
+    {
+      "id": "e3fe501f-c780-4cab-ac78-88891dfcfdf3",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 3774,
+      "output_token_count": 524,
+      "latency_ms": 6713,
+      "error_code": null
+    },
+    {
+      "id": "0d317701-4a00-4ee3-b9a3-3edb7c9ec81c",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2243,
+      "output_token_count": 83,
+      "latency_ms": 2873,
+      "error_code": null
+    },
+    {
+      "id": "a07617ac-42f8-4695-aff8-cdb826731ebe",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2923,
+      "output_token_count": 344,
+      "latency_ms": 5125,
+      "error_code": null
+    },
+    {
+      "id": "c3bf786b-8084-4f4a-99f5-45881f19cf9c",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "REJECTED_BY_VALIDATOR",
+      "input_token_count": 2145,
+      "output_token_count": 42,
+      "latency_ms": 1763,
+      "error_code": null
+    }
+  ]
+}

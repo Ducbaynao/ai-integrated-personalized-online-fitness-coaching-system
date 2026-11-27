@@ -75,7 +75,125 @@ tags:
   - name: Progress Dashboard
     description: Deterministic multi-dimensional progress tracking (Current Goal and Lifetime) independent from AI.
 
+  - name: AI Agent
+    description: Scoped AI conversations, bounded tool execution and pending proposals with no autonomous domain application.
+
 paths:
+  /ai/conversations:
+    get:
+      tags: [AI Agent]
+      operationId: listAiAgentConversations
+      summary: List owned AI conversations still readable under current consent
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Up to 50 currently readable conversation summaries
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AiAgentConversationSummary' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [AI Agent]
+      operationId: createAiAgentConversation
+      summary: Create an owned conversation with server-verified subject authority
+      description: Separate from Student-Trainer chat. actorRole does not grant capability. Self-scoped conversations use STUDENT; other subjects require current Trainer authority.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actorRole: { type: string, enum: [STUDENT, TRAINER, ADMIN] }
+                subjectId: { type: [string, 'null'], format: uuid }
+                title: { type: [string, 'null'] }
+      responses:
+        '200':
+          description: Created conversation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiAgentConversationSummary' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /ai/conversations/{conversationId}:
+    parameters:
+      - { name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [AI Agent]
+      operationId: getAiAgentConversation
+      summary: Read conversation history after ownership and consent revalidation
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Conversation and ordered turns
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversationId, actorRole, subjectId, title, status, turns]
+                properties:
+                  conversationId: { type: string, format: uuid }
+                  actorRole: { type: string, enum: [STUDENT, TRAINER, ADMIN] }
+                  subjectId: { type: [string, 'null'], format: uuid }
+                  title: { type: string }
+                  status: { type: string, enum: [ACTIVE, ARCHIVED] }
+                  turns: { type: array, items: { $ref: '#/components/schemas/AiAgentConversationTurn' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404': { description: Conversation not found }
+  /ai/conversations/{conversationId}/turns:
+    parameters:
+      - { name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [AI Agent]
+      operationId: sendAiAgentTurn
+      summary: Execute a bounded AI turn without applying domain changes
+      description: Same operationKey and trimmed message replays the existing turn; different message returns 409. Keep the same turnId and operationKey after a lost response. Provider I/O runs outside DB transactions.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, minLength: 1, maxLength: 2000 }
+                turnId: { type: [string, 'null'], format: uuid }
+                operationKey: { type: [string, 'null'], maxLength: 120 }
+      responses:
+        '200':
+          description: Persisted turn, including pending idempotent replay or terminal failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiAgentConversationTurn' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404': { description: Conversation not found }
+        '409': { description: Operation identity reused with a different payload }
+  /ai/conversations/{conversationId}/turns/{turnId}/cancel:
+    parameters:
+      - { name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: turnId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [AI Agent]
+      operationId: cancelAiAgentTurn
+      summary: Cancel a pending turn and prevent late answer persistence
+      description: Marks the bound AI Run cancelled and denies subsequent tool calls. An HTTP/model call already in flight may finish; it cannot overwrite the cancelled turn.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Persisted cancelled or already terminal turn
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiAgentConversationTurn' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/AIForbidden' }
+        '404': { description: Conversation or turn not found }
   /review-timezone/me:
     get:
       tags: [Attention and Review]
@@ -7095,6 +7213,32 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
+    AiAgentConversationSummary:
+      type: object
+      required: [conversationId, actorRole, subjectId, title, status, updatedAt]
+      properties:
+        conversationId: { type: string, format: uuid }
+        actorRole: { type: string, enum: [STUDENT, TRAINER, ADMIN] }
+        subjectId: { type: [string, 'null'], format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        updatedAt: { type: string, format: date-time }
+    AiAgentConversationTurn:
+      type: object
+      required: [turnId, turnIndex, aiRunId, userMessage, assistantMessage, clarificationQuestion, resultType, reasonCode, citations, proposalDraft, status, createdAt]
+      properties:
+        turnId: { type: string, format: uuid }
+        turnIndex: { type: integer, minimum: 1 }
+        aiRunId: { type: [string, 'null'], format: uuid }
+        userMessage: { type: string }
+        assistantMessage: { type: [string, 'null'] }
+        clarificationQuestion: { type: [string, 'null'] }
+        resultType: { type: [string, 'null'], enum: [INFORMATION, CLARIFICATION_REQUIRED, PROPOSAL_DRAFT, INSUFFICIENT_DATA, BLOCKED, null] }
+        reasonCode: { type: [string, 'null'] }
+        citations: { type: array, items: { $ref: '#/components/schemas/KnowledgeCitation' } }
+        proposalDraft: { type: [object, 'null'], description: Pending proposal reference; never an application receipt. }
+        status: { type: string, enum: [PENDING, SUCCEEDED, FAILED, CANCELLED] }
+        createdAt: { type: string, format: date-time }
     AppointmentLocalInterval:
       type: object
       required: [localStart, localEnd, timezone, startUtcOffset, endUtcOffset]

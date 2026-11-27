@@ -1,0 +1,227 @@
+{
+  "benchmark_id": "ag02-rerank-prep-9docs-20261127",
+  "source_dataset": "data/evaluation/ag02-dev-benchmark.json",
+  "source_dataset_sha256": "407a6a6b421fabe25c1f40d0d703cb021a3d4f3f5d296224161dc862d84fd20d",
+  "coverage_snapshot_ref": "reports/evaluation/baselines/live-9docs-hybrid-v68-20261127/coverage-snapshot-isolated-hybrid-v68-9docs.json",
+  "label_governance": "PROVISIONAL_AGENT_PROPOSED_NOT_REVIEWED",
+  "holdout_status": "SEPARATE_FROM_HOLDOUT",
+  "pipeline_scope": "RetrievalPipeline (Agent search_knowledge; does NOT affect Public F01)",
+  "arms": [
+    {
+      "name": "rrf_current",
+      "flags": {
+        "AI_RETRIEVAL_HYBRID_ENABLED": true,
+        "RAG_RERANK_ENABLED": false,
+        "RAG_MMR_ENABLED": false
+      }
+    },
+    {
+      "name": "rerank",
+      "flags": {
+        "AI_RETRIEVAL_HYBRID_ENABLED": true,
+        "RAG_RERANK_ENABLED": true,
+        "RAG_MMR_ENABLED": false
+      }
+    },
+    {
+      "name": "rerank_mmr",
+      "flags": {
+        "AI_RETRIEVAL_HYBRID_ENABLED": true,
+        "RAG_RERANK_ENABLED": true,
+        "RAG_MMR_ENABLED": true
+      }
+    }
+  ],
+  "cases": [
+    {
+      "case_key": "WHO-PA-SB-2020:E01",
+      "query_id": "AG02-DEV-001",
+      "question_vi": "WHO 2020 khuyến nghị người 30 tuổi vận động bao nhiêu mỗi tuần?",
+      "language": "vi",
+      "scope": "NARROW_SINGLE_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "WHO-PA-SB-2020:E02",
+      "query_id": "AG02-DEV-002",
+      "question_vi": "Có phải vừa tập 300 phút vừa vừa tập 150 phút mạnh mỗi tuần không?",
+      "language": "vi",
+      "scope": "NARROW_SINGLE_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "NIDDK-WEIGHT-FACTORS-2023:E01",
+      "query_id": "AG02-DEV-004",
+      "question_vi": "Những yếu tố nào ảnh hưởng đến cân nặng cơ thể theo NIDDK?",
+      "language": "vi",
+      "scope": "NARROW_SINGLE_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:VI-NO-DIACRITICS-01",
+      "query_id": "AG02-DEV-006",
+      "question_vi": "WHO 2020 khuyen nghi nguoi truong thanh tap van dong bao nhieu phut moi tuan?",
+      "language": "vi_no_diacritics",
+      "scope": "NARROW_SINGLE_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:EN-01",
+      "query_id": "AG02-DEV-008",
+      "question_vi": "What are the WHO 2020 weekly aerobic and muscle-strengthening physical activity recommendations for adults?",
+      "language": "en",
+      "scope": "NARROW_SINGLE_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:EN-02",
+      "query_id": "AG02-DEV-009",
+      "question_vi": "How do protein intake guidelines for resistance training compare with general weekly resistance exercise frequency recommendations?",
+      "language": "en",
+      "scope": "MULTI_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+          "target_version": "1.0.0",
+          "acceptable_versions": [
+            "1.0.0"
+          ]
+        },
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:MIXED-01",
+      "query_id": "AG02-DEV-010",
+      "question_vi": "Tập resistance training mấy ngày mỗi tuần và ăn bao nhiêu whey protein là hợp lý theo khuyến nghị?",
+      "language": "vi_mixed_en",
+      "scope": "MULTI_SOURCE",
+      "case_type": "DIRECT_KNOWLEDGE",
+      "annotated_action": "ANSWER_EXPECTED",
+      "expected_documents": [
+        {
+          "document_id": "WHO-PA-SB-2020-VI-05",
+          "target_version": "1.1.0",
+          "acceptable_versions": [
+            "1.1.0"
+          ]
+        },
+        {
+          "document_id": "ISSN-PROTEIN-EXERCISE-2017-VI-03",
+          "target_version": "1.0.0",
+          "acceptable_versions": [
+            "1.0.0"
+          ]
+        }
+      ],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:MIXED-02",
+      "query_id": "AG02-DEV-011",
+      "question_vi": "Chỉ số HRV và giấc ngủ REM tối ưu trên đồng hồ thông minh cho vận động viên marathon là bao nhiêu?",
+      "language": "vi_mixed_en",
+      "scope": "EMPTY_EVIDENCE",
+      "case_type": "EVIDENCE_LIMITATION",
+      "annotated_action": "ABSTENTION_EXPECTED",
+      "expected_documents": [],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:EMPTY-01",
+      "query_id": "AG02-DEV-012",
+      "question_vi": "Lịch tập chi tiết 12 tuần cho giải Ironman 70.3 kèm thực đơn từng bữa của ứng dụng là gì?",
+      "language": "vi",
+      "scope": "EMPTY_EVIDENCE",
+      "case_type": "EVIDENCE_LIMITATION",
+      "annotated_action": "ABSTENTION_EXPECTED",
+      "expected_documents": [],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    },
+    {
+      "case_key": "AG02-DEV:EMPTY-02",
+      "query_id": "AG02-DEV-013",
+      "question_vi": "Tôi đang đau ngực khi chạy bộ và có tiền sử bệnh tim, tôi có thể tập HIIT tối đa nhịp tim không?",
+      "language": "vi",
+      "scope": "EMPTY_EVIDENCE",
+      "case_type": "SPECIALIZED_POPULATION",
+      "annotated_action": "REVIEW_REQUIRED",
+      "expected_documents": [],
+      "label_status": "PROVISIONAL",
+      "requires_specialist_signoff": true
+    }
+  ]
+}

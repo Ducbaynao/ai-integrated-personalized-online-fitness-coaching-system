@@ -1,0 +1,46 @@
+{
+  "manifest_format_version": "1.1.0-ag02-holdout-template",
+  "dataset_name": "AG-02 Fitness Agent Independent Holdout Structure",
+  "dataset_version": "0.0.0-unpopulated",
+  "dataset_role": "INDEPENDENT_HOLDOUT_STRUCTURE_ONLY",
+  "holdout_status": "SEALED_EMPTY_TEMPLATE_NOT_EVALUATED",
+  "governance": {
+    "do_not_use_for_tuning": true,
+    "do_not_ingest_into_corpus": true,
+    "requires_ad05_thresholds_locked_before_eval": true,
+    "requires_double_blind_specialist_labeling": true,
+    "minimum_target_size": 60,
+    "note": "Structure only. No holdout queries are populated or evaluated yet. Populate only after AG-02 dev baseline and AD-05 thresholds are locked and reviewed."
+  },
+  "required_case_schema": {
+    "required_fields": [
+      "case_key",
+      "query_id",
+      "language",
+      "scope",
+      "case_type",
+      "annotated_action",
+      "question_text",
+      "expected_behavior",
+      "citation_requirement",
+      "expected_documents",
+      "relevance_labels",
+      "provenance"
+    ],
+    "relevance_labels_contract": {
+      "document_relevance": "Array of {document_id, version, grade (0|1|2)}",
+      "chunk_relevance": "Array of {chunk_id, document_id, version, grade (0|1|2)} required for nDCG",
+      "reviewer_signoff": "Minimum 2 independent reviewers (domain + technical) with adjudication record"
+    }
+  },
+  "strata_targets": [
+    { "stratum": "vi_diacritics_direct", "language": "vi", "scope": "NARROW_SINGLE_SOURCE", "target_min_cases": 15 },
+    { "stratum": "vi_no_diacritics", "language": "vi_no_diacritics", "scope": "NARROW_SINGLE_SOURCE", "target_min_cases": 8 },
+    { "stratum": "en_cross_lingual", "language": "en", "scope": "NARROW_SINGLE_SOURCE", "target_min_cases": 8 },
+    { "stratum": "vi_mixed_en_multi_source", "language": "vi_mixed_en", "scope": "MULTI_SOURCE", "target_min_cases": 10 },
+    { "stratum": "empty_evidence_insufficient_data", "language": "vi_and_en", "scope": "EMPTY_EVIDENCE", "target_min_cases": 8 },
+    { "stratum": "policy_guardrail_and_injection", "language": "vi_and_en", "scope": "OUT_OF_SCOPE_OR_POLICY", "target_min_cases": 6 },
+    { "stratum": "permission_restricted_cross_user_and_revoked", "language": "vi", "scope": "PERMISSION_RESTRICTED", "target_min_cases": 5 }
+  ],
+  "cases": []
+}

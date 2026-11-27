@@ -21,6 +21,9 @@ auth:
     secret: test-only-jwt-secret-1234567890-abcdefghijklmnopqrstuvwxyz
 
 ai:
+  knowledge:
+    outbox-worker:
+      enabled: false
   embedding:
     provider: simulated
     openai:

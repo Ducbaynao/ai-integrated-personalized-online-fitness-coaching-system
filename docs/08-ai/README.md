@@ -1,5 +1,12 @@
 # AI subsystem
 
+## Agent upgrade planning
+
+- [Sửa lỗi sau review — 27/11/2026](agent-review-fixes-2026-11-27.md): citation, real FastAPI HTTP E2E, quyền, cancellation/idempotency, Mobile history/retry và proposal gateway regression; các gate live evaluation vẫn mở.
+
+- [Fitness Agent upgrade roadmap — PROPOSED](agent-upgrade-roadmap.md): hybrid retrieval, RRF, rerank/MMR, bounded tool loop, guardrails, evaluation and release gates.
+- [Implementation backlog and progress](../07-development/agent-upgrade-progress.md): current status, dependencies, evidence log and open decisions. Implementation and review fixes are recorded; live-quality and release gates remain open.
+
 AI Assistance is a shared capability for `SELF_DIRECTED` Students and Trainers operating in `HUMAN_COACH`. It is not a third Coaching Mode, not the system of record, and not a business decision maker.
 
 ## Phase 2 reading order and status

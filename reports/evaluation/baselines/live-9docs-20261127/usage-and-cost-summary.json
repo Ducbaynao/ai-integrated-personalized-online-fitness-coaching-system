@@ -1,0 +1,141 @@
+{
+  "budget_cap_usd": 0.5,
+  "probe_embedding_tokens": 4,
+  "llm_runs_count": 14,
+  "llm_prompt_tokens": 38066,
+  "llm_completion_tokens": 3141,
+  "llm_total_tokens": 41207,
+  "llm_measured_cost_usd": 0.007594,
+  "embedding_estimated_tokens_upper_bound": 20000,
+  "embedding_estimated_cost_usd": 0.0004,
+  "total_estimated_cost_usd": 0.007994,
+  "within_budget": true,
+  "runs": [
+    {
+      "id": "ce999cd1-4407-4dc5-9114-bb502ba10a32",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "REJECTED_BY_VALIDATOR",
+      "input_token_count": 2299,
+      "output_token_count": 265,
+      "latency_ms": 5824,
+      "error_code": null
+    },
+    {
+      "id": "d6c39de5-1a3b-4907-8c03-96d6b23977cd",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 3056,
+      "output_token_count": 451,
+      "latency_ms": 8382,
+      "error_code": null
+    },
+    {
+      "id": "76be4af3-fc61-4a00-983a-0b01fb866392",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 3135,
+      "output_token_count": 65,
+      "latency_ms": 4275,
+      "error_code": null
+    },
+    {
+      "id": "0a2bf1a5-2b9d-4974-82d4-86f5a2671139",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "FAILED",
+      "input_token_count": 3584,
+      "output_token_count": 800,
+      "latency_ms": 10993,
+      "error_code": null
+    },
+    {
+      "id": "9e5e22e1-9d88-4d52-b3de-b80ab13b1e88",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2647,
+      "output_token_count": 73,
+      "latency_ms": 2605,
+      "error_code": null
+    },
+    {
+      "id": "29fc881c-c6e6-4233-bbd7-945ac4783e5e",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2053,
+      "output_token_count": 84,
+      "latency_ms": 3112,
+      "error_code": null
+    },
+    {
+      "id": "f124b618-c420-49c4-bfec-f6768fc11032",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 3028,
+      "output_token_count": 69,
+      "latency_ms": 2877,
+      "error_code": null
+    },
+    {
+      "id": "2b59b108-bad6-4d62-bcea-2b1698d211c3",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "FAILED",
+      "input_token_count": 2733,
+      "output_token_count": 800,
+      "latency_ms": 10695,
+      "error_code": null
+    },
+    {
+      "id": "ca02523d-03ae-4a52-922e-6f4f542cbda4",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2731,
+      "output_token_count": 86,
+      "latency_ms": 2443,
+      "error_code": null
+    },
+    {
+      "id": "16a857f2-b5b6-45b5-99c7-56083095228c",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2738,
+      "output_token_count": 98,
+      "latency_ms": 2995,
+      "error_code": null
+    },
+    {
+      "id": "c4d49538-a1ba-43c5-bd4a-10ed8fc1dc5c",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2429,
+      "output_token_count": 118,
+      "latency_ms": 2544,
+      "error_code": null
+    },
+    {
+      "id": "1258e870-1d82-4be5-9844-effaf03b48fc",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "SUCCEEDED",
+      "input_token_count": 2992,
+      "output_token_count": 110,
+      "latency_ms": 2663,
+      "error_code": null
+    },
+    {
+      "id": "912949d5-7f92-450c-af7e-8350885a3db4",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "REJECTED_BY_VALIDATOR",
+      "input_token_count": 2686,
+      "output_token_count": 80,
+      "latency_ms": 2725,
+      "error_code": null
+    },
+    {
+      "id": "2c41d600-1975-43f5-b80f-aa29ed6ea44a",
+      "request_type": "F01_GENERAL_KNOWLEDGE",
+      "status": "REJECTED_BY_VALIDATOR",
+      "input_token_count": 1955,
+      "output_token_count": 42,
+      "latency_ms": 1847,
+      "error_code": null
+    }
+  ]
+}

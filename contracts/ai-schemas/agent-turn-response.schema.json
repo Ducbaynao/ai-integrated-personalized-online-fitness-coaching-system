@@ -1,0 +1,339 @@
+{
+  "$defs": {
+    "AgentStepTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "title": "Step",
+          "type": "integer"
+        },
+        "action": {
+          "enum": [
+            "MODEL_DECISION",
+            "TOOL_CALL",
+            "CLARIFICATION",
+            "FINAL_ANSWER",
+            "STOPPED"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "toolName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Toolname"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "durationMs": {
+          "default": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "sourceRefs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sourcerefs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "step",
+        "action",
+        "status"
+      ],
+      "title": "AgentStepTrace",
+      "type": "object"
+    },
+    "CitationDto": {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "pattern": "^[A-Z0-9-]+-VI-[0-9]{2}$",
+          "title": "Documentid",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "sourceId": {
+          "pattern": "^[A-Z0-9-]+$",
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/LocatorDto"
+        },
+        "quoteOrExcerpt": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quoteorexcerpt"
+        }
+      },
+      "required": [
+        "documentId",
+        "version",
+        "sourceId",
+        "locator"
+      ],
+      "title": "CitationDto",
+      "type": "object"
+    },
+    "LocatorDto": {
+      "additionalProperties": false,
+      "properties": {
+        "sourcePath": {
+          "minLength": 1,
+          "title": "Sourcepath",
+          "type": "string"
+        },
+        "heading": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "pageRange": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pagerange"
+        },
+        "sectionIndex": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sectionindex"
+        }
+      },
+      "required": [
+        "sourcePath"
+      ],
+      "title": "LocatorDto",
+      "type": "object"
+    },
+    "ProposedActionDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "proposalType": {
+          "enum": [
+            "F03_WORKOUT_ADJUSTMENT",
+            "F05_WORKOUT_RESCHEDULE"
+          ],
+          "title": "Proposaltype",
+          "type": "string"
+        },
+        "recommendationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recommendationid"
+        },
+        "status": {
+          "default": "PENDING",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        }
+      },
+      "required": [
+        "proposalType",
+        "summary"
+      ],
+      "title": "ProposedActionDraft",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "runId": {
+      "format": "uuid",
+      "title": "Runid",
+      "type": "string"
+    },
+    "correlationId": {
+      "format": "uuid",
+      "title": "Correlationid",
+      "type": "string"
+    },
+    "runStatus": {
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "REJECTED_BY_VALIDATOR",
+        "CANCELLED"
+      ],
+      "title": "Runstatus",
+      "type": "string"
+    },
+    "resultType": {
+      "enum": [
+        "INFORMATION",
+        "CLARIFICATION_REQUIRED",
+        "PROPOSAL_DRAFT",
+        "INSUFFICIENT_DATA",
+        "BLOCKED"
+      ],
+      "title": "Resulttype",
+      "type": "string"
+    },
+    "reasonCode": {
+      "default": "NONE",
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "answer": {
+      "default": "",
+      "title": "Answer",
+      "type": "string"
+    },
+    "clarificationQuestion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clarificationquestion"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/CitationDto"
+      },
+      "title": "Citations",
+      "type": "array"
+    },
+    "evidenceChunkIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 40,
+      "title": "Evidencechunkids",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "missingData": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingdata",
+      "type": "array"
+    },
+    "proposalDraft": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProposedActionDraft"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "stopReason": {
+      "title": "Stopreason",
+      "type": "string"
+    },
+    "promptVersion": {
+      "title": "Promptversion",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/AgentStepTrace"
+      },
+      "title": "Steps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "runId",
+    "correlationId",
+    "runStatus",
+    "resultType",
+    "stopReason",
+    "promptVersion",
+    "model",
+    "provider"
+  ],
+  "title": "AgentTurnResponse",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/agent-turn-response.schema.json"
+}

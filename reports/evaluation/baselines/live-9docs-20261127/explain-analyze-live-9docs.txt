@@ -1,0 +1,56 @@
+SET
+Limit  (cost=28.70..28.71 rows=1 width=250) (actual time=0.580..0.582 rows=5.00 loops=1)
+  Buffers: shared hit=413
+  InitPlan 1
+    ->  Limit  (cost=0.00..0.02 rows=1 width=32) (actual time=0.002..0.002 rows=1.00 loops=1)
+          Buffers: shared hit=1
+          ->  Seq Scan on knowledge_embeddings  (cost=0.00..17.00 rows=700 width=32) (actual time=0.002..0.002 rows=1.00 loops=1)
+                Buffers: shared hit=1
+  InitPlan 2
+    ->  Limit  (cost=0.00..0.02 rows=1 width=32) (actual time=0.004..0.004 rows=1.00 loops=1)
+          Buffers: shared hit=1
+          ->  Seq Scan on knowledge_embeddings knowledge_embeddings_1  (cost=0.00..17.00 rows=700 width=32) (actual time=0.004..0.004 rows=1.00 loops=1)
+                Buffers: shared hit=1
+  ->  Sort  (cost=28.66..28.66 rows=1 width=250) (actual time=0.579..0.580 rows=5.00 loops=1)
+        Sort Key: ((ke.embedding <=> (InitPlan 2).col1))
+        Sort Method: top-N heapsort  Memory: 26kB
+        Buffers: shared hit=413
+        ->  Nested Loop Semi Join  (cost=4.60..28.65 rows=1 width=250) (actual time=0.180..0.546 rows=29.00 loops=1)
+              Join Filter: (kv.id = kpr.knowledge_version_id)
+              Buffers: shared hit=410
+              ->  Nested Loop  (cost=4.45..28.34 rows=1 width=298) (actual time=0.067..0.141 rows=29.00 loops=1)
+                    Buffers: shared hit=93
+                    ->  Nested Loop  (cost=4.30..28.00 rows=1 width=266) (actual time=0.048..0.101 rows=29.00 loops=1)
+                          Buffers: shared hit=35
+                          ->  Nested Loop  (cost=0.14..18.47 rows=1 width=234) (actual time=0.031..0.054 rows=9.00 loops=1)
+                                Join Filter: (kv.knowledge_document_id = kd.id)
+                                Rows Removed by Join Filter: 36
+                                Buffers: shared hit=14
+                                ->  Index Scan using idx_knowledge_versions_status_readiness on knowledge_versions kv  (cost=0.14..8.16 rows=1 width=32) (actual time=0.022..0.032 rows=9.00 loops=1)
+                                      Index Cond: ((status = 'ACTIVE'::knowledge_status) AND ((technical_readiness)::text = 'TECHNICAL_VERIFICATION_PASSED'::text))
+                                      Index Searches: 1
+                                      Buffers: shared hit=5
+                                ->  Seq Scan on knowledge_documents kd  (cost=0.00..10.30 rows=1 width=234) (actual time=0.001..0.001 rows=5.00 loops=9)
+                                      Filter: (deleted_at IS NULL)
+                                      Buffers: shared hit=9
+                          ->  Bitmap Heap Scan on knowledge_chunks kc  (cost=4.16..9.50 rows=2 width=32) (actual time=0.004..0.004 rows=3.22 loops=9)
+                                Recheck Cond: (knowledge_version_id = kv.id)
+                                Heap Blocks: exact=12
+                                Buffers: shared hit=21
+                                ->  Bitmap Index Scan on knowledge_chunks_knowledge_version_id_chunk_index_key  (cost=0.00..4.16 rows=2 width=0) (actual time=0.002..0.002 rows=3.22 loops=9)
+                                      Index Cond: (knowledge_version_id = kv.id)
+                                      Index Searches: 9
+                                      Buffers: shared hit=9
+                    ->  Index Scan using knowledge_embeddings_knowledge_chunk_id_embedding_model_ver_key on knowledge_embeddings ke  (cost=0.15..0.29 rows=1 width=48) (actual time=0.001..0.001 rows=1.00 loops=29)
+                          Index Cond: ((knowledge_chunk_id = kc.id) AND (embedding_model_version_id = 'e1000000-0000-0000-0000-000000000002'::uuid))
+                          Index Searches: 29
+                          Buffers: shared hit=58
+              ->  Index Scan using idx_knowledge_processing_version_time on knowledge_processing_runs kpr  (cost=0.14..0.28 rows=1 width=16) (actual time=0.001..0.001 rows=1.00 loops=29)
+                    Index Cond: (knowledge_version_id = kc.knowledge_version_id)
+                    Filter: ((status)::text = 'SUCCEEDED'::text)
+                    Index Searches: 29
+                    Buffers: shared hit=58
+Planning:
+  Buffers: shared hit=807
+Planning Time: 2.528 ms
+Execution Time: 0.721 ms

@@ -1,0 +1,118 @@
+{
+  "snapshot_id": "snap-ag02-isolated-retest-20261127",
+  "verified_at": "2026-11-26T20:49:08Z",
+  "environment": "isolated_dev_retest_who_niddk_9docs_live",
+  "tier": "VERIFIED",
+  "source": "ISOLATED_POSTGRESQL_OPENAI_OUTBOX",
+  "provenance": {
+    "host": "127.0.0.1:15433",
+    "database": "digital_fitness",
+    "schema": "fitness",
+    "model_space": "openai/text-embedding-3-small/1536",
+    "embedding_dimension": 1536,
+    "total_active_documents": 9,
+    "total_chunks": 29,
+    "total_vectors": 29
+  },
+  "active_documents": [
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "ccc81a64-cfd0-4b2f-8a99-1b838e3306de",
+      "content_hash": "49a628a6f06a20c0f85599542e8a4592ec3087a7d44fb64bb940d93de760cd90",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "0b36f06e-7a51-4485-8bca-7945e289f1d7",
+      "content_hash": "cd5f102f182bfd2eea2a7ebf4f6b9aa91e6ecc894c8f9197756d2f9a4aa7c3d5",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "8f82bcce-3c03-4eb8-b81c-65c7d850e167",
+      "content_hash": "cee3300127db2e339b2ceccf0e73a6c4e81172cb2db02942e332af3d0c9669ec",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "cfb9618a-f826-430c-9a48-662fba63cd16",
+      "content_hash": "87e4a99998a3fcea44d96bcda218b27214cba3dabc18e008fb1cd8bc618ef82f",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "3304dc81-3ba9-435b-81aa-a18e05d3e828",
+      "content_hash": "5d191d97fbbc258aa38396cc23557fadc906c4958db106e2b40f956156339840",
+      "chunk_count": 5,
+      "vector_count": 5
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "dd3c0732-8ddb-42d2-828d-9519f3f44665",
+      "content_hash": "47393a0e6335c702fe4c69bb2c45b7a848bab39a265a1532d7a2e4a389a2ad51",
+      "chunk_count": 5,
+      "vector_count": 5
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "a0acdc33-a751-4dd6-9533-ecc8894f444e",
+      "content_hash": "d56ad3c4473e8648e2b158c20e9cfa311a9fd37f282a0b517f1a9494c2099ebc",
+      "chunk_count": 4,
+      "vector_count": 4
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-05",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "9d2ad07a-f3db-4dff-87d7-1f70ae9da9f1",
+      "content_hash": "db6f9dc1140fd582487422cc23596224bfda2e711ff009335a7da07227b6fbe5",
+      "chunk_count": 6,
+      "vector_count": 6
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-06",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "9b097ceb-19f7-4f7f-b52e-fa29cbd1d2d5",
+      "content_hash": "630802d505124da0fa395cc939977ed4278ee2297dfcac9cdde7fce6eb49fdd0",
+      "chunk_count": 5,
+      "vector_count": 5
+    }
+  ]
+}

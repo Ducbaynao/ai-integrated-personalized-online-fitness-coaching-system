@@ -1441,4 +1441,166 @@ class AiKnowledgeRetrievalIntegrationTest {
         assertThat(resultEmptyScope.isValid()).isFalse();
         assertThat(resultEmptyScope.failureReason()).contains("is outside envelope allowedSourceIds scope");
     }
+
+    @Test
+    @DisplayName("AG-M1: Hybrid retrieval (dense + PostgreSQL full-text + RRF) respects ACTIVE/readiness guards and preserves cosine similarity")
+    void hybridRetrievalRespectsGuardsAndFusesLexicalResults() {
+        UUID activeDocId = UUID.randomUUID();
+        UUID activeVerId = UUID.randomUUID();
+        UUID draftDocId = UUID.randomUUID();
+        UUID draftVerId = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (id, document_code, source_id, title, document_type, created_by)
+                VALUES (?, 'HYBRID-ACTIVE-01', 'WHO-PA-SB-2020', 'Hybrid Active', 'GUIDELINE', ?)
+                """, activeDocId, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (id, knowledge_document_id, version_number, version_label, status, technical_readiness, content_hash, content_path, created_by)
+                VALUES (?, ?, 1, '1.0.0', 'ACTIVE', 'TECHNICAL_VERIFICATION_PASSED', ?, 'data/who/hybrid-active.md', ?)
+                """, activeVerId, activeDocId, sha256("hybrid-active"), ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (id, knowledge_version_id, run_type, operation_key, model_version_id, status, statistics)
+                VALUES (?, ?, 'EMBED', ?, ?, 'SUCCEEDED', ?::jsonb)
+                """, UUID.randomUUID(), activeVerId, "op-" + UUID.randomUUID(), embeddingGenerator.modelVersionId(),
+                "{\"index_ready\": true, \"embedding_model_version_id\": \"" + embeddingGenerator.modelVersionId() + "\"}");
+        UUID activeChunkId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (id, knowledge_version_id, chunk_index, heading_path, content)
+                VALUES (?, ?, 0, 'Creatine > Loading', 'Creatine monohydrate protocol 5g daily for strength athletes.')
+                """, activeChunkId, activeVerId);
+
+        float[] queryVec = embeddingGenerator.generateEmbedding("creatine monohydrate");
+        float[] oppositeVec = new float[queryVec.length];
+        for (int i = 0; i < queryVec.length; i++) {
+            oppositeVec[i] = -queryVec[i];
+        }
+        String oppositeVecStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(oppositeVec);
+        String queryVecStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(queryVec);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (id, knowledge_chunk_id, embedding_model_version_id, embedding)
+                VALUES (?, ?, ?, ?::vector)
+                """, UUID.randomUUID(), activeChunkId, embeddingGenerator.modelVersionId(), oppositeVecStr);
+
+        // Draft document with exact lexical match - MUST NOT be returned
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (id, document_code, source_id, title, document_type, created_by)
+                VALUES (?, 'HYBRID-DRAFT-01', 'WHO-PA-SB-2020', 'Hybrid Draft', 'GUIDELINE', ?)
+                """, draftDocId, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (id, knowledge_document_id, version_number, version_label, status, technical_readiness, content_hash, content_path, created_by)
+                VALUES (?, ?, 1, '1.0.0', 'DRAFT', 'TECHNICAL_VERIFICATION_PASSED', ?, 'data/who/hybrid-draft.md', ?)
+                """, draftVerId, draftDocId, sha256("hybrid-draft"), ADMIN_ID);
+        UUID draftChunkId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (id, knowledge_version_id, chunk_index, heading_path, content)
+                VALUES (?, ?, 0, 'Creatine > Draft', 'Creatine monohydrate secret draft protocol.')
+                """, draftChunkId, draftVerId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (id, knowledge_chunk_id, embedding_model_version_id, embedding)
+                VALUES (?, ?, ?, ?::vector)
+                """, UUID.randomUUID(), draftChunkId, embeddingGenerator.modelVersionId(), queryVecStr);
+
+        try {
+            List<RetrievedKnowledgeChunk> denseOnly = retrievalUseCase.retrieveActiveKnowledge(
+                    "creatine monohydrate", List.of("WHO-PA-SB-2020"), 5);
+            assertThat(denseOnly).extracting(RetrievedKnowledgeChunk::documentCode)
+                    .doesNotContain("HYBRID-ACTIVE-01", "HYBRID-DRAFT-01");
+
+            org.springframework.test.util.ReflectionTestUtils.setField(retrievalUseCase, "hybridEnabled", true);
+            List<RetrievedKnowledgeChunk> hybrid = retrievalUseCase.retrieveActiveKnowledge(
+                    "creatine monohydrate", List.of("WHO-PA-SB-2020"), 5);
+            assertThat(hybrid).extracting(RetrievedKnowledgeChunk::documentCode)
+                    .contains("HYBRID-ACTIVE-01")
+                    .doesNotContain("HYBRID-DRAFT-01");
+            RetrievedKnowledgeChunk found = hybrid.stream()
+                    .filter(c -> "HYBRID-ACTIVE-01".equals(c.documentCode()))
+                    .findFirst().orElseThrow();
+            assertThat(found.similarityScore()).isLessThan(0.0);
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(retrievalUseCase, "hybridEnabled", false);
+        }
+    }
+
+    @Test
+    @DisplayName("V68 folded lexical search retrieves accented WHO-PA-SB-2020-VI-05#1 for diacritic-stripped Vietnamese query and respects ACTIVE/DRAFT guards")
+    void foldedLexicalHybridRetrievesAccentedContentFromUnaccentedQuery() {
+        UUID activeDocId = UUID.randomUUID();
+        UUID activeVerId = UUID.randomUUID();
+        UUID activeChunkHeaderId = UUID.randomUUID();
+        UUID activeChunkRecId = UUID.randomUUID();
+        UUID draftDocId = UUID.randomUUID();
+        UUID draftVerId = UUID.randomUUID();
+        UUID draftChunkId = UUID.randomUUID();
+
+        // Orthogonal vector so dense branch alone does NOT return these chunks
+        float[] queryVec = embeddingGenerator.generateEmbedding("WHO 2020 khuyen nghi nguoi truong thanh tap van dong bao nhieu phut moi tuan?");
+        float[] orthoVec = new float[queryVec.length];
+        orthoVec[0] = -queryVec[0];
+        String orthoVecStr = com.fitnesscoaching.platform.modules.content.adapter.out.persistence.JdbcKnowledgeEmbeddingRepository.vectorToString(orthoVec);
+
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (id, document_code, source_id, title, document_type, created_by)
+                VALUES (?, 'FOLDED-WHO-VI-05', 'WHO-PA-SB-2020', 'WHO 2020 Adults', 'GUIDELINE', ?)
+                """, activeDocId, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (id, knowledge_document_id, version_number, version_label, status, technical_readiness, content_hash, content_path, created_by)
+                VALUES (?, ?, 1, '1.1.0', 'ACTIVE', 'TECHNICAL_VERIFICATION_PASSED', ?, 'derivatives/who-2020/05-adults-activity.vi.md', ?)
+                """, activeVerId, activeDocId, sha256("folded-who-vi-05"), ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_processing_runs (id, knowledge_version_id, run_type, model_version_id, status, statistics, operation_key)
+                VALUES (?, ?, 'EMBED', ?, 'SUCCEEDED', jsonb_build_object('index_ready', true, 'embedding_model_version_id', ?::text), ?)
+                """, UUID.randomUUID(), activeVerId, embeddingGenerator.modelVersionId(), embeddingGenerator.modelVersionId().toString(), "op-folded-" + activeVerId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (id, knowledge_version_id, chunk_index, heading_path, content)
+                VALUES (?, ?, 0, 'Vận động và tăng cường cơ ở tuổi 18–64', '# Vận động và tăng cường cơ ở tuổi 18–64')
+                """, activeChunkHeaderId, activeVerId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (id, knowledge_version_id, chunk_index, heading_path, content)
+                VALUES (?, ?, 1, 'Vận động và tăng cường cơ ở tuổi 18–64 > Khuyến nghị được chuẩn hóa', 'Trong tuần: 150–300 phút aerobic cường độ vừa, hoặc 75–150 phút aerobic cường độ mạnh, hoặc kết hợp tương đương.')
+                """, activeChunkRecId, activeVerId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (id, knowledge_chunk_id, embedding_model_version_id, embedding)
+                VALUES (?, ?, ?, ?::vector), (?, ?, ?, ?::vector)
+                """, UUID.randomUUID(), activeChunkHeaderId, embeddingGenerator.modelVersionId(), orthoVecStr,
+                UUID.randomUUID(), activeChunkRecId, embeddingGenerator.modelVersionId(), orthoVecStr);
+
+        // DRAFT doc with exact unaccented match MUST NOT be returned
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_documents (id, document_code, source_id, title, document_type, created_by)
+                VALUES (?, 'FOLDED-DRAFT-01', 'WHO-PA-SB-2020', 'Draft', 'GUIDELINE', ?)
+                """, draftDocId, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_versions (id, knowledge_document_id, version_number, version_label, status, technical_readiness, content_hash, content_path, created_by)
+                VALUES (?, ?, 1, '1.0.0', 'DRAFT', 'TECHNICAL_VERIFICATION_PASSED', ?, 'derivatives/who-2020/draft.md', ?)
+                """, draftVerId, draftDocId, sha256("folded-draft-01"), ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_chunks (id, knowledge_version_id, chunk_index, heading_path, content)
+                VALUES (?, ?, 0, 'Khuyen nghi', 'WHO 2020 khuyen nghi nguoi truong thanh tap van dong 150 phut moi tuan.')
+                """, draftChunkId, draftVerId);
+        jdbcTemplate.update("""
+                INSERT INTO fitness.knowledge_embeddings (id, knowledge_chunk_id, embedding_model_version_id, embedding)
+                VALUES (?, ?, ?, ?::vector)
+                """, UUID.randomUUID(), draftChunkId, embeddingGenerator.modelVersionId(), orthoVecStr);
+
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(retrievalUseCase, "hybridEnabled", true);
+            List<RetrievedKnowledgeChunk> hybrid = retrievalUseCase.retrieveActiveKnowledge(
+                    "WHO 2020 khuyen nghi nguoi truong thanh tap van dong bao nhieu phut moi tuan?",
+                    List.of("WHO-PA-SB-2020"),
+                    5
+            );
+            assertThat(hybrid)
+                    .extracting(RetrievedKnowledgeChunk::documentCode)
+                    .contains("FOLDED-WHO-VI-05")
+                    .doesNotContain("FOLDED-DRAFT-01");
+            RetrievedKnowledgeChunk recChunk = hybrid.stream()
+                    .filter(c -> "FOLDED-WHO-VI-05".equals(c.documentCode()) && c.sectionIndex() == 1)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(recChunk.content()).contains("150–300 phút");
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(retrievalUseCase, "hybridEnabled", false);
+        }
+    }
 }

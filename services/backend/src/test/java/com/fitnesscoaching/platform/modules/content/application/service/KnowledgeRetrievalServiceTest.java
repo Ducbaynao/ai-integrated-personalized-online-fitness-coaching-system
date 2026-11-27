@@ -234,6 +234,80 @@ class KnowledgeRetrievalServiceTest {
                 .isNull();
     }
 
+    @Test
+    @DisplayName("Hybrid mode executes both dense and lexical queries with identical eligibility guards and preserves cosine similarity")
+    void hybridModeExecutesDenseAndLexicalWithSharedGuardsAndPreservesCosine() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "hybridEnabled", true);
+        float[] vector = new float[1536];
+        vector[0] = 0.5f;
+        when(embeddingModelPort.generateEmbedding("creatine monohydrate")).thenReturn(vector);
+        UUID modelVersionId = UUID.randomUUID();
+        when(embeddingModelPort.modelVersionId()).thenReturn(modelVersionId);
+
+        RetrievedKnowledgeChunk denseOnly = new RetrievedKnowledgeChunk(
+                new UUID(0, 1), UUID.randomUUID(), "DOC-1", "1.0.0", "WHO-PA-SB-2020",
+                "Title 1", "path1", "h1", 0, "dense content", "dense", 0.85
+        );
+        RetrievedKnowledgeChunk both = new RetrievedKnowledgeChunk(
+                new UUID(0, 2), UUID.randomUUID(), "DOC-2", "1.0.0", "WHO-PA-SB-2020",
+                "Title 2", "path2", "h2", 0, "creatine monohydrate", "creatine", 0.42
+        );
+        RetrievedKnowledgeChunk lexicalOnly = new RetrievedKnowledgeChunk(
+                new UUID(0, 3), UUID.randomUUID(), "DOC-3", "1.0.0", "WHO-PA-SB-2020",
+                "Title 3", "path3", "h3", 0, "creatine dosage", "dosage", -0.05
+        );
+
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of(denseOnly, both))
+                .thenReturn(List.of(lexicalOnly, both));
+
+        List<RetrievedKnowledgeChunk> results = service.retrieveActiveKnowledge(
+                "creatine monohydrate",
+                List.of("WHO-PA-SB-2020"),
+                3
+        );
+
+        assertThat(results).extracting(RetrievedKnowledgeChunk::chunkId)
+                .containsExactly(both.chunkId(), denseOnly.chunkId(), lexicalOnly.chunkId());
+        assertThat(results.get(0).similarityScore()).isEqualTo(0.42);
+        assertThat(results.get(2).similarityScore()).isEqualTo(-0.05);
+
+        verify(jdbcTemplate, org.mockito.Mockito.times(2)).query(
+                org.mockito.ArgumentMatchers.argThat((String sql) ->
+                        sql.contains("v.status = 'ACTIVE'") &&
+                        sql.contains("v.technical_readiness = 'TECHNICAL_VERIFICATION_PASSED'") &&
+                        sql.contains("d.deleted_at IS NULL") &&
+                        sql.contains("e.embedding_model_version_id = ?") &&
+                        sql.contains("index_ready")),
+                any(RowMapper.class),
+                any(Object[].class)
+        );
+    }
+
+    @Test
+    @DisplayName("Folded lexical tsquery normalizes Vietnamese diacritics, đ/Đ, NFD/NFC, English, and mixed-language")
+    void buildFoldedLexicalTsQueryHandlesDiacriticsAndUnicode() {
+        String accented = KnowledgeRetrievalService.buildFoldedLexicalTsQuery(
+                "WHO 2020 khuyến nghị người trưởng thành vận động bao nhiêu phút mỗi tuần?"
+        );
+        String unaccented = KnowledgeRetrievalService.buildFoldedLexicalTsQuery(
+                "WHO 2020 khuyen nghi nguoi truong thanh van dong bao nhieu phut moi tuan?"
+        );
+        String decomposedNfd = KnowledgeRetrievalService.buildFoldedLexicalTsQuery(
+                java.text.Normalizer.normalize(
+                        "WHO 2020 khuyến nghị người trưởng thành vận động bao nhiêu phút mỗi tuần?",
+                        java.text.Normalizer.Form.NFD
+                )
+        );
+
+        assertThat(accented).isEqualTo(unaccented);
+        assertThat(decomposedNfd).isEqualTo(unaccented);
+        assertThat(unaccented).contains("who", "2020", "khuyen", "nghi", "van", "dong", "phut", "tuan");
+        assertThat(KnowledgeRetrievalService.buildFoldedLexicalTsQuery("Đẩy tạ đùi (Squat) 150 phút"))
+                .isEqualTo("day | ta | dui | squat | 150 | phut");
+        assertThat(KnowledgeRetrievalService.buildFoldedLexicalTsQuery("   ??? ---   ")).isEmpty();
+    }
+
     static class TestTx {
         boolean active = true;
     }

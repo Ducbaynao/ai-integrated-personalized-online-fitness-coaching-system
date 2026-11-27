@@ -1,0 +1,118 @@
+{
+  "snapshot_id": "snap-ag02-isolated-citation-retest-20261127",
+  "verified_at": "2026-11-27T04:00:29.153429+00:00",
+  "environment": "isolated_dev_agent_e2e_who_niddk_9docs_live",
+  "tier": "VERIFIED",
+  "source": "ISOLATED_POSTGRESQL_OPENAI_OUTBOX",
+  "provenance": {
+    "host": "127.0.0.1:15433",
+    "database": "digital_fitness",
+    "schema": "fitness",
+    "model_space": "openai/text-embedding-3-small/1536",
+    "embedding_dimension": 1536,
+    "total_active_documents": 9,
+    "total_chunks": 29,
+    "total_vectors": 29
+  },
+  "active_documents": [
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "771537df-5072-47b7-b553-56e3ac72b23a",
+      "content_hash": "49a628a6f06a20c0f85599542e8a4592ec3087a7d44fb64bb940d93de760cd90",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "a7fd2e45-6fdd-4553-b893-13a495dddd6e",
+      "content_hash": "cd5f102f182bfd2eea2a7ebf4f6b9aa91e6ecc894c8f9197756d2f9a4aa7c3d5",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "77f468a0-b834-4d9e-837a-0dd6c94ac3d4",
+      "content_hash": "cee3300127db2e339b2ceccf0e73a6c4e81172cb2db02942e332af3d0c9669ec",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "NIDDK-WEIGHT-FACTORS-2023-VI-04",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "NIDDK-WEIGHT-FACTORS-2023",
+      "version_id": "efc9d1b3-a10a-4440-ad92-ed435de51a49",
+      "content_hash": "87e4a99998a3fcea44d96bcda218b27214cba3dabc18e008fb1cd8bc618ef82f",
+      "chunk_count": 1,
+      "vector_count": 1
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-01",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "397466e7-0aa2-4188-b8a4-2cd3f1757faa",
+      "content_hash": "5d191d97fbbc258aa38396cc23557fadc906c4958db106e2b40f956156339840",
+      "chunk_count": 5,
+      "vector_count": 5
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-02",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "48e48cc4-2ab5-4d1b-90e0-ca0c58dae171",
+      "content_hash": "47393a0e6335c702fe4c69bb2c45b7a848bab39a265a1532d7a2e4a389a2ad51",
+      "chunk_count": 5,
+      "vector_count": 5
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-03",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "36ed419c-e300-4780-bba0-8c0917406b91",
+      "content_hash": "d56ad3c4473e8648e2b158c20e9cfa311a9fd37f282a0b517f1a9494c2099ebc",
+      "chunk_count": 4,
+      "vector_count": 4
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-05",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "2bf844b2-e4c9-4449-af6c-a28ae02f7f17",
+      "content_hash": "db6f9dc1140fd582487422cc23596224bfda2e711ff009335a7da07227b6fbe5",
+      "chunk_count": 6,
+      "vector_count": 6
+    },
+    {
+      "document_id": "WHO-PA-SB-2020-VI-06",
+      "version": "1.1.0",
+      "status": "ACTIVE",
+      "index_ready": true,
+      "source_id": "WHO-PA-SB-2020",
+      "version_id": "133d7b1e-d6a7-4140-9b47-0b1567ef28fd",
+      "content_hash": "630802d505124da0fa395cc939977ed4278ee2297dfcac9cdde7fce6eb49fdd0",
+      "chunk_count": 5,
+      "vector_count": 5
+    }
+  ]
+}

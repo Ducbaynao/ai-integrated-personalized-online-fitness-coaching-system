@@ -1,0 +1,20 @@
+{
+  "openai_budget_cap_usd": 0.5,
+  "openai_prior_cumulative_usd": 0.012696,
+  "openai_llm_calls": 27,
+  "openai_llm_prompt_tokens": 43288,
+  "openai_llm_completion_tokens": 3363,
+  "openai_llm_measured_cost_usd": 0.008511,
+  "openai_embedding_est_tokens": 17200,
+  "openai_embedding_est_cost_usd": 0.000344,
+  "openai_this_wave_total_usd": 0.008855,
+  "openai_cumulative_total_usd": 0.021551,
+  "openai_within_budget": true,
+  "cohere_budget_cap_usd": 0.1,
+  "cohere_prior_cumulative_usd": 0.022,
+  "cohere_calls_this_wave": 8,
+  "cohere_this_wave_cost_usd": 0.016,
+  "cohere_cumulative_total_usd": 0.038,
+  "cohere_within_budget": true,
+  "unknown_requests": 0
+}

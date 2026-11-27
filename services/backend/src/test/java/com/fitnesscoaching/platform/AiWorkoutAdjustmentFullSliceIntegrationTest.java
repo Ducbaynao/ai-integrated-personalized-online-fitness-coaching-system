@@ -85,10 +85,16 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
         registry.add("spring.flyway.schemas", () -> "fitness");
         registry.add("spring.flyway.default-schema", () -> "fitness");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("ai.agent.proposals-enabled", () -> "true");
     }
 
     @Autowired
     private AiWorkoutAdjustmentUseCase adjustmentService;
+
+    @Autowired private com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService agentGateway;
+    @Autowired private com.fitnesscoaching.platform.modules.ai.application.port.in.AiRunF01UseCase agentRuns;
+    @Autowired private com.fitnesscoaching.platform.modules.ai.application.service.AiAgentConversationService conversations;
+    @Autowired private com.fitnesscoaching.platform.modules.coaching.application.port.in.CoachingSharingUseCase sharing;
 
     @Autowired
     private AiRecommendationRepository recommendationRepository;
@@ -226,6 +232,69 @@ class AiWorkoutAdjustmentFullSliceIntegrationTest {
                 java.sql.Timestamp.from(plannedStart), student);
 
         return occId;
+    }
+
+    @Test
+    void agentGatewayCreatesPendingF03ForBoundStudentWithoutApplying() {
+        UUID student = person("STUDENT");
+        createSelfDirectedPeriod(student);
+        PlanDetail plan = activePlan(student, student);
+        UUID prescription = workoutPlanQuery.version(student, plan.plan().id(), plan.currentVersion().id())
+                .sessions().getFirst().prescriptions().getFirst().id();
+        var run = agentRuns.createF01Run(student,
+                new com.fitnesscoaching.platform.modules.ai.application.port.in.CreateF01AiRunCommand(
+                        "Adjust my current workout", "vi", null, UUID.randomUUID(), student, false));
+        var args = Map.<String, Object>of("scope", "TEMPLATE_OR_FUTURE_OCCURRENCES",
+                "targetPlanId", plan.plan().id().toString(), "planVersionNumber", plan.currentVersion().versionNumber(),
+                "exercisePrescriptionId", prescription.toString(), "reason", "Equipment unavailable",
+                "requestedChange", "Substitute exercise");
+        var input = new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                run.id(), student, "STUDENT", student, args);
+        var result = agentGateway.prepareWorkoutAdjustment(input);
+        assertThat(result.status()).isEqualTo("OK");
+        assertThat(result.proposalDraft().status()).isEqualTo("PENDING");
+        var recommendation = recommendationRepository.findById(result.proposalDraft().recommendationId()).orElseThrow();
+        assertThat(recommendation.status()).isEqualTo(AiRecommendationStatus.PENDING);
+        assertThat(workoutPlanQuery.findActive(student, student).orElseThrow().currentVersion().id())
+                .isEqualTo(plan.currentVersion().id());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fitness.ai_recommendation_applications WHERE ai_recommendation_id = ?",
+                Integer.class, recommendation.id())).isZero();
+
+        var wrongVersion = new java.util.HashMap<>(args);
+        wrongVersion.put("planVersionNumber", plan.currentVersion().versionNumber() + 1);
+        assertThatThrownBy(() -> agentGateway.prepareWorkoutAdjustment(
+                new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                        run.id(), student, "STUDENT", student, wrongVersion))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> agentGateway.prepareWorkoutAdjustment(
+                new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                        run.id(), student, "STUDENT", UUID.randomUUID(), args))).isInstanceOf(AiRunAccessDeniedException.class);
+    }
+
+    @Test
+    void revokedTrainerConsentBlocksConversationReadListAndSearchTool() {
+        var setup = createHumanCoachSetup();
+        UUID permission = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO fitness.data_sharing_permissions
+                (id,relationship_id,student_id,trainer_id,data_scope,decision,access_level,valid_from,granted_by)
+                VALUES (?,?,?,?, 'WORKOUT_HISTORY','ALLOW','VIEW'::fitness.data_access_level,
+                        clock_timestamp()-interval '1 day',?)
+                """, permission, setup.relationshipId(), setup.studentId(), setup.trainerId(), setup.studentId());
+        var conversation = conversations.createConversation(setup.trainerId(), "TRAINER", setup.studentId(), "Review");
+        conversations.getConversation(setup.trainerId(), conversation.conversationId());
+        // A minimal authorized run binding is sufficient to test live tool authorization.
+        var run = agentRuns.createF01Run(setup.trainerId(),
+                new com.fitnesscoaching.platform.modules.ai.application.port.in.CreateF01AiRunCommand(
+                        "General fitness knowledge", "vi", null, UUID.randomUUID(), setup.studentId(), false));
+        var call = new com.fitnesscoaching.platform.modules.ai.application.service.AgentToolGatewayService.ToolCallInput(
+                run.id(), setup.trainerId(), "TRAINER", setup.studentId(), Map.of());
+        assertThat(agentGateway.authorizeKnowledgeSearch(call).status()).isEqualTo("OK");
+        long permissionVersion = jdbc.queryForObject("SELECT version FROM fitness.data_sharing_permissions WHERE id = ?", Long.class, permission);
+        sharing.revoke(setup.studentId(), setup.relationshipId(), permission, permissionVersion, "Consent revoked", UUID.randomUUID());
+        assertThatThrownBy(() -> conversations.getConversation(setup.trainerId(), conversation.conversationId()))
+                .isInstanceOf(AiRunAccessDeniedException.class);
+        assertThat(conversations.listConversations(setup.trainerId())).noneMatch(c -> c.conversationId().equals(conversation.conversationId()));
+        assertThatThrownBy(() -> agentGateway.authorizeKnowledgeSearch(call)).isInstanceOf(AiRunAccessDeniedException.class);
     }
 
     @Test

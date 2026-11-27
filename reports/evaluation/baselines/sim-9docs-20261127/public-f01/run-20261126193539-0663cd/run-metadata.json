@@ -1,0 +1,31 @@
+{
+  "run_id": "run-20261126193539-0663cd",
+  "timestamp": "2026-11-26T19:35:39.180Z",
+  "mode": "public-f01",
+  "endpoint": "http://127.0.0.1:18080/api/v1/ai/knowledge/query",
+  "git_sha": "57e27f8f40ed385c931979e5b35cff660b9f9fa8",
+  "working_tree_clean": false,
+  "status_summary": "DIRTY",
+  "dataset_name": "AG-02 Fitness Agent Dev Benchmark (A-49 Compatible)",
+  "dataset_version": "0.1.0-dev-provisional",
+  "dataset_hash": "0bdb6c6ebb24b4fc50c2104dc2315309cb7eb667e40e09639b46f40bec84b970",
+  "manifest_verified": true,
+  "holdout_status": "SEPARATE_FROM_HOLDOUT",
+  "top_k": 5,
+  "timeout_ms": 10000,
+  "coverage_snapshot": {
+    "status": "SNAPSHOT_PROVIDED",
+    "source": "ISOLATED_POSTGRESQL_SIMULATED_OUTBOX",
+    "path": "D:\\Projects\\ai-integrated-personalized-online-fitness-coaching-system\\reports\\evaluation\\baselines\\sim-9docs-20261127\\coverage-snapshot-isolated-sim-9docs.json"
+  },
+  "model_space": {
+    "model_space": "simulated/deterministic-1536/1.0.0",
+    "source": "DECLARED"
+  },
+  "filters_applied": {
+    "source": null,
+    "case_id": null,
+    "limit": null
+  },
+  "selected_case_count": 16
+}

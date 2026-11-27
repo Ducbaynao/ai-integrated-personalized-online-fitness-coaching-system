@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.routes.internal_agent import router as internal_agent_router
 from app.api.routes.internal_food_text_estimate import router as internal_food_text_estimate_router
 from app.api.routes.internal_knowledge import router as internal_knowledge_router
 from app.api.routes.internal_progress_summary import router as internal_progress_summary_router
@@ -13,6 +14,7 @@ app = FastAPI(
     description="Creates structured recommendations without applying business changes.",
 )
 
+app.include_router(internal_agent_router)
 app.include_router(internal_knowledge_router)
 app.include_router(internal_food_text_estimate_router)
 app.include_router(internal_workout_proposal_router)

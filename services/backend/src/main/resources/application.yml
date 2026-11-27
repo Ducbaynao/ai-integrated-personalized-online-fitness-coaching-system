@@ -61,6 +61,17 @@ auth:
     refresh-token-ttl: ${REFRESH_TOKEN_TTL:P30D}
 
 ai:
+  agent:
+    enabled: ${AI_AGENT_ENABLED:true}
+    proposals-enabled: ${AI_AGENT_PROPOSALS_ENABLED:false}
+  retrieval:
+    hybrid-enabled: ${AI_RETRIEVAL_HYBRID_ENABLED:false}
+  knowledge:
+    outbox-worker:
+      enabled: ${AI_KNOWLEDGE_OUTBOX_WORKER_ENABLED:true}
+      fixed-delay-ms: ${AI_KNOWLEDGE_OUTBOX_WORKER_DELAY_MS:5000}
+      initial-delay-ms: ${AI_KNOWLEDGE_OUTBOX_WORKER_INITIAL_DELAY_MS:5000}
+      batch-size: ${AI_KNOWLEDGE_OUTBOX_WORKER_BATCH_SIZE:10}
   f06:
     processing-timeout-seconds: ${AI_F06_PROCESSING_TIMEOUT_SECONDS:300}
   service:

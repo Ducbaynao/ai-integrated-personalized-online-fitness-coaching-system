@@ -1,0 +1,12 @@
+{
+  "cohere_rerank_budget_cap_usd": 0.1,
+  "cohere_calls_including_probe": 11,
+  "cohere_measured_cost_usd": 0.022,
+  "cohere_within_budget": true,
+  "openai_embedding_prior_cap_usd": 0.5,
+  "openai_embedding_prior_cumulative_usd": 0.012376,
+  "openai_embedding_this_wave_est_tokens": 16000,
+  "openai_embedding_this_wave_est_cost_usd": 0.00032,
+  "openai_cumulative_estimated_total_usd": 0.012696,
+  "openai_within_budget": true
+}

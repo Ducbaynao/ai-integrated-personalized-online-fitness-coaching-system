@@ -559,7 +559,38 @@ export function scorePublicF01Case(
   const citationDocHit = exactMatchedCitations.size > 0 ? 1 : 0;
   const citationDocRecall = expectedDocIds.length > 0 ? exactMatchedCitations.size / expectedDocIds.length : null;
 
-  // Step 4: Execution failure check
+  const annotatedAction = caseDef.annotated_action || 'REVIEW_REQUIRED';
+
+  // Step 4: Execution failure check (legitimate RULE_BLOCKED on ABSTENTION_EXPECTED is valid guardrail behavior, not an execution failure)
+  const isExpectedGuardrailBlock = (
+    annotatedAction === 'ABSTENTION_EXPECTED' &&
+    runStatus === 'REJECTED_BY_VALIDATOR' &&
+    resultType === 'BLOCKED' &&
+    reasonCode === 'RULE_BLOCKED'
+  );
+
+  if (isExpectedGuardrailBlock) {
+    return {
+      evaluable: true,
+      schema_valid: true,
+      execution_failure: false,
+      correct_refusal: citations.length === 0,
+      false_refusal: false,
+      citations_contract_valid: citationsValid,
+      citation_failure_reason: citationFailureReason,
+      run_status: runStatus,
+      result_type: resultType,
+      reason_code: reasonCode,
+      citation_document_matches: {
+        expected_doc_ids: expectedDocIds,
+        cited_doc_ids: citedDocIds,
+        hit: citationDocHit,
+        recall: citationDocRecall,
+      },
+      scope_verified: scopeVerified,
+    };
+  }
+
   if (runStatus === 'FAILED' || runStatus === 'REJECTED_BY_VALIDATOR') {
     return {
       evaluable: true,
@@ -583,7 +614,6 @@ export function scorePublicF01Case(
   }
 
   // Step 5: Behavioral Scoring Using Structured Annotation (NO text search heuristics!)
-  const annotatedAction = caseDef.annotated_action || 'REVIEW_REQUIRED';
 
   if (annotatedAction === 'ABSTENTION_EXPECTED') {
     const isAbstained = resultType === 'INSUFFICIENT_DATA' || resultType === 'BLOCKED';
@@ -640,7 +670,7 @@ export function scorePublicF01Case(
       evaluable: true,
       schema_valid: true,
       execution_failure: false,
-      correct_refusal: false,
+      correct_refusal: null,
       false_refusal: isVerifiedFullCoverage ? isFalseRefusal : null,
       refusal_evaluable: isVerifiedFullCoverage,
       refusal_exclusion_reason: exclusionReason,
@@ -735,6 +765,10 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
   let abstentionDenominator = 0;
   let validCitationsCount = 0;
   let totalCitationResponses = 0;
+  let citationPresenceCount = 0;
+  let validCitationsWhenPresentCount = 0;
+  let nonInfraPublicCases = 0;
+  let schemaValidPublicCases = 0;
 
   let exploratoryFalseRefusalCount = 0;
   let exploratoryDirectKnowledgeDenominator = 0;
@@ -826,6 +860,7 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
     // Public scoring
     const pub = r.public_scoring;
     if (pub) {
+      nonInfraPublicCases++;
       if (pub.schema_valid === false) {
         schemaViolations++;
         failedCases.push({
@@ -835,6 +870,7 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
         });
         continue;
       }
+      schemaValidPublicCases++;
 
       if (pub.evaluable) {
         evaluablePublicCases++;
@@ -893,9 +929,24 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
               details: pub.citation_failure_reason || 'Citation contract or allowlist failure',
             });
           }
+          const hasCitations = Boolean(
+            pub.has_citations ||
+            (pub.citation_document_matches && Array.isArray(pub.citation_document_matches.cited_doc_ids) && pub.citation_document_matches.cited_doc_ids.length > 0)
+          );
+          if (hasCitations) {
+            citationPresenceCount++;
+            if (pub.citations_contract_valid) {
+              validCitationsWhenPresentCount++;
+            }
+          }
         }
 
-        if (pub.citation_document_matches && pub.citation_document_matches.expected_doc_ids.length > 0) {
+        const hasVerifiedActiveCoverage = Boolean(
+          cov &&
+          cov.snapshot_tier === 'VERIFIED' &&
+          (cov.status === 'FULL_COVERAGE' || cov.status === 'PARTIAL_COVERAGE')
+        );
+        if (hasVerifiedActiveCoverage && pub.citation_document_matches && pub.citation_document_matches.expected_doc_ids.length > 0) {
           citationDocMatchDenominator++;
           if (pub.citation_document_matches.hit === 1) {
             citationDocHitCount++;
@@ -955,6 +1006,8 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
     },
     counts: {
       total_cases: totalCases,
+      attempted_cases: totalCases,
+      non_infra_public_cases: nonInfraPublicCases,
       evaluable_retrieval_cases: evaluableRetrievalCases,
       evaluable_public_cases: evaluablePublicCases,
       infrastructure_errors: infraErrors,
@@ -1040,7 +1093,29 @@ export function aggregateMetrics(results, topK = 5, mode = 'retrieval') {
         valid_responses: validCitationsCount,
         denominator: totalCitationResponses,
         status: totalCitationResponses > 0 ? 'CALCULATED' : 'NOT_EVALUATED',
-        reason: totalCitationResponses === 0 ? 'No evaluated responses with citations' : null,
+        reason: totalCitationResponses === 0 ? 'No schema-valid evaluable public responses' : null,
+        definition: 'Includes all schema-valid evaluable public responses (including responses with 0 citations such as INSUFFICIENT_DATA/BLOCKED); see citation_validity_when_present for responses with citations > 0.',
+      },
+      schema_validity_rate: {
+        value: nonInfraPublicCases > 0 ? Number((schemaValidPublicCases / nonInfraPublicCases).toFixed(4)) : null,
+        valid_responses: schemaValidPublicCases,
+        denominator: nonInfraPublicCases,
+        status: nonInfraPublicCases > 0 ? 'CALCULATED' : 'NOT_EVALUATED',
+        reason: nonInfraPublicCases === 0 ? 'Applicable only in public-f01 mode' : null,
+      },
+      citation_presence_rate: {
+        value: totalCitationResponses > 0 ? Number((citationPresenceCount / totalCitationResponses).toFixed(4)) : null,
+        responses_with_citations: citationPresenceCount,
+        denominator: totalCitationResponses,
+        status: totalCitationResponses > 0 ? 'CALCULATED' : 'NOT_EVALUATED',
+        reason: totalCitationResponses === 0 ? 'No schema-valid evaluable public responses' : null,
+      },
+      citation_validity_when_present: {
+        value: citationPresenceCount > 0 ? Number((validCitationsWhenPresentCount / citationPresenceCount).toFixed(4)) : null,
+        valid_responses: validCitationsWhenPresentCount,
+        denominator: citationPresenceCount,
+        status: citationPresenceCount > 0 ? 'CALCULATED' : 'NOT_EVALUATED',
+        reason: citationPresenceCount === 0 ? 'No evaluated responses with citations > 0' : null,
       },
       citation_support_and_faithfulness: {
         value: null,

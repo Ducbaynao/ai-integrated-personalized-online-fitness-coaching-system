@@ -33,6 +33,8 @@ These documents are in Vietnamese and use the same domain identifiers as the exi
 
 ## Sources of truth
 
+For the proposed chatbot-to-agent upgrade, see the [technical roadmap](08-ai/agent-upgrade-roadmap.md) and [implementation progress tracker](07-development/agent-upgrade-progress.md). These supplement the Phase 2 baseline; they do not claim implementation or release approval.
+
 - PostgreSQL is the source of truth for normalized business data.
 - Flyway migrations in `services/backend/src/main/resources/db/migration` are the executable schema history.
 - OpenAPI and event schemas in `contracts` are executable interface contracts.

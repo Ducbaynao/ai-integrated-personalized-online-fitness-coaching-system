@@ -1,0 +1,15 @@
+{
+  "budget_cap_usd": 0.5,
+  "prior_cumulative_estimated_usd": 0.012016,
+  "wave_llm_runs_count": 0,
+  "wave_llm_prompt_tokens": 0,
+  "wave_llm_completion_tokens": 0,
+  "wave_llm_total_tokens": 0,
+  "wave_llm_measured_cost_usd": 0.0,
+  "wave_embedding_estimated_tokens_upper_bound": 18000,
+  "wave_embedding_estimated_cost_usd": 0.00036,
+  "cumulative_measured_llm_cost_usd": 0.010976,
+  "cumulative_estimated_total_cost_usd": 0.012376,
+  "within_budget": true,
+  "runs": []
+}

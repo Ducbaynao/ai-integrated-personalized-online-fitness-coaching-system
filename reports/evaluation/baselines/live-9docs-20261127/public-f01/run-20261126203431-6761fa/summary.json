@@ -1,0 +1,214 @@
+{
+  "k": 5,
+  "mode": "public-f01",
+  "coverage_summary": {
+    "total_cases": 13,
+    "full_coverage": 4,
+    "partial_coverage": 2,
+    "no_coverage": 3,
+    "coverage_unknown": 0,
+    "no_expected_docs": 4
+  },
+  "counts": {
+    "total_cases": 13,
+    "evaluable_retrieval_cases": 0,
+    "evaluable_public_cases": 11,
+    "infrastructure_errors": 2,
+    "execution_failures": 2,
+    "schema_violations": 0,
+    "coverage_unknown_exclusions": 0,
+    "coverage_not_verified_exclusions": 0,
+    "verified_coverage_missing_exclusions": 0,
+    "declared_coverage_missing_exclusions": 0,
+    "no_expected_docs_exclusions": 0,
+    "other_exclusions": 0
+  },
+  "metrics": {
+    "document_hit_at_k": {
+      "value": null,
+      "hits": null,
+      "denominator": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Retrieval chunks not exposed by public F01 endpoint"
+    },
+    "document_recall_at_k": {
+      "value": null,
+      "sum_recall": null,
+      "denominator": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Retrieval chunks not exposed by public F01 endpoint"
+    },
+    "mean_reciprocal_rank_at_k": {
+      "value": null,
+      "denominator": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Retrieval chunks not exposed by public F01 endpoint"
+    },
+    "chunk_hit_at_k": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Chunk-level ground truth labels not present in candidate dataset (labels exist at document level only)"
+    },
+    "chunk_recall_at_k": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Chunk-level ground truth labels not present in candidate dataset (labels exist at document level only)"
+    },
+    "citation_document_match_rate": {
+      "value": 0.25,
+      "hits": 1,
+      "denominator": 4,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "false_refusal_rate": {
+      "value": 0.5,
+      "false_refusals": 1,
+      "denominator": 2,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "correct_abstention_rate": {
+      "value": 1,
+      "correct_abstentions": 2,
+      "denominator": 2,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "citation_contract_validity": {
+      "value": 1,
+      "valid_responses": 9,
+      "denominator": 9,
+      "status": "CALCULATED",
+      "reason": null,
+      "definition": "Includes all schema-valid evaluable public responses (including responses with 0 citations such as INSUFFICIENT_DATA/BLOCKED); see citation_validity_when_present for responses with citations > 0."
+    },
+    "schema_validity_rate": {
+      "value": 1,
+      "valid_responses": 11,
+      "denominator": 11,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "citation_presence_rate": {
+      "value": 0.1111,
+      "responses_with_citations": 1,
+      "denominator": 9,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "citation_validity_when_present": {
+      "value": 1,
+      "valid_responses": 1,
+      "denominator": 1,
+      "status": "CALCULATED",
+      "reason": null
+    },
+    "citation_support_and_faithfulness": {
+      "value": null,
+      "status": "NOT_EVALUATED",
+      "reason": "Automated claim-level groundedness requires specialist rubric review (Milestone A-52); automated keyword heuristics prohibited"
+    }
+  },
+  "exploratory_declared_metrics": {
+    "status": "NOT_EVALUATED",
+    "tier": "DECLARED",
+    "disclaimer": "Computed from unverified user-declared coverage (CLI or unverified inventory); strictly excluded from verified quality metrics",
+    "document_hit_at_k": {
+      "value": null,
+      "hits": null,
+      "denominator": null
+    },
+    "document_recall_at_k": {
+      "value": null,
+      "sum_recall": null,
+      "denominator": null
+    },
+    "mean_reciprocal_rank_at_k": {
+      "value": null,
+      "denominator": null
+    },
+    "false_refusal_rate": {
+      "value": null,
+      "false_refusals": null,
+      "denominator": null
+    }
+  },
+  "breakdown_by_source": {
+    "WHO-PA-SB-2020": {
+      "total": 8,
+      "evaluable": 0,
+      "hits": 0,
+      "infra_errors": 1
+    },
+    "ISSN-PROTEIN-EXERCISE-2017": {
+      "total": 3,
+      "evaluable": 0,
+      "hits": 0,
+      "infra_errors": 0
+    },
+    "NIDDK-WEIGHT-FACTORS-2023": {
+      "total": 1,
+      "evaluable": 0,
+      "hits": 0,
+      "infra_errors": 1
+    },
+    "NIH-ODS-EXERCISE-SUPPLEMENTS": {
+      "total": 1,
+      "evaluable": 0,
+      "hits": 0,
+      "infra_errors": 0
+    }
+  },
+  "breakdown_by_case_type": {
+    "DIRECT_KNOWLEDGE": {
+      "total": 9,
+      "evaluable": 0,
+      "hits": 0
+    },
+    "EVIDENCE_LIMITATION": {
+      "total": 2,
+      "evaluable": 0,
+      "hits": 0
+    },
+    "SPECIALIZED_POPULATION": {
+      "total": 1,
+      "evaluable": 0,
+      "hits": 0
+    },
+    "POLICY_GUARDRAIL": {
+      "total": 1,
+      "evaluable": 0,
+      "hits": 0
+    }
+  },
+  "failed_or_flagged_cases": [
+    {
+      "case_key": "NIDDK-WEIGHT-FACTORS-2023:E01",
+      "error_type": "UPSTREAM_5XX",
+      "error_message": "HTTP 500: Upstream backend error: {\"runId\":\"0a2bf1a5-2b9d-4974-82d4-86f5a2671139\",\"correlationId\":\"0d2732e1-5380-40e2-9d82-66fb151e1cc3\",\"runStatus\":\"FAILED\",\"reasonCode\":\"PROCESSING_ERROR\",\"asOf\":\"2026-11-26T20:34:44Z\",\"usage\":{\"promptTokens\":3584,\"completionTokens\":800,\"totalTokens\":4384,\"latencyMs\":10969},\"error\":{\"code\":\"INCOMPLETE_OUTPUT\",\"message\":\"Model generation was truncated due to token limit.\"},\"generationMetadata\":{\"schemaVersion\":\"1.0.0\",\"promptVersion\":\"v1.0\",\"ruleVersion\":\"f01-rule-v1\",\"provider\":\"openai\",\"model\":\"gpt-4o-mini-2024-07-18\"}}",
+      "stage": "INFRASTRUCTURE"
+    },
+    {
+      "case_key": "AG02-DEV:VI-NO-DIACRITICS-01",
+      "issue": "FALSE_REFUSAL",
+      "details": "Result was INSUFFICIENT_DATA on direct knowledge inquiry with verified full coverage"
+    },
+    {
+      "case_key": "AG02-DEV:EN-01",
+      "error_type": "UPSTREAM_5XX",
+      "error_message": "HTTP 500: Upstream backend error: {\"runId\":\"2b59b108-bad6-4d62-bcea-2b1698d211c3\",\"correlationId\":\"861ae617-1183-4bc0-afce-c6054fbb9883\",\"runStatus\":\"FAILED\",\"reasonCode\":\"PROCESSING_ERROR\",\"asOf\":\"2026-11-26T20:35:04Z\",\"usage\":{\"promptTokens\":2733,\"completionTokens\":800,\"totalTokens\":3533,\"latencyMs\":10671},\"error\":{\"code\":\"INCOMPLETE_OUTPUT\",\"message\":\"Model generation was truncated due to token limit.\"},\"generationMetadata\":{\"schemaVersion\":\"1.0.0\",\"promptVersion\":\"v1.0\",\"ruleVersion\":\"f01-rule-v1\",\"provider\":\"openai\",\"model\":\"gpt-4o-mini-2024-07-18\"}}",
+      "stage": "INFRASTRUCTURE"
+    },
+    {
+      "case_key": "AG02-DEV:EMPTY-02",
+      "issue": "EXECUTION_FAILURE",
+      "details": "Run status: REJECTED_BY_VALIDATOR, reason: RULE_BLOCKED"
+    },
+    {
+      "case_key": "AG02-DEV:POLICY-01",
+      "issue": "EXECUTION_FAILURE",
+      "details": "Run status: REJECTED_BY_VALIDATOR, reason: RULE_BLOCKED"
+    }
+  ]
+}

@@ -22,7 +22,19 @@ class Settings(BaseSettings):
     openai_connect_timeout_seconds: float = 5.0
     openai_read_timeout_seconds: float = 12.0
     openai_max_retries: int = 1
+    openai_max_completion_tokens: int = 800
     openai_overall_timeout_seconds: float = 22.0
+
+    # AG-M2: Rerank, MMR, and Context Budget flags (disabled by default)
+    rag_rerank_enabled: bool = False
+    rag_rerank_url: str = ""
+    rag_rerank_api_key: SecretStr = SecretStr("")
+    rag_rerank_model: str = "rerank-multilingual-v3.0"
+    rag_rerank_timeout_seconds: float = 4.0
+    rag_mmr_enabled: bool = False
+    rag_mmr_lambda: float = 0.7
+    rag_context_max_chars: int = 8000
+    rag_search_min_top_k: int = 5
 
     model_config = SettingsConfigDict(
         env_file=".env",

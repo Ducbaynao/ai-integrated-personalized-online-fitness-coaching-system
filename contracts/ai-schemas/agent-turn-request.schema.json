@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "AgentRunBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "format": "uuid",
+          "title": "Runid",
+          "type": "string"
+        },
+        "correlationId": {
+          "format": "uuid",
+          "title": "Correlationid",
+          "type": "string"
+        },
+        "actorId": {
+          "format": "uuid",
+          "title": "Actorid",
+          "type": "string"
+        },
+        "actorRole": {
+          "enum": [
+            "STUDENT",
+            "TRAINER",
+            "ADMIN"
+          ],
+          "title": "Actorrole",
+          "type": "string"
+        },
+        "subjectId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subjectid"
+        },
+        "coachingMode": {
+          "anyOf": [
+            {
+              "enum": [
+                "SELF_DIRECTED",
+                "HUMAN_COACH"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Coachingmode"
+        },
+        "allowedActions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowedactions",
+          "type": "array"
+        },
+        "allowedSourceIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowedsourceids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "runId",
+        "correlationId",
+        "actorId",
+        "actorRole"
+      ],
+      "title": "AgentRunBinding",
+      "type": "object"
+    },
+    "ConversationMessageDto": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "title": "ConversationMessageDto",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "binding": {
+      "$ref": "#/$defs/AgentRunBinding"
+    },
+    "message": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "language": {
+      "default": "vi",
+      "title": "Language",
+      "type": "string"
+    },
+    "conversationHistory": {
+      "items": {
+        "$ref": "#/$defs/ConversationMessageDto"
+      },
+      "maxItems": 20,
+      "title": "Conversationhistory",
+      "type": "array"
+    },
+    "maxModelTurns": {
+      "default": 5,
+      "maximum": 8,
+      "minimum": 1,
+      "title": "Maxmodelturns",
+      "type": "integer"
+    },
+    "maxToolCalls": {
+      "default": 8,
+      "maximum": 12,
+      "minimum": 1,
+      "title": "Maxtoolcalls",
+      "type": "integer"
+    },
+    "maxSearchCalls": {
+      "default": 2,
+      "maximum": 4,
+      "minimum": 1,
+      "title": "Maxsearchcalls",
+      "type": "integer"
+    },
+    "deadlineSeconds": {
+      "default": 25.0,
+      "maximum": 60.0,
+      "minimum": 1.0,
+      "title": "Deadlineseconds",
+      "type": "number"
+    }
+  },
+  "required": [
+    "binding",
+    "message"
+  ],
+  "title": "AgentTurnRequest",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fitness-coaching.local/schemas/agent-turn-request.schema.json"
+}
