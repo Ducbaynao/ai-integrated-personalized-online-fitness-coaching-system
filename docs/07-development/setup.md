@@ -59,7 +59,7 @@ npm run dev:admin
 
 Docker Compose automatically reads `.env` to configure PostgreSQL credentials. However, running Spring Boot directly via Maven does not automatically parse the root `.env` file, which can lead to authentication mismatches (`FATAL: password authentication failed for user "fitness_app"`).
 
-To prevent this, use the recommended development launcher script, which reads the root `.env`, validates that required credentials exist, and securely exports only allowlisted variables (`DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `BACKEND_PORT`) without printing secrets:
+To prevent this, use the recommended development launcher script, which reads the root `.env`, validates that required credentials exist, and securely exports only allowlisted variables (database, backend port and the SMTP variables documented below) without printing secrets:
 
 Windows (PowerShell) (Recommended):
 ```powershell
@@ -71,7 +71,39 @@ Unix / macOS (Recommended):
 bash ./services/backend/run-dev.sh
 ```
 
-The `dev` profile explicitly activates the development verification-email adapter (`DevelopmentVerificationEmailSender`), which dispatches verification emails via SMTP to Mailpit alongside a development-only JWT signing secret. The verification token is visible in Mailpit (`http://localhost:8025`) for development testing and deep linking, but plaintext tokens are strictly never written to backend application logs. Default and production profiles intentionally fail fast if `JWT_SECRET` is missing/short or if no production `VerificationEmailPort` is configured. Milestone M1A/M1B is not production-email-ready (durable outbox delivery, persistent retry queues, and third-party email provider integration are deferred to subsequent milestones).
+The `dev` profile defaults to Mailpit and a development-only JWT secret. Mailpit is allowed only in `dev`. Non-dev deployments require `JWT_SECRET` and explicitly configured real SMTP; never enable `dev` in production. The test profile uses its test-only capturing adapter and cannot create a duplicate network sender.
+
+### Real SMTP verification email
+
+In the ignored root `.env` (loaded by both development launchers), or the process environment for a non-dev deployment:
+
+```dotenv
+VERIFICATION_EMAIL_MODE=smtp
+VERIFICATION_EMAIL_FROM=your-authorized-sender@example.com
+SPRING_MAIL_HOST=smtp.your-provider.example
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=your-smtp-username
+SPRING_MAIL_PASSWORD=replace-locally-never-commit
+SMTP_AUTH=true
+SMTP_STARTTLS=true
+SMTP_SSL=false
+SMTP_CONNECTION_TIMEOUT_MS=5000
+SMTP_READ_TIMEOUT_MS=5000
+SMTP_WRITE_TIMEOUT_MS=5000
+```
+
+Both launchers allowlist these variables without printing values or placing passwords in Maven arguments. Maven alone does not read `.env`. Keep secrets in the environment or an ignored local file, never in tracked YAML, PRs or CI logs. Real SMTP requires an explicit host, port and authorized From; authenticated SMTP also requires username/password. Invalid/missing configuration fails startup. Incorrect credentials, unreachable hosts and provider rejections fail during delivery. STARTTLS is required when enabled; implicit SSL uses `SMTP_STARTTLS=false` and `SMTP_SSL=true` (usually port 465). Insecure real SMTP and simultaneous STARTTLS/SSL are rejected. The three positive timeouts are milliseconds, default 5000. Provider authorization/connectivity require a live send.
+
+For personal Gmail use `smtp.gmail.com`, port `587`, STARTTLS, and your Gmail address for From and username. Enable Google 2-Step Verification and create an App Password, entered directly into the ignored local file; never paste it in chat. See [Google SMTP settings](https://developers.google.com/workspace/gmail/imap/imap-smtp) and [Google App Password instructions](https://support.google.com/mail/answer/185833?hl=en).
+
+To return to Mailpit set `VERIFICATION_EMAIL_MODE=mailpit`, remove the real SMTP variables, and run the existing `dev` launcher. Defaults: localhost:1025, no auth/TLS, From `no-reply@fitnesscoaching.local`. Existing `SPRING_MAIL_HOST`/`SPRING_MAIL_PORT` overrides still work.
+
+Email contains the existing manual token and optional `ai-fitness-coaching://` link. Enter the token on the current form; custom links depend on the installed app and are not guaranteed in Expo Go. Token generation/hash/storage, 24-hour expiry, single use, account lifecycle and sessions are unchanged.
+
+Delivery remains synchronous **after registration commits**. The adapter reports SMTP acceptance only after `send` returns. Failure propagates to the existing application-service handler, which increments `auth.email.verification.delivery.failures` and warns; registration still returns its existing response and the account/token remain pending. HTTP 201 is not a delivery receipt. Do not automatically repeat registration: duplicate-email guards remain active. No retry, resend, queue or outbox is introduced. Provider exceptions are sanitized before that handler logs them because failed-mail exceptions can retain the raw token/message.
+
+For live verification use a separate disposable database/runtime and a fresh QA account at an explicitly approved recipient. Record SMTP acceptance separately from the recipient's Inbox/Spam confirmation, then confirm through the existing API/form. Never publish the token. Without credentials or mailbox confirmation, real inbox delivery and end-to-end verification remain unverified.
+
 
 ## 7. Start AI Service
 

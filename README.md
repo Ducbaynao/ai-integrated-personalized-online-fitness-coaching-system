@@ -63,7 +63,7 @@ Unix / macOS (Recommended):
 bash ./services/backend/run-dev.sh
 ```
 
-The `dev` profile activates the development verification-email adapter (`DevelopmentVerificationEmailSender`), which dispatches verification emails via SMTP to Mailpit alongside a development-only JWT signing secret. The verification token is visible in Mailpit (`http://localhost:8025`) for development testing and mobile deep link verification, but plaintext tokens are strictly never written to backend application logs. Default and production profiles intentionally fail fast if `JWT_SECRET` is missing/short or if no production `VerificationEmailPort` is configured. Milestone M1A/M1B is not production-email-ready (durable outbox delivery and external provider integration are deferred).
+The `dev` profile defaults to Mailpit. Real SMTP is opt-in via `VERIFICATION_EMAIL_MODE=smtp` and works without `dev`; see [SMTP configuration](docs/07-development/setup.md#real-smtp-verification-email). The existing manual verification token, 24-hour expiry and registration/session contracts are unchanged. SMTP acceptance does not prove inbox delivery; post-commit failure leaves the account pending and increments the failure metric without retry/resend. Non-dev deployments still require a valid `JWT_SECRET`.
 
 Start AI Service:
 ```bash

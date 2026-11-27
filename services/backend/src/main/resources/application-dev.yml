@@ -4,15 +4,6 @@ spring:
       on-profile: dev
   jpa:
     show-sql: true
-  mail:
-    host: ${SPRING_MAIL_HOST:localhost}
-    port: ${SPRING_MAIL_PORT:1025}
-    properties:
-      mail:
-        smtp:
-          auth: false
-          starttls:
-            enable: false
 
 logging:
   level:
@@ -21,6 +12,8 @@ logging:
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: WARN
 
 auth:
+  verification-email:
+    mode: ${VERIFICATION_EMAIL_MODE:mailpit}
   jwt:
     secret: dev-only-jwt-secret-change-before-production-1234567890
 
