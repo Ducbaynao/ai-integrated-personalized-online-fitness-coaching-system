@@ -2,7 +2,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/design-system/components/AppButton';
 import { AppCard } from '@/design-system/components/AppCard';
 import { AppIcon } from '@/design-system/components/AppIcon';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -18,6 +18,7 @@ import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
+import { useAuth } from '@/features/auth/AuthContext';
 import { apiErrorMessage, goalStatusLabels } from '@/localization/displayLabels';
 import { formatContextFreeInstant } from '@/localization/instantDisplay';
 import {
@@ -33,6 +34,7 @@ import {
   withUnit,
 } from '@/localization/progressLabels';
 import { measurementApi } from '@/services/measurementApi';
+import { getAuthSessionBinding } from '@/services/apiClient';
 import { progressDashboardApi } from '@/services/progressDashboardApi';
 import {
   MetricDelta,
@@ -47,7 +49,14 @@ interface ProgressDashboardScreenProps {
   readOnly?: boolean;
 }
 
-export function ProgressDashboardScreen({ studentId, readOnly = false }: ProgressDashboardScreenProps) {
+export function ProgressDashboardScreen(props: ProgressDashboardScreenProps) {
+  const { user, activeCapability } = useAuth();
+  const binding = getAuthSessionBinding();
+  const key = `${binding.authEpoch}:${binding.capabilityEpoch}:${user?.id}:${activeCapability}:${props.studentId ?? 'me'}:${props.readOnly ?? false}`;
+  return <ProgressDashboardContent key={key} {...props} />;
+}
+
+function ProgressDashboardContent({ studentId, readOnly = false }: ProgressDashboardScreenProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = getSemanticColors(isDark);
@@ -61,6 +70,18 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const binding = getAuthSessionBinding();
+  const contextKey = `${binding.authEpoch}:${binding.capabilityEpoch}:${studentId ?? 'me'}:${readOnly}`;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const isCurrentContext = useCallback(() => {
+    const current = getAuthSessionBinding();
+    return mounted.current &&
+      current.authEpoch === binding.authEpoch && current.capabilityEpoch === binding.capabilityEpoch;
+  }, [binding.authEpoch, binding.capabilityEpoch]);
 
   const loadData = useCallback(() => {
     let active = true;
@@ -75,17 +96,17 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
       }),
     ])
       .then(([sum, photoPage]) => {
-        if (!active) return;
+        if (!active || !isCurrentContext()) return;
         setErrorMessage(null);
         setSummary(sum);
         setPhotos(photoPage.content);
       })
       .catch((err: any) => {
-        if (!active) return;
+        if (!active || !isCurrentContext()) return;
         setErrorMessage(apiErrorMessage(err, 'Không thể tải bảng tiến độ. Vui lòng thử lại.'));
       })
       .finally(() => {
-        if (!active) return;
+        if (!active || !isCurrentContext()) return;
         setIsLoading(false);
         setIsRefreshing(false);
       });
@@ -93,7 +114,7 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
     return () => {
       active = false;
     };
-  }, [studentId, scope]);
+  }, [studentId, scope, isCurrentContext]);
 
   useEffect(() => {
     return loadData();
@@ -110,10 +131,10 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
       await measurementApi.uploadProgressPhoto({
         ...params,
         studentId: studentId || params.studentId,
-      });
-      await loadData();
+      }, isCurrentContext);
+      if (isCurrentContext()) loadData();
     } finally {
-      setIsUploadingPhoto(false);
+      if (isCurrentContext()) setIsUploadingPhoto(false);
     }
   };
 
@@ -429,13 +450,14 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
         </ScrollView>
       ) : null}
 
-      <UploadProgressPhotoModal
+      {isUploadModalOpen && <UploadProgressPhotoModal
+        key={contextKey}
         visible={isUploadModalOpen}
         isSubmitting={isUploadingPhoto}
         isDark={isDark}
         onClose={() => setIsUploadModalOpen(false)}
         onSubmit={handleUploadPhoto}
-      />
+      />}
     </SafeAreaView>
   );
 }

@@ -2,9 +2,15 @@ import React from 'react';
 import renderer from 'react-test-renderer';
 import { Text } from 'react-native';
 import { ProgressDashboardScreen } from '@/features/progress/ProgressDashboardScreen';
+import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
+import { invalidateAuthSession } from '@/services/apiClient';
 import { measurementApi } from '@/services/measurementApi';
 import { progressDashboardApi } from '@/services/progressDashboardApi';
 import { ProgressDashboardSummary } from '@/types/measurement';
+
+jest.mock('@/features/auth/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'viewer' }, activeCapability: 'STUDENT' }),
+}));
 
 jest.mock('expo-router', () => ({
   router: {
@@ -104,6 +110,37 @@ describe('ProgressDashboardScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each(['student change', 'account change', 'unmount'])('ignores an upload completion after %s', async change => {
+    (progressDashboardApi.getSummary as jest.Mock).mockResolvedValue(sampleSummaryCurrentGoal);
+    (measurementApi.listProgressPhotos as jest.Mock).mockResolvedValue({ content: [], totalElements: 0 });
+    let finish!: () => void;
+    (measurementApi.uploadProgressPhoto as jest.Mock).mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    let tree!: renderer.ReactTestRenderer;
+    await renderer.act(async () => { tree = renderer.create(<ProgressDashboardScreen studentId="student-1" />); });
+    renderer.act(() => { tree.root.findByProps({ testID: 'upload-photo-btn' }).props.onPress(); });
+    let pending!: Promise<void>;
+    renderer.act(() => {
+      pending = tree.root.findByType(UploadProgressPhotoModal).props.onSubmit({ fileUri: 'file:///fixture.jpg', fileName: 'fixture.jpg', mimeType: 'image/jpeg' });
+    });
+    const guard = (measurementApi.uploadProgressPhoto as jest.Mock).mock.calls[0][1];
+    expect(guard()).toBe(true);
+    await renderer.act(async () => {
+      if (change === 'unmount') tree.unmount();
+      else {
+        if (change === 'account change') invalidateAuthSession();
+        tree.update(<ProgressDashboardScreen studentId={change === 'student change' ? 'student-2' : 'student-1'} />);
+      }
+    });
+    expect(guard()).toBe(false);
+    const loads = (measurementApi.listProgressPhotos as jest.Mock).mock.calls.length;
+    await renderer.act(async () => { finish(); await pending; });
+    expect(measurementApi.listProgressPhotos).toHaveBeenCalledTimes(loads);
+    if (change !== 'unmount') {
+      expect(tree.root.findAllByType(UploadProgressPhotoModal)).toHaveLength(0);
+      renderer.act(() => tree.unmount());
+    }
   });
 
   const settle = async () => {
