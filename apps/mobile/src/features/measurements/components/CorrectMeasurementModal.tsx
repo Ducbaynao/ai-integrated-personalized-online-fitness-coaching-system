@@ -12,7 +12,7 @@ import {
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { CorrectMeasurementRequest, Measurement } from '@/types/measurement';
 import { metricLabel, unitTypeLabel, valueFieldLabel, withUnit } from '@/localization/progressLabels';
 
@@ -92,11 +92,11 @@ export function CorrectMeasurementModal({
           <ScrollView style={styles.scroll}>
             <View style={[styles.infoBox, { backgroundColor: themeColors.surfaceSubtle, borderColor: themeColors.border }]}>
               <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
-                Chỉ số: <Text style={{ color: themeColors.textPrimary, fontWeight: '700' }}>{metricLabel(measurement.metricCode, measurement.metricDisplayName)}</Text>
+                Chỉ số: <Text style={{ color: themeColors.textPrimary, fontFamily: fontFamily.bold }}>{metricLabel(measurement.metricCode, measurement.metricDisplayName)}</Text>
               </Text>
               <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
                 Giá trị ban đầu:{' '}
-                <Text style={{ color: themeColors.textPrimary, fontWeight: '700' }}>
+                <Text style={{ color: themeColors.textPrimary, fontFamily: fontFamily.bold }}>
                   {measurement.numericValue !== null && measurement.numericValue !== undefined
                     ? withUnit(measurement.numericValue, measurement.unitCode, { metricCode: measurement.metricCode, symbol: measurement.unitSymbol })
                     : measurement.textValue || '—'}
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h2,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     marginBottom: spacing.md,
   },
   scroll: {
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginBottom: spacing.xs,
   },
   inputGroup: {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginTop: spacing.xs,
   },
   buttonRow: {
@@ -272,6 +272,6 @@ const styles = StyleSheet.create({
   btnSubmit: {},
   btnText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

@@ -12,7 +12,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { colors, getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export function ChoosePurposeScreen() {
   const router = useRouter();
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   cardBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   cardTitle: {
     ...typography.h3,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
     textDecorationLine: 'underline',
   },
 });

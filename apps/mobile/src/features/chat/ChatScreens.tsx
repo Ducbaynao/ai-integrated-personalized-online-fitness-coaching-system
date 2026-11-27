@@ -17,6 +17,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { pushApi, PushDeliveryState } from '@/services/pushApi';
+import { formatInstantDateVietnam, formatInstantVietnam } from '@/localization/instantDisplay';
+import { formatRecordedScheduleTime } from '@/features/workout-schedule/scheduleDisplay';
 
 type PendingAttachment = { uri: string; name: string; mimeType: string; size: number; commandKey: string };
 const attachmentTypes = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -31,6 +33,12 @@ const key = (actor: string, role: string, resource: string, id?: string) => ['ch
 const messageStatus: Record<ChatMessage['status'], string> = {
   SENT: 'Đã gửi', DELIVERED: 'Đã nhận', READ: 'Đã đọc',
 };
+/** Shown instead of a guessed time when a timestamp is missing, date-only, offset-less or unparsable. */
+const UNKNOWN_TIME_LABEL = 'Chưa rõ thời điểm';
+function conversationOpenLabel(updatedAt: unknown) {
+  const day = formatInstantDateVietnam(updatedAt);
+  return day ? `Mở hội thoại ngày ${day}` : 'Mở hội thoại';
+}
 function errorText(error: unknown) {
   if (error instanceof ApiError && [403, 404].includes(error.status)) return 'Không còn quyền xem nội dung này.';
   if (error instanceof ApiError && error.status === 0) return 'Mất kết nối. Vui lòng thử lại.';
@@ -65,10 +73,10 @@ export function ChatInboxScreen() {
     {query.isError ? <CoachingState title="Không thể tải hội thoại" message={errorText(query.error)} onRetry={() => query.refetch()} /> : null}
     {!query.isPending && !query.isError && rows.length === 0 ? <CoachingState title="Chưa có tin nhắn" message="Mở quan hệ huấn luyện hiện hành để gửi tin đầu tiên." /> : null}
     {!concealed && !query.isError && rows.map((row: ChatConversation) => <Pressable key={row.id} accessibilityRole="button"
-      accessibilityLabel={`Mở hội thoại ngày ${new Date(row.updatedAt).toLocaleDateString('vi-VN')}`}
+      accessibilityLabel={conversationOpenLabel(row.updatedAt)}
       onPress={() => router.push(`/chat/${row.id}` as never)}>
       <CoachingCard><Text style={[styles.h2, { color: theme.textPrimary }]}>Hội thoại huấn luyện</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Cập nhật {new Date(row.updatedAt).toLocaleString('vi-VN')}</Text></CoachingCard>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Cập nhật {formatInstantVietnam(row.updatedAt) ?? UNKNOWN_TIME_LABEL}</Text></CoachingCard>
     </Pressable>)}
     {query.hasNextPage && !query.isError ? <CoachingButton label="Tải thêm" secondary busy={query.isFetchingNextPage}
       disabled={query.isFetchingNextPage} onPress={() => query.fetchNextPage()} /> : null}
@@ -238,7 +246,7 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
         ? <CoachingButton label="Mở tài nguyên được chia sẻ" secondary
           onPress={() => router.push(`/chat/linked/${message.id}` as never)} />
         : <Text style={[styles.body, { color: theme.textSecondary }]}>Tài nguyên không còn khả dụng.</Text> : null}
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{message.senderId === actor ? 'Bạn' : 'Đối phương'} · {new Date(message.sentAt).toLocaleString('vi-VN')} · {messageStatus[message.status]}</Text>
+      <Text style={[styles.label, { color: theme.textSecondary }]}>{message.senderId === actor ? 'Bạn' : 'Đối phương'} · {formatInstantVietnam(message.sentAt) ?? UNKNOWN_TIME_LABEL} · {messageStatus[message.status]}</Text>
       {message.senderId !== actor && !message.readAt ? <CoachingButton label="Đánh dấu đã đọc" secondary onPress={() => receipt.mutate({ id: message.id, kind: 'READ' })} /> : null}
     </CoachingCard>)}
     {messages.hasNextPage && !messages.isError ? <CoachingButton label="Tải tin cũ" secondary onPress={() => messages.fetchNextPage()} /> : null}
@@ -276,11 +284,11 @@ export function ConversationScreen({ conversationId, studentId }: { conversation
             disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'WORKOUT_PLAN_VERSION',
               resourceId: plan.currentVersionId!, parentId: plan.id })} />)}
         {!workouts.isError && workouts.data?.items.map(workout =>
-          <CoachingButton key={workout.occurrenceId} label={`Gửi lịch tập: ${new Date(workout.plannedStartAt).toLocaleString('vi-VN')}`}
+          <CoachingButton key={workout.occurrenceId} label={`Gửi lịch tập: ${formatRecordedScheduleTime(workout.plannedStartAt, workout.timezone) ?? UNKNOWN_TIME_LABEL}`}
             secondary disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'PLANNED_WORKOUT',
               resourceId: workout.occurrenceId, parentId: null })} />)}
         {!appointments.isError && appointments.data?.items.filter(item => item.studentId === targetStudent).map(item =>
-          <CoachingButton key={item.appointmentId} label={`Gửi lịch hẹn: ${new Date(item.startAt).toLocaleString('vi-VN')}`}
+          <CoachingButton key={item.appointmentId} label={`Gửi lịch hẹn: ${formatRecordedScheduleTime(item.startAt, item.timezone) ?? UNKNOWN_TIME_LABEL}`}
             secondary disabled={sendLink.isPending} onPress={() => chooseLink({ type: 'APPOINTMENT',
               resourceId: item.appointmentId, parentId: null })} />)}
         {plans.data?.items.length === 0 && workouts.data?.items.length === 0 && appointments.data?.items.length === 0
@@ -309,10 +317,10 @@ export function ChatLinkedResourceScreen({ messageId }: { messageId: string }) {
       }
       if (item.type === 'PLANNED_WORKOUT') {
         const workout = await workoutScheduleApi.detail(item.resourceId);
-        return { title: 'Lịch tập', summary: new Date(workout.plannedStartAt).toLocaleString('vi-VN') };
+        return { title: 'Lịch tập', summary: formatRecordedScheduleTime(workout.plannedStartAt, workout.timezone) ?? UNKNOWN_TIME_LABEL };
       }
       const appointment = await appointmentApi.detail(item.resourceId);
-      return { title: 'Lịch hẹn huấn luyện', summary: new Date(appointment.startAt).toLocaleString('vi-VN') };
+      return { title: 'Lịch hẹn huấn luyện', summary: formatRecordedScheduleTime(appointment.startAt, appointment.timezone) ?? UNKNOWN_TIME_LABEL };
     },
   });
   const denied = [link.error, source.error].some(error => error instanceof ApiError && [403, 404].includes(error.status));
@@ -383,7 +391,7 @@ export function NotificationsScreen() {
     {!query.isError && rows.map(item => <CoachingCard key={item.id}>
       <Text style={[styles.h2, { color: theme.textPrimary }]}>{item.title}</Text>
       <Text style={[styles.body, { color: theme.textSecondary }]}>{item.body}</Text>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
+      <Text style={[styles.label, { color: theme.textSecondary }]}>{formatInstantVietnam(item.createdAt) ?? UNKNOWN_TIME_LABEL}</Text>
       <CoachingButton label="Xem trạng thái thông báo đẩy" secondary onPress={() => { void showDelivery(item.id); }} />
       {visibleDelivery?.id === item.id ? <Text style={[styles.body, { color: theme.textSecondary }]}>
         {visibleDelivery.items.length ? visibleDelivery.items.map(state => ({

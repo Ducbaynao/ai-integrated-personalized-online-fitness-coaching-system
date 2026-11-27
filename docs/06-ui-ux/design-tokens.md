@@ -44,6 +44,8 @@ P7-012: Be Vietnam Pro thay DM Sans vì DM Sans chỉ có subset `latin`/`latin-
 
 Không sử dụng body text nhỏ hơn 14 px trên mobile cho nội dung cần đọc liên tục.
 
+**Weight và nghiêng:** chọn đúng `fontFamily.*` của token (`regular`, `medium`, `semiBold`, `bold`, `regularItalic`, `mediumItalic`), không đặt `fontWeight` hoặc `fontStyle: 'italic'` lên một family token. Mỗi family là một file riêng; `fontWeight`/`fontStyle` chồng lên file Regular khiến nền tảng tự tạo chữ đậm/nghiêng giả thay vì dùng face Be Vietnam Pro thật. Chỉ face thực sự có caller mới được đăng ký trong `appFontAssets` (hiện có 4 weight đứng và hai italic Regular/Medium); cần face mới thì thêm token và asset cùng lúc. Text không dùng token (ví dụ ký tự ✓/✕ hoặc modal dùng chữ hệ thống) dùng font hệ thống và có thể giữ `fontWeight`; danh sách này được khóa trong `src/__tests__/fontFaceOverrides.test.ts`. Kiểm tra này là kiểm tra mã nguồn, không thay thế kiểm tra hiển thị trên thiết bị.
+
 ## Spacing và radius
 
 - Spacing: `2, 4, 8, 12, 16, 24, 32`.

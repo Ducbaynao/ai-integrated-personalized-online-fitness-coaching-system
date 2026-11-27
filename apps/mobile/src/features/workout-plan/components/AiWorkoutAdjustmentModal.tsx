@@ -13,7 +13,7 @@ import { getSemanticColors } from '@/design-system/tokens/colors';
 import { aiRecommendationStatusLabels } from '@/localization/displayLabels';
 import { spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import {
   aiWorkoutAdjustmentApi,
   getWorkoutAdjustmentErrorMessage,
@@ -2565,7 +2565,7 @@ const styles = StyleSheet.create({
   },
   emptyPrescriptionText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   label: {
     ...typography.label,
@@ -2609,7 +2609,7 @@ const styles = StyleSheet.create({
   },
   conflictTitle: {
     ...typography.label,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   conflictBody: {
     ...typography.bodySmall,
@@ -2634,7 +2634,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxs,
     borderRadius: radius.sm,
     ...typography.caption,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   authorityLabel: {
     ...typography.caption,
@@ -2665,12 +2665,12 @@ const styles = StyleSheet.create({
   },
   diffHeader: {
     ...typography.caption,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
     marginBottom: spacing.xxs,
   },
   diffTitle: {
     ...typography.label,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   diffMeta: {
     ...typography.bodySmall,
@@ -2682,7 +2682,7 @@ const styles = StyleSheet.create({
   },
   changeReason: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
     marginTop: spacing.xs,
   },
   bulletItem: {
@@ -2691,7 +2691,7 @@ const styles = StyleSheet.create({
   },
   warningTitle: {
     ...typography.label,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   warningBody: {
     ...typography.bodySmall,
@@ -2699,7 +2699,7 @@ const styles = StyleSheet.create({
   },
   appliedTitle: {
     ...typography.h3,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   appliedBody: {
     ...typography.bodySmall,
@@ -2726,7 +2726,7 @@ const styles = StyleSheet.create({
   },
   fieldDiffName: {
     ...typography.bodySmall,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   fieldDiffBefore: {
     ...typography.bodySmall,
@@ -2737,7 +2737,7 @@ const styles = StyleSheet.create({
   },
   fieldDiffAfter: {
     ...typography.bodySmall,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   fieldDiffDelta: {
     ...typography.bodySmall,
@@ -2752,7 +2752,7 @@ const styles = StyleSheet.create({
   },
   selectedVariationTitle: {
     ...typography.label,
-    fontWeight: 'bold',
+    fontFamily: fontFamily.bold,
   },
   selectedVariationSub: {
     ...typography.caption,

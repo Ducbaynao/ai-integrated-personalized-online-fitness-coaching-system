@@ -15,7 +15,7 @@ import { apiErrorMessage } from '@/localization/displayLabels';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { FitnessGoal, GoalLifecycleStatus } from '@/types/goal';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { ApiError } from '@/services/apiClient';
@@ -997,7 +997,7 @@ export function CurrentGoalScreen({ goalId }: CurrentGoalScreenProps) {
                           color: isSelected
                             ? themeColors.primary
                             : themeColors.textSecondary,
-                          fontWeight: isSelected ? '700' : '500',
+                          fontFamily: isSelected ? fontFamily.bold : fontFamily.medium,
                         },
                       ]}>
                       {label}
@@ -1109,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   screenTitle: {
     ...typography.h3,
@@ -1166,7 +1166,7 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   pauseActionButton: {
     minHeight: layout.minimumTouchTarget,
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
   },
   pauseActionText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   resumeActionButton: {
     minHeight: layout.minimumTouchTarget,
@@ -1189,7 +1189,7 @@ const styles = StyleSheet.create({
   },
   resumeActionText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#FFFFFF',
   },
   primaryActionButton: {
@@ -1202,7 +1202,7 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#FFFFFF',
   },
   tabBar: {
@@ -1246,7 +1246,7 @@ const styles = StyleSheet.create({
   },
   reconciliationCardTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     marginBottom: 2,
   },
   reconciliationCardSubtitle: {
@@ -1262,7 +1262,7 @@ const styles = StyleSheet.create({
   },
   retryActionText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#FFFFFF',
   },
 });

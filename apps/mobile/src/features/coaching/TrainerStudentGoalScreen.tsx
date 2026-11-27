@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { useRelationshipDetail } from './coachingQueries';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { FitnessGoal, GoalProposal } from '@/types/goal';
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   detailsBlock: {
     marginTop: spacing.sm,
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#ffffff',
   },
   proposalsSection: {
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   },
   proposalTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   captionText: {
     ...typography.caption,

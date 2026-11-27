@@ -23,7 +23,7 @@ import { getTodayDateOnly } from '@/features/shared/dateInputUtils';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 const GENDER_OPTIONS: { label: string; value: Gender }[] = [
   { label: genderLabels.MALE, value: 'MALE' },
@@ -508,7 +508,7 @@ export function StudentOnboardingScreen() {
             onPress={handleLogout}>
             <Text style={[styles.switchAccountText, { color: subtextColor }]}>
               Không phải tài khoản của bạn?{' '}
-              <Text style={{ color: themeColors.primary, fontWeight: '600' }}>
+              <Text style={{ color: themeColors.primary, fontFamily: fontFamily.semiBold }}>
                 Đăng xuất
               </Text>
             </Text>
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   errorBannerText: {
     ...typography.bodySmall,
     color: semanticColors.dangerText,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
   inputGroup: {
     gap: spacing.xs,

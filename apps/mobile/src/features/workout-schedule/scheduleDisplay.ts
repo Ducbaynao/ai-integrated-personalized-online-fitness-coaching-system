@@ -1,5 +1,6 @@
 import type { PlannedWorkoutStatus } from '@/types/workoutSchedule';
 import { formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
+import { parseExactInstant } from '@/localization/instantDisplay';
 
 const DAY = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 30;
@@ -28,4 +29,15 @@ export function formatScheduleTime(instant: string, timezone: string | null, pro
 export function formatTrainerScheduleTime(instant: string, timezone: string | null) {
   return timezone ? formatScheduleTime(instant, timezone)
     : `${formatScheduleTime(instant, 'UTC')} (múi giờ của bản ghi cũ chưa xác định)`;
+}
+
+/**
+ * Shows an instant that belongs to a saved record (planned workout, appointment) in that record's own
+ * timezone with an explicit label, never in the phone's timezone. A record without a saved timezone is
+ * shown in UTC and marked as such rather than guessed. Returns null when the value is not an exact
+ * instant, so callers show "unknown" instead of a made-up time (or crashing on an invalid date).
+ */
+export function formatRecordedScheduleTime(instant: unknown, timezone: string | null | undefined): string | null {
+  if (parseExactInstant(instant) === null) return null;
+  return formatTrainerScheduleTime(instant as string, timezone ?? null);
 }

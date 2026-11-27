@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { AddMeasurementModal } from '@/features/measurements/components/AddMeasurementModal';
 import { CorrectMeasurementModal } from '@/features/measurements/components/CorrectMeasurementModal';
 import { measurementApi } from '@/services/measurementApi';
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     ...typography.h3,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   topBar: {
     flexDirection: 'row',
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   btnAdd: {
     minHeight: 44,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   btnAddText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   listContent: {
     padding: spacing.md,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   metricTitle: {
     ...typography.h3,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   valueRow: {
     flexDirection: 'row',
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   itemValue: {
     ...typography.h1,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   btnCorrect: {
     borderWidth: 1,
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   btnCorrectText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   metaRow: {
     flexDirection: 'row',
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   notesText: {
     ...typography.bodySmall,
     maxWidth: '50%',
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   centerContainer: {
     flex: 1,
@@ -456,12 +456,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...typography.h2,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     marginBottom: spacing.xs,
   },
   errorTitle: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
@@ -473,6 +473,6 @@ const styles = StyleSheet.create({
   btnRetryText: {
     ...typography.label,
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
 });

@@ -5,6 +5,7 @@ import { CurrentGoalScreen, isGoalActionAllowed } from '@/features/goal/CurrentG
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 import { ApiError } from '@/types/auth';
 import { FitnessGoal } from '@/types/goal';
+import { syntheticFaceOffenders } from '@/test-utils/textFaces';
 
 let mockActiveFocusCleanup: (() => void) | void = undefined;
 let mockActiveFocusCallback: (() => (() => void) | void) | null = null;
@@ -154,6 +155,8 @@ describe('CurrentGoalScreen', () => {
     expect(fitnessGoalApi.getCurrentGoal).toHaveBeenCalledWith(true);
     expect(root.findByProps({ testID: 'pause-goal-button' })).toBeDefined();
     expect(root.findAllByProps({ testID: 'resume-goal-button' }).length).toBe(0);
+    // Tabs, labels and values ask for weight through the matching Be Vietnam Pro face, not fontWeight.
+    expect(syntheticFaceOffenders(tree!)).toEqual([]);
   });
 
   it('allows student to pause an active goal with mandatory reason and confirmation', async () => {

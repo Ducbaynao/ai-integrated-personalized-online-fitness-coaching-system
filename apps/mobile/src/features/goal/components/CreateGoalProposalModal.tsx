@@ -12,7 +12,7 @@ import {
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GOAL_TYPE_OPTIONS } from '@/features/goal/goalTypeOptions';
 
 interface CreateGoalProposalModalProps {
@@ -204,7 +204,7 @@ export function CreateGoalProposalModal({
                           styles.chipText,
                           {
                             color: isSelected ? '#ffffff' : themeColors.textPrimary,
-                            fontWeight: isSelected ? '700' : '400',
+                            fontFamily: isSelected ? fontFamily.bold : fontFamily.regular,
                           },
                         ]}>
                         {opt.label}
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   fieldGroup: {
     marginBottom: spacing.md,
@@ -370,12 +370,12 @@ const styles = StyleSheet.create({
   primaryButton: {},
   primaryButtonText: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#ffffff',
   },
   secondaryButton: {},
   secondaryButtonText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

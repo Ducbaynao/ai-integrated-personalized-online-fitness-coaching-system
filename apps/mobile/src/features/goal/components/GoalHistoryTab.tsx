@@ -9,7 +9,7 @@ import {
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { FitnessGoalVersion, GoalTransition } from '@/types/goal';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
 
@@ -163,7 +163,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   activeSubTab === 'versions'
                     ? themeColors.primary
                     : themeColors.textSecondary,
-                fontWeight: activeSubTab === 'versions' ? '700' : '500',
+                fontFamily: activeSubTab === 'versions' ? fontFamily.bold : fontFamily.medium,
               },
             ]}>
             Phiên bản mục tiêu ({versions.length})
@@ -191,7 +191,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                   activeSubTab === 'transitions'
                     ? themeColors.primary
                     : themeColors.textSecondary,
-                fontWeight: activeSubTab === 'transitions' ? '700' : '500',
+                fontFamily: activeSubTab === 'transitions' ? fontFamily.bold : fontFamily.medium,
               },
             ]}>
             Chuyển tiếp ({transitions.length})
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   },
   conceptDescription: {
     ...typography.caption,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.mediumItalic,
     paddingHorizontal: spacing.xs,
   },
   listContainer: {
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   },
   versionTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   currentBadge: {
     paddingHorizontal: spacing.xs,
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   },
   currentBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   row: {
     flexDirection: 'row',
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   metaValue: {
     ...typography.caption,
@@ -577,6 +577,6 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

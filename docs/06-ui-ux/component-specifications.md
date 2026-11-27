@@ -111,6 +111,14 @@ Hiển thị target, action, impact, required reason, permission, step-up requir
 - Không tự suy đoán hay tự chuyển bữa ăn theo giờ đồng hồ thiết bị.
 - Bảo đảm `accessibilityRole="radiogroup"` / `"radio"`, trạng thái `checked`/`selected`/`disabled`, vùng chạm tối thiểu `44 × 44` (`flexWrap: 'wrap'`, `flexShrink: 1` không cắt chữ khi nhãn dài ở chiều rộng `360px`), và dấu hiệu chọn kép (nền nhấn mạnh, viền `2px` và dấu `✓`) không phụ thuộc duy nhất vào màu sắc hoặc ký tự tròn nhỏ.
 
+## Hiển thị thời điểm không phụ thuộc múi giờ thiết bị
+
+- **Mốc thông thường** (thời gian tin nhắn, thông báo trong ứng dụng, "cập nhật lúc", thời điểm phát hiện/sự kiện của Attention) là `Instant` không kèm bối cảnh: hiển thị theo `Asia/Ho_Chi_Minh` bằng `formatInstantVietnam` / `formatInstantDateVietnam` (`src/localization/instantDisplay.ts`), không đọc múi giờ máy hay điện thoại.
+- **Mốc thuộc bản ghi đã lưu** (lịch tập, lịch hẹn gửi trong Chat, bằng chứng 100 ngày, khoảng dự kiến của Attention) giữ múi giờ/ngữ cảnh của bản ghi và hiển thị nhãn múi giờ (kèm offset theo đúng thời điểm, nên DST được phản ánh): dùng `formatRecordedScheduleTime` (bản ghi không có múi giờ hiện UTC kèm ghi chú chưa xác định, không đoán). Ngày đã lưu (`previousLocalDate`, `dueDate`) không bị đổi thành instant.
+- **Mốc không có bối cảnh** như `takenAt` của ảnh tiến độ hoặc `completedAt` của lần xử lý AI vẫn hiện UTC có nhãn (`formatContextFreeInstant`).
+- Thiếu giá trị, chỉ có ngày, không có offset/`Z` hoặc không parse được thì hiện "Chưa rõ thời điểm" (hoặc nhãn chưa rõ riêng của màn), không đoán giờ và không hiện "Invalid Date".
+- Các màn ngoài Chat/Attention chưa được chuyển sang quy ước này được liệt kê trong handoff `p7-followups-timezone-nutrients-font-handoff.md`.
+
 ## Friendly Timezone Defaults & `TimezoneContextPicker` (`timezoneUtils`)
 
 - Giao diện Mobile thường không hiển thị ô tìm/nhập hay chuỗi mã IANA thô: mọi tạo mới thực sự (`resolveNewRecordDefaultTimezone`) mặc định `Asia/Ho_Chi_Minh` (`Giờ Việt Nam`) bất kể múi giờ tài khoản hay thiết bị.

@@ -12,7 +12,7 @@ import {
 import { colors, getSemanticColors } from '@/design-system/tokens/colors';
 import { spacing, layout } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { aiRecommendationStatusLabels } from '@/localization/displayLabels';
 import {
   aiWorkoutRescheduleApi,
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   detailRow: {
     flexDirection: 'row',

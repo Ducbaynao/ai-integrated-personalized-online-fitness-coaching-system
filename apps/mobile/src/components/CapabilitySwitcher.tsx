@@ -5,7 +5,7 @@ import { ActiveCapability } from '@/features/auth/routeGuard';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export function CapabilitySwitcher() {
   const { user, activeCapability, setActiveCapability } = useAuth();
@@ -60,7 +60,7 @@ export function CapabilitySwitcher() {
               color: isStudentActive
                 ? themeColors.textOnPrimary
                 : themeColors.textSecondary,
-              fontWeight: isStudentActive ? '700' : '500',
+              fontFamily: isStudentActive ? fontFamily.bold : fontFamily.medium,
             },
           ]}>
           Học viên
@@ -86,7 +86,7 @@ export function CapabilitySwitcher() {
               color: isTrainerActive
                 ? themeColors.textOnPrimary
                 : themeColors.textSecondary,
-              fontWeight: isTrainerActive ? '700' : '500',
+              fontFamily: isTrainerActive ? fontFamily.bold : fontFamily.medium,
             },
           ]}>
           Huấn luyện viên

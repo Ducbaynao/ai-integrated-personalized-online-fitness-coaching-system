@@ -550,6 +550,7 @@ a1e675c4df6e73c94071cd595cef91c152f8e9aa2a5e356b889983727fa5941a  apps/mobile/sr
 
 - **Đã đóng về code/copy:** toàn bộ mục §5 (1a, 1b, 1c, 2, 3, 4, 5b). Mục 5a đã có sẵn trên main.
 - **Chưa chạy (vẫn tách riêng):** QA visual và device Android/Web (**`DEFERRED_FOR_RAM`**), QC toàn app, release. Kết quả trên không phải PASS Android/Web.
+- **Cập nhật 2026-11-27 (sau §12):** hai mục dưới — thời điểm theo múi giờ thiết bị ở Chat/Attention và fallback mã thô của `nutrientLabel` — đã đóng trong [p7-followups-timezone-nutrients-font-handoff.md](p7-followups-timezone-nutrients-font-handoff.md). Các màn khác còn dùng `toLocale*String` được liệt kê ở đó.
 - **Ghi nhận ngoài §5, chưa xử lý:**
   - Một số màn ngoài §5 vẫn hiển thị thời điểm bằng `toLocaleString('vi-VN')` theo múi giờ thiết bị (Chat, Attention).
   - Fallback mã thô của `NutritionScreen.nutrientLabel` với mã lạ.

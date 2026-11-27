@@ -15,7 +15,7 @@ import { CapabilitySwitcher } from '@/components/CapabilitySwitcher';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { DEFAULT_APP_TIMEZONE, formatTimezoneDisplay } from '@/features/shared/timezoneUtils';
 
 const ACCOUNT_STATUS_LABELS: Record<string, string> = {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   badgeText: {
     ...typography.caption,
     color: colors.brand[700],
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   profileButton: {
     borderWidth: 1,

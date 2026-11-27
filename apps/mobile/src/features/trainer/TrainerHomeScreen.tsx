@@ -20,7 +20,7 @@ import { TrainerProfileResponse } from '@/types/trainer';
 import { colors, getSemanticColors, semanticColors } from '@/design-system/tokens/colors';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 
 export function TrainerHomeScreen() {
   const router = useRouter();
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   },
   roleTagText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   title: {
     ...typography.h2,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     ...typography.bodySmall,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
     textDecorationLine: 'underline',
   },
 });

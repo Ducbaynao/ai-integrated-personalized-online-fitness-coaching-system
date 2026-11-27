@@ -10,7 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { getSemanticColors } from '@/design-system/tokens/colors';
 import { radius } from '@/design-system/tokens/radius';
 import { layout, spacing } from '@/design-system/tokens/spacing';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import { GoalProposal, ProposalStatus } from '@/types/goal';
 import { goalProposalStatusLabels } from '@/localization/displayLabels';
 import { fitnessGoalApi } from '@/services/fitnessGoalApi';
@@ -207,7 +207,7 @@ export function GoalProposalsTab({ goalId, isDark, onSelectProposal }: GoalPropo
                     activeFilter === tab
                       ? themeColors.primary
                       : themeColors.textSecondary,
-                  fontWeight: activeFilter === tab ? '700' : '500',
+                  fontFamily: activeFilter === tab ? fontFamily.bold : fontFamily.medium,
                 },
               ]}>
               {filterLabels[tab]}
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     textTransform: 'uppercase',
   },
   statusBadge: {
@@ -426,15 +426,15 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   proposalTitle: {
     ...typography.label,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   reasonText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   metaRow: {
     flexDirection: 'row',
@@ -502,6 +502,6 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     ...typography.label,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
 });

@@ -119,6 +119,7 @@ On Android `Pixel_7` (Expo Go) and web at phone width, after a cold start (clear
 
 ## 6. Known limits and follow-ups (not changed here)
 
+- **Cập nhật 2026-11-27:** mục `fontWeight` và italic bên dưới đã được xử lý trong [p7-followups-timezone-nutrients-font-handoff.md](p7-followups-timezone-nutrients-font-handoff.md) (inventory lại bằng AST, map sang `fontFamily.*`, thêm face italic Regular/Medium). Nội dung dưới giữ làm lịch sử.
 - **Explicit `fontWeight` overrides (31 files)** combined with a single-weight token family can trigger synthetic bold on Android. This predates P7-012, is not a glyph defect, and fixing it means editing callers across features. Recommended follow-up: map overrides to the matching `fontFamily.*` token.
 - **Italic:** no italic file is registered. The package ships italics (`BeVietnamPro_*_Italic`, also full Vietnamese coverage), so adding italic tokens is possible later if design requires a true italic.
 - `themed-text.tsx` / `Fonts` in `constants/theme.ts` are starter leftovers using system fonts; they were not changed.

@@ -18,7 +18,7 @@ import { colors, getSemanticColors } from '@/design-system/tokens/colors';
 import { DateInputField } from '@/components/ui/DateInputField';
 import { layout, spacing } from '@/design-system/tokens/spacing';
 import { radius } from '@/design-system/tokens/radius';
-import { typography } from '@/design-system/tokens/typography';
+import { fontFamily, typography } from '@/design-system/tokens/typography';
 import {
   aiProgressSummaryApi,
   getAiProgressSummaryErrorMessage,
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   headerTitle: {
     ...typography.h3,
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
   },
   presetButtonText: {
     ...typography.bodySmall,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   dateInputsRow: {
     flexDirection: 'row',
@@ -1058,11 +1058,11 @@ const styles = StyleSheet.create({
   },
   metricChipText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   validationText: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
     marginTop: spacing.xxs,
   },
   primaryButton: {
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.body,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   buttonBusyRow: {
     flexDirection: 'row',
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   warningBanner: {
     borderRadius: radius.lg,
@@ -1126,7 +1126,7 @@ const styles = StyleSheet.create({
   },
   warningTitle: {
     ...typography.body,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   warningMessage: {
     ...typography.bodySmall,
@@ -1139,7 +1139,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#FFFFFF',
   },
   resultContainer: {
@@ -1156,7 +1156,7 @@ const styles = StyleSheet.create({
   },
   resultTypeBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   alertCard: {
     borderRadius: radius.lg,
@@ -1166,7 +1166,7 @@ const styles = StyleSheet.create({
   },
   alertCardTitle: {
     ...typography.body,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   alertCardMessage: {
     ...typography.bodySmall,
@@ -1183,11 +1183,11 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.caption,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   value: {
     ...typography.body,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   bodySmall: {
     ...typography.bodySmall,
@@ -1201,7 +1201,7 @@ const styles = StyleSheet.create({
   },
   evalLabel: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   evalText: {
     ...typography.bodySmall,
@@ -1213,7 +1213,7 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     ...typography.bodySmall,
-    fontStyle: 'italic',
+    fontFamily: fontFamily.regularItalic,
   },
   metricItemRow: {
     borderBottomWidth: 1,
@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
   },
   metricCodeText: {
     ...typography.body,
-    fontWeight: '600',
+    fontFamily: fontFamily.semiBold,
   },
   trendBadge: {
     paddingHorizontal: spacing.sm,
@@ -1237,7 +1237,7 @@ const styles = StyleSheet.create({
   },
   trendBadgeText: {
     ...typography.caption,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   metricMessageText: {
     ...typography.bodySmall,
