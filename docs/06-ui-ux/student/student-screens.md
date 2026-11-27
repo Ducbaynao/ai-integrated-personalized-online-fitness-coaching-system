@@ -82,6 +82,8 @@ Header có owner/creator, status, duration, current version và source. Danh sá
 
 Sticky header: exercise progress và timer. Mỗi set có planned vs actual rep/load, complete checkbox, RPE sau exercise hoặc session. Quick actions: substitute, skip with reason, add set, note. Không tự áp dụng AI substitution nếu chưa được authority phê duyệt.
 
+Trong Mobile hiện hành, chỉ chủ buổi tập có tài khoản ACTIVE và hồ sơ Student mới ghi set/thêm hiệp/thay bài/kết thúc khi execution `IN_PROGRESS`. `COMPLETED`, `PARTIALLY_COMPLETED` và `ABORTED` hiển thị kết quả chỉ đọc, gồm trạng thái hiệp và các giá trị actual; thiếu dữ liệu là “Chưa ghi”, đơn vị actual thiếu không suy từ prescription. Backend hiện không có correction set sau terminal. Callback cũ và response đến muộn không được mở lại quyền sửa hoặc thay buổi current mới; retry cùng intent giữ body, identity/key và expectedVersion ban đầu. [Bằng chứng và giới hạn kiểm chứng](../evidence/workout-terminal-ui/README.md).
+
 ## ST-09 Progress Dashboard
 
 Tabs `Current Goal` và `Lifetime`. Filters theo time range và metric. Chart phải có data quality, sample count và textual summary. Section gồm body metric trend, training volume, frequency, completion, schedule adherence, nutrition trend, photos và inactivity period.
