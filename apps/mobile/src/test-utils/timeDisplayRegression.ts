@@ -24,8 +24,11 @@ export async function expectTimeDisplay(
       if (firstText === undefined) firstText = text;
       else expect(text).toBe(firstText);
     } finally {
-      if (tree) renderer.act(() => tree!.unmount());
-      restore();
+      try {
+        if (tree) await renderer.act(async () => { tree!.unmount(); });
+      } finally {
+        restore();
+      }
     }
   }
 }
