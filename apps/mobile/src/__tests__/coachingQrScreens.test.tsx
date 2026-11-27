@@ -105,8 +105,11 @@ const studentUser = {
   capabilities: { hasStudentProfile: true, hasTrainerProfile: false, canCoach: false },
 };
 
+const queryClients: QueryClient[] = [];
 function makeClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false, gcTime: 0 } } });
+  queryClients.push(client);
+  return client;
 }
 
 describe('F12 Coaching QR mobile screens and messages', () => {
@@ -121,6 +124,8 @@ describe('F12 Coaching QR mobile screens and messages', () => {
       activeCapability: 'STUDENT',
     });
   });
+
+  afterEach(() => { queryClients.splice(0).forEach(client => client.clear()); });
 
   it('maps QR errors including 429 Retry-After', () => {
     const rateLimited = new ApiError(
@@ -401,7 +406,7 @@ describe('F12 Coaching QR mobile screens and messages', () => {
     expect(tree.root.findByProps({ testID: 'qr-preview-avatar-placeholder' })).toBeTruthy();
 
     await renderer.act(async () => {
-      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).props.onPress();
+      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123 } });
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
     const firstKey = (coachingApi.requestTrainer as jest.Mock).mock.calls[0][1];
@@ -409,7 +414,7 @@ describe('F12 Coaching QR mobile screens and messages', () => {
 
     // Retry reuses the exact same commandKey
     await renderer.act(async () => {
-      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).props.onPress();
+      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123 } });
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
     expect((coachingApi.requestTrainer as jest.Mock).mock.calls[1][1]).toBe(firstKey);
@@ -454,10 +459,14 @@ describe('F12 Coaching QR mobile screens and messages', () => {
     });
 
     await renderer.act(async () => {
-      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).props.onPress();
-      await Promise.resolve();
+      tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 123 } });
+      await new Promise(resolve => setTimeout(resolve, 0));
     });
     expect(coachingApi.inviteStudent).toHaveBeenCalledWith('student-2', expect.any(String));
+    const pending = tree.root.findByProps({ testID: 'qr-initiate-coaching-button' }).findByProps({ accessibilityRole: 'button' });
+    expect(pending.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    renderer.act(() => pending.props.onPress({ nativeEvent: { timestamp: 124 } }));
+    expect(coachingApi.inviteStudent).toHaveBeenCalledTimes(1);
 
     // Switch capability mid-flight
     (useAuth as jest.Mock).mockReturnValue({
@@ -651,4 +660,31 @@ describe('F12 Coaching QR mobile screens and messages', () => {
     clearPendingCoachingQrIntent();
     renderer.act(() => tree.unmount());
   });
+
+  it.each([
+    { verificationStatus: 'VERIFIED', isAcceptingStudents: true, yearsExperience: 0, verificationText: 'Đã xác minh', availabilityText: 'Đang nhận học viên' },
+    { verificationStatus: 'PENDING', isAcceptingStudents: false, yearsExperience: null, verificationText: 'Đang chờ xác minh', availabilityText: 'Hiện không nhận học viên' },
+  ])('SH-09 presents actual verification/availability and unknown experience ($verificationStatus)', ({ verificationStatus, isAcceptingStudents, yearsExperience, verificationText, availabilityText }) => {
+    mockParams = { publicCode: sampleCode, targetRole: 'TRAINER', payloadVersion: '1' };
+    (useResolveCoachingQr as jest.Mock).mockReturnValue({ isPending: false, isError: false, data: {
+      counterpartyId: 'trainer-1', targetRole: 'TRAINER', displayName: 'Huấn luyện viên có tên dài để xuống dòng', avatarUrl: null,
+      trainerSummary: { verificationStatus, isAcceptingStudents, yearsExperience, specialties: [] },
+      relationshipState: { status: 'NONE', relationshipId: null, direction: null, version: null, canInitiate: false },
+    }, refetch: jest.fn() });
+    const qc = makeClient();
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<QueryClientProvider client={qc}><QrProfilePreviewScreen /></QueryClientProvider>); });
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain(verificationText);
+    expect(rendered).toContain(availabilityText);
+    expect(rendered).toContain('Chưa cập nhật');
+    if (yearsExperience === null) expect(rendered).not.toContain('Kinh nghiệm: ');
+    else expect(tree.root.findAll(node => node.children.join('') === 'Kinh nghiệm: 0 năm')).not.toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'qr-initiate-coaching-button' })).toHaveLength(0);
+    expect(coachingApi.requestTrainer).not.toHaveBeenCalled();
+    expect(coachingApi.inviteStudent).not.toHaveBeenCalled();
+    renderer.act(() => tree.unmount());
+    qc.clear();
+  });
+
 });

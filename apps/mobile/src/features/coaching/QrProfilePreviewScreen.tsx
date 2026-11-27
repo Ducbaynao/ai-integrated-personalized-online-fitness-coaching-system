@@ -4,13 +4,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/AuthContext';
+import { AppButton } from '@/design-system/components/AppButton';
+import { AppCard } from '@/design-system/components/AppCard';
+import { AppIcon } from '@/design-system/components/AppIcon';
+import { verificationLabels } from '@/localization/displayLabels';
+import { radius } from '@/design-system/tokens/radius';
 import { getSemanticColors } from '@/design-system/tokens/colors';
-import { spacing } from '@/design-system/tokens/spacing';
+import { layout, spacing } from '@/design-system/tokens/spacing';
 import { CoachingOutcome, CoachingQrRole } from '@/types/coaching';
 import { coachingApi, createCommandKey } from '@/services/coachingApi';
 import { coachingErrorMessage, coachingStatusLabels, isStaleCoachingError } from './coachingMessages';
 import { coachingQueryKeys, useResolveCoachingQr } from './coachingQueries';
-import { CoachingButton, CoachingCard, CoachingState, coachingUiStyles as styles } from './components/CoachingUi';
+import { coachingUiStyles as styles } from './components/CoachingUi';
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -139,24 +144,24 @@ export function QrProfilePreviewScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: theme.canvas }]}>
-      <ScrollView testID="qr-profile-preview-screen" style={styles.screen} contentContainerStyle={styles.content}>
+      <ScrollView testID="qr-profile-preview-screen" style={styles.screen} contentContainerStyle={[styles.content, { width: '100%', maxWidth: layout.mobileContentMaxWidth, alignSelf: 'center' }]}>
         <View>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Hồ sơ từ mã QR</Text>
+          <Text accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.textPrimary }]}>Hồ sơ từ mã QR</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
             Tư cách hiện hành: {activeCapability === 'TRAINER' ? 'Huấn luyện viên' : 'Học viên'} · Xem hồ sơ chưa cấp quyền dữ liệu sức khỏe.
           </Text>
         </View>
 
         {!validParams ? (
-          <CoachingState
+          <AppCard state="info"
             testID="qr-preview-invalid-params"
             title="Mã QR không hợp lệ"
             message="Liên kết mã QR thiếu thông tin hoặc phiên bản không được hỗ trợ."
           />
         ) : query.isPending ? (
-          <CoachingState testID="qr-preview-loading" busy title="Đang xác thực mã QR" message="Đang tải hồ sơ tối thiểu từ máy chủ." />
+          <AppCard testID="qr-preview-loading" state="loading" title="Đang xác thực mã QR" message="Đang tải hồ sơ tối thiểu từ máy chủ." />
         ) : query.isError ? (
-          <CoachingState
+          <AppCard state="error"
             testID="qr-preview-error"
             title="Không thể mở hồ sơ"
             message={coachingErrorMessage(query.error)}
@@ -164,11 +169,11 @@ export function QrProfilePreviewScreen() {
           />
         ) : (
           <>
-            <CoachingCard testID="qr-preview-card">
+            <AppCard testID="qr-preview-card">
               <View style={localStyles.headerRow}>
                 <View
                   testID="qr-preview-avatar-placeholder"
-                  accessibilityLabel={`Ảnh đại diện của ${query.data.displayName}`}
+                  accessibilityLabel={`Chữ viết tắt tên ${query.data.displayName}`}
                   style={[localStyles.avatarPlaceholder, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                 >
                   <Text style={[styles.h2, { color: theme.primary }]}>
@@ -176,7 +181,7 @@ export function QrProfilePreviewScreen() {
                   </Text>
                 </View>
                 <View style={localStyles.headerMeta}>
-                  <Text testID="qr-preview-display-name" style={[styles.h2, { color: theme.textPrimary }]}>
+                  <Text accessibilityRole="header" aria-level={2} testID="qr-preview-display-name" style={[styles.h2, { color: theme.textPrimary }]}>
                     {query.data.displayName}
                   </Text>
                   <Text testID="qr-preview-role" style={[styles.label, { color: theme.primary }]}>
@@ -187,8 +192,14 @@ export function QrProfilePreviewScreen() {
 
               {query.data.targetRole === 'TRAINER' && query.data.trainerSummary ? (
                 <View testID="qr-preview-trainer-summary" style={localStyles.summaryBlock}>
-                  <Text style={[styles.body, { color: theme.textPrimary }]}>
-                    Trạng thái xác minh: {query.data.trainerSummary.verificationStatus === 'VERIFIED' ? 'Đã xác minh' : query.data.trainerSummary.verificationStatus}
+                  <View style={localStyles.statusRow}>
+                    <AppIcon name={query.data.trainerSummary.verificationStatus === 'VERIFIED' ? 'shield' : 'info'} color={theme.primary} />
+                    <Text testID="qr-preview-verification" style={[styles.label, localStyles.statusText, { color: theme.textPrimary }]}>
+                      Trạng thái xác minh: {verificationLabels[query.data.trainerSummary.verificationStatus]}
+                    </Text>
+                  </View>
+                  <Text testID="qr-preview-availability" style={[styles.body, { color: theme.textPrimary }]}>
+                    {query.data.trainerSummary.isAcceptingStudents ? 'Đang nhận học viên' : 'Hiện không nhận học viên'}
                   </Text>
                   <Text style={[styles.body, { color: theme.textSecondary }]}>
                     Chuyên môn: {query.data.trainerSummary.specialties.length > 0 ? query.data.trainerSummary.specialties.join(', ') : 'Chưa cập nhật'}
@@ -200,10 +211,11 @@ export function QrProfilePreviewScreen() {
                   ) : null}
                 </View>
               ) : null}
-            </CoachingCard>
+            </AppCard>
+            <AppCard state="info" icon="info" title="Thông tin công khai" message="Hồ sơ chỉ hiển thị thông tin máy chủ cung cấp. Lời mời đang chờ chưa bắt đầu huấn luyện hoặc cấp quyền dữ liệu sức khỏe." />
 
             {effectiveStatus !== 'NONE' && effectiveRelId ? (
-              <CoachingCard testID="qr-preview-existing-relationship">
+              <AppCard testID="qr-preview-existing-relationship">
                 <Text style={[styles.label, { color: theme.textPrimary }]}>
                   {submittedOutcome
                     ? query.data.targetRole === 'TRAINER'
@@ -218,15 +230,17 @@ export function QrProfilePreviewScreen() {
                       : 'Đang chờ đối tác phản hồi.'}
                   </Text>
                 ) : null}
-                <CoachingButton
+                <AppButton
+                  icon="arrow"
                   testID="view-existing-relationship-button"
                   label={effectiveStatus === 'PENDING' ? 'Xem yêu cầu' : 'Xem quan hệ hiện có'}
                   onPress={() => router.replace(`/coaching/${effectiveRelId}` as never)}
                 />
-              </CoachingCard>
+              </AppCard>
             ) : query.data.relationshipState.canInitiate ? (
               <View style={localStyles.actionBlock}>
-                <CoachingButton
+                <AppButton
+                  icon="coaching"
                   testID="qr-initiate-coaching-button"
                   label={
                     initiateMutation.isPending
@@ -235,12 +249,12 @@ export function QrProfilePreviewScreen() {
                         ? 'Gửi yêu cầu huấn luyện'
                         : 'Gửi lời mời huấn luyện'
                   }
-                  busy={initiateMutation.isPending}
+                  loading={initiateMutation.isPending}
                   disabled={initiateMutation.isPending}
                   onPress={handleInitiate}
                 />
                 {initiateMutation.isError ? (
-                  <CoachingState
+                  <AppCard state="error"
                     testID="qr-initiate-error"
                     title="Chưa thể gửi"
                     message={coachingErrorMessage(initiateMutation.error)}
@@ -252,10 +266,11 @@ export function QrProfilePreviewScreen() {
           </>
         )}
 
-        <CoachingButton
+        <AppButton
+          icon="back"
           testID="qr-preview-rescan-button"
           label="Quét mã khác"
-          secondary
+          variant="secondary"
           onPress={() => router.back()}
         />
       </ScrollView>
@@ -270,21 +285,24 @@ const localStyles = StyleSheet.create({
     gap: spacing.md,
   },
   avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: layout.featureIconContainer,
+    height: layout.featureIconContainer,
+    borderRadius: radius.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerMeta: {
     flex: 1,
+    minWidth: 0,
     gap: spacing.xs,
   },
   summaryBlock: {
     paddingTop: spacing.sm,
-    gap: spacing.xs,
+    gap: spacing.md,
   },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  statusText: { flex: 1, minWidth: 0 },
   actionBlock: {
     gap: spacing.md,
   },
