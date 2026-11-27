@@ -1,6 +1,8 @@
 import { request } from '@/services/apiClient';
 import { ApiError } from '@/types/auth';
 import { resolveNewRecordDefaultTimezone } from '@/features/shared/timezoneUtils';
+import { apiErrorMessage } from '@/localization/displayLabels';
+import { CONTINUITY_LABELS, trendLabel } from '@/localization/progressLabels';
 import {
   F04ProgressSummaryApiRequest,
   F04ProgressSummaryResponse,
@@ -33,20 +35,47 @@ export const METRIC_LABELS: Record<string, string> = {
   MUSCLE_MASS: 'Khối lượng cơ (kg)',
 };
 
-export const CONTINUITY_STATE_LABELS: Record<string, string> = {
-  CONFIRMED_NEW: 'Học viên mới bắt đầu',
-  PROLONGED_INACTIVITY: 'Gián đoạn tập luyện dài hạn',
-  RECENT_ACTIVITY_OBSERVED: 'Có hoạt động tập luyện gần đây',
-  UNKNOWN_HISTORY: 'Lịch sử chưa xác định đầy đủ',
-  RESTRICTED_HISTORY: 'Lịch sử bị giới hạn quyền truy cập',
-};
+/** Same source as the Progress screens (progressLabels.ts); kept as a named export for callers/tests. */
+export const CONTINUITY_STATE_LABELS: Readonly<Record<string, string>> = CONTINUITY_LABELS;
 
-export const TREND_DIRECTION_LABELS: Record<string, { label: string; symbol: string }> = {
-  INCREASED: { label: 'Tăng', symbol: '↑' },
-  DECREASED: { label: 'Giảm', symbol: '↓' },
-  STABLE: { label: 'Ổn định', symbol: '→' },
-  INSUFFICIENT_DATA: { label: 'Chưa đủ dữ liệu xu hướng', symbol: '—' },
-};
+/**
+ * TrendDirection labels derived from trendLabel() so every screen shows the same wording
+ * (STABLE = zero delta → "Không đổi", never "Ổn định").
+ */
+export const TREND_DIRECTION_LABELS: Readonly<Record<string, { label: string; symbol: string }>> = Object.fromEntries(
+  (['INCREASED', 'DECREASED', 'STABLE', 'INSUFFICIENT_DATA'] as const).map((code) => {
+    const { label, symbol } = trendLabel(code);
+    return [code, { label, symbol }];
+  })
+);
+
+const GENERIC_SUMMARY_ERROR = 'Đã xảy ra lỗi khi tạo bản tóm tắt tiến độ. Vui lòng thử lại.';
+
+/**
+ * Backend diagnostic (ErrorResponse.message), used only to classify verified cases; never displayed.
+ * Non-string values are ignored rather than coerced.
+ */
+function backendDiagnostic(error: ApiError): string {
+  const value: unknown = error.errorResponse?.message;
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * 400 VALIDATION_FAILED diagnostics verified in F04ContextBuilder / AiProgressSummaryController.
+ * Unrecognised 400s get a neutral copy instead of assuming a date-range problem.
+ */
+function validationCopy(diagnostic: string): string {
+  if (/^fromdate cannot be after todate\.?$/.test(diagnostic)) {
+    return 'Khoảng ngày không hợp lệ. Vui lòng đảm bảo ngày bắt đầu không sau ngày kết thúc.';
+  }
+  if (/^fromdate and todate are required parameters\.?$/.test(diagnostic)) {
+    return 'Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.';
+  }
+  if (/^invalid timezone string: /.test(diagnostic)) {
+    return 'Múi giờ của yêu cầu không hợp lệ. Vui lòng thử lại.';
+  }
+  return 'Thông tin yêu cầu chưa hợp lệ. Vui lòng kiểm tra lại.';
+}
 
 export function getAiProgressSummaryErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -77,15 +106,11 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
       if (error.errorResponse?.fieldErrors?.length) {
         return 'Thông tin yêu cầu không hợp lệ. Vui lòng kiểm tra các trường đã nhập.';
       }
-      return 'Khoảng ngày không hợp lệ. Vui lòng đảm bảo ngày bắt đầu không sau ngày kết thúc.';
+      return validationCopy(error.status === 400 ? backendDiagnostic(error) : '');
     }
 
     if (code === 'AI_OUTPUT_VALIDATION_FAILED' || error.status === 422) {
       return 'Kết quả từ AI không vượt qua kiểm định an toàn và tính toàn vẹn dữ liệu.';
-    }
-
-    if (code === 'AI_FEATURE_DISABLED') {
-      return 'Tính năng tóm tắt tiến độ AI hiện đang tạm tắt theo cấu hình quản trị.';
     }
 
     if (error.status === 504) {
@@ -97,6 +122,13 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
     }
 
     if (error.status === 503) {
+      // AiFeatureDisabledException → 503 SERVICE_UNAVAILABLE (GlobalExceptionHandler), not a dedicated code.
+      if (
+        code === 'SERVICE_UNAVAILABLE' &&
+        /^ai progress summarization is currently disabled by administrator configuration\.?$/.test(backendDiagnostic(error))
+      ) {
+        return 'Tính năng tóm tắt tiến độ AI hiện đang tạm tắt theo cấu hình quản trị.';
+      }
       return 'Dịch vụ phân tích AI tạm thời không khả dụng hoặc quá tải. Vui lòng thử lại sau.';
     }
 
@@ -104,16 +136,11 @@ export function getAiProgressSummaryErrorMessage(error: unknown): string {
       return 'Mất kết nối mạng. Vui lòng kiểm tra kết nối internet và thử lại.';
     }
 
-    if (error.message && !error.message.startsWith('Request failed with status')) {
-      return error.message;
-    }
+    // Status-based Vietnamese copy shared with apiClient (e.g. 401, 409); never the raw message.
+    return apiErrorMessage(error, GENERIC_SUMMARY_ERROR);
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Đã xảy ra lỗi không xác định khi tạo bản tóm tắt tiến độ.';
+  return GENERIC_SUMMARY_ERROR;
 }
 
 export const aiProgressSummaryApi = {

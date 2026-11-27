@@ -6,7 +6,6 @@ import {
   genderLabels,
   goalProposalStatusLabels,
   goalStatusLabels,
-  localizedServerMessage,
   scheduleFieldLabel,
   trainerActivityLabels,
   verificationLabels,
@@ -36,8 +35,8 @@ describe('Vietnamese display labels', () => {
     expect(apiErrorMessage({ status: 503, errorResponse: { errorCode: 'STORAGE_UNAVAILABLE' } })).toContain('lưu trữ tài liệu');
     expect(apiErrorMessage({ status: 409, errorResponse: { errorCode: 'TRAINER_APPLICATION_ALREADY_ACTIVE' } })).toContain('đang chờ xét duyệt');
     expect(apiErrorMessage({ status: 400, errorResponse: { errorCode: 'INVALID_LIFECYCLE_TRANSITION' } })).toContain('Trạng thái hồ sơ');
-    expect(localizedServerMessage('Giờ không hợp lệ', 'Giá trị chưa hợp lệ')).toBe('Giờ không hợp lệ');
-    expect(localizedServerMessage('Invalid time', 'Giá trị chưa hợp lệ')).toBe('Giá trị chưa hợp lệ');
+    // P7-016: localizedServerMessage (showing server text when it has Vietnamese diacritics) was removed;
+    // callers now map structured codes (scheduleItemErrors.ts, fieldErrorMessages.ts).
     expect(scheduleFieldLabel('localStart')).toBe('giờ bắt đầu');
   });
 

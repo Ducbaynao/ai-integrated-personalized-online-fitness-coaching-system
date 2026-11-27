@@ -14,7 +14,8 @@ import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleApi } from '@/services/workoutScheduleApi';
 import { appointmentApi } from '@/services/appointmentApi';
 import { ApiError } from '@/types/auth';
-import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displayLabels';
+import { scheduleFieldLabel } from '@/localization/displayLabels';
+import { scheduleItemErrorMessage } from '@/localization/scheduleItemErrors';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { ConfirmWorkoutScheduleBatchRequest } from '@/types/workoutScheduleBatch';
 import { isMonday, validProposalOffsets } from '@/features/workout-schedule-proposals/proposalTime';
@@ -114,7 +115,7 @@ export function StudentConfirmBatchScreen({ planId }: { planId: string }) {
       const status = reason instanceof ApiError ? reason.status : undefined;
       const itemMessages = reason instanceof ApiError ? reason.errorResponse?.itemErrors?.map((item) => {
         const index = body.items.findIndex((entry) => entry.clientItemId === item.clientItemId);
-        return `${entries[index]?.session.name ?? 'Buổi trong đợt lịch'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${localizedServerMessage(item.message, 'Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại.')}`;
+        return `${entries[index]?.session.name ?? 'Buổi trong đợt lịch'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${scheduleItemErrorMessage(item.code)}`;
       }) ?? [] : [];
       setError([batchError(reason), ...itemMessages].join('\n'));
       if (status === 403 || status === 404) {

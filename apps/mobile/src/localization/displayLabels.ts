@@ -73,10 +73,6 @@ export const aiRecommendationStatusLabels: Record<AdjustmentRecommendationStatus
 
 export const unspecified = 'Chưa cung cấp';
 
-/** Preserve specific Vietnamese validation copy; hide unlocalized server prose. */
-export function localizedServerMessage(value: unknown, fallback: string): string {
-  return typeof value === 'string' && /[\u00c0-\u1ef9]/.test(value) ? value : fallback;
-}
 
 const scheduleFieldLabels: Record<string, string> = {
   localStart: 'giờ bắt đầu',

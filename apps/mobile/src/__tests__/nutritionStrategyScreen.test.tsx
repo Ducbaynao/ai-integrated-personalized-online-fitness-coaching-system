@@ -87,6 +87,26 @@ describe('B07 nutrition strategy Mobile', () => {
     renderer.act(() => tree.unmount());
   }, 15000);
 
+  it('P7-016: names V39 system nutrients in Vietnamese by code (catalog names are English)', () => {
+    const systemNutrients = [
+      { id: 41, code: 'B07_ENERGY_KCAL', name: 'Energy', defaultUnitId: 93, unitCode: 'B07_KCAL', unitSymbol: 'kcal', dimension: 'ENERGY' },
+      { id: 42, code: 'B07_PROTEIN_G', name: 'Protein', defaultUnitId: 94, unitCode: 'B07_GRAM', unitSymbol: 'g', dimension: 'MASS' },
+    ];
+    (useQuery as jest.Mock).mockImplementation(({ queryKey }: { queryKey: string[] }) => ({
+      data: queryKey.includes('frozen-corrections') ? [] : queryKey.includes('types') ? catalog : queryKey.includes('nutrients') ? systemNutrients
+        : queryKey.includes('day') ? undefined : { goal: null, proposals: [proposal] },
+      isPending: false, isError: false, error: null, refetch: jest.fn(),
+    }));
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => { tree = renderer.create(<NutritionStrategyScreen />); });
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Năng lượng · Ngày mặc định (kcal)' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Energy · Ngày mặc định (kcal)' })).toHaveLength(0);
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain('Năng lượng');
+    expect(text).not.toContain('Energy');
+    renderer.act(() => tree.unmount());
+  });
+
   it('requires current CONTRIBUTE for Trainer proposal rather than deriving it from VIEW', () => {
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'trainer-id' }, activeCapability: 'TRAINER' });
     (useSharingSummary as jest.Mock).mockReturnValue({ data: { relationshipStatus: 'ACTIVE', items: [

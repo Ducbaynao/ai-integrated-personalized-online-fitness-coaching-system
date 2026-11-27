@@ -16,6 +16,7 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { typography } from '@/design-system/tokens/typography';
 import { UploadProgressPhotoModal } from '@/features/progress/components/UploadProgressPhotoModal';
 import { apiErrorMessage, goalStatusLabels } from '@/localization/displayLabels';
+import { formatContextFreeInstant } from '@/localization/instantDisplay';
 import {
   CONTINUITY_SECTION_TITLE,
   continuityExplanation,
@@ -413,7 +414,9 @@ export function ProgressDashboardScreen({ studentId, readOnly = false }: Progres
                         </Text>
                       ) : null}
                     </View>
-                    <Text style={[styles.photoDateText, { color: themeColors.textSecondary }]}>{p.takenAt}</Text>
+                    <Text testID={`photo-taken-at-${p.id}`} style={[styles.photoDateText, { color: themeColors.textSecondary }]}>
+                      {formatContextFreeInstant(p.takenAt) ?? 'Chưa rõ thời điểm chụp'}
+                    </Text>
                     {!readOnly && (
                       <Pressable
                         testID={`btn-delete-photo-${p.id}`}

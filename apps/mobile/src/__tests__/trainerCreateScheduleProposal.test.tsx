@@ -149,6 +149,24 @@ describe('Trainer proposal create', () => {
     renderer.act(() => tree.unmount());
   });
 
+  it('P7-016: shows item errors by code, never the server message, and keeps the 409 stale handling', async () => {
+    (workoutScheduleProposalApi.create as jest.Mock).mockImplementationOnce((_studentId, body) => Promise.reject(new ApiError(409, 'stale', {
+      errorCode: 'WORKOUT_SCHEDULE_OVERLAP', message: 'Workout schedule proposal could not be processed', timestamp: '', requestId: '',
+      fieldErrors: [],
+      // Backend sends a fixed English message; a Vietnamese one here proves diacritics no longer unlock display.
+      itemErrors: [{ clientItemId: body.items[0].clientItemId, field: null, code: 'WORKOUT_SCHEDULE_OVERLAP', message: 'Trùng lịch với buổi riêng tư của học viên B' }],
+    })));
+    const tree = render();
+    await fillValid(tree);
+    await press(tree, 'confirm-create-proposal');
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain('Upper body: Trùng thời gian với một buổi tập khác.');
+    expect(text).not.toContain('học viên B');
+    expect(tree.root.findAllByProps({ testID: 'confirm-create-proposal' })).toHaveLength(0);
+    expect((useCurrentWorkoutPlan as jest.Mock).mock.results.some((result) => result.value.refetch.mock.calls.length > 0)).toBe(true);
+    renderer.act(() => tree.unmount());
+  });
+
   it('drops the retry command on 409 and requires a fresh preview', async () => {
     (workoutScheduleProposalApi.create as jest.Mock).mockRejectedValueOnce(new ApiError(409, 'stale'));
     const tree = render();

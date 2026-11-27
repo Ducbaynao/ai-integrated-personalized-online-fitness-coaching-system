@@ -15,7 +15,8 @@ import { formatTimezoneDisplay, resolveNewRecordDefaultTimezone } from '@/featur
 import { createCommandKey } from '@/services/coachingApi';
 import { workoutScheduleProposalApi } from '@/services/workoutScheduleProposalApi';
 import { ApiError } from '@/types/auth';
-import { localizedServerMessage, scheduleFieldLabel } from '@/localization/displayLabels';
+import { scheduleFieldLabel } from '@/localization/displayLabels';
+import { scheduleItemErrorMessage } from '@/localization/scheduleItemErrors';
 import type { WorkoutSession } from '@/types/workoutPlan';
 import type { CreateWorkoutScheduleProposalRequest } from '@/types/workoutScheduleProposal';
 import { proposalErrorMessage } from './proposalPresentation';
@@ -160,7 +161,7 @@ export function TrainerCreateScheduleProposalScreen({ relationshipId }: { relati
       const itemMessages = reason instanceof ApiError ? reason.errorResponse?.itemErrors?.map((item) => {
         const index = pending?.body.items.findIndex((entry) => entry.clientItemId === item.clientItemId) ?? -1;
         const name = index >= 0 ? entries[index]?.session.name : undefined;
-        return `${name || 'Buổi trong đề xuất'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${localizedServerMessage(item.message, 'Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại.')}`;
+        return `${name || 'Buổi trong đề xuất'}${item.field ? ` (${scheduleFieldLabel(item.field)})` : ''}: ${scheduleItemErrorMessage(item.code)}`;
       }) ?? [] : [];
       setError([proposalErrorMessage(reason), ...itemMessages].join('\n'));
       if (reason instanceof ApiError && reason.status === 409) {

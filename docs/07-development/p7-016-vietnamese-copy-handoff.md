@@ -184,6 +184,8 @@ Quyền actor, mutation, retry/command key, request body, navigation và testID 
 
 `localizedServerMessage` được giữ trong `displayLabels.ts` vì hai màn trên còn dùng.
 
+> **Trạng thái mới nhất:** patch timezone đã merge (#180). Mọi mục trong bảng trên đã được xử lý hoặc xác nhận ở đợt cuối, xem **§12**. Bảng giữ nguyên làm lịch sử; số dòng trong bảng là của snapshot cũ.
+
 ## 6. Ghi chú cho reviewer (không chặn review)
 
 1. **COUNT trung tính** cho cả `RESTING_HEART_RATE`: nếu sau này contract/Backend định nghĩa đơn vị theo thời gian (ví dụ một mã đơn vị nhịp/phút), chỉ cần thêm vào `METRIC_UNIT_OVERRIDES` hoặc `UNIT_LABELS`, kèm dẫn nguồn.
@@ -412,4 +414,146 @@ Các file khác của P7-016 trên main không đổi trong follow-up này. Hand
 - **Git:** sửa `aiWorkoutAdjustmentApi.ts`, `aiWorkoutAdjustmentApi.test.ts`, `mobile-vietnamese-audit.md` và handoff này; thêm 1 file test mới. Người dùng đã cho phép commit chọn lọc, push, tạo PR base `main` và merge bằng merge commit khi đủ điều kiện. Kết quả PR/CI/merge được báo ngoài tài liệu, không tạo commit chỉ để ghi trạng thái CI. PR #179 và task timezone không bị đụng tới.
 - **Review:** thay đổi thuần mapping/copy. Theo quyết định của người dùng, không cần thêm Codex review. Câu “hết hạn” chốt là “Đề xuất điều chỉnh đã hết hạn nên không thể tiếp tục thao tác.”, không hướng dẫn “tạo đề xuất mới”.
 - **P7-016 chưa hoàn tất:** các mục Việt hoá trong file thuộc patch timezone (§5) vẫn chờ.
+- **Đã chạy sau khi ghi tài liệu:** `node tools/validate-ux-docs.mjs` → “UX documentation validation passed (18 required files).”; `git diff --check` → exit 0.
+
+
+## 12. Đợt cuối P7-016: các mục §5 sau khi timezone merge — 2026-11-27
+
+- **Checkout:** `C:\VScode\CodePTIT\Đồ Án Tốt Nghiệp\p7-016-ai-error-mapping`, tái dùng clone sạch.
+- **Branch / base:** `fix/p7-016-final-ui-copy` @ `ab4613c6ced6adcc3c85cf8c37ab58dfd2dcabb6` (main sau #178 font, #179, #180 timezone, #181 mapper lỗi AI).
+  - `git ls-remote` xác nhận base; CI main #425 trên `ab4613c6`: 6/6 success.
+  - Nhánh #181 (`fix/p7-016-ai-error-mapping` @ `8f081df`) giữ nguyên.
+- **Môi trường:** `apps/mobile/node_modules` là junction tới `p7-012-integration` (lockfile trùng hash); không cài dependency.
+- **Phạm vi:** chỉ presentation và mapping. Không đổi timezone mặc định, context ngày, instant, offset/DST, payload, body/key, retry, quyền, navigation hay cách tính. Không sửa Backend, OpenAPI, Flyway hay AI schema.
+
+### 12.1 Checklist §5 (đối chiếu source trên main trước khi sửa)
+
+| # | Mục §5 | Trạng thái trên `ab4613c6` | Xử lý | File:dòng (bản cuối) |
+|---|---|---|---|---|
+| 1a | `CONTINUITY_STATE_LABELS` trùng `progressLabels` | Còn | **Đã đóng.** Một nguồn duy nhất: `progressLabels.CONTINUITY_LABELS` được export; `aiProgressSummaryApi` re-export. Câu chữ không đổi. | `localization/progressLabels.ts:159`; `services/aiProgressSummaryApi.ts:39` |
+| 1b | `TREND_DIRECTION_LABELS.STABLE = 'Ổn định'` | Còn (production không dùng, chỉ test) | **Đã đóng.** Dẫn xuất từ `trendLabel()`: STABLE → “Không đổi”, ký hiệu ▲/▼/→/— giống màn Progress. | `services/aiProgressSummaryApi.ts:45-50` |
+| 1c | Mapper lỗi F04 trả `error.message` thô | Còn; ngoài ra mọi 400 bị gán “khoảng ngày”; `AI_FEATURE_DISABLED` không bao giờ khớp vì Backend trả 503 `SERVICE_UNAVAILABLE` | **Đã đóng.** Xem §12.2. | `services/aiProgressSummaryApi.ts:52-144` |
+| 2 | `localizedServerMessage` cho `itemErrors` ở 2 màn lịch | Còn | **Đã đóng.** Ánh xạ theo `itemErrors[].code` (§12.3). Đã gỡ hẳn `localizedServerMessage` khỏi `displayLabels.ts` vì không còn caller. | `localization/scheduleItemErrors.ts`; `StudentConfirmBatchScreen.tsx:118`; `TrainerCreateScheduleProposalScreen.tsx:164` |
+| 3 | “Máy cáp (Cable)”, “Máy tạ (Machine)” và mục còn mở ở `AiWorkoutProposalModal` | Còn; thêm “(AI)” ở tiêu đề và nút | **Đã đóng.** “Máy cáp”, “Máy tạ”, “Đề xuất giáo án 1 tuần bằng AI”, “Tạo đề xuất giáo án bằng AI”. `id` thiết bị gửi API không đổi. | `AiWorkoutProposalModal.tsx:414,605,606,783` |
+| 4 | ISO thô: `takenAt` ảnh tiến độ, `completedAt` readback AI | Còn | **Đã đóng.** Xem §12.4. | `localization/instantDisplay.ts`; `ProgressDashboardScreen.tsx:417-419`; `AiKnowledgeScreen.tsx:575` |
+| 5a | Nhãn đơn vị Nutrition (`SERVING`/ký hiệu seed) | **Đã có.** Basis: “Gam (g)”, “Khẩu phần”, “Mililít (ml)” (`NutritionScreen.tsx:514`, `FoodAnalysisScreen.tsx:51-55`). `unitSymbol` chất dinh dưỡng chỉ là `kcal`/`g` (V39); ký hiệu `serving` của `B07_SERVING` không hiển thị trên UI. | Không đổi | — |
+| 5b | (Phát hiện khi rà Nutrition) tên chất dinh dưỡng hệ thống tiếng Anh “Energy/Protein/Carbohydrate/Fat” hiển thị thô | Còn, 10 chỗ ở `NutritionStrategyScreen` (1 chỗ không có fallback) | **Đã đóng.** Xem §12.5. | `localization/nutritionLabels.ts`; `NutritionStrategyScreen.tsx:361,418,419,428,443,505,510,517,537,570` |
+
+### 12.2 Mapper lỗi F04 (`getAiProgressSummaryErrorMessage`)
+
+Nguồn Backend:
+- `F04ContextBuilder`: 400 `VALIDATION_FAILED` với “fromDate and toDate are required parameters.”, “fromDate cannot be after toDate.”, “Invalid timezone string: {tz}”.
+- `AiProgressSummaryController`: 400 với “Request body must not be null”.
+- `GlobalExceptionHandler:1020-1024`: `AiFeatureDisabledException` → 503 `SERVICE_UNAVAILABLE`.
+
+| Trường hợp | Trước | Sau |
+|---|---|---|
+| 400 không có fieldErrors | Luôn “Khoảng ngày không hợp lệ…” | Theo diagnostic (string, lowercase, neo trọn câu): khoảng ngày / “Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.” / “Múi giờ của yêu cầu không hợp lệ. Vui lòng thử lại.” (không echo giá trị múi giờ). Lạ hoặc không phải string → “Thông tin yêu cầu chưa hợp lệ. Vui lòng kiểm tra lại.” |
+| 400 có fieldErrors | Câu kiểm tra trường | Không đổi |
+| Tạm tắt theo cấu hình | Nhánh `AI_FEATURE_DISABLED` không bao giờ khớp | Chỉ khi 503 + `SERVICE_UNAVAILABLE` + đúng diagnostic Backend. 503 khác vẫn là câu “tạm thời không khả dụng” |
+| 403 / 404 / 422 / 502 / 504 / 0 | Câu cố định | Không đổi |
+| ApiError status khác (401, 409, 500…) | `error.message` (trừ “Request failed…”) | `apiErrorMessage(error, …)`: câu theo status dùng chung với `apiClient`; 500 → “Đã xảy ra lỗi khi tạo bản tóm tắt tiến độ. Vui lòng thử lại.” |
+| Lỗi không phải ApiError | `error.message` thô | Câu cố định ở trên. Phân loại abort/timeout theo `name`/message nội bộ giữ nguyên |
+
+Request, body, `timezone` mặc định, signal và retry của màn không đổi.
+
+### 12.3 `itemErrors` của đợt lịch / đề xuất lịch
+
+- **Đường lỗi thật:** `WorkoutScheduleBatchErrorAdvice` và `ScheduleProposalErrorAdvice` luôn gửi `field: null` cùng message tiếng Anh cố định “Schedule item could not be confirmed”. Ý nghĩa chỉ nằm ở `code`.
+- **Các mã cấp phần tử:** `WorkoutScheduleBatchService` ném kèm `clientItemId`; `ScheduleProposalService` dùng lại cùng bước kiểm tra.
+
+| Mã | Copy |
+|---|---|
+| `WORKOUT_SCHEDULE_DUPLICATE` | Buổi tập tại thời điểm này đã tồn tại. |
+| `WORKOUT_SCHEDULE_OVERLAP` | Trùng thời gian với một buổi tập khác. |
+| `WORKOUT_SCHEDULE_APPOINTMENT_NOT_QUALIFYING` | Cuộc hẹn liên kết không phù hợp với buổi tập này. |
+| `WORKOUT_SCHEDULE_SOURCE_MISMATCH` | Buổi tập không còn khớp với kế hoạch hiện tại. |
+| `WORKOUT_SCHEDULE_COACH_REQUIRED_UNSUPPORTED` | Buổi tập cần huấn luyện viên nhưng chưa có cuộc hẹn liên kết. |
+| `VALIDATION_FAILED`, mã lạ, giá trị không phải string | Dữ liệu buổi tập chưa hợp lệ. Vui lòng kiểm tra lại. (câu fallback cũ) |
+
+- **Không dùng lại** bảng mã của luồng đổi lịch (`scheduleChange.ts`), vì đó là thông điệp viết riêng cho thao tác đổi/hủy lịch.
+- **Giữ nguyên** câu lỗi cấp request (`batchError`, `proposalErrorMessage`), tên buổi, nhãn trường và các nhánh 403/404/409/400/5xx (xóa lệnh chờ, ẩn dữ liệu, tải lại nguồn).
+
+### 12.4 Thời điểm không có timezone context
+
+- **Kiểu dữ liệu:** `ProgressPhotoResponse.takenAt` và `AiRunResponse.completedAt` đều là `Instant`, không kèm timezone.
+- **Quy ước:** dùng đúng fallback của `formatProposalInstant` (#180): `Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })` kèm nhãn “· UTC”. Không đổi sang giờ Việt Nam, tài khoản hay thiết bị.
+- **Chỉ nhận** chuỗi có giờ và offset/Z. Thiếu giá trị, chỉ có ngày, không có offset hoặc không parse được → “Chưa rõ thời điểm chụp” (ảnh) / “Chưa rõ” (lần xử lý). Không hiện giờ đoán.
+
+### 12.5 Tên chất dinh dưỡng
+
+- **Seed V39** có `B07_ENERGY_KCAL` “Energy”, `B07_PROTEIN_G` “Protein”, `B07_CARBOHYDRATE_G` “Carbohydrate”, `B07_FAT_G` “Fat”.
+- **`nutrientName(nutrient, fallback?)`** hiển thị theo mã: Năng lượng / Protein / Carb / Chất béo, cùng câu chữ với `NutritionScreen.nutrientLabel` và `FoodAnalysisScreen`, nhưng không kèm đơn vị vì caller tự nối `unitSymbol`.
+- **Chất dinh dưỡng khác** giữ tên catalog nguyên văn. Thiếu tên thì dùng fallback riêng của từng chỗ (“Chất dinh dưỡng chưa có tên” / “Chất dinh dưỡng” / “chất dinh dưỡng”). Dòng 428 trước đây không có fallback, nay dùng fallback mặc định.
+- **Chưa đổi:** `NutritionScreen.nutrientLabel` (output đã là tiếng Việt). Fallback hiện tại của hàm này là mã thô với mã lạ; chỉ ghi nhận.
+
+### 12.6 Test
+
+- **Mới `aiProgressSummaryErrorMapping.test.ts`:** đi qua `aiProgressSummaryApi.generate/getSummary` → `request` → `parseResponse` → `ApiError` → mapper thật; chỉ mock `fetch` (**HTTP mock**, không phải live Backend/DB).
+  - Phủ: 3 diagnostic 400 và biến thể chữ hoa; 400 lạ hoặc metadata sai kiểu; fieldErrors; diagnostic nhạy cảm giả lập; 503 tắt/không tắt/sai mã/null/mã không tồn tại; 403/404/mạng; 409/500 không echo diagnostic; lỗi không phải ApiError; abort.
+- **Mới `p7016FinalCopy.test.ts`:** `scheduleItemErrorMessage` (6 mã, mã lạ, kiểu sai, khóa prototype); `formatContextFreeInstant` (UTC, không dịch sang giờ Việt Nam, offset tường minh, phần thập phân giây, các giá trị không hợp lệ); `nutrientName`; nhãn continuity/trend của `aiProgressSummaryApi` bằng đúng `progressLabels`.
+- **Bổ sung vào suite có sẵn:**
+  - `trainerCreateScheduleProposal.test.tsx`: 409 + `itemErrors` `WORKOUT_SCHEDULE_OVERLAP` có message tiếng Việt giả lập → hiện câu theo mã, không hiện message server; vẫn bỏ nút xác nhận và tải lại kế hoạch.
+  - `ProgressDashboardScreen.test.tsx`: `takenAt` UTC / chỉ có ngày / rỗng.
+  - `AiKnowledgeScreen.test.tsx`: `completedAt` hiện theo UTC, không phải ISO thô.
+  - `nutritionStrategyScreen.test.tsx`: nhãn ô nhập và text hiện “Năng lượng”, không còn “Energy”, với mã seed thật.
+- **Assertion hiển thị được đổi có chủ đích:**
+  - `studentDirectScheduling.test.tsx:162-164`: trước khẳng định message server “Giờ không hợp lệ” được hiển thị (đúng hành vi “có dấu thì cho qua” đã bị cấm); nay khẳng định câu theo `code` và không chứa message server. Assertion gỡ nút xác nhận và ẩn dữ liệu sau 403 giữ nguyên.
+  - `aiProgressSummaryApi.test.ts:219-220`: ký hiệu `INCREASED` “↑” → “▲” (dẫn xuất từ `trendLabel`).
+  - `displayLabels.test.ts`: bỏ 2 assertion của `localizedServerMessage` đã gỡ.
+  - Các assertion về dữ liệu, quyền, body/key, retry và navigation không bị đổi.
+
+### 12.7 Lệnh đã chạy (tuần tự, `apps/mobile`, `--runInBand --testTimeout=30000`)
+
+Trước khi chạy: C: trống ~16,3 GB, RAM trống 0,76–1,87 GB. Chỉ có 2 tiến trình node runtime Codex nhàn rỗi, không có Jest/tsc/Gradle khác. Log nằm ngoài Git, ở scratchpad phiên `…\scratchpad\p7-016-final\`.
+
+| Lệnh | Kết quả |
+|---|---|
+| **Trước khi sửa:** tạm ghi lại nội dung `origin/main` cho 9 file nguồn đã sửa (helper mới giữ lại vì test import), chạy 9 suite liên quan (`jest-BEFORE-fix.log`) | exit 1; **12 fail / 79 pass / 91**. Đúng các test mới hoặc đã cập nhật cho từng mục 1–5b. Sau đó khôi phục bản sửa từ backup; `sha256sum -c` khớp cả 9 file. |
+| **Sau khi sửa:** `npx jest --findRelatedTests <12 file nguồn> aiProgressSummaryErrorMapping.test.ts p7016FinalCopy.test.ts` (`jest-AFTER-fix-focused.log`) | exit 0; **110/110 suite, 1.279/1.279 test**, 199 s. Tập rộng vì `displayLabels`/`progressLabels` được nhiều màn import. |
+| `npx tsc --noEmit` | exit 0, không output |
+| `npx expo lint <file đã sửa>` | exit 0, không output |
+| `npm run lint` | 0 lỗi, 12 cảnh báo **baseline** ở `CurrentGoalScreen.test.tsx`, `coachingQrScreens.test.tsx` (không sửa); **không có cảnh báo mới** |
+| `npm run audit:ui-mixed` | 13 dòng, không đổi: `coach-alex` 3, `Barbell Bench Press` 1, “reps” 9 (đã duyệt) |
+| `node tools/validate-ux-docs.mjs`, `git diff --check` | xem §12.9 |
+
+Không chạy Backend, Docker, Metro, emulator hay browser.
+
+### 12.8 SHA-256 cuối (source/test/audit)
+
+```
+405494463ee3423eb3e5cfa942158ebb86bbb54e69557bcbe50831969d249c7b  apps/mobile/src/__tests__/AiKnowledgeScreen.test.tsx
+a70a1797e4b6cbee7419445bf9feda7f41082d54554832923bc9e7cc8bc41651  apps/mobile/src/__tests__/ProgressDashboardScreen.test.tsx
+a7c8dcf183f717064216ab1f11625651664262077a91fa80a053386ac270813e  apps/mobile/src/__tests__/aiProgressSummaryApi.test.ts
+f2364d1f079a3a2819ba082af21d5568f2fb5c8e3761f28726ad468322252fd9  apps/mobile/src/__tests__/aiProgressSummaryErrorMapping.test.ts
+9fd44d14f6092682793cac3717a542cc2dc039c67a2c37ce785bdb787ecb6f7f  apps/mobile/src/__tests__/displayLabels.test.ts
+71bbffeb27f500870895963802b1130be266f303c7afc2a7e15b31f74e5fa20b  apps/mobile/src/__tests__/nutritionStrategyScreen.test.tsx
+aa9246ca5b9226aa822fbc84f303aa7935d68f8fd8d7c283341e0c5bed48debe  apps/mobile/src/__tests__/p7016FinalCopy.test.ts
+9bed2fc8c50d982ed167f23629e6ea35b191832c3dfafd0c5ffbd48e6be82866  apps/mobile/src/__tests__/studentDirectScheduling.test.tsx
+c759dcfe90c5773efcb58e6b3fb554161c86f69ba614a7bf576583eec69abf6f  apps/mobile/src/__tests__/trainerCreateScheduleProposal.test.tsx
+d02e4909d073bd90598afd158c7b1a7a01ae0a0da0b6058a6c60efba9041b52c  apps/mobile/src/features/ai-knowledge/AiKnowledgeScreen.tsx
+e8eb1192a2f6c6f0c02d0ca4bbecf3b14eedccda3fe868ddf371f858ccef5b3d  apps/mobile/src/features/nutrition/NutritionStrategyScreen.tsx
+671309d303f0d260ec464359f8b1fd1fc8972c34f1d16d6afa881ef280ab207e  apps/mobile/src/features/progress/ProgressDashboardScreen.tsx
+8ed64fc98435b0f604f95d15a1c7117f69cb0fc694d23f392b324f48adb62086  apps/mobile/src/features/workout-plan/components/AiWorkoutProposalModal.tsx
+50daaaaaed8da4310b38562fb10c19dbae03bdf316ed434ced723977bb5095f1  apps/mobile/src/features/workout-schedule-proposals/TrainerCreateScheduleProposalScreen.tsx
+b4a079251a676c136abc48ae7f33871cc2c45b6cc7fcc23562f2859e5a55ca53  apps/mobile/src/features/workout-schedule/StudentConfirmBatchScreen.tsx
+20d4df6f13bc257c8a06759e9b5776bb0bef947bf81eff8138c30d5c3ef2d61f  apps/mobile/src/localization/displayLabels.ts
+d7ac939e83c3551ef6b68b6994f14b4a2772f871530f986fd485cd90707c2ace  apps/mobile/src/localization/instantDisplay.ts
+847fc6200260881f510e59fcf18e2f4fa5485f884167a93819503e28c0eb1b91  apps/mobile/src/localization/nutritionLabels.ts
+708b71f241e3771f4e7fc22d08d66f9e4cebc456ff6f01ca32847d6cb96ed3bc  apps/mobile/src/localization/progressLabels.ts
+ca39d2dc8b5640d7266293e116c8481c5c7e1d13d474ecb656e1321254b2d12e  apps/mobile/src/localization/scheduleItemErrors.ts
+a1e675c4df6e73c94071cd595cef91c152f8e9aa2a5e356b889983727fa5941a  apps/mobile/src/services/aiProgressSummaryApi.ts
+4ab0a6f76720b44b3d0e572dca1db51398df8bb4443889e0348fdb85ab6331af  docs/06-ui-ux/mobile-vietnamese-audit.md
+```
+
+### 12.9 Trạng thái, giới hạn và việc còn lại
+
+- **Đã đóng về code/copy:** toàn bộ mục §5 (1a, 1b, 1c, 2, 3, 4, 5b). Mục 5a đã có sẵn trên main.
+- **Chưa chạy (vẫn tách riêng):** QA visual và device Android/Web (**`DEFERRED_FOR_RAM`**), QC toàn app, release. Kết quả trên không phải PASS Android/Web.
+- **Ghi nhận ngoài §5, chưa xử lý:**
+  - Một số màn ngoài §5 vẫn hiển thị thời điểm bằng `toLocaleString('vi-VN')` theo múi giờ thiết bị (Chat, Attention).
+  - Fallback mã thô của `NutritionScreen.nutrientLabel` với mã lạ.
+  - Cả hai cần quyết định riêng về context thời gian và nhãn.
+- **P7-016:** các acceptance copy/mapping trong phạm vi đã đóng. **Không tuyên bố toàn P7-016 hoàn tất** khi QA visual/device còn hoãn.
+- **Git:** người dùng cho phép commit chọn lọc, push, PR base `main` và merge bằng merge commit khi đủ điều kiện. Kết quả PR/CI/merge được báo ngoài tài liệu; không tạo commit chỉ để ghi trạng thái CI.
 - **Đã chạy sau khi ghi tài liệu:** `node tools/validate-ux-docs.mjs` → “UX documentation validation passed (18 required files).”; `git diff --check` → exit 0.

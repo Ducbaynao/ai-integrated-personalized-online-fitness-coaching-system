@@ -33,6 +33,7 @@ import {
 } from '@/types/aiKnowledge';
 import { CoachingRelationship } from '@/types/coaching';
 import { aiRequestTypeLabel, aiRunStatusLabel } from '@/localization/aiRunLabels';
+import { formatContextFreeInstant } from '@/localization/instantDisplay';
 
 /**
  * Example questions aligned with the ACTIVE knowledge corpus (WHO & ISSN guidelines).
@@ -571,7 +572,7 @@ export function AiKnowledgeScreen({
               </Text>
               {readbackRun.completedAt && (
                 <Text style={[styles.charCount, { color: theme.textSecondary }]}>
-                  Thời gian hoàn tất: {readbackRun.completedAt}
+                  Thời gian hoàn tất: {formatContextFreeInstant(readbackRun.completedAt) ?? 'Chưa rõ'}
                 </Text>
               )}
             </View>
