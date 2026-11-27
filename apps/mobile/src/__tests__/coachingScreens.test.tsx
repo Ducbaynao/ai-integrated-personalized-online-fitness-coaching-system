@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -231,5 +232,13 @@ describe('coaching screens', () => {
     expect(tree.root.findAllByProps({ accessibilityLabel: 'Lưu thay đổi' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'Thu hồi' })).toHaveLength(0);
     renderer.act(() => tree.unmount());
+  });
+  it('time display: relationship history and permission bounds use Vietnam without changing sharing data', async () => {
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship, resume: null, currentPeriod: null }, isPending: false, isError: false, refetch: jest.fn() });
+    (useRelationshipHistory as jest.Mock).mockReturnValue({ data: { pages: [{ items: [{ id: 'event-1', fromStatus: 'PENDING', toStatus: 'ACTIVE', changedBy: 'student-1', reason: null, changedAt: TIME_BOUNDARY }] }] }, isPending: false, isError: false });
+    (useSharingSummary as jest.Mock).mockReturnValue({ data: { items: [{ dataScope: 'FITNESS_GOAL', state: 'EXPIRED', decision: 'ALLOW', accessLevel: 'VIEW', permissionId: 'p-1', version: 1, historyFrom: TIME_BOUNDARY, historyUntil: '2026-11-26T16:59:00Z', validUntil: TIME_BOUNDARY }] }, isPending: false, isError: false });
+    await expectTimeDisplay(() => renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />), [VIETNAM_MOMENT]);
+    await expectTimeDisplay(() => renderWithQueryClient(<SharingPermissionsScreen relationshipId={relationship.id} />), [`Phạm vi lịch sử: ${VIETNAM_MOMENT} – 23:59 26 thg 11, 2026`, `Có hiệu lực đến ${VIETNAM_MOMENT}`]);
+    expect(coachingApi.setSharing).not.toHaveBeenCalled();
   });
 });

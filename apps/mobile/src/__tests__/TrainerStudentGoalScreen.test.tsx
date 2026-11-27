@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_DAY } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import { Alert } from 'react-native';
 import renderer from 'react-test-renderer';
@@ -301,5 +302,14 @@ describe('TrainerStudentGoalScreen', () => {
     });
 
     expect(mockBack).toHaveBeenCalled();
+  });
+  it('time display: trainer sees proposal creation day in Vietnam', async () => {
+    (fitnessGoalApi.getStudentCurrentGoalForTrainer as jest.Mock).mockResolvedValue(activeStudentGoal);
+    (fitnessGoalApi.getStudentGoalProposalsForTrainer as jest.Mock).mockResolvedValue({ items: [{ ...pendingProposal, createdAt: TIME_BOUNDARY }], totalPages: 1 });
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<TrainerStudentGoalScreen relationshipId="rel-123" />); });
+      return tree;
+    }, [VIETNAM_DAY]);
   });
 });

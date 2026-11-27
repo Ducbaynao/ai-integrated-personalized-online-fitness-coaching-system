@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { MeasurementsScreen } from '@/features/measurements/MeasurementsScreen';
@@ -240,5 +241,17 @@ describe('MeasurementsScreen', () => {
     // Correct buttons should not exist
     const correctBtns = tree.root.findAllByProps({ testID: 'btn-correct-m-1' });
     expect(correctBtns).toHaveLength(0);
+  });
+  it.each([TIME_BOUNDARY, null, '2026-11-26T16:59:00Z', '', 'not-a-date', '2026-11-27', '2026-11-27T08:00:00'])('time display: measurement list and correction agree for %s', async (measuredAt) => {
+    (measurementApi.getMetricDefinitions as jest.Mock).mockResolvedValue(sampleMetrics);
+    (measurementApi.getMeasurements as jest.Mock).mockResolvedValue({ content: [{ ...sampleMeasurements[0], measuredAt }] });
+    const expected = measuredAt === TIME_BOUNDARY ? VIETNAM_MOMENT : measuredAt === '2026-11-26T16:59:00Z' ? '23:59 26 thg 11, 2026' : 'Chưa rõ thời điểm';
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<MeasurementsScreen studentId="student-1" />); });
+      expect(tree.root.findByProps({ testID: 'measurement-item-m-1' }).findAll((node) => (node.type as unknown) === 'Text').map((node) => node.children.join('')).join(' ')).toContain(expected);
+      await renderer.act(async () => { tree.root.findByProps({ testID: 'btn-correct-m-1' }).props.onPress(); });
+      return tree;
+    }, [`Thời điểm đo: ${expected}`]);
   });
 });

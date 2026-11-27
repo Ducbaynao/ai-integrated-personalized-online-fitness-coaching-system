@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Modal,
@@ -1817,7 +1818,7 @@ export function AiWorkoutAdjustmentModal({
 
                 {proposal.expiresAt ? (
                   <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                    Thời hạn hiệu lực: {new Date(proposal.expiresAt).toLocaleString('vi-VN')}
+                    Thời hạn hiệu lực: {(formatInstantVietnam(proposal.expiresAt) ?? 'Chưa rõ thời điểm')}
                   </Text>
                 ) : null}
               </WorkoutCard>

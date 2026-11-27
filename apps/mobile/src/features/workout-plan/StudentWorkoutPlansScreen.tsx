@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useMemo, useState } from 'react';
 import { AiWorkoutProposalModal } from './components/AiWorkoutProposalModal';
 import { ScrollView, Text, useColorScheme } from 'react-native';
@@ -42,7 +43,7 @@ export function StudentWorkoutPlansScreen() {
       {current ? <>
         <Text style={[styles.h2, { color: theme.textPrimary }]}>{current.plan.name}</Text>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{workoutStatusLabels[current.plan.status]} · {workoutOwnerLabels[current.plan.decisionOwnerType]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {current.currentVersion?.versionNumber ?? '—'}{current.currentVersion?.effectiveFrom ? ` · hiệu lực ${new Date(current.currentVersion.effectiveFrom).toLocaleString('vi-VN')}` : ''}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>Phiên bản {current.currentVersion?.versionNumber ?? '—'}{current.currentVersion?.effectiveFrom ? ` · hiệu lực ${(formatInstantVietnam(current.currentVersion.effectiveFrom) ?? 'Chưa rõ thời điểm')}` : ''}</Text>
         {currentVersionQuery.isPending ? <Text style={[styles.body, { color: theme.textSecondary }]}>Đang tải tóm tắt buổi tập…</Text> : null}
         {currentVersionQuery.isError ? <WorkoutState testID="current-plan-content-error" title="Không thể tải tóm tắt buổi tập" message={workoutPlanErrorMessage(currentVersionQuery.error)} onRetry={() => currentVersionQuery.refetch()} /> : null}
         {currentVersionQuery.data ? <Text style={[styles.body, { color: theme.textSecondary }]}>{currentVersionQuery.data.sessions.length} buổi trong phiên bản hiện tại</Text> : null}

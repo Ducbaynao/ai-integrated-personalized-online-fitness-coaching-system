@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -61,7 +62,7 @@ export function WorkoutPlanHistoryScreen({ planId }: { planId: string }) {
 
     {selectedId ? <WorkoutCard testID="history-version-detail">
       <Text style={[styles.h2, { color: theme.textPrimary }]}>Phiên bản {selected?.versionNumber}</Text>
-      <Text style={[styles.body, { color: theme.textSecondary }]}>{selected?.current ? 'Phiên bản đang dùng' : 'Phiên bản lịch sử chỉ để xem'} · hiệu lực {selected?.effectiveFrom ? new Date(selected.effectiveFrom).toLocaleString('vi-VN') : '—'}</Text>
+      <Text style={[styles.body, { color: theme.textSecondary }]}>{selected?.current ? 'Phiên bản đang dùng' : 'Phiên bản lịch sử chỉ để xem'} · hiệu lực {selected?.effectiveFrom ? (formatInstantVietnam(selected.effectiveFrom) ?? 'Chưa rõ thời điểm') : '—'}</Text>
       {selected?.changeReason ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {selected.changeReason}</Text> : null}
       {selected?.changeSummary ? <Text style={[styles.body, { color: theme.textSecondary }]}>Tóm tắt: {selected.changeSummary}</Text> : null}
       {versionQuery.isPending ? <WorkoutState busy title="Đang tải nội dung phiên bản" message="Vui lòng chờ trong giây lát." /> : null}

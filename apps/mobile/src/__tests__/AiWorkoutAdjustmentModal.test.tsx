@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import { Text } from 'react-native';
 import renderer from 'react-test-renderer';
@@ -2949,4 +2950,13 @@ describe('AiWorkoutAdjustmentModal', () => {
       );
     });
   });
+  it.each([TIME_BOUNDARY, 'invalid', '2026-11-27', '2026-11-27T08:00:00'])('time display: adjustment expiry is an ordinary instant for %s', async (expiresAt) => {
+    (aiWorkoutAdjustmentApi.getRecommendation as jest.Mock).mockResolvedValue({ ...mockSubstitutionProposal, expiresAt });
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<AiWorkoutAdjustmentModal visible studentId="stu-1" occurrenceContext={mockOccurrenceContext} initialRecommendationId="rec-sub-1" onClose={jest.fn()} />); });
+      return tree;
+    }, [expiresAt === TIME_BOUNDARY ? VIETNAM_MOMENT : 'Chưa rõ thời điểm']);
+  });
+
 });

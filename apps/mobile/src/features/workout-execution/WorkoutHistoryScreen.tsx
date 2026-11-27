@@ -1,3 +1,5 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
+import { formatRecordedScheduleTime } from '@/features/workout-schedule/scheduleDisplay';
 import React, { useMemo } from 'react';
 import { ScrollView, Text, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -17,11 +19,6 @@ import {
   workoutExecutionErrorMessage,
   workoutExecutionStatusLabels,
 } from './workoutExecutionMessages';
-
-function formatDate(value: string | null, timezone?: string): string {
-  if (!value) return 'Chưa có dữ liệu';
-  return new Date(value).toLocaleString('vi-VN', timezone ? { timeZone: timezone } : undefined);
-}
 
 export function WorkoutHistoryScreen() {
   const { user, activeCapability } = useAuth();
@@ -80,10 +77,10 @@ export function WorkoutHistoryScreen() {
             {workoutExecutionStatusLabels[item.status]}
           </Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
-            Bắt đầu thực tế: {formatDate(item.performedStartedAt, user?.timezone)}
+            Bắt đầu thực tế: {item.performedStartedAt ? (formatInstantVietnam(item.performedStartedAt) ?? 'Chưa rõ thời điểm') : 'Chưa có dữ liệu'}
           </Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
-            Thời gian dự kiến: {formatDate(item.plannedStartAt, user?.timezone)}
+            Thời gian dự kiến: {item.plannedStartAt ? (formatRecordedScheduleTime(item.plannedStartAt, null) ?? 'Chưa rõ thời điểm') : 'Chưa có dữ liệu'}
           </Text>
           {item.supervisionRequirement ? (
             <Text style={[styles.body, { color: theme.textSecondary }]}>

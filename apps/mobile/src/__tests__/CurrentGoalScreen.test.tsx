@@ -1,3 +1,4 @@
+import { expectTimeDisplay, TIME_BOUNDARY, VIETNAM_MOMENT, VIETNAM_DAY } from '@/test-utils/timeDisplayRegression';
 import React from 'react';
 import { Alert } from 'react-native';
 import renderer from 'react-test-renderer';
@@ -2376,5 +2377,13 @@ describe('CurrentGoalScreen', () => {
         })
       );
     });
+  });
+  it('time display: pause and update use Vietnam while goal dates stay date-only', async () => {
+    (fitnessGoalApi.getCurrentGoal as jest.Mock).mockResolvedValue({ ...activeGoal, status: 'PAUSED', pausedAt: TIME_BOUNDARY, updatedAt: TIME_BOUNDARY });
+    await expectTimeDisplay(async () => {
+      let tree!: renderer.ReactTestRenderer;
+      await renderer.act(async () => { tree = renderer.create(<CurrentGoalScreen />); });
+      return tree;
+    }, [VIETNAM_MOMENT, VIETNAM_DAY, '2026-09-01', '2026-12-01']);
   });
 });

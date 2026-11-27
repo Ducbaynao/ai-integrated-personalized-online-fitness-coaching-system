@@ -1,3 +1,5 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
+import { formatRecordedScheduleTime } from '@/features/workout-schedule/scheduleDisplay';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -71,11 +73,6 @@ function displayExercise(exercise: WorkoutExerciseExecution): string {
     exercise.actualVariationPresentation ?? exercise.prescribedVariationPresentation;
   if (!presentation) return 'Bài tập không còn khả dụng';
   return [presentation.exerciseName, presentation.variationName].filter(Boolean).join(' · ');
-}
-
-function formatDate(value: string | null, timezone?: string): string {
-  if (!value) return 'Chưa có dữ liệu';
-  return new Date(value).toLocaleString('vi-VN', timezone ? { timeZone: timezone } : undefined);
 }
 
 interface ResolvedUnit {
@@ -663,10 +660,10 @@ function WorkoutExecutionContent({
           {workoutExecutionStatusLabels[detail.execution.status]}
         </Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>
-          Bắt đầu thực tế: {formatDate(detail.execution.performedStartedAt, user?.timezone)}
+          Bắt đầu thực tế: {detail.execution.performedStartedAt ? (formatInstantVietnam(detail.execution.performedStartedAt) ?? 'Chưa rõ thời điểm') : 'Chưa có dữ liệu'}
         </Text>
         <Text style={[styles.body, { color: theme.textSecondary }]}>
-          Thời gian dự kiến: {formatDate(detail.execution.plannedStartAt, user?.timezone)}
+          Thời gian dự kiến: {detail.execution.plannedStartAt ? (formatRecordedScheduleTime(detail.execution.plannedStartAt, null) ?? 'Chưa rõ thời điểm') : 'Chưa có dữ liệu'}
         </Text>
         {detail.execution.supervisionRequirement ? (
           <Text style={[styles.body, { color: theme.textSecondary }]}>
@@ -687,7 +684,7 @@ function WorkoutExecutionContent({
         {inProgress ? <ElapsedTime startedAt={detail.execution.performedStartedAt} /> : null}
         {detail.execution.performedEndedAt ? (
           <Text style={[styles.body, { color: theme.textSecondary }]}>
-            Kết thúc thực tế: {formatDate(detail.execution.performedEndedAt, user?.timezone)}
+            Kết thúc thực tế: {formatInstantVietnam(detail.execution.performedEndedAt) ?? 'Chưa rõ thời điểm'}
           </Text>
         ) : null}
       </ExecutionCard>

@@ -1,3 +1,4 @@
+import { formatInstantVietnam } from '@/localization/instantDisplay';
 import React, { useMemo, useRef, useState } from 'react';
 import { Modal, ScrollView, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -141,7 +142,7 @@ export function RelationshipDetailScreen({ relationshipId }: { relationshipId: s
       {!historyQuery.isPending && !historyQuery.isError && history.length === 0 ? <Text style={[styles.body, { color: theme.textSecondary }]}>Chưa có sự kiện lịch sử.</Text> : null}
       {history.map((event) => <View key={event.id}>
         <Text style={[styles.label, { color: theme.textPrimary }]}>{coachingStatusLabels[event.toStatus]}</Text>
-        <Text style={[styles.body, { color: theme.textSecondary }]}>{event.changedBy === user?.id ? 'Bạn' : event.changedBy ? 'Đối phương' : 'Hệ thống'} · {new Date(event.changedAt).toLocaleString('vi-VN')}</Text>
+        <Text style={[styles.body, { color: theme.textSecondary }]}>{event.changedBy === user?.id ? 'Bạn' : event.changedBy ? 'Đối phương' : 'Hệ thống'} · {(formatInstantVietnam(event.changedAt) ?? 'Chưa rõ thời điểm')}</Text>
         {event.reason ? <Text style={[styles.body, { color: theme.textSecondary }]}>Lý do: {event.reason}</Text> : null}
       </View>)}
       {historyQuery.hasNextPage ? <CoachingButton label={historyQuery.isFetchingNextPage ? 'Đang tải thêm lịch sử' : 'Tải thêm lịch sử'} busy={historyQuery.isFetchingNextPage} disabled={historyQuery.isFetchingNextPage} secondary onPress={() => historyQuery.fetchNextPage()} /> : null}

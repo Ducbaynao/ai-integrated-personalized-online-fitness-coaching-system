@@ -1,3 +1,4 @@
+import { formatInstantDateVietnam, formatInstantVietnam } from '@/localization/instantDisplay';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { getSemanticColors } from '@/design-system/tokens/colors';
@@ -42,7 +43,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
           </Text>
           {goal.pausedAt && (
             <Text style={[styles.bannerDate, { color: themeColors.textSecondary }]}>
-              Tạm dừng lúc: {new Date(goal.pausedAt).toLocaleString('vi-VN')}
+              Tạm dừng lúc: {(formatInstantVietnam(goal.pausedAt) ?? 'Chưa rõ thời điểm')}
             </Text>
           )}
           {goal.statusReason && (
@@ -98,7 +99,7 @@ export function GoalOverviewTab({ goal, isDark }: GoalOverviewTabProps) {
         <View style={styles.row}>
           <Text style={[styles.label, { color: themeColors.textSecondary }]}>Cập nhật lần cuối</Text>
           <Text style={[styles.value, { color: themeColors.textPrimary }]}>
-            {goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('vi-VN') : 'Chưa rõ'}
+            {goal.updatedAt ? (formatInstantDateVietnam(goal.updatedAt) ?? 'Chưa rõ thời điểm') : 'Chưa rõ'}
           </Text>
         </View>
 

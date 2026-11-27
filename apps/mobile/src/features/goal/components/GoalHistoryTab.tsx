@@ -1,3 +1,4 @@
+import { formatInstantDateVietnam } from '@/localization/instantDisplay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -281,9 +282,9 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                       Có hiệu lực:
                     </Text>
                     <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
-                      {new Date(ver.effectiveFrom).toLocaleDateString('vi-VN')}
+                      {(formatInstantDateVietnam(ver.effectiveFrom) ?? 'Chưa rõ thời điểm')}
                       {ver.effectiveUntil
-                        ? ` – ${new Date(ver.effectiveUntil).toLocaleDateString('vi-VN')}`
+                        ? ` – ${(formatInstantDateVietnam(ver.effectiveUntil) ?? 'Chưa rõ thời điểm')}`
                         : ' (Present)'}
                     </Text>
                   </View>
@@ -420,7 +421,7 @@ export function GoalHistoryTab({ goalId, isDark }: GoalHistoryTabProps) {
                     Ngày:
                   </Text>
                   <Text style={[styles.metaValue, { color: themeColors.textPrimary }]}>
-                    {new Date(trans.transitionedAt).toLocaleDateString('vi-VN')}
+                    {(formatInstantDateVietnam(trans.transitionedAt) ?? 'Chưa rõ thời điểm')}
                   </Text>
                 </View>
 
