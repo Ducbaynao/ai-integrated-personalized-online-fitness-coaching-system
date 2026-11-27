@@ -11,6 +11,8 @@ import { StudentLookupScreen } from '@/features/coaching/StudentLookupScreen';
 import { useAuth } from '@/features/auth/AuthContext';
 import { coachingApi } from '@/services/coachingApi';
 import { useRelationshipDetail, useRelationshipHistory, useRelationships, useSharingSummary, useTrainerDirectory } from '@/features/coaching/coachingQueries';
+import { NavigationAction } from '@/design-system/components/NavigationAction';
+import { AppButton } from '@/design-system/components/AppButton';
 import { ApiError } from '@/types/auth';
 
 const mockPush = jest.fn();
@@ -23,7 +25,7 @@ jest.mock('@/features/coaching/coachingQueries', () => {
 });
 jest.mock('@/services/coachingApi', () => {
   const actual = jest.requireActual('@/services/coachingApi');
-  return { ...actual, coachingApi: { ...actual.coachingApi, relationshipAction: jest.fn(), setSharing: jest.fn(), revokeSharing: jest.fn(), requestTrainer: jest.fn(), lookupStudent: jest.fn(), inviteStudent: jest.fn() } };
+  return { ...actual, coachingApi: { ...actual.coachingApi, relationshipAction: jest.fn(), setSharing: jest.fn(), revokeSharing: jest.fn(), resumeAction: jest.fn(), requestResume: jest.fn(), requestTrainer: jest.fn(), lookupStudent: jest.fn(), inviteStudent: jest.fn() } };
 });
 
 const student = {
@@ -177,13 +179,17 @@ describe('coaching screens', () => {
     const tree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
     expect(tree.root.findByType(SafeAreaView).props.edges).toEqual(['top']);
     renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Kết thúc huấn luyện' }).props.onPress());
-    let confirm = tree.root.findByProps({ accessibilityLabel: 'Xác nhận' });
+    let confirm = tree.root.findByProps({ testID: 'confirm-lifecycle-action' }).findByProps({ accessibilityRole: 'button' });
     expect(confirm.props.accessibilityState.disabled).toBe(true);
+    renderer.act(() => confirm.props.onPress({ nativeEvent: { timestamp: 1 } }));
+    expect(coachingApi.relationshipAction).not.toHaveBeenCalled();
     renderer.act(() => tree.root.findByProps({ testID: 'end-reason-input' }).props.onChangeText('Hoàn tất chương trình'));
-    confirm = tree.root.findByProps({ accessibilityLabel: 'Xác nhận' });
-    await renderer.act(async () => { confirm.props.onPress(); await new Promise((resolve) => setTimeout(resolve, 0)); });
-    confirm = tree.root.findByProps({ accessibilityLabel: 'Đang xử lý' });
+    confirm = tree.root.findByProps({ testID: 'confirm-lifecycle-action' }).findByProps({ accessibilityRole: 'button' });
+    await renderer.act(async () => { confirm.props.onPress({ nativeEvent: { timestamp: 1 } }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    confirm = tree.root.findByProps({ testID: 'confirm-lifecycle-action' }).findByProps({ accessibilityRole: 'button' });
     expect(confirm.props.accessibilityState.disabled).toBe(true);
+    expect(confirm.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    renderer.act(() => confirm.props.onPress({ nativeEvent: { timestamp: 2 } }));
     expect(coachingApi.relationshipAction).toHaveBeenCalledTimes(1);
     expect(coachingApi.relationshipAction).toHaveBeenCalledWith(relationship.id, 'end', 3, 'Hoàn tất chương trình', expect.any(String));
     await renderer.act(async () => { finishMutation({ relationship: { ...relationship, status: 'ENDED' }, resume: null, currentPeriod: null }); await pendingMutation; });
@@ -241,4 +247,114 @@ describe('coaching screens', () => {
     await expectTimeDisplay(() => renderWithQueryClient(<SharingPermissionsScreen relationshipId={relationship.id} />), [`Phạm vi lịch sử: ${VIETNAM_MOMENT} – 23:59 26 thg 11, 2026`, `Có hiệu lực đến ${VIETNAM_MOMENT}`]);
     expect(coachingApi.setSharing).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { capability: 'STUDENT', actorId: 'student-1', senderId: 'trainer-1', actions: ['Chấp nhận', 'Từ chối'], forbidden: ['Hủy yêu cầu'], action: 'accept', status: 'ACTIVE' },
+    { capability: 'TRAINER', actorId: 'trainer-1', senderId: 'student-1', actions: ['Chấp nhận', 'Từ chối'], forbidden: ['Hủy yêu cầu'], action: 'reject', status: 'REJECTED' },
+    { capability: 'STUDENT', actorId: 'student-1', senderId: 'student-1', actions: ['Hủy yêu cầu'], forbidden: ['Chấp nhận', 'Từ chối'], action: 'cancel', status: 'CANCELLED' },
+    { capability: 'TRAINER', actorId: 'trainer-1', senderId: 'trainer-1', actions: ['Hủy yêu cầu'], forbidden: ['Chấp nhận', 'Từ chối'], action: 'cancel', status: 'CANCELLED' },
+  ])('keeps pending $capability invitation decisions scoped to sender/recipient ($action)', async ({ capability, actorId, senderId, actions, forbidden, action, status }) => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { ...student, id: actorId }, activeCapability: capability });
+    const pending = { ...relationship, status: 'PENDING', requestedBy: senderId, direction: senderId === actorId ? 'OUTGOING' : 'INCOMING' };
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship: pending, resume: null, currentPeriod: null }, isPending: false, isError: false, refetch: jest.fn() });
+    (coachingApi.relationshipAction as jest.Mock).mockResolvedValue({ relationship: { ...pending, status }, resume: null, currentPeriod: null });
+    const tree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
+    const findButton = (label: string) => tree.root.findAllByType(AppButton).find(node => node.props.label === label)!.findByProps({ accessibilityRole: 'button' });
+    const labels = tree.root.findAllByType(AppButton).map(node => node.props.label);
+    actions.forEach(label => expect(labels).toContain(label));
+    forbidden.forEach(label => expect(labels).not.toContain(label));
+    const actionLabel = action === 'accept' ? 'Chấp nhận' : action === 'reject' ? 'Từ chối' : 'Hủy yêu cầu';
+    renderer.act(() => findButton(actionLabel).props.onPress({ nativeEvent: { timestamp: 10 } }));
+    expect(coachingApi.relationshipAction).not.toHaveBeenCalled();
+    expect(tree.root.findByProps({ testID: 'lifecycle-confirmation' })).toBeTruthy();
+    renderer.act(() => findButton('Quay lại').props.onPress({ nativeEvent: { timestamp: 11 } }));
+    expect(coachingApi.relationshipAction).not.toHaveBeenCalled();
+    renderer.act(() => findButton(actionLabel).props.onPress({ nativeEvent: { timestamp: 12 } }));
+    await renderer.act(async () => { findButton('Xác nhận').props.onPress({ nativeEvent: { timestamp: 13 } }); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(coachingApi.relationshipAction).toHaveBeenCalledTimes(1);
+    expect(coachingApi.relationshipAction).toHaveBeenCalledWith(relationship.id, action, 3, '', expect.any(String));
+    renderer.act(() => tree.unmount());
+  });
+
+  it.each([
+    { senderId: 'student-1', allowed: ['Hủy yêu cầu tiếp tục'], forbidden: ['Chấp nhận tiếp tục', 'Từ chối tiếp tục'], action: 'cancel', label: 'Hủy yêu cầu tiếp tục' },
+    { senderId: 'trainer-1', allowed: ['Chấp nhận tiếp tục', 'Từ chối tiếp tục'], forbidden: ['Hủy yêu cầu tiếp tục'], action: 'accept', label: 'Chấp nhận tiếp tục' },
+  ])('keeps a paused relationship and resume versions separate ($action)', async ({ senderId, allowed, forbidden, action, label }) => {
+    const paused = { ...relationship, status: 'PAUSED' };
+    const resume = { id: 'resume-1', requestedBy: senderId, status: 'PENDING', version: 7 };
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship: paused, resume, currentPeriod: null }, isPending: false, isError: false, refetch: jest.fn() });
+    (coachingApi.resumeAction as jest.Mock).mockResolvedValue({ relationship: { ...paused, status: action === 'accept' ? 'ACTIVE' : 'PAUSED' }, resume: { ...resume, status: action === 'accept' ? 'ACCEPTED' : 'CANCELLED' }, currentPeriod: null });
+    const tree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
+    const labels = tree.root.findAllByType(AppButton).map(node => node.props.label);
+    allowed.forEach(value => expect(labels).toContain(value));
+    forbidden.forEach(value => expect(labels).not.toContain(value));
+    expect(labels).not.toContain('Yêu cầu tiếp tục');
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: label }).props.onPress({ nativeEvent: { timestamp: 1 } }));
+    expect(coachingApi.resumeAction).not.toHaveBeenCalled();
+    await renderer.act(async () => { tree.root.findByProps({ testID: 'confirm-lifecycle-action' }).findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 2 } }); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(coachingApi.resumeAction).toHaveBeenCalledWith(relationship.id, 'resume-1', action, 3, 7, expect.any(String));
+    renderer.act(() => tree.unmount());
+  });
+
+  it('requires a scoped revoke confirmation and preserves exact retry identity after a native press', async () => {
+    const item = { dataScope: 'WORKOUT_HISTORY', state: 'ALLOWED', decision: 'ALLOW', accessLevel: 'VIEW', permissionId: 'permission-1', version: 4, historyFrom: null, historyUntil: null, validFrom: null, validUntil: null };
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship, resume: null, currentPeriod: null }, isPending: false, isError: false, refetch: jest.fn() });
+    (useSharingSummary as jest.Mock).mockReturnValue({ data: { relationshipStatus: 'ACTIVE', items: [item] }, isPending: false, isError: false });
+    let settle!: (value: unknown) => void;
+    (coachingApi.revokeSharing as jest.Mock).mockRejectedValueOnce(new ApiError(0, 'offline')).mockImplementationOnce(() => new Promise(resolve => { settle = resolve; }));
+    const tree = renderWithQueryClient(<SharingPermissionsScreen relationshipId={relationship.id} />);
+    renderer.act(() => tree.root.findByProps({ accessibilityLabel: 'Thu hồi' }).props.onPress({ nativeEvent: { timestamp: 1 } }));
+    expect(coachingApi.revokeSharing).not.toHaveBeenCalled();
+    const dialog = tree.root.findByProps({ testID: 'sharing-confirmation-WORKOUT_HISTORY' });
+    expect(dialog.props.title).toBe('Xác nhận thu hồi quyền');
+    expect(dialog.findAll(node => node.children.includes('Lịch sử buổi tập'))).not.toHaveLength(0);
+    await renderer.act(async () => { tree.root.findByProps({ accessibilityLabel: 'Xác nhận thu hồi' }).props.onPress({ nativeEvent: { timestamp: 2 } }); await new Promise(resolve => setTimeout(resolve, 0)); });
+    const firstCall = (coachingApi.revokeSharing as jest.Mock).mock.calls[0];
+    expect(firstCall).toEqual([relationship.id, 'permission-1', 4, undefined, expect.any(String)]);
+    expect(tree.root.findByProps({ testID: 'sharing-confirmation-WORKOUT_HISTORY' })).toBeTruthy();
+    await renderer.act(async () => { tree.root.findByProps({ accessibilityLabel: 'Xác nhận thu hồi' }).props.onPress({ nativeEvent: { timestamp: 3 } }); await new Promise(resolve => setTimeout(resolve, 0)); });
+    const busy = tree.root.findByProps({ accessibilityLabel: 'Đang thu hồi' });
+    expect(busy.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    renderer.act(() => busy.props.onPress({ nativeEvent: { timestamp: 4 } }));
+    expect(coachingApi.revokeSharing).toHaveBeenCalledTimes(2);
+    expect((coachingApi.revokeSharing as jest.Mock).mock.calls[1]).toEqual(firstCall);
+    expect(coachingApi.setSharing).not.toHaveBeenCalled();
+    await renderer.act(async () => { settle({}); await new Promise(resolve => setTimeout(resolve, 0)); });
+    renderer.act(() => tree.unmount());
+  });
+
+
+  it('preserves Trainer workspace navigation and removes active-only entries when paused', () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: { ...student, id: 'trainer-1' }, activeCapability: 'TRAINER' });
+    const period = { id: 'period-1', mode: 'HUMAN_COACH', startedAt: '2026-01-02T00:00:00Z', endedAt: null };
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship, currentPeriod: period, resume: null }, isPending: false, isError: false });
+    const tree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
+    const destinations: Record<string, string> = {
+      'open-sharing-button': '/coaching/relationship-1/sharing',
+      'open-chat-button': '/chat/new?studentId=student-1',
+      'open-appointments-button': '/appointments?studentId=student-1',
+      'open-student-nutrition-button': '/coaching/relationship-1/nutrition',
+      'open-student-goal-button': '/coaching/relationship-1/goal',
+      'open-student-nutrition-strategy-button': '/coaching/relationship-1/nutrition-strategy',
+      'open-program-button': '/coaching/relationship-1/program',
+      'open-recurring-proposals': '/coaching/relationship-1/planned-workout-series',
+      'open-trainer-attention-button': '/coaching/relationship-1/attention',
+      'open-student-progress-button': '/coaching/relationship-1/progress',
+      'open-student-progress-summary-button': '/coaching/relationship-1/progress-summary',
+      'open-student-ai-knowledge-button': '/coaching/relationship-1/ai-knowledge',
+    };
+    Object.entries(destinations).forEach(([testID, destination]) => {
+      const action = tree.root.findAllByType(NavigationAction).find(node => node.props.testID === testID)!;
+      renderer.act(() => action.findByProps({ accessibilityRole: 'button' }).props.onPress({ nativeEvent: { timestamp: 1 } }));
+      expect(mockPush).toHaveBeenLastCalledWith(destination);
+    });
+    expect(mockPush).toHaveBeenCalledTimes(12);
+    renderer.act(() => tree.unmount());
+    (useRelationshipDetail as jest.Mock).mockReturnValue({ data: { relationship: { ...relationship, status: 'PAUSED' }, currentPeriod: null, resume: null }, isPending: false, isError: false });
+    const pausedTree = renderWithQueryClient(<RelationshipDetailScreen relationshipId={relationship.id} />);
+    const visibleEntries = pausedTree.root.findAllByType(NavigationAction).map(node => node.props.testID);
+    expect(visibleEntries).toEqual(['open-sharing-button', 'open-student-nutrition-button']);
+    renderer.act(() => pausedTree.unmount());
+  });
+
 });

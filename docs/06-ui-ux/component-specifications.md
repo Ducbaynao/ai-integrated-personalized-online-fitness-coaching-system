@@ -10,7 +10,7 @@ Mọi component hỗ trợ nội dung dài, localization, dynamic type và trạ
 - Size: `medium` 48 px, `large` 54 px.
 - State: default, pressed, focused, loading, disabled.
 - Destructive action phải ghi rõ đối tượng bị ảnh hưởng; không dùng icon đơn độc.
-- Implementation `AppButton` tại `apps/mobile/src/design-system/components`: icon trang trí tùy chọn, nhãn tự xuống dòng, loading giữ nhãn + spinner và chặn thao tác cùng disabled/busy semantics; focus bàn phím có viền. Áp dụng cho Student/Trainer Home và các bề mặt entry/list/overview và hành trình workout detail/form/modal đã ghi trong handoff light UI. Legacy wrapper ngoài phạm vi vẫn giữ nguyên. `onPress` luôn được gọi không có đối số để native press event không trở thành domain/retry intent; disabled/loading chặn dispatch. `accessibilityHint`, style và tone danger cho secondary được hỗ trợ.
+- Implementation `AppButton` tại `apps/mobile/src/design-system/components`: icon trang trí tùy chọn, nhãn tự xuống dòng, loading giữ nhãn + spinner và chặn thao tác cùng disabled/busy semantics; focus bàn phím có viền. Áp dụng cho Student/Trainer Home và các bề mặt entry/list/overview và hành trình workout detail/form/modal và Coaching hub/profile/relationship/sharing đã ghi trong handoff light UI. Legacy wrapper ngoài phạm vi vẫn giữ nguyên. `onPress` luôn được gọi không có đối số để native press event không trở thành domain/retry intent; disabled/loading chặn dispatch. `accessibilityHint`, style và tone danger cho secondary được hỗ trợ.
 
 ## AppCard, AppIcon & NavigationAction
 
